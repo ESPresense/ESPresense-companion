@@ -1,9 +1,16 @@
 using System;
+using System.Collections;
+using System.IO;
 using ESPresense;
 using ESPresense.Models;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using Serilog;
 using Serilog.Events;
 using SQLite;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +32,7 @@ app.UseSerilogRequestLogging(o =>
     o.EnrichDiagnosticContext = (dc, ctx) => dc.Set("UserAgent", ctx?.Request?.Headers["User-Agent"]);
     o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Debug;
 });
+app.UseMiddleware<FixAbsolutePaths>();
 app.UseStaticFiles();
 app.UseRouting();
 
