@@ -3,7 +3,7 @@ name: Deploy to Docker
 on:
   push:
     branches: [ main ]
-    tags: [ '*' ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
@@ -16,11 +16,9 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
-      - name: Git Version
+      - name: Git Semantic Version
         id: version
-        uses: codacy/git-version@2.7.1
-        with:
-          release-branch: main
+        uses: PaulHatch/semantic-version@v5.0.0-beta
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
