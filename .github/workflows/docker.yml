@@ -1,0 +1,56 @@
+#### Publish tags to docker hub
+name: Deploy to Docker
+on:
+  push:
+    branches: [ main ]
+    tags: [ '*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Deploy to Docker add-on with tag
+    runs-on: ubuntu-latest
+    environment: CI - release environment
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Git Version
+        id: version
+        uses: codacy/git-version@2.7.1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Available platforms
+        run: echo ${{ steps.buildx.outputs.platforms }}
+
+      - name: Login to Docker hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🛠️ Run Buildx
+        run: |
+          docker buildx build \
+            --platform linux/arm,linux/arm64,linux/amd64 \
+            --output "type=image,push=true" \
+            --no-cache \
+            --file ./Dockerfile . \
+            --compress \
+            --tag "ghcr.io/espresense/espresense-companion:${{ steps.version.outputs.version }}" \
+            --tag "espresense/espresense-companion:${{ steps.version.outputs.version }}"
+
