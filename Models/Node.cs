@@ -6,6 +6,17 @@ namespace ESPresense.Models;
 
 public class Node
 {
+    public Node()
+    {
+    }
+
+    public Node(ConfigNode node)
+    {
+        Name = node.Name;
+        Id = node.GetId();
+        Location = new Point3D(node.Point[0], node.Point[1], node.Point[2]);
+    }
+
     public override string ToString()
     {
         return $"{nameof(Id)}: {Id}";

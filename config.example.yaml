@@ -1,0 +1,103 @@
+# Bounds (x,y,z) of map in  meters
+bounds: [[-2, -2, -2], [10, 18, 5]]
+# How long before device considered stale
+timeout: 30
+# How long before device is considered away
+away_timeout: 120
+
+# Floors w/ the points to draw it in meters
+floors:
+  - name: First Floor
+    z: 1 # Elevation in meters
+    rooms:
+      - name: Powder
+        points:
+          - [6.2, 11]
+          - [8, 11]
+          - [8, 9]
+          - [6.2, 9]
+          - [6.2, 11]
+      - name: Office
+        points:
+          - [6.2, 14.5]
+          - [9.6, 14.5]
+          - [9.6, 12.5]
+          - [8.6, 11]
+          - [6.2, 11]
+          - [6.2, 14.5]
+      - name: Family
+        points:
+          - [0, 0]
+          - [0, 5.5]
+          - [5.2, 5.5]
+          - [5.2, 0]
+          - [0, 0]
+      - name: Kitchen
+        points:
+          - [5.6, 2]
+          - [5.6, 8.5]
+          - [12.5, 8.5]
+          - [12.5, 2]
+          - [5.6, 2]
+      - name: Garage
+        points:
+          - [0, 19.2]
+          - [6.1, 19.2]
+          - [6.1, 9]
+          - [0, 9]
+          - [0, 19.2]
+      - name: Living
+        points:
+          - [16.6, 13.25]
+          - [16.6, 7.75]
+          - [12.6, 7.75]
+          - [12.6, 13.25]
+          - [16.6, 13.25]
+      - name: Dining
+        points:
+          - [16.6, 2]
+          - [16.6, 7.75]
+          - [15.4, 7.75]
+          - [12.6, 7.75]
+          - [12.6, 2]
+          - [16.6, 2]
+      - name: Foyer
+        points:
+          - [9.6, 13.25]
+          - [12.5, 13.25]
+          - [12.5, 10]
+          - [9.6, 10]
+          - [9.6, 13.25]
+      - name: Laundry
+        points:
+          - [0, 8.85]
+          - [4.5, 8.85]
+          - [4.5, 5.65]
+          - [0, 5.65]
+          - [0, 8.85]
+
+# Locations of espresense nodes in meters
+nodes:
+  - name: Master
+    point: [4, 13, 4.2]
+  - name: Bathroom
+    point: [0.1, 10, 4.2]
+  - name: Garage
+    point: [1, 19, 0.5]
+  - name: Office
+    point: [7, 13.5, 0.5]
+  - name: Office 2
+    point: [7, 12.5, 0.25]
+  - name: Family
+    point: [0.5, 0.5, 0.25]
+  - name: Kitchen
+    point: [10, 7.5, 0.5]
+  - name: Dining
+    point: [16.4, 2.3, 0.5]
+  - name: Basement
+    point: [16.2, 13.1, -1.5]
+
+# Devices to track
+devices:
+  - name: Darrell Watch
+    id: darrells-watch

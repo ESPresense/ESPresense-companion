@@ -12,24 +12,24 @@ namespace ESPresense;
 
 internal class Multilateralizer : BackgroundService
 {
-    private readonly SQLiteConnection _db;
+    private readonly Config _cfg;
     private readonly ILogger<Multilateralizer> _logger;
     private readonly State _state;
 
     private ConcurrentHashSet<Device> dirty = new();
 
     
-    public Multilateralizer(SQLiteConnection db, ILogger<Multilateralizer> logger , State state)
+    public Multilateralizer(Config cfg, ILogger<Multilateralizer> logger , State state)
     {
-        _db = db;
+        _cfg = cfg;
         _logger = logger;
         _state = state;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        foreach (var node in _db.Query<Node>("SELECT * FROM Node"))
-            _state.Nodes.TryAdd(node.Id ?? "", node);
+        foreach (var node in _cfg.Nodes)
+            _state.Nodes.TryAdd(node.GetId(), new Node(node));
         var mqttFactory = new MqttFactory();
 
         var mc = mqttFactory.CreateManagedMqttClient();
