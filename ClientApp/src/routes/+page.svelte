@@ -15,14 +15,10 @@
 {#if $config?.bounds }
 <div class="map">
   <LayerCake x='0' y='1' flatData={ $config.bounds } xReverse = { false } yReverse = { true }>
-
-    <Canvas>
-      <Nodes />
-    </Canvas>
-
     <Svg>
-      <Devices />
       <Rooms />
+      <Nodes />
+      <Devices />
     </Svg>
   </LayerCake>
 </div>
