@@ -4,6 +4,8 @@
   import Rooms from './Rooms.svelte';
   import Devices from './Devices.svelte';
   import Nodes from './Nodes.svelte';
+
+  const aspectRatio = 2.63;
 </script>
 
 <svelte:head>
@@ -12,7 +14,7 @@
 
 {#if $config?.bounds }
 <div class="map">
-  <LayerCake x='0' y='1' flatData={ $config.bounds }>
+  <LayerCake x='0' y='1' flatData={ $config.bounds } xReverse = { false } yReverse = { true }>
 
     <Canvas>
       <Nodes />

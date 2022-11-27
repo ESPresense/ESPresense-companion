@@ -1,5 +1,5 @@
 # Bounds (x,y,z) of map in  meters
-bounds: [[-2, -2, -2], [10, 18, 5]]
+bounds: [[-1, -1, -1], [18, 20, 5]]
 # How long before device considered stale
 timeout: 30
 # How long before device is considered away
