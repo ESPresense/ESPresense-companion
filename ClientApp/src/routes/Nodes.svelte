@@ -1,25 +1,19 @@
 <script>
-    import { getContext } from 'svelte';
-    import { scaleCanvas } from 'layercake';
+	// Import the getContext function from svelte
+	import { getContext } from 'svelte';
+	import { config, devices, nodes } from '../lib/stores';
 
-    import { config, devices, nodes } from '../lib/stores';
-    const { data, xGet, yGet, width, height } = getContext('LayerCake');
-    const { ctx } = getContext('canvas');
+	const { data, x, xScale, y, yScale } = getContext('LayerCake');
 
-  $: {
-    if ($ctx && $devices) {
-    ($devices).forEach((node) => {
-      $ctx.beginPath();
-      $ctx.fillStyle = node.color ? node.color : "#ffffff80";
-      $ctx.arc($xGet(node.location.x), $yGet(node.location.y), 0.1 , 0, 2 * Math.PI);
-      $ctx.moveTo($xGet(node.location.x + (node.coverage ?? 16)), $yGet(node.location.y));
-      $ctx.arc($xGet(node.location.x), $yGet(node.location.y), node.coverage ?? 16, 0, 2 * Math.PI);
-      $ctx.stroke();
-
-      $ctx.fillStyle = 'red';
-      $ctx.fillText(node.name ?? node.id, $xGet(node.location.x), $yGet(node.location.y));
-    });
-  }
-  };
-
+	export let fill = 'white';
+	export let r = 5;
   </script>
+
+  <g>
+	{#if $nodes }
+	{#each $nodes as d}
+	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' {fill} {r} />
+	  <text x='{ $xScale(d.location.x)  + 7}' y='{ $yScale(d.location.y)  + 3.5}' fill='red' font-size='10px'>{d.id}</text>
+	{/each}
+	{/if}
+  </g>

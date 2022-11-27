@@ -34,10 +34,24 @@ export interface Config {
 }
 
 export const config = writable<Config>();
+let socket: WebSocket;
 
 async function getData(){
 	const response = await fetch(`/api/state/config`);
 	config.set(await response.json());
+
+	socket = new WebSocket(`${location.origin.replace('http://','ws://')}/ws`);
+
+	socket.addEventListener('open', function (event) {
+		console.log("It's open");
+	});
+
+	socket.addEventListener('message', async function (event) {
+		var eventData = JSON.parse(event.data);
+		console.log("Receive: " + eventData.type);
+		const response = await fetch(`/api/state/config`);
+		config.set(await response.json());
+	});
 }
 getData();
 

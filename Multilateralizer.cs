@@ -12,24 +12,34 @@ namespace ESPresense;
 
 internal class Multilateralizer : BackgroundService
 {
-    private readonly Config _cfg;
+    private readonly ConfigLoader _cfg;
     private readonly ILogger<Multilateralizer> _logger;
     private readonly State _state;
 
     private ConcurrentHashSet<Device> dirty = new();
 
     
-    public Multilateralizer(Config cfg, ILogger<Multilateralizer> logger , State state)
+    public Multilateralizer(ConfigLoader cfg, ILogger<Multilateralizer> logger , State state)
     {
         _cfg = cfg;
         _logger = logger;
         _state = state;
+
+        _cfg.ConfigChanged += (_, args) => { LoadConfig(args); };
+        LoadConfig(_cfg.Config);
+    }
+
+    private void LoadConfig(Config? c)
+    {
+        if (c == null) return;
+        var configNodes = c.Nodes;
+        if (configNodes == null) return;
+        foreach (var node in configNodes)
+            _state.Nodes.TryAdd(node.GetId(), new Node(node));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        foreach (var node in _cfg.Nodes)
-            _state.Nodes.TryAdd(node.GetId(), new Node(node));
         var mqttFactory = new MqttFactory();
 
         var mc = mqttFactory.CreateManagedMqttClient();

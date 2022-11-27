@@ -1,21 +1,25 @@
-﻿using ESPresense.Models;
+﻿using System.Data.SqlTypes;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using ESPresense.Models;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 using SQLite;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace ESPresense.Controllers
 {
-    [Route("api/state")]
     [ApiController]
     public class StateController : ControllerBase
     {
         private readonly SQLiteConnection _db;
         private readonly ILogger<RoomController> _logger;
         private readonly State _state;
-        private readonly Config _config;
+        private readonly ConfigLoader _config;
 
-        public StateController(SQLiteConnection db, ILogger<RoomController> logger, State state, Config config)
+        public StateController(SQLiteConnection db, ILogger<RoomController> logger, State state, ConfigLoader config)
         {
             _db = db;
             _logger = logger;
@@ -24,25 +28,68 @@ namespace ESPresense.Controllers
         }
 
         // GET: api/rooms
-        [HttpGet("nodes")]
+        [HttpGet("api/state/nodes")]
         public IEnumerable<Node> GetNodes()
         {
             return _state.Nodes.Values;
         }
 
-        
+
         // GET: api/rooms
-        [HttpGet("devices")]
+        [HttpGet("api/state/devices")]
         public IEnumerable<Device> GetDevices()
         {
             return _state.Devices.Values;
         }
 
         // GET: api/config
-        [HttpGet("config")]
+        [HttpGet("api/state/config")]
         public Config GetConfig()
         {
-            return _config;
+            return _config?.Config;
+        }
+
+        [Route("/ws")]
+        public async Task Get()
+        {
+            if (!HttpContext.WebSockets.IsWebSocketRequest)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
+            bool configChanged = true;
+
+            void OnConfigChanged(object? sender, Config args) => configChanged = true;
+
+            _config.ConfigChanged += OnConfigChanged;
+            try
+            {
+                var buffer = new byte[1024 * 4];
+                using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+
+                while (!webSocket.CloseStatus.HasValue)
+                {
+                    await Task.Delay(100);
+                    if (configChanged)
+                    {
+                        configChanged = false;
+                        var json = JsonSerializer.Serialize(new { type = "configChanged" });
+                        var bytes = Encoding.UTF8.GetBytes(json);
+                        await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+
+                }
+
+                await webSocket.CloseAsync(
+                    webSocket.CloseStatus.Value,
+                    webSocket.CloseStatusDescription,
+                    CancellationToken.None);
+            }
+            finally
+            {
+                _config.ConfigChanged -= OnConfigChanged;
+            }
         }
     }
 }

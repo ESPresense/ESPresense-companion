@@ -15,7 +15,7 @@
 	{#if $devices }
 	{#each $devices as d}
 	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' {fill} {r} />
-	  <text x='{ $xScale(d.location.x) }' y='{ $yScale(d.location.y) }' fill='white' font-size='10px'>{d.id}</text>
+	  <text x='{ $xScale(d.location.x) + 7}' y='{ $yScale(d.location.y) + 3 }' fill='white' font-size='10px'>{d.id}</text>
 	{/each}
 	{/if}
   </g>
