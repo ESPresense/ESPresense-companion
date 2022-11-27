@@ -1,6 +1,47 @@
 import { readable } from 'svelte/store';
 import { writable } from 'svelte/store';
 
+
+export interface Room {
+	name: string;
+	points: number[][];
+}
+
+export interface Floor {
+	name: string;
+	z: number;
+	rooms: Room[];
+}
+
+export interface Node {
+	name: string;
+	id?: any;
+	point: number[];
+}
+
+export interface Device {
+	name: string;
+	id: string;
+}
+
+export interface Config {
+	bounds: number[][];
+	timeout: number;
+	awayTimeout: number;
+	floors: Floor[];
+	nodes: Node[];
+	devices: Device[];
+}
+
+export const config = writable<Config>();
+
+async function getData(){
+	const response = await fetch(`/api/state/config`);
+	config.set(await response.json());
+}
+getData();
+
+
 export const nodes = readable([], function start(set) {
 	var errors = 0;
 	var outstanding = false;
@@ -19,7 +60,7 @@ export const nodes = readable([], function start(set) {
 				if (errors > 5) set(null);
 				console.log(ex);
 			});
-	}, 1000)
+	}, 60000)
 
 	return function stop() {
 		clearInterval(interval);
@@ -51,28 +92,3 @@ export const devices = readable([], function start(set) {
 	};
 });
 
-var initialValue = {};
-var socket = null;
-export const events = readable(initialValue, function start(set) {
-	socket = new WebSocket(`${location.origin.replace('http://','ws://')}/ws`);
-
-	socket.addEventListener('open', function (event) {
-		console.log("It's open");
-	});
-
-	socket.addEventListener('message', function (event) {
-		initialValue = JSON.parse(event.data);
-		console.log("Receive: " + event.data);
-		set(initialValue);
-	});
-
-	return function stop() {
-		socket.close();
-	};
-});
-
-export function enroll(name) {
-	var d = JSON.stringify({ command:"enroll", payload:name });
-	console.log("Send: " + d);
-	socket.send(d);
-}

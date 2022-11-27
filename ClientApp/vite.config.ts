@@ -10,7 +10,8 @@ export default defineConfig({
 				target: 'ws://localhost:5279',
 				ws: true
 			}
-		}
+		},
+		host: true
 	},
 
 	plugins: [

@@ -13,12 +13,14 @@ namespace ESPresense.Controllers
         private readonly SQLiteConnection _db;
         private readonly ILogger<RoomController> _logger;
         private readonly State _state;
+        private readonly Config _config;
 
-        public StateController(SQLiteConnection db, ILogger<RoomController> logger, State state)
+        public StateController(SQLiteConnection db, ILogger<RoomController> logger, State state, Config config)
         {
             _db = db;
             _logger = logger;
             _state = state;
+            _config = config;
         }
 
         // GET: api/rooms
@@ -34,6 +36,13 @@ namespace ESPresense.Controllers
         public IEnumerable<Device> GetDevices()
         {
             return _state.Devices.Values;
+        }
+
+        // GET: api/config
+        [HttpGet("config")]
+        public Config GetConfig()
+        {
+            return _config;
         }
     }
 }

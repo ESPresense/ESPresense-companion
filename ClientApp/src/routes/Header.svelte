@@ -1,10 +1,16 @@
 <script>
 	import { page } from '$app/stores';
-	import logo from '$lib/images/svelte-logo.svg';
+	import logo from '$lib/images/logo.svg';
 	import github from '$lib/images/github.svg';
 </script>
 
 <header>
+	<div class="corner">
+		<a href="https://espresense.com/companion">
+			<img src={logo} alt="ESPresense Companion" />
+		</a>
+	</div>
+
 	<nav>
 		<svg viewBox="0 0 2 3" aria-hidden="true">
 			<path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
@@ -21,12 +27,23 @@
 			<path d="M0,0 L0,3 C0.5,3 0.5,3 1,2 L2,0 Z" />
 		</svg>
 	</nav>
+
+	<div class="corner">
+		<a href="https://github.com/ESPresense/ESPresense-companion">
+			<img src={github} alt="GitHub" />
+		</a>
+	</div>
 </header>
 
 <style>
 	header {
 		display: flex;
 		justify-content: space-between;
+	}
+
+	.corner {
+		width: 3em;
+		height: 3em;
 	}
 
 	nav {
