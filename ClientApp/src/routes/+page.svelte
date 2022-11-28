@@ -1,13 +1,15 @@
 <script>
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
   import { config, devices, nodes } from '../lib/stores';
+  import { writable } from 'svelte/store';
+
   import Rooms from './Rooms.svelte';
   import Devices from './Devices.svelte';
   import Nodes from './Nodes.svelte';
   import AxisX from './AxisX.svelte';
   import AxisY from './AxisY.svelte';
 
-  const aspectRatio = 2.63;
+  export const radar = writable();
 </script>
 
 <svelte:head>
@@ -21,8 +23,8 @@
       <AxisX />
       <AxisY />
       <Rooms />
-      <Nodes />
-      <Devices />
+      <Nodes radar={$radar} />
+      <Devices on:selected={ r => $radar = r.detail } />
     </Svg>
   </LayerCake>
 </div>
