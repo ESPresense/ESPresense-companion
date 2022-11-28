@@ -34,9 +34,11 @@ export interface Config {
 }
 
 export const config = writable<Config>();
+export const nodes = writable();
+
 let socket: WebSocket;
 
-async function getData(){
+async function getConfig(){
 	const response = await fetch(`/api/state/config`);
 	config.set(await response.json());
 
@@ -53,33 +55,14 @@ async function getData(){
 		config.set(await response.json());
 	});
 }
-getData();
+getConfig();
 
 
-export const nodes = readable([], function start(set) {
-	var errors = 0;
-	var outstanding = false;
-	const interval = setInterval(() => {
-		if (outstanding) return;
-		outstanding = true;
-		fetch(`/api/state/nodes`)
-			.then(d => d.json())
-			.then(r => {
-				outstanding = false;
-				errors = 0;
-				set(r);
-			})
-			.catch((ex) => {
-				outstanding = false;
-				if (errors > 5) set(null);
-				console.log(ex);
-			});
-	}, 60000)
-
-	return function stop() {
-		clearInterval(interval);
-	};
-});
+async function getNodes() {
+	const response = await fetch(`/api/state/nodes`);
+	nodes.set(await response.json());
+}
+getNodes();
 
 export const devices = readable([], function start(set) {
 	var errors = 0;

@@ -1,20 +1,37 @@
 <script>
 	// Import the getContext function from svelte
-	import { getContext } from 'svelte';
+	import { getContext, createEventDispatcher } from 'svelte';
 	import { config, devices, nodes } from '../lib/stores';
+	import { tweened } from 'svelte/motion';
+	import { cubicOut } from 'svelte/easing';
 
-	// Access the context using the 'LayerCake' keyword
-	// Grab some helpful functions
 	const { data, x, xScale, y, yScale } = getContext('LayerCake');
 
+
+	const r = tweened(5, {
+		duration: 400,
+		easing: cubicOut
+	});
+
 	export let fill = '#000';
-	export let r = 5;
+
+	let hovered = false;
+
+	let dispatcher = createEventDispatcher();
+
+function log (d) {
+	r.set(d == null ? 5 : 10);
+	hovered = d?.id;
+	console.log(d);
+	dispatcher('selected', d);
+}
   </script>
 
   <g>
 	{#if $devices }
 	{#each $devices as d}
-	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' {fill} {r} />
+	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' {fill} r={ d.id == hovered ? $r : 5 } on:mouseover="{() => { log(d) }}" on:focus="{() => { log(d) }}"
+		on:mouseout="{() => { log(null) }}" on:blur="{() => { log(null) }}" />
 	  <text x='{ $xScale(d.location.x) + 7}' y='{ $yScale(d.location.y) + 3 }' fill='white' font-size='10px'>{d.id}</text>
 	{/each}
 	{/if}
