@@ -19,6 +19,6 @@ public class Device
     public Point3D ReportedLocation { get; set; }
 
     [JsonConverter(typeof(NodeDistanceConverter))]
-    public ConcurrentDictionary<string, DeviceNode> Nodes { get; set; } = new ConcurrentDictionary<string, DeviceNode>(comparer: StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, DeviceNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
     public double Scale { get; set; } = 1;
 }

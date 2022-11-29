@@ -17,7 +17,7 @@ public class NodeDistanceConverter : JsonConverter<ConcurrentDictionary<string, 
 
     public override void Write(Utf8JsonWriter writer, ConcurrentDictionary<string, DeviceNode> distances, JsonSerializerOptions options)
     {
-        var d = distances.ToDictionary(a => a.Key, a => a.Value.Distance);
+        var d = distances.Where(a => a.Value.Current).ToDictionary(a => a.Key, a => a.Value.Distance);
         DefaultDictConverter.Write(writer, d, options);
     }
 }

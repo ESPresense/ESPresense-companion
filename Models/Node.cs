@@ -10,11 +10,12 @@ public class Node
     {
     }
 
-    public Node(ConfigNode node)
+    public Node(Config config, ConfigNode node)
     {
         Name = node.Name;
         Id = node.GetId();
         Location = new Point3D(node.Point[0], node.Point[1], node.Point[2]);
+        Config = config;
     }
 
     public override string ToString()
@@ -41,4 +42,6 @@ public class Node
             Z = value.Z;
         }
     }
+
+    public Config Config { get; }
 }
