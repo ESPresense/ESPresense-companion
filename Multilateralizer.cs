@@ -35,7 +35,7 @@ internal class Multilateralizer : BackgroundService
         var configNodes = c.Nodes;
         if (configNodes == null) return;
         foreach (var node in configNodes)
-            _state.Nodes.TryAdd(node.GetId(), new Node(node));
+            _state.Nodes.TryAdd(node.GetId(), new Node(c, node));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -98,7 +98,7 @@ internal class Multilateralizer : BackgroundService
             try
             {
                 var solver = new NelderMeadSimplex(1e-7, 10000);
-                var obj = ObjectiveFunction.Value(x => { return Math.Pow(100, Math.Abs(1 - x[3])) + device.Nodes.Values.OrderByDescending(a => a.Distance).Take(5).Sum(dn => Math.Pow(new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - (x[3] * dn.Distance), 2)); });
+                var obj = ObjectiveFunction.Value(x => { return Math.Pow(100, Math.Abs(1 - x[3])) + device.Nodes.Values.Where(a=>a.Current).Sum(dn => Math.Pow(new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - (x[3] * dn.Distance), 2)); });
                 var prevLoc = device.Location;
                 var init = Vector<double>.Build.Dense(new double[4]
                 {

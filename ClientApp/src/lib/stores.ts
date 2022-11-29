@@ -50,8 +50,6 @@ async function getConfig(){
 
 	socket.addEventListener('message', async function (event) {
 		var eventData = JSON.parse(event.data);
-		console.log("Receive: " + eventData.type);
-		const response = await fetch(`/api/state/config`);
 		config.set(await response.json());
 	});
 }

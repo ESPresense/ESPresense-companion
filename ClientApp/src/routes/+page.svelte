@@ -1,4 +1,4 @@
-<script>
+<script type="ts">
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
   import { config, devices, nodes } from '../lib/stores';
   import { writable } from 'svelte/store';
@@ -9,7 +9,8 @@
   import AxisX from './AxisX.svelte';
   import AxisY from './AxisY.svelte';
 
-  export const radar = writable();
+  const selected = writable<Device>();
+  const hovered = writable<Device>();
 </script>
 
 <svelte:head>
@@ -23,8 +24,8 @@
       <AxisX />
       <AxisY />
       <Rooms />
-      <Nodes radar={$radar} />
-      <Devices on:selected={ r => $radar = r.detail } />
+      <Nodes radar={$hovered ?? $selected} />
+      <Devices on:selected={ r => $selected = r.detail } on:hovered={ r => $hovered = r.detail } />
     </Svg>
   </LayerCake>
 </div>
