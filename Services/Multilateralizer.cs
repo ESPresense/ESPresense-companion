@@ -8,7 +8,7 @@ using MQTTnet.Client;
 using MQTTnet.Extensions.ManagedClient;
 using SQLite;
 
-namespace ESPresense;
+namespace ESPresense.Services;
 
 internal class Multilateralizer : BackgroundService
 {
@@ -18,8 +18,8 @@ internal class Multilateralizer : BackgroundService
 
     private ConcurrentHashSet<Device> dirty = new();
 
-    
-    public Multilateralizer(ConfigLoader cfg, ILogger<Multilateralizer> logger , State state)
+
+    public Multilateralizer(ConfigLoader cfg, ILogger<Multilateralizer> logger, State state)
     {
         _cfg = cfg;
         _logger = logger;
@@ -98,7 +98,7 @@ internal class Multilateralizer : BackgroundService
             try
             {
                 var solver = new NelderMeadSimplex(1e-7, 10000);
-                var obj = ObjectiveFunction.Value(x => { return Math.Pow(100, Math.Abs(1 - x[3])) + device.Nodes.Values.Where(a=>a.Current).Sum(dn => Math.Pow(new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - (x[3] * dn.Distance), 2)); });
+                var obj = ObjectiveFunction.Value(x => { return Math.Pow(100, Math.Abs(1 - x[3])) + device.Nodes.Values.Where(a => a.Current).Sum(dn => Math.Pow(new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - x[3] * dn.Distance, 2)); });
                 var prevLoc = device.Location;
                 var init = Vector<double>.Build.Dense(new double[4]
                 {

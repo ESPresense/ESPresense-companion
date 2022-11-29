@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
-using ESPresense.Models;
 
-namespace ESPresense;
+namespace ESPresense.Models;
 
 public class State
 {

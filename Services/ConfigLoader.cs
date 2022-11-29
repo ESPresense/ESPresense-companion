@@ -1,5 +1,5 @@
 using System.Reflection;
-using ESPresense;
+using ESPresense.Models;
 using Serilog;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;

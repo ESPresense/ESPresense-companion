@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using ESPresense.Converters;
 using MathNet.Spatial.Euclidean;
 using SQLite;
 

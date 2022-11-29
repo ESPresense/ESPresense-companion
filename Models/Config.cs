@@ -1,9 +1,9 @@
 ﻿using TextExtensions;
 using YamlDotNet.Serialization;
 
-namespace ESPresense
+namespace ESPresense.Models
 {
-    
+
     public class Config
     {
         [YamlMember(Alias = "bounds")]
@@ -12,7 +12,7 @@ namespace ESPresense
         [YamlMember(Alias = "timeout")]
         public long Timeout { get; set; } = 30;
 
-        [YamlMember(Alias = "away_timeout")] 
+        [YamlMember(Alias = "away_timeout")]
         public long AwayTimeout { get; set; } = 120;
 
         [YamlMember(Alias = "floors")]

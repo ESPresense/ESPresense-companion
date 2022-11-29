@@ -3,11 +3,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ESPresense.Models;
 
-namespace ESPresense;
+namespace ESPresense.Converters;
 
 public class NodeDistanceConverter : JsonConverter<ConcurrentDictionary<string, DeviceNode>>
 {
-    private static readonly JsonConverter<IDictionary<string, double>> DefaultDictConverter = 
+    private static readonly JsonConverter<IDictionary<string, double>> DefaultDictConverter =
         (JsonConverter<IDictionary<string, double>>)JsonSerializerOptions.Default.GetConverter(typeof(IDictionary<string, double>));
 
     public override ConcurrentDictionary<string, DeviceNode>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

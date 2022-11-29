@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace ESPresense;
+namespace ESPresense.Middleware;
 
 public class FixAbsolutePaths
 {

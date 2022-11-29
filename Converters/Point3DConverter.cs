@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using MathNet.Spatial.Euclidean;
 
-namespace ESPresense;
+namespace ESPresense.Converters;
 
 public class Point3DConverter : JsonConverter<Point3D>
 {
@@ -35,12 +35,12 @@ public class Point3DConverter : JsonConverter<Point3D>
             throw new JsonException();
         }
 
-        double x=0, y=0, z=0;
+        double x = 0, y = 0, z = 0;
         while (reader.Read())
         {
             if (reader.TokenType == JsonTokenType.EndObject)
             {
-                return new Point3D(x,y,z);
+                return new Point3D(x, y, z);
             }
 
             if (reader.TokenType == JsonTokenType.PropertyName)
@@ -63,7 +63,7 @@ public class Point3DConverter : JsonConverter<Point3D>
         }
         throw new JsonException();
     }
-    
+
     public override void Write(Utf8JsonWriter writer, Point3D person, JsonSerializerOptions options)
     {
         writer.WriteStartObject();

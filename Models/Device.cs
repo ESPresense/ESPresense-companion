@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
+using ESPresense.Converters;
 using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Models;
