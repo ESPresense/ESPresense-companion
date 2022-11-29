@@ -21,12 +21,10 @@
 function hover (d) {
 	r.set(d == null ? 5 : 10);
 	hovered = d?.id;
-	console.log(d);
 	dispatcher('hovered', d);
 }
 
 function select (d) {
-	r.set(d == null ? 5 : 10);
 	selected = d?.id;
 	console.log(d);
 	dispatcher('selected', d);

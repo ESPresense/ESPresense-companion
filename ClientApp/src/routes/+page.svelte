@@ -24,7 +24,7 @@
       <AxisX />
       <AxisY />
       <Rooms />
-      <Nodes radar={$hovered} />
+      <Nodes radar={$hovered ?? $selected} />
       <Devices on:selected={ r => $selected = r.detail } on:hovered={ r => $hovered = r.detail } />
     </Svg>
   </LayerCake>
