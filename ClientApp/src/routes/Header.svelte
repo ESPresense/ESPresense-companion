@@ -7,7 +7,7 @@
 <header>
 	<div class="corner">
 		<a href="https://espresense.com/companion">
-			<img src={logo} alt="ESPresense Companion" />
+			<img src={logo} alt="ESPresense Companion" style="padding-left: 8px; padding-top: 8px" />
 		</a>
 	</div>
 
@@ -37,6 +37,7 @@
 
 <style>
 	header {
+    z-index: 1;
 		display: flex;
 		justify-content: space-between;
 	}
