@@ -23,4 +23,4 @@ ENV CONFIG_DIR "/config/espresense"
 COPY --from=build-env /App/out .
 LABEL \
     io.hass.version="VERSION"
-ENTRYPOINT ["dotnet", "espresense-companion.dll"]
+ENTRYPOINT ["dotnet", "ESPresense.Companion.dll"]
