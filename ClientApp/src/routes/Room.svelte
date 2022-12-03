@@ -8,7 +8,7 @@
 
   export let room = null;
 
-  $: hull = polygonHull(room.points);
+  $: hull = room.points;
   $: centroid = polygonCentroid(hull);
   $: scaledHull = hull.map((p) => {
       return [$xScale(p[0]),$yScale(p[1])];
