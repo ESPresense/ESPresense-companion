@@ -6,27 +6,27 @@ using MathNet.Spatial.Euclidean;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Extensions.ManagedClient;
+using Serilog;
 using SQLite;
 
 namespace ESPresense.Services;
 
 internal class Multilateralizer : BackgroundService
 {
-    private readonly ConfigLoader _cfg;
+    private readonly Task<IManagedMqttClient> _mc;
     private readonly ILogger<Multilateralizer> _logger;
     private readonly State _state;
 
-    private ConcurrentHashSet<Device> dirty = new();
+    private ConcurrentHashSet<Device> _dirty = new();
 
-
-    public Multilateralizer(ConfigLoader cfg, ILogger<Multilateralizer> logger, State state)
+    public Multilateralizer(Task<IManagedMqttClient> mc,ConfigLoader cfg, ILogger<Multilateralizer> logger, State state)
     {
-        _cfg = cfg;
+        _mc = mc;
         _logger = logger;
         _state = state;
 
-        _cfg.ConfigChanged += (_, args) => { LoadConfig(args); };
-        LoadConfig(_cfg.Config);
+        cfg.ConfigChanged += (_, args) => { LoadConfig(args); };
+        LoadConfig(cfg.Config);
     }
 
     private void LoadConfig(Config? c)
@@ -40,20 +40,13 @@ internal class Multilateralizer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var mqttFactory = new MqttFactory();
+        var mc = await _mc;
 
-        var mc = mqttFactory.CreateManagedMqttClient();
-        var mqttClientOptions = new MqttClientOptionsBuilder()
-            .WithTcpServer("mqtt")
-            .WithWillTopic("espresense/companion/status")
-            .WithWillRetain()
-            .WithWillPayload("offline")
-            .Build();
-        var managedMqttClientOptions = new ManagedMqttClientOptionsBuilder()
-            .WithClientOptions(mqttClientOptions)
-            .Build();
-
-        await mc.StartAsync(managedMqttClientOptions);
+        mc.ConnectingFailedAsync += (s)=>
+        {
+            Log.Error("MQTT connection failed {@error}: {@inner}", s.Exception.Message, s.Exception?.InnerException.Message);
+            return Task.CompletedTask;
+        };
 
         await mc.EnqueueAsync("espresense/companion/status", "online");
 
@@ -70,7 +63,7 @@ internal class Multilateralizer : BackgroundService
             {
                 var device = _state.Devices.GetOrAdd(deviceId, a => new Device { Id = a });
                 if (device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload))
-                    dirty.Add(device);
+                    _dirty.Add(device);
             }
 
             return Task.CompletedTask;
@@ -78,11 +71,11 @@ internal class Multilateralizer : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            while (dirty.IsEmpty)
+            while (_dirty.IsEmpty)
                 await Task.Delay(1000, stoppingToken);
 
-            var todo = dirty;
-            dirty = new ConcurrentHashSet<Device>();
+            var todo = _dirty;
+            _dirty = new ConcurrentHashSet<Device>();
 
 
             foreach (var device in todo.AsParallel().Where(Locate))
@@ -123,5 +116,10 @@ internal class Multilateralizer : BackgroundService
                 return false;
             }
         }
+    }
+
+    private Task Mc_ConnectingFailedAsync(ConnectingFailedEventArgs arg)
+    {
+        throw new NotImplementedException();
     }
 }

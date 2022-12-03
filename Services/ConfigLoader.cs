@@ -4,6 +4,8 @@ using Serilog;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
+namespace ESPresense.Services;
+
 public class ConfigLoader : BackgroundService
 {
     private readonly IDeserializer _deserializer;
@@ -61,6 +63,17 @@ public class ConfigLoader : BackgroundService
             await _toWait;
             _toWait = Load();
             await Task.Delay(1000, stoppingToken);
+        }
+    }
+
+    public async Task<Config> ConfigAsync(CancellationToken ct = default)
+    {
+        while (true)
+        {
+            await _toWait;
+            if (Config != null)
+                return Config;
+            ct.ThrowIfCancellationRequested();
         }
     }
 }
