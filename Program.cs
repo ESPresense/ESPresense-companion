@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ESPresense.Extensions;
 using ESPresense.Middleware;
 using ESPresense.Models;
@@ -49,15 +50,22 @@ builder.Services.AddSingleton<Task<IManagedMqttClient>>(async a =>
     {
         try
         {
-            var (_, host, port, ssl, username, password, _) = await "http://supervisor/services/mqtt"
-                .WithOAuthBearerToken(supervisorToken)
-                .GetJsonAsync<HassIoMqtt>();
+            try
+            {
+                var (_, host, port, ssl, username, password, _) = await "http://supervisor/services/mqtt"
+                    .WithOAuthBearerToken(supervisorToken)
+                    .GetJsonAsync<HassIoMqtt>();
 
-            c.Mqtt.Host = string.IsNullOrEmpty(host) ? "localhost" : host;
-            c.Mqtt.Port = int.TryParse(port, out var i) ? i : 1883;
-            c.Mqtt.Username = username;
-            c.Mqtt.Password = password;
-            c.Mqtt.Ssl = ssl;
+                c.Mqtt.Host = string.IsNullOrEmpty(host) ? "localhost" : host;
+                c.Mqtt.Port = int.TryParse(port, out var i) ? i : 1883;
+                c.Mqtt.Username = username;
+                c.Mqtt.Password = password;
+                c.Mqtt.Ssl = ssl;
+            }
+            catch (FlurlHttpException ex) {
+                var error = await ex.GetResponseJsonAsync<HassIoError>();
+                Log.Warning($"Failed to get MQTT config from Hass.io: {error.Message}");
+            }
         }
         catch (Exception e)
         {
