@@ -106,7 +106,7 @@ internal class Multilateralizer : BackgroundService
                 device.Scale = result.MinimizingPoint[3];
                 var moved = Math.Abs(device.Location.DistanceTo(device.ReportedLocation)) > 0.5;
 
-                if (moved) _logger.LogInformation("New location {0}, {1}@{2} {3} {4}", device, device.Location, device.Scale, result.FunctionInfoAtMinimum.Value, result.Iterations);
+                if (moved) _logger.LogDebug("New location {0}, {1}@{2} {3} {4}", device, device.Location, device.Scale, result.FunctionInfoAtMinimum.Value, result.Iterations);
                 return moved;
 
             }

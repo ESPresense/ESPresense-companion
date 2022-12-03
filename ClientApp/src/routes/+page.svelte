@@ -2,6 +2,7 @@
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
   import { config, devices, nodes } from '../lib/stores';
   import { writable } from 'svelte/store';
+  import type { Config, Node, Room } from './lib/types';
 
   import Rooms from './Rooms.svelte';
   import Devices from './Devices.svelte';
@@ -24,7 +25,7 @@
       <AxisX />
       <AxisY />
       <Rooms />
-      <Nodes radar={$hovered ?? $selected} />
+      <Nodes radarId={$hovered?.id ?? $selected?.id} />
       <Devices on:selected={ r => $selected = r.detail } on:hovered={ r => $hovered = r.detail } />
     </Svg>
   </LayerCake>
