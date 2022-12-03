@@ -1,3 +1,11 @@
+# MQTT Connection, if empty will query and use hassio provided mqtt
+mqtt:
+  host:
+  port: 1883
+  ssl: false
+  username:
+  password:
+
 # Bounds (x,y,z) of map in  meters
 bounds: [[-1, -1, -1], [18, 20, 5]]
 # How long before device considered stale

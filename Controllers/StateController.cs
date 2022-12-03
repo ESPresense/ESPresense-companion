@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using ESPresense.Models;
+using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using SQLite;
