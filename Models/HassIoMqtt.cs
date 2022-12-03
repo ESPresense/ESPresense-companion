@@ -11,3 +11,8 @@ public record HassIoMqtt(
     [property: JsonPropertyName("password")] string Password,
     [property: JsonPropertyName("protocol")] string Protocol
 );
+
+public record HassIoError(
+    [property: JsonPropertyName("result")] string Result,
+    [property: JsonPropertyName("message")] string Message
+);
