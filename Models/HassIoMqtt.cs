@@ -2,6 +2,13 @@
 
 namespace ESPresense.Models;
 
+public record HassIoResult(
+    [property: JsonPropertyName("result")] string Result,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("data")] HassIoMqtt Data
+);
+
+
 public record HassIoMqtt(
     [property: JsonPropertyName("addon")] string Addon,
     [property: JsonPropertyName("host")] string Host,
@@ -10,9 +17,4 @@ public record HassIoMqtt(
     [property: JsonPropertyName("username")] string Username,
     [property: JsonPropertyName("password")] string Password,
     [property: JsonPropertyName("protocol")] string Protocol
-);
-
-public record HassIoError(
-    [property: JsonPropertyName("result")] string Result,
-    [property: JsonPropertyName("message")] string Message
 );
