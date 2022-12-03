@@ -26,7 +26,6 @@ function hover (d) {
 
 function select (d) {
 	selected = d?.id;
-	console.log(d);
 	dispatcher('selected', d);
 }
   </script>
@@ -34,7 +33,7 @@ function select (d) {
   <g>
 	{#if $devices }
 	{#each $devices as d}
-	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' {fill} r={ d.id == hovered ? $r : 5 } on:mouseover="{() => { hover(d) }}" on:focus="{() => { select(d) }}" on:mouseout="{() => { hover(null) }}" on:blur="{() => { select(null) }}" />
+	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' {fill} r={ d.id == hovered ? $r : 5 } on:mouseover="{() => { hover(d) }}" on:focus="{() => { select(d) }}" on:mouseout="{() => { hover(null) }}" />
 	  <text x='{ $xScale(d.location.x) + 7}' y='{ $yScale(d.location.y) + 3 }' fill='white' font-size='10px'>{d.id}</text>
 	{/each}
 	{/if}
