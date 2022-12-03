@@ -52,18 +52,18 @@ builder.Services.AddSingleton<Task<IManagedMqttClient>>(async a =>
         {
             try
             {
-                var (_, host, port, ssl, username, password, _) = await "http://supervisor/services/mqtt"
+                var (_, _, data) = await "http://supervisor/services/mqtt"
                     .WithOAuthBearerToken(supervisorToken)
-                    .GetJsonAsync<HassIoMqtt>();
+                    .GetJsonAsync<HassIoResult>();
 
-                c.Mqtt.Host = string.IsNullOrEmpty(host) ? "localhost" : host;
-                c.Mqtt.Port = int.TryParse(port, out var i) ? i : 1883;
-                c.Mqtt.Username = username;
-                c.Mqtt.Password = password;
-                c.Mqtt.Ssl = ssl;
+                c.Mqtt.Host = string.IsNullOrEmpty(data.Host) ? "localhost" : data.Host;
+                c.Mqtt.Port = int.TryParse(data.Port, out var i) ? i : null;
+                c.Mqtt.Username = data.Username;
+                c.Mqtt.Password = data.Password;
+                c.Mqtt.Ssl = data.Ssl;
             }
             catch (FlurlHttpException ex) {
-                var error = await ex.GetResponseJsonAsync<HassIoError>();
+                var error = await ex.GetResponseJsonAsync<HassIoResult>();
                 Log.Warning($"Failed to get MQTT config from Hass.io: {error.Message}");
             }
         }
