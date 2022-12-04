@@ -41,7 +41,7 @@ public class ConfigLoader : BackgroundService
             if (_lastModified == fi.LastWriteTimeUtc)
                 return;
 
-            Log.Information("Loading configuration");
+            Log.Information("Loading " + _configPath);
 
             var reader = await File.ReadAllTextAsync(_configPath);
             Config = _deserializer.Deserialize<Config>(reader);

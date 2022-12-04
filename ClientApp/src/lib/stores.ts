@@ -7,29 +7,36 @@ export const nodes = writable<Node[]>();
 
 let socket: WebSocket;
 
-async function getConfig(){
-	const response = await fetch(`/api/state/config`);
-	config.set(await response.json());
-
-	socket = new WebSocket(`${location.origin.replace('http://','ws://')}/ws`);
-
-	socket.addEventListener('open', function (event) {
-		console.log("It's open");
-	});
-
-	socket.addEventListener('message', async function (event) {
-		var eventData = JSON.parse(event.data);
-		config.set(await response.json());
-	});
-}
-getConfig();
-
-
 async function getNodes() {
 	const response = await fetch(`/api/state/nodes`);
 	nodes.set(await response.json());
 }
 getNodes();
+
+async function getConfig(){
+	const response = await fetch(`/api/state/config`);
+	config.set(await response.json());
+}
+getConfig();
+
+function setupWebsocket() {
+
+	socket = new WebSocket(`${location.origin.replace('http://', 'ws://')}/ws`);
+	socket.addEventListener('open', function (event) {
+		console.log("It's open");
+	});
+
+	socket.addEventListener('message', async function (event) {
+		console.log(event.data);
+		var eventData = JSON.parse(event.data);
+		if (eventData.type == "configChanged") {
+			getConfig();
+			getNodes();
+		}
+	});
+}
+
+setupWebsocket();
 
 export const devices = readable([], function start(set) {
 	var errors = 0;

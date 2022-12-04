@@ -35,7 +35,12 @@ internal class Multilateralizer : BackgroundService
         var configNodes = c.Nodes;
         if (configNodes == null) return;
         foreach (var node in configNodes)
-            _state.Nodes.TryAdd(node.GetId(), new Node(c, node));
+        {
+            var n2 = _state.Nodes.GetOrAdd(node.GetId(), a => new Node(c, node));
+            n2.X = node.Point[0];
+            n2.Y = node.Point[1];
+            n2.Z = node.Point[2];
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
