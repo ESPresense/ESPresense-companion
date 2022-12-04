@@ -93,18 +93,21 @@ nodes:
   - name: Garage
     point: [1, 19, 0.5]
   - name: Office
-    point: [7, 13.5, 0.5]
+    point: [7, 13.25, 0.5]
   - name: Office 2
-    point: [7, 12.5, 0.25]
+    point: [7, 11, 0.25]
   - name: Family
     point: [0.5, 0.5, 0.25]
   - name: Kitchen
-    point: [10, 7.5, 0.5]
+    point: [8, 7.5, 0.5]
   - name: Dining
     point: [16.4, 2.3, 0.5]
   - name: Basement
     point: [16.2, 13.1, -1.5]
-
+  - name: Laundry
+    point: [5, 9, 2]
+  - name: VW EOS
+    enabled: false
 # Devices to track
 devices:
   - name: Darrell Watch

@@ -15,7 +15,7 @@ public class Node
     {
         Name = node.Name;
         Id = node.GetId();
-        Location = new Point3D(node.Point[0], node.Point[1], node.Point[2]);
+        Location = new Point3D(node?.Point?[0] ?? 0, node?.Point?[1] ?? 0, node?.Point?[2] ?? 0);
         Config = config;
     }
 
