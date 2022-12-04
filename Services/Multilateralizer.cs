@@ -37,9 +37,9 @@ internal class Multilateralizer : BackgroundService
         foreach (var node in configNodes)
         {
             var n2 = _state.Nodes.GetOrAdd(node.GetId(), a => new Node(c, node));
-            n2.X = node.Point[0];
-            n2.Y = node.Point[1];
-            n2.Z = node.Point[2];
+            n2.X = node.Point?[0] ?? 0;
+            n2.Y = node.Point?[1] ?? 0;
+            n2.Z = node.Point?[2] ?? 0;
         }
     }
 
@@ -69,7 +69,7 @@ internal class Multilateralizer : BackgroundService
                 var device = _state.Devices.GetOrAdd(deviceId, a => new Device { Id = a });
                 if (device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload))
                     _dirty.Add(device);
-            }
+            } else Log.Warning("Unknown node {nodeId}", nodeId);
 
             return Task.CompletedTask;
         };

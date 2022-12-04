@@ -87,6 +87,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "point")]
         public double[] Point { get; set; }
 
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; } = true;
+
         public string GetId() => Id ?? Name.ToSnakeCase().ToLower();
     }
 
