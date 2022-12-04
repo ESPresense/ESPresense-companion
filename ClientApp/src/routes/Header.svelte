@@ -1,5 +1,6 @@
 <script>
 	import { page } from '$app/stores';
+  import { assets, base } from '$app/paths';
 	import logo from '$lib/images/logo.svg';
 	import github from '$lib/images/github.svg';
 </script>
@@ -16,11 +17,11 @@
 			<path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
 		</svg>
 		<ul>
-			<li aria-current={$page.url.pathname === '/' ? 'page' : undefined}>
-				<a href="/">Home</a>
+			<li aria-current={$page.url.pathname === `{base}` ? 'page' : undefined}>
+				<a href="{base}/">Home</a>
 			</li>
-			<li aria-current={$page.url.pathname === '/settings' ? 'page' : undefined}>
-				<a href="/settings">Settings</a>
+			<li aria-current={$page.url.pathname === `{base}/settings` ? 'page' : undefined}>
+				<a href="{base}/settings">Settings</a>
 			</li>
 		</ul>
 		<svg viewBox="0 0 2 3" aria-hidden="true">
