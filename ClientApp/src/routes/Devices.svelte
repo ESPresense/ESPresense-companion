@@ -1,8 +1,9 @@
-<script>
-	import { getContext, createEventDispatcher } from 'svelte';
-	import { config, devices, nodes } from '../lib/stores';
-	import { tweened } from 'svelte/motion';
-	import { cubicOut } from 'svelte/easing';
+<script lang="ts">
+  import { getContext, createEventDispatcher } from 'svelte';
+  import { config, devices, nodes } from '../lib/stores';
+  import type { Config, Device, Node, Room } from '../lib/types';
+  import { tweened } from 'svelte/motion';
+  import { cubicOut } from 'svelte/easing';
 
 	const { data, x, xScale, y, yScale } = getContext('LayerCake');
 
@@ -11,6 +12,7 @@
 		easing: cubicOut
 	});
 
+  export let floor = 0;
 	export let fill = '#000';
 
 	let hovered = "";
@@ -18,13 +20,13 @@
 
 	let dispatcher = createEventDispatcher();
 
-function hover (d) {
+function hover (d:Device) {
 	r.set(d == null ? 5 : 10);
 	hovered = d?.id;
 	dispatcher('hovered', d);
 }
 
-function select (d) {
+function select (d:Device) {
 	selected = d?.id;
 	dispatcher('selected', d);
 }

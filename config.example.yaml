@@ -6,8 +6,6 @@ mqtt:
   username:
   password:
 
-# Bounds (x,y,z) of map in  meters
-bounds: [[-1, -1, -1], [18, 20, 5]]
 # How long before device considered stale
 timeout: 30
 # How long before device is considered away
@@ -15,8 +13,10 @@ away_timeout: 120
 
 # Floors w/ the points to draw it in meters
 floors:
-  - name: First Floor
-    z: 1 # Elevation in meters
+  - id: first
+    name: First Floor
+  # Bounds (x,y,z) of map in  meters
+    bounds: [[-1, -1, 0], [18, 20, 3.1]]
     rooms:
       - name: Powder
         points:
@@ -83,31 +83,48 @@ floors:
           - [4.5, 5.65]
           - [0, 5.65]
           - [0, 8.85]
+  - id: second
+    name: Second Floor
+    bounds: [[-1, -1, 3.1], [18, 20, 6.2]]
+  - id: outside
+    name: Outside
+    bounds: [[-10, -10, 0], [28, 30, 20]]
 
 # Locations of espresense nodes in meters
 nodes:
   - name: Master
     point: [4, 13, 4.2]
+    floors: ["second"]
   - name: Bathroom
     point: [0.1, 10, 4.2]
+    floors: ["second"]
   - name: Garage
     point: [1, 19, 0.5]
+    floors: ["first"]
   - name: Office
     point: [7, 13.25, 0.5]
+    floors: ["first"]
   - name: Office 2
     point: [7, 11, 0.25]
+    floors: ["first"]
   - name: Family
     point: [0.5, 0.5, 0.25]
+    floors: ["first"]
   - name: Kitchen
     point: [8, 7.5, 0.5]
+    floors: ["first"]
   - name: Dining
     point: [16.4, 2.3, 0.5]
+    floors: ["first"]
   - name: Basement
     point: [16.2, 13.1, -1.5]
+    floors: ["first"]
   - name: Laundry
     point: [5, 9, 2]
+    floors: ["first"]
   - name: VW EOS
-    enabled: false
+    point: [0, 0, 0]
+    floors: ["outside"]
 # Devices to track
 devices:
   - name: Darrell Watch

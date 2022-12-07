@@ -3,9 +3,11 @@ import preprocess from 'svelte-preprocess';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-	// Consult https://github.com/sveltejs/svelte-preprocess
-	// for more information about preprocessors
-	preprocess: preprocess(),
+	preprocess: [
+		preprocess({
+			postcss: true
+		})
+	],
 
 	kit: {
 		prerender: {
@@ -13,11 +15,9 @@ const config = {
 		},
 		adapter: adapter({
 			fallback: 'index.html',
-			strict: false,
-		  }),
-		  //prerender: { entries: [] },
+			strict: false
+		})
 	}
-
 };
 
 export default config;
