@@ -96,6 +96,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; } = true;
 
+        [YamlMember(Alias = "stationary")]
+        public bool Stationary { get; set; } = true;
+
         public string GetId() => Id ?? Name?.ToSnakeCase().ToLower() ?? "none";
     }
 
