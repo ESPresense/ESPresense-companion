@@ -49,54 +49,54 @@ namespace ESPresense.Models
     public class ConfigDevice
     {
         [YamlMember(Alias = "name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [YamlMember(Alias = "id")]
-        public string Id { get; set; }
+        public string? Id { get; set; }
     }
 
     public class ConfigFloor
     {
         [YamlMember(Alias = "id")]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [YamlMember(Alias = "name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [YamlMember(Alias = "bounds")]
-        public double[][] Bounds { get; set; }
+        public double[][]? Bounds { get; set; }
 
         [YamlMember(Alias = "rooms")]
-        public ConfigRoom[] Rooms { get; set; }
+        public ConfigRoom[]? Rooms { get; set; }
     }
 
     public class ConfigRoom
     {
         [YamlMember(Alias = "name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [YamlMember(Alias = "points")]
-        public double[][] Points { get; set; }
+        public double[][]? Points { get; set; }
     }
 
     public class ConfigNode
     {
         [YamlMember(Alias = "name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
 
         [YamlMember(Alias = "point")]
-        public double[] Point { get; set; }
+        public double[]? Point { get; set; }
 
         [YamlMember(Alias = "floors")]
-        public string[] Floors { get; set; }
+        public string[]? Floors { get; set; }
 
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; } = true;
 
-        public string GetId() => Id ?? Name.ToSnakeCase().ToLower();
+        public string GetId() => Id ?? Name?.ToSnakeCase().ToLower() ?? "none";
     }
 
 }

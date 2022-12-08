@@ -13,7 +13,7 @@ public class DeviceNode
 
     public double LastDistance { get; set; }
 
-    public bool Current => DateTime.Now - LastHit < TimeSpan.FromSeconds(Node?.Config.Timeout ?? 30);
+    public bool Current => DateTime.Now - LastHit < TimeSpan.FromSeconds(Node?.Config?.Timeout ?? 30);
 
     public bool ReadMessage(byte[] payload)
     {
