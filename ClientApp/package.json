@@ -1,6 +1,6 @@
 {
-	"name": "my-app",
-	"version": "0.0.1",
+	"name": "espresense-companion",
+	"version": "0.2.0",
 	"scripts": {
 		"start": "vite dev",
 		"build": "vite build",
