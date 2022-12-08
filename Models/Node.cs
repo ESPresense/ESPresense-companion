@@ -44,5 +44,5 @@ public class Node
         }
     }
 
-    public Config Config { get; }
+    public Config? Config { get; }
 }

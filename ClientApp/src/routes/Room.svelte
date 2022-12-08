@@ -23,4 +23,4 @@ fill-opacity="0.1"
 d={`M${scaledHull.join("L")}Z`}
 />
 
-<text x='{ $xScale(centroid[0]) }' y='{ $yScale(centroid[1]) }' fill='white' font-size='10px'>{room.name}</text>
+<text dominant-baseline='middle' text-anchor='middle' x='{ $xScale(centroid[0]) }' y='{ $yScale(centroid[1]) }' fill='white' font-size='10px'>{room.name}</text>

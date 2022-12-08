@@ -1,11 +1,9 @@
-﻿using System.Data.SqlTypes;
-using System.Net.WebSockets;
+﻿using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
 using SQLite;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -47,7 +45,7 @@ namespace ESPresense.Controllers
         [HttpGet("api/state/config")]
         public Config GetConfig()
         {
-            return _config?.Config;
+            return _config?.Config ?? new Config();
         }
 
         [Route("/ws")]

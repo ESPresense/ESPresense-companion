@@ -49,7 +49,7 @@ internal class Multilateralizer : BackgroundService
 
         mc.ConnectingFailedAsync += (s)=>
         {
-            Log.Error("MQTT connection failed {@error}: {@inner}", s.Exception.Message, s.Exception?.InnerException.Message);
+            Log.Error("MQTT connection failed {@error}: {@inner}", s.Exception.Message, s.Exception?.InnerException?.Message);
             return Task.CompletedTask;
         };
 
