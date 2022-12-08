@@ -15,7 +15,7 @@
   const hovered = writable<Device>();
   const floor = writable<number>(0);
 
-  $: bounds = $config.floors[$floor].bounds
+  $: bounds = $config?.floors[$floor]?.bounds
 </script>
 
 <svelte:head>
