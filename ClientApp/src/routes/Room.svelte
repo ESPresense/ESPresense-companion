@@ -3,18 +3,17 @@
   import { scaleCanvas } from 'layercake';
   import { scaleLinear, polygonHull, polygonCentroid } from "d3";
   import { config, devices, nodes } from '../lib/stores';
-  import type { Config, Node, Room } from './lib/types';
+  import type { Config, Node, Room } from '../lib/types';
 
   const { data, xGet, yGet, width, height, xScale, yScale } = getContext('LayerCake');
 
-  export let room:Room = null;
+  export let room:Room;;
 
   $: hull = room.points;
   $: centroid = polygonCentroid(hull);
-  $: scaledHull = hull.map((p) => {
+  $: scaledHull = hull?.map((p) => {
       return [$xScale(p[0]),$yScale(p[1])];
   });
-
 </script>
 
 <path

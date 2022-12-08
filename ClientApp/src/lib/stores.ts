@@ -22,7 +22,7 @@ getConfig();
 
 function setupWebsocket() {
 
-	var loc = new URL(`{base}/ws`, window.location.href);
+	var loc = new URL(`${base}/ws`, window.location.href);
 	var new_uri = (loc.protocol === "https:" ? "wss:" : "ws:") + "//" + loc.host + loc.pathname;
 	socket = new WebSocket(new_uri);
 	socket.addEventListener('open', function (event) {

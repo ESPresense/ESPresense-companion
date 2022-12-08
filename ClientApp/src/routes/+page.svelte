@@ -1,45 +1,39 @@
-<script type="ts">
+<script lang="ts">
+  import { writable } from 'svelte/store';
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
   import { config, devices, nodes } from '../lib/stores';
-  import { writable } from 'svelte/store';
-  import type { Config, Node, Room } from './lib/types';
+  import type { Config, Device, Node, Room } from '../lib/types';
 
   import Rooms from './Rooms.svelte';
   import Devices from './Devices.svelte';
+  import FloorTabs from './FloorTabs.svelte';
   import Nodes from './Nodes.svelte';
   import AxisX from './AxisX.svelte';
   import AxisY from './AxisY.svelte';
 
   const selected = writable<Device>();
   const hovered = writable<Device>();
+  const floor = writable<number>(0);
+
+  $: bounds = $config.floors[$floor].bounds
 </script>
 
 <svelte:head>
 	<title>ESPresense Companion</title>
 </svelte:head>
-
-{#if $config?.bounds }
-<div class="map">
-  <LayerCake x='0' y='1' flatData={ $config.bounds } xReverse={ false } yReverse={ true } padding={ {top: 5, left: 5, bottom: 20, right: 5} }>
+{#if bounds }
+<div class="w-full h-full">
+  <FloorTabs selected={floor} />
+  <LayerCake x='0' y='1' flatData={ bounds } xReverse={ false } yReverse={ true } padding={ {top: 0, left: 0, bottom: 72, right: 0} }>
     <Svg>
       <AxisX />
       <AxisY />
-      <Rooms />
-      <Nodes radarId={$hovered?.id ?? $selected?.id} />
-      <Devices on:selected={ r => $selected = r.detail } on:hovered={ r => $hovered = r.detail } />
+      <Rooms floor={$floor} />
+      <Nodes radarId={$hovered?.id ?? $selected?.id} floor={$floor} />
+      <Devices floor={$floor} on:selected={ r => $selected = r.detail } on:hovered={ r => $hovered = r.detail } />
     </Svg>
   </LayerCake>
 </div>
 {:else}
 <div>Loading...</div>
 {/if}
-
-<style>
-  .map {
-    position:absolute;
-    top: 0;
-    left: 0;
-    width:100%;
-    height:100%;
-  }
-</style>

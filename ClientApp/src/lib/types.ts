@@ -1,28 +1,29 @@
 
 export interface Room {
 	name: string;
-	points: number[][];
+	points: [number, number][];
 }
 
 export interface Floor {
+	id: string;
 	name: string;
-	z: number;
+	bounds: number[][];
 	rooms: Room[];
 }
 
 export interface Node {
+	id: string;
 	name: string;
-	id?: any;
 	point: number[];
+	floors: string[];
 }
 
 export interface Device {
-	name: string;
 	id: string;
+	name: string;
 }
 
 export interface Config {
-	bounds: number[][];
 	timeout: number;
 	awayTimeout: number;
 	floors: Floor[];

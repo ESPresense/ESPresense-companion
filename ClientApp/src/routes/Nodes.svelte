@@ -2,12 +2,13 @@
   import { getContext } from 'svelte';
   import { config, devices, nodes } from '../lib/stores';
   import { scaleOrdinal, schemeCategory10 } from "d3";
-  import type { Config, Node, Room, Device } from './lib/types';
+  import type { Config, Node, Room, Device } from '../lib/types';
 
   const { data, x, xScale, y, yScale } = getContext('LayerCake');
 
   export let r = 5;
   export let radarId:string = "";
+  export let floor = 0;
 
   let radar:Device = null;
   $: radar = $devices?.find(n => n.id == radarId);

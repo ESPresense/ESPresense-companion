@@ -57,11 +57,14 @@ namespace ESPresense.Models
 
     public class ConfigFloor
     {
+        [YamlMember(Alias = "id")]
+        public string Id { get; set; }
+
         [YamlMember(Alias = "name")]
         public string Name { get; set; }
 
-        [YamlMember(Alias = "z")]
-        public double Z { get; set; }
+        [YamlMember(Alias = "bounds")]
+        public double[][] Bounds { get; set; }
 
         [YamlMember(Alias = "rooms")]
         public ConfigRoom[] Rooms { get; set; }
@@ -86,6 +89,9 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "point")]
         public double[] Point { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[] Floors { get; set; }
 
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; } = true;
