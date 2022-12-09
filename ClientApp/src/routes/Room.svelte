@@ -2,7 +2,7 @@
   import { getContext } from 'svelte';
   import { scaleCanvas } from 'layercake';
   import { scaleLinear, polygonHull, polygonCentroid } from "d3";
-  import { config, devices, nodes } from '../lib/stores';
+  import { config, devices } from '../lib/stores';
   import type { Config, Node, Room } from '../lib/types';
 
   const { data, xGet, yGet, width, height, xScale, yScale } = getContext('LayerCake');

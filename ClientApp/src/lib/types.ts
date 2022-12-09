@@ -21,6 +21,7 @@ export interface Node {
 export interface Device {
 	id: string;
 	name: string;
+	nodes: { [index: string]: number }
 }
 
 export interface Config {

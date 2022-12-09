@@ -1,7 +1,7 @@
 <script lang="ts">
   import { writable } from 'svelte/store';
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
-  import { config, devices, nodes } from '../lib/stores';
+  import { config, devices } from '../lib/stores';
   import type { Config, Device, Node, Room } from '../lib/types';
 
   import Rooms from './Rooms.svelte';

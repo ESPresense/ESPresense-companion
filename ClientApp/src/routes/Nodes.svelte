@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { config, devices, nodes } from '../lib/stores';
+  import { config, devices } from '../lib/stores';
   import { scaleOrdinal, schemeCategory10 } from "d3";
   import type { Config, Node, Room, Device } from '../lib/types';
 
@@ -10,18 +10,18 @@
   export let radarId:string = "";
   export let floor = 0;
 
-  let radar:Device = null;
+  let radar: Device | undefined;
   $: radar = $devices?.find(n => n.id == radarId);
   let myColor = scaleOrdinal(schemeCategory10);
   </script>
 
-{#if $nodes }
-  {#each $nodes as n}
-    <circle cx='{ $xScale(n.location.x) }' cy='{ $yScale(n.location.y) }' fill={myColor(n)} {r} />
-    <text x='{ $xScale(n.location.x)  + 7}' y='{ $yScale(n.location.y)  + 3.5}' fill='white' font-size='10px'>{n.id}</text>
+{#if $config?.nodes }
+  {#each $config?.nodes as n}
+    <circle cx='{ $xScale(n.point[0]) }' cy='{ $yScale(n.point[1]) }' fill={myColor(n.id)} {r} />
+    <text x='{ $xScale(n.point[0])  + 7}' y='{ $yScale(n.point[1])  + 3.5}' fill='white' font-size='10px'>{n.name}</text>
     {#if radar?.nodes && radar.nodes[n.id] }
-      <ellipse cx='{ $xScale(n.location.x) }' cy='{ $yScale(n.location.y) }' fill={myColor(n)} stroke={myColor(n)} fill-opacity='0.1' rx='{Math.abs($xScale(0) - $xScale(radar.nodes[n.id]))}' ry='{Math.abs($yScale(0) - $yScale(radar.nodes[n.id]))}' />
-      <text x='{ $xScale(n.location.x)}' y='{ $yScale(n.location.y + radar.nodes[n.id]/2)}' fill={myColor(n)} font-size='10px'>{radar.nodes[n.id]}</text>
+      <ellipse cx='{ $xScale(n.point[0]) }' cy='{ $yScale(n.point[1]) }' fill={myColor(n.id)} stroke={myColor(n.id)} fill-opacity='0.1' rx='{Math.abs($xScale(0) - $xScale(radar.nodes[n.id]))}' ry='{Math.abs($yScale(0) - $yScale(radar.nodes[n.id]))}' />
+      <text x='{ $xScale(n.point[0])}' y='{ $yScale(n.point[1] + radar.nodes[n.id]/2)}' fill={myColor(n.id)} font-size='10px'>{radar.nodes[n.id]}</text>
     {/if}
   {/each}
 {/if}

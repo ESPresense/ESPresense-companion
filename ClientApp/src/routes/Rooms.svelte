@@ -1,7 +1,7 @@
 <script>
   import { getContext } from 'svelte';
   import { scaleCanvas } from 'layercake';
-  import { config, devices, nodes } from '../lib/stores';
+  import { config, devices } from '../lib/stores';
   import Room from './Room.svelte';
 
   export let floor = 0;

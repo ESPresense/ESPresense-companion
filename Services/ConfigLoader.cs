@@ -44,7 +44,7 @@ public class ConfigLoader : BackgroundService
             Log.Information("Loading " + _configPath);
 
             var reader = await File.ReadAllTextAsync(_configPath);
-            Config = _deserializer.Deserialize<Config>(reader);
+            Config = FixIds(_deserializer.Deserialize<Config>(reader));
             ConfigChanged?.Invoke(this, Config);
             _lastModified = fi.LastWriteTimeUtc;
         }
@@ -52,6 +52,22 @@ public class ConfigLoader : BackgroundService
         {
             Log.Error($"Error reading config, ignoring... {ex}");
         }
+    }
+
+    private Config FixIds(Config? c)
+    {
+        Config config = c ?? new Config();
+
+        foreach (var device in config.Devices ?? Enumerable.Empty<ConfigDevice>())
+            device.Id ??= device.GetId();
+
+        foreach (var node in config.Nodes ?? Enumerable.Empty<ConfigNode>())
+            node.Id ??= node.GetId();
+
+        foreach (var floor in config.Floors ?? Enumerable.Empty<ConfigFloor>())
+            floor.Id ??= floor.GetId();
+
+        return config;
     }
 
     public event EventHandler<Config>? ConfigChanged;

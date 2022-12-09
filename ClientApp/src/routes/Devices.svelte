@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext, createEventDispatcher } from 'svelte';
-  import { config, devices, nodes } from '../lib/stores';
+  import { config, devices } from '../lib/stores';
   import type { Config, Device, Node, Room } from '../lib/types';
   import { tweened } from 'svelte/motion';
   import { cubicOut } from 'svelte/easing';

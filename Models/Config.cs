@@ -53,6 +53,8 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
+
+        public string GetId() => Id ?? Name?.ToSnakeCase().ToLower() ?? "none";
     }
 
     public class ConfigFloor
@@ -68,6 +70,8 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "rooms")]
         public ConfigRoom[]? Rooms { get; set; }
+
+        public string GetId() => Id ?? Name?.ToSnakeCase().ToLower() ?? "none";
     }
 
     public class ConfigRoom
