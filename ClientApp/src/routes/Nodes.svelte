@@ -13,10 +13,14 @@
   let radar: Device | undefined;
   $: radar = $devices?.find(n => n.id == radarId);
   let myColor = scaleOrdinal(schemeCategory10);
+  $: floorId = $config?.floors[floor]?.id;
+  $: console.log("floorId", floorId);
+  let nodes: Node[] | undefined;
+  $: nodes = $config?.nodes?.filter(n => n.floors.includes(floorId));
   </script>
 
-{#if $config?.nodes }
-  {#each $config?.nodes as n}
+{#if nodes }
+  {#each nodes as n}
     <circle cx='{ $xScale(n.point[0]) }' cy='{ $yScale(n.point[1]) }' fill={myColor(n.id)} {r} />
     <text x='{ $xScale(n.point[0])  + 7}' y='{ $yScale(n.point[1])  + 3.5}' fill='white' font-size='10px'>{n.name}</text>
     {#if radar?.nodes && radar.nodes[n.id] }

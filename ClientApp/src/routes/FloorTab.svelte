@@ -7,7 +7,6 @@
 
   const onClickHandler = (event) => {
     event.preventDefault();
-    console.log('clicked '+value);
     selected.set(value);
   }
 </script>
