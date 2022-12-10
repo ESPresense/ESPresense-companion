@@ -47,14 +47,6 @@ internal class Multilateralizer : BackgroundService
     {
         var mc = await _mc;
 
-        mc.ConnectingFailedAsync += (s)=>
-        {
-            Log.Error("MQTT connection failed {@error}: {@inner}", s.Exception.Message, s.Exception?.InnerException?.Message);
-            return Task.CompletedTask;
-        };
-
-        await mc.EnqueueAsync("espresense/companion/status", "online");
-
         await mc.SubscribeAsync("espresense/devices/#");
 
         mc.ApplicationMessageReceivedAsync += arg =>
@@ -82,7 +74,6 @@ internal class Multilateralizer : BackgroundService
             var todo = _dirty;
             _dirty = new ConcurrentHashSet<Device>();
 
-
             foreach (var device in todo.AsParallel().Where(Locate))
             {
                 await mc.EnqueueAsync("espresense/ips/" + device.Id, $"{{ \"x\":{device.Location.X}, \"y\":{device.Location.Y}, \"z\":{device.Location.Z}, \"name\":\"{device.Name ?? device.Id}\" }}");
@@ -91,7 +82,7 @@ internal class Multilateralizer : BackgroundService
         }
 
         // Returns: true if moved
-        bool Locate(Device device)
+        static bool Locate(Device device)
         {
             try
             {
@@ -111,20 +102,15 @@ internal class Multilateralizer : BackgroundService
                 device.Scale = result.MinimizingPoint[3];
                 var moved = Math.Abs(device.Location.DistanceTo(device.ReportedLocation)) > 0.5;
 
-                if (moved) _logger.LogDebug("New location {0}, {1}@{2} {3} {4}", device, device.Location, device.Scale, result.FunctionInfoAtMinimum.Value, result.Iterations);
+                if (moved) Log.Debug("New location {0}, {1}@{2} {3} {4}", device, device.Location, device.Scale, result.FunctionInfoAtMinimum.Value, result.Iterations);
                 return moved;
 
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error finding location for {0}", device);
+                Log.Error(ex, "Error finding location for {0}", device);
                 return false;
             }
         }
-    }
-
-    private Task Mc_ConnectingFailedAsync(ConnectingFailedEventArgs arg)
-    {
-        throw new NotImplementedException();
     }
 }

@@ -1,16 +1,9 @@
-using System.Text.Json.Serialization;
-using ESPresense.Extensions;
 using ESPresense.Middleware;
 using ESPresense.Models;
 using ESPresense.Services;
-using Flurl.Http;
-using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Diagnostics;
-using MQTTnet.Extensions.ManagedClient;
 using Serilog;
 using Serilog.Events;
-using Serilog.Extensions.Hosting;
 using SQLite;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,58 +31,7 @@ builder.Services.AddSingleton(a =>
     return new SQLiteConnection(databasePath);
 });
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
-builder.Services.AddSingleton<Task<IManagedMqttClient>>(async a =>
-{
-    var cfg = a.GetRequiredService<ConfigLoader>();
-    var c = await cfg.ConfigAsync();
-
-    c.Mqtt ??= new ConfigMqtt();
-
-    var supervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN");
-    if (string.IsNullOrEmpty(c.Mqtt.Host) && !string.IsNullOrEmpty(supervisorToken))
-    {
-        try
-        {
-            try
-            {
-                var (_, _, data) = await "http://supervisor/services/mqtt"
-                    .WithOAuthBearerToken(supervisorToken)
-                    .GetJsonAsync<HassIoResult>();
-
-                c.Mqtt.Host = string.IsNullOrEmpty(data.Host) ? "localhost" : data.Host;
-                c.Mqtt.Port = int.TryParse(data.Port, out var i) ? i : null;
-                c.Mqtt.Username = data.Username;
-                c.Mqtt.Password = data.Password;
-                c.Mqtt.Ssl = data.Ssl;
-            }
-            catch (FlurlHttpException ex) {
-                var error = await ex.GetResponseJsonAsync<HassIoResult>();
-                Log.Warning($"Failed to get MQTT config from Hass.io: {error.Message}");
-            }
-        }
-        catch (Exception e)
-        {
-            Log.Error(e, "Failed to get MQTT config from Hass.io");
-        }
-    }
-
-    var mqttFactory = new MqttFactory(a.GetRequiredService<IMqttNetLogger>());
-
-    var mc = mqttFactory.CreateManagedMqttClient();
-    var mqttClientOptions = new MqttClientOptionsBuilder()
-        .WithConfig(c.Mqtt)
-        .WithWillTopic("espresense/companion/status")
-        .WithWillRetain()
-        .WithWillPayload("offline")
-        .Build();
-
-    var managedMqttClientOptions = new ManagedMqttClientOptionsBuilder()
-        .WithClientOptions(mqttClientOptions)
-        .Build();
-
-    await mc.StartAsync(managedMqttClientOptions);
-    return mc;
-});
+builder.Services.AddSingleton(MqttConnection.GetClient);
 builder.Services.AddHostedService<Multilateralizer>();
 builder.Services.AddSingleton<State>();
 
