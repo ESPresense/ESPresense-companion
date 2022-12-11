@@ -39,7 +39,7 @@
 	{#if $devices }
 	{#each $devices.filter(a => (a?.room?.floor ?? floorId) == floorId) as d}
 	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' fill={d?.room?.id ? colors(d?.room?.id) : "black"} r={ d.id == hovered ? $r : 5 } on:mouseover="{() => { hover(d) }}" on:focus="{() => { select(d) }}" on:mouseout="{() => { hover(null) }}" />
-	  <text x='{ $xScale(d.location.x) + 7}' y='{ $yScale(d.location.y) + 3 }' fill='white' font-size='10px'>{d.id}</text>
+	  <text x='{ $xScale(d.location.x) + 7}' y='{ $yScale(d.location.y) + 3 }' fill='white' font-size='10px'>{d.name ?? d.id}</text>
 	{/each}
 	{/if}
   </g>
