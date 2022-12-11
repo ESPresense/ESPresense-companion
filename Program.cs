@@ -58,7 +58,4 @@ app.MapControllerRoute(
 
 app.MapFallbackToFile("index.html");
 
-var db = app.Services.GetRequiredService<SQLiteConnection>();
-db.CreateTable<Node>();
-
 app.Run();

@@ -21,4 +21,6 @@ public class Device
     [JsonConverter(typeof(NodeDistanceConverter))]
     public ConcurrentDictionary<string, DeviceNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
     public double Scale { get; set; } = 1;
+    [JsonConverter(typeof(RoomConverter))]
+    public Room? Room { get; set; }
 }

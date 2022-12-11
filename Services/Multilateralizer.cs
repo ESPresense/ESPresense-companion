@@ -1,4 +1,5 @@
 ﻿using ConcurrentCollections;
+using ESPresense.Extensions;
 using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
@@ -14,33 +15,14 @@ namespace ESPresense.Services;
 internal class Multilateralizer : BackgroundService
 {
     private readonly Task<IManagedMqttClient> _mc;
-    private readonly ILogger<Multilateralizer> _logger;
     private readonly State _state;
 
     private ConcurrentHashSet<Device> _dirty = new();
 
-    public Multilateralizer(Task<IManagedMqttClient> mc,ConfigLoader cfg, ILogger<Multilateralizer> logger, State state)
+    public Multilateralizer(Task<IManagedMqttClient> mc, State state)
     {
         _mc = mc;
-        _logger = logger;
         _state = state;
-
-        cfg.ConfigChanged += (_, args) => { LoadConfig(args); };
-        LoadConfig(cfg.Config);
-    }
-
-    private void LoadConfig(Config? c)
-    {
-        if (c == null) return;
-        var configNodes = c.Nodes;
-        if (configNodes == null) return;
-        foreach (var node in configNodes)
-        {
-            var n2 = _state.Nodes.GetOrAdd(node.GetId(), a => new Node(c, node));
-            n2.X = node.Point?[0] ?? 0;
-            n2.Y = node.Point?[1] ?? 0;
-            n2.Z = node.Point?[2] ?? 0;
-        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,7 +43,8 @@ internal class Multilateralizer : BackgroundService
                 var device = _state.Devices.GetOrAdd(deviceId, a => new Device { Id = a });
                 if (device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload))
                     _dirty.Add(device);
-            } else Log.Warning("Unknown node {nodeId}", nodeId);
+            }
+            else Log.Warning("Unknown node {nodeId}", nodeId);
 
             return Task.CompletedTask;
         };
@@ -69,7 +52,7 @@ internal class Multilateralizer : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             while (_dirty.IsEmpty)
-                await Task.Delay(1000, stoppingToken);
+                await Task.Delay(500, stoppingToken);
 
             var todo = _dirty;
             _dirty = new ConcurrentHashSet<Device>();
@@ -82,7 +65,7 @@ internal class Multilateralizer : BackgroundService
         }
 
         // Returns: true if moved
-        static bool Locate(Device device)
+        bool Locate(Device device)
         {
             try
             {
@@ -102,7 +85,17 @@ internal class Multilateralizer : BackgroundService
                 device.Scale = result.MinimizingPoint[3];
                 var moved = Math.Abs(device.Location.DistanceTo(device.ReportedLocation)) > 0.5;
 
-                if (moved) Log.Debug("New location {0}, {1}@{2} {3} {4}", device, device.Location, device.Scale, result.FunctionInfoAtMinimum.Value, result.Iterations);
+                if (moved)
+                {
+                    Log.Debug("New location {0}, {1}@{2} {3} {4}", device, device.Location, device.Scale, result.FunctionInfoAtMinimum.Value, result.Iterations);
+                    var floors = _state.Floors.Values.Where(a => a.Contained(device.Location.Z));
+                    var room = floors.SelectMany(a => a.Rooms.Values).FirstOrDefault(a => a.Polygon?.EnclosesPoint(device.Location.ToPoint2D()) ?? false);
+                    if (device.Room != room)
+                    {
+                        Log.Information("New room {0} = {1}", device, room);
+                        device.Room = room;
+                    }
+                }
                 return moved;
 
             }
