@@ -2,7 +2,7 @@
   import { getContext, setContext } from 'svelte';
 	import { page } from '$app/stores';
   import { assets, base } from '$app/paths';
-  import { config, devices, nodes } from '../lib/stores';
+  import { config, devices } from '../lib/stores';
   import { writable } from 'svelte/store';
   import FloorTab from './FloorTab.svelte';
 

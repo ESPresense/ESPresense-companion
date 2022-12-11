@@ -53,6 +53,8 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
+
+        public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
     public class ConfigFloor
@@ -68,15 +70,22 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "rooms")]
         public ConfigRoom[]? Rooms { get; set; }
+
+        public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
     public class ConfigRoom
     {
+        [YamlMember(Alias = "id")]
+        public string? Id { get; set; }
+        
         [YamlMember(Alias = "name")]
         public string? Name { get; set; }
 
         [YamlMember(Alias = "points")]
         public double[][]? Points { get; set; }
+
+        public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
     public class ConfigNode
@@ -96,7 +105,10 @@ namespace ESPresense.Models
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; } = true;
 
-        public string GetId() => Id ?? Name?.ToSnakeCase().ToLower() ?? "none";
+        [YamlMember(Alias = "stationary")]
+        public bool Stationary { get; set; } = true;
+
+        public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
 }

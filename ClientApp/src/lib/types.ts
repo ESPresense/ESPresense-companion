@@ -1,5 +1,6 @@
 
 export interface Room {
+	id: string;
 	name: string;
 	points: [number, number][];
 }
@@ -21,6 +22,8 @@ export interface Node {
 export interface Device {
 	id: string;
 	name: string;
+	nodes: { [index: string]: number }
+	room: { id: string, floor: string };
 }
 
 export interface Config {

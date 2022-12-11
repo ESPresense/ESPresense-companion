@@ -1,8 +1,10 @@
 <script lang="ts">
   import { writable } from 'svelte/store';
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
-  import { config, devices, nodes } from '../lib/stores';
+  import { config, devices } from '../lib/stores';
   import type { Config, Device, Node, Room } from '../lib/types';
+  import { scaleOrdinal, schemeCategory10 } from "d3";
+  import { setContext } from 'svelte';
 
   import Rooms from './Rooms.svelte';
   import Devices from './Devices.svelte';
@@ -14,6 +16,8 @@
   const selected = writable<Device>();
   const hovered = writable<Device>();
   const floor = writable<number>(0);
+
+  setContext('colors', scaleOrdinal(schemeCategory10))
 
   $: bounds = $config?.floors[$floor]?.bounds
 </script>

@@ -1,18 +1,11 @@
 import { readable } from 'svelte/store';
 import { writable } from 'svelte/store';
 import { assets, base } from '$app/paths';
-import type { Config, Node } from './types';
+import type { Config, Node, Device } from './types';
 
 export const config = writable<Config>();
-export const nodes = writable<Node[]>();
 
 let socket: WebSocket;
-
-async function getNodes() {
-	const response = await fetch(`/api/state/nodes`);
-	nodes.set(await response.json());
-}
-getNodes();
 
 async function getConfig(){
 	const response = await fetch(`/api/state/config`);
@@ -25,23 +18,18 @@ function setupWebsocket() {
 	var loc = new URL(`${base}/ws`, window.location.href);
 	var new_uri = (loc.protocol === "https:" ? "wss:" : "ws:") + "//" + loc.host + loc.pathname;
 	socket = new WebSocket(new_uri);
-	socket.addEventListener('open', function (event) {
-		console.log("It's open");
-	});
-
 	socket.addEventListener('message', async function (event) {
 		console.log(event.data);
 		var eventData = JSON.parse(event.data);
 		if (eventData.type == "configChanged") {
 			getConfig();
-			getNodes();
 		}
 	});
 }
 
 setupWebsocket();
 
-export const devices = readable([], function start(set) {
+export const devices = readable<Device[]>([], function start(set) {
 	var errors = 0;
 	var outstanding = false;
 	const interval = setInterval(() => {
@@ -56,7 +44,7 @@ export const devices = readable([], function start(set) {
 			})
 			.catch((ex) => {
 				outstanding = false;
-				if (errors > 5) set(null);
+				if (errors > 5) set([]);
 				console.log(ex);
 			});
 	}, 1000)
