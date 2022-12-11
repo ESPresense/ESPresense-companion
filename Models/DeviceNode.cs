@@ -17,6 +17,7 @@ public class DeviceNode
 
     public bool ReadMessage(byte[] payload)
     {
+        bool moved = false;
         var reader = new Utf8JsonReader(payload);
         string? prop = null;
         while (reader.Read())
@@ -27,24 +28,18 @@ public class DeviceNode
                 case JsonTokenType.PropertyName:
                     prop = reader.GetString();
                     break;
-                case JsonTokenType.Number:
-                {
-                    var intValue = reader.GetDouble();
-                    switch (prop)
-                    {
-                        case "distance":
-                            return NewDistance(intValue);
-                    }
-
+                case JsonTokenType.String:
+                    if (prop == "name") Device!.Name = reader.GetString();
                     break;
-                }
-
+                case JsonTokenType.Number:
+                    if (prop == "distance") moved |= NewDistance(reader.GetDouble());
+                    break;
                 default:
                     reader.Skip();
                     break;
             }
 
-        return false;
+        return moved;
     }
 
     private bool NewDistance(double d)
