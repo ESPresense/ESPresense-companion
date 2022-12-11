@@ -49,13 +49,13 @@ public class Floor
 {
     [JsonIgnore]
     public Config? Config { get; private set; }
-    
+
     public string? Id { get;private  set; }
     public string? Name { get; private set; }
     public Point3D[]? Bounds { get; private set; }
 
     public ConcurrentDictionary<string, Room> Rooms { get; } = new(StringComparer.OrdinalIgnoreCase);
-    
+
     public void Update(Config c, ConfigFloor cf)
     {
         Config = c;
@@ -84,14 +84,14 @@ public class Room
 {
     [JsonIgnore]
     public Config? Config { get; private set; }
-    
+
     public string? Id { get;private  set; }
     public string? Name { get; private set; }
-    
+
     [JsonIgnore]
     public Polygon2D? Polygon { get; private set; }
 
-    public Floor Floor { get; set; }
+    public Floor? Floor { get; set; }
 
     public void Update(Config config, Floor floor, ConfigRoom room)
     {

@@ -87,14 +87,13 @@ internal class Multilateralizer : BackgroundService
 
                 if (moved)
                 {
-                    Log.Debug("New location {0}, {1}@{2} {3} {4}", device, device.Location, device.Scale, result.FunctionInfoAtMinimum.Value, result.Iterations);
                     var floors = _state.Floors.Values.Where(a => a.Contained(device.Location.Z));
                     var room = floors.SelectMany(a => a.Rooms.Values).FirstOrDefault(a => a.Polygon?.EnclosesPoint(device.Location.ToPoint2D()) ?? false);
                     if (device.Room != room)
                     {
-                        Log.Information("New room {0} = {1}", device, room);
                         device.Room = room;
                     }
+                    Log.Debug("New location {0} {1}@{2}", device, device.Room?.Name ?? "Unknown", device.Location);
                 }
                 return moved;
 
