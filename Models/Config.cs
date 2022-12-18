@@ -54,6 +54,8 @@ namespace ESPresense.Models
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
 
+        [YamlMember(Alias = "track")] public bool Track { get; set; } = true;
+
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 

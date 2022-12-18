@@ -4,11 +4,8 @@ using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
-using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Extensions.ManagedClient;
 using Serilog;
-using SQLite;
 
 namespace ESPresense.Services;
 
@@ -40,8 +37,25 @@ internal class Multilateralizer : BackgroundService
 
             if (_state.Nodes.TryGetValue(nodeId, out var node))
             {
-                var device = _state.Devices.GetOrAdd(deviceId, a => new Device { Id = a });
-                if (device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload))
+                var device = _state.Devices.GetOrAdd(deviceId, a => new Device { Id = a, Check = true });
+                var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload);
+
+                if (device.Check)
+                {
+                    if (_state.ConfigDeviceById.TryGetValue(deviceId, out var cdById)){
+                        device.Track = cdById.Track;
+                        if (!string.IsNullOrWhiteSpace(cdById.Name))
+                            device.Name = cdById.Name;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue(device.Name, out var cdByName))
+                        device.Track = cdByName.Track;
+                    else if (_state.ConfigDeviceById.TryGetValue("*", out var cdByIdWild))
+                        device.Track = cdByIdWild.Track;
+                    if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue("*", out var cdByNameWild))
+                        device.Track = cdByNameWild.Track;
+                    device.Check = false;
+                }
+                if (device.Track && dirty)
                     _dirty.Add(device);
             }
             else Log.Warning("Unknown node {nodeId}", nodeId);
@@ -72,7 +86,7 @@ internal class Multilateralizer : BackgroundService
                 var solver = new NelderMeadSimplex(1e-7, 10000);
                 var obj = ObjectiveFunction.Value(x => { return Math.Pow(100, Math.Abs(1 - x[3])) + device.Nodes.Values.Where(a => a.Current).Sum(dn => Math.Pow(new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - x[3] * dn.Distance, 2)); });
                 var prevLoc = device.Location;
-                var init = Vector<double>.Build.Dense(new double[4]
+                var init = Vector<double>.Build.Dense(new double[]
                 {
                     prevLoc.X,
                     prevLoc.Y,

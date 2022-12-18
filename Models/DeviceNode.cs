@@ -29,7 +29,7 @@ public class DeviceNode
                     prop = reader.GetString();
                     break;
                 case JsonTokenType.String:
-                    if (prop == "name") Device!.Name = reader.GetString();
+                    if (prop == "name") NewName(reader.GetString());
                     break;
                 case JsonTokenType.Number:
                     if (prop == "distance") moved |= NewDistance(reader.GetDouble());
@@ -39,7 +39,17 @@ public class DeviceNode
                     break;
             }
 
+
         return moved;
+    }
+
+    private void NewName(string name)
+    {
+        if (Device == null) return;
+        if (string.IsNullOrEmpty(name)) return;
+        if (Device.Name == name) return;
+        Device.Name = name;
+        Device.Check = true;
     }
 
     private bool NewDistance(double d)

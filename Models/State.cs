@@ -7,10 +7,31 @@ public class State
 {
     public State(ConfigLoader cl)
     {
+        ConcurrentDictionary<string, ConfigDevice> GetConfigDeviceById(Config c)
+        {
+            ConcurrentDictionary<string, ConfigDevice> devices = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var device in c.Devices ?? Enumerable.Empty<ConfigDevice>())
+                if (!string.IsNullOrWhiteSpace(device.Id))
+                    devices.GetOrAdd(device.Id, a => device);
+            return devices;
+        }
+
+        ConcurrentDictionary<string, ConfigDevice> GetConfigDeviceByName(Config c)
+        {
+            ConcurrentDictionary<string, ConfigDevice> devices = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var device in c.Devices ?? Enumerable.Empty<ConfigDevice>())
+                if (!string.IsNullOrWhiteSpace(device.Name))
+                    devices.GetOrAdd(device.Name, a => device);
+            return devices;
+        }
+
         void LoadConfig(Config c)
         {
             foreach (var node in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(node.GetId(), a => new Node()).Update(c, node);
             foreach (var floor in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(floor.GetId(), a => new Floor()).Update(c, floor);
+            ConfigDeviceById = GetConfigDeviceById(c);
+            ConfigDeviceByName = GetConfigDeviceByName(c);
+            foreach (var device in Devices.Values) device.Check = true;
         }
 
         cl.ConfigChanged += (_, args) => { LoadConfig(args); };
@@ -20,5 +41,7 @@ public class State
     public ConcurrentDictionary<string, Node> Nodes { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Device> Devices { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Floor> Floors { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceByName { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceById { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 

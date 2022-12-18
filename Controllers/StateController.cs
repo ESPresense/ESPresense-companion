@@ -38,7 +38,7 @@ namespace ESPresense.Controllers
         [HttpGet("api/state/devices")]
         public IEnumerable<Device> GetDevices()
         {
-            return _state.Devices.Values;
+            return _state.Devices.Values.Where(a => a.Track);
         }
 
         // GET: api/config
