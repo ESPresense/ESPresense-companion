@@ -6,7 +6,6 @@
 
   const { data, x, xScale, y, yScale } = getContext('LayerCake');
 
-  export let r = 5;
   export let radarId:string = "";
   export let floor = 0;
 
@@ -21,7 +20,7 @@
 
 {#if nodes }
   {#each nodes as n}
-    <circle cx='{ $xScale(n.point[0]) }' cy='{ $yScale(n.point[1]) }' fill={colors(n.id)} {r} />
+    <path d="M{$xScale(n.point[0])},{$yScale(n.point[1])} m -5,0 5,-5 5,5 -5,5 z" fill={colors(n.id)} />
     <text x='{ $xScale(n.point[0])  + 7}' y='{ $yScale(n.point[1])  + 3.5}' fill='white' font-size='10px'>{n.name}</text>
     {#if radar?.nodes && radar.nodes[n.id] }
       <ellipse cx='{ $xScale(n.point[0]) }' cy='{ $yScale(n.point[1]) }' fill={colors(n.id)} stroke={colors(n.id)} fill-opacity='0.1' rx='{Math.abs($xScale(0) - $xScale(radar.nodes[n.id]))}' ry='{Math.abs($yScale(0) - $yScale(radar.nodes[n.id]))}' />
