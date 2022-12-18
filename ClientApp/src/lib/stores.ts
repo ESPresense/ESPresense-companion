@@ -3,6 +3,8 @@ import { writable } from 'svelte/store';
 import { assets, base } from '$app/paths';
 import type { Config, Node, Device } from './types';
 
+export const showAll : SvelteStore<boolean> = writable(false);
+
 export const config = writable<Config>();
 
 let socket: WebSocket;

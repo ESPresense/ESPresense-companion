@@ -1,19 +1,19 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { config, devices } from '../lib/stores';
-  import { scaleOrdinal, schemeCategory10 } from "d3";
-  import type { Config, Node, Room, Device } from '../lib/types';
+  import type { ScaleOrdinal } from "d3";
+  import type { Node, Device } from '../lib/types';
 
-  const { data, x, xScale, y, yScale } = getContext('LayerCake');
+  const { xScale, yScale } = getContext('LayerCake');
 
   export let radarId:string = "";
   export let floor = 0;
 
   let radar: Device | undefined;
   $: radar = $devices?.find(n => n.id == radarId);
-  let colors = getContext('colors');
+  let colors : ScaleOrdinal<string, string> = getContext('colors');
+
   $: floorId = $config?.floors[floor]?.id;
-  $: console.log("floorId", floorId);
   let nodes: Node[] | undefined;
   $: nodes = $config?.nodes?.filter(n => n.floors.includes(floorId));
   </script>

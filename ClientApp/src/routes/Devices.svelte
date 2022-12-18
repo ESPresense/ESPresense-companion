@@ -1,19 +1,20 @@
 <script lang="ts">
   import { getContext, createEventDispatcher } from 'svelte';
-  import { config, devices } from '../lib/stores';
-  import type { Config, Device, Node, Room } from '../lib/types';
+  import { config, devices, showAll } from '../lib/stores';
   import { tweened } from 'svelte/motion';
   import { cubicOut } from 'svelte/easing';
-  import { filter } from '@skeletonlabs/skeleton';
 
-	const { data, x, xScale, y, yScale } = getContext('LayerCake');
+  import type { ScaleOrdinal } from "d3";
+  import type { Device } from '../lib/types';
+
+  let colors : ScaleOrdinal<string, string> = getContext('colors');
+
+	const { xScale, yScale } = getContext('LayerCake');
 
 	const r = tweened(5, {
 		duration: 400,
 		easing: cubicOut
 	});
-
-  let colors = getContext('colors');
 
   export let floor = 0;
   $: floorId = $config?.floors[floor]?.id;
@@ -23,22 +24,25 @@
 
 	let dispatcher = createEventDispatcher();
 
-	function hover (d:Device) {
+	function hover (d:Device | null) {
 		r.set(d == null ? 5 : 10);
-		hovered = d?.id;
+		hovered = d?.id ?? "";
 		dispatcher('hovered', d);
 	}
 
+  function unselect(){
+  }
+
 	function select (d:Device) {
-		selected = d?.id;
+		selected = d?.id ?? "";
 		dispatcher('selected', d);
 	}
   </script>
 
   <g>
 	{#if $devices }
-	{#each $devices.filter(a => (a?.room?.floor ?? floorId) == floorId) as d}
-	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' fill={d?.room?.id ? colors(d?.room?.id) : "black"} r={ d.id == hovered ? $r : 5 } on:mouseover="{() => { hover(d) }}" on:focus="{() => { select(d) }}" on:mouseout="{() => { hover(null) }}" />
+	{#each $devices.filter(a => $showAll || (((a.name ?? "").length > 0) && (a?.room?.floor ?? floorId) == floorId)) as d}
+	  <circle cx='{ $xScale(d.location.x) }' cy='{ $yScale(d.location.y) }' fill={d?.room?.id ? colors(d?.room?.id) : "black"} r={ d.id == hovered ? $r : 5 } on:mouseover="{() => { hover(d) }}" on:focus="{() => { select(d) }}" on:mouseout="{() => { hover(null) }}" on:blur="{()=>{unselect()}}" />
 	  <text x='{ $xScale(d.location.x) + 7}' y='{ $yScale(d.location.y) + 3 }' fill='white' font-size='10px'>{d.name ?? d.id}</text>
 	{/each}
 	{/if}

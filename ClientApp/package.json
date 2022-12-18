@@ -18,6 +18,7 @@
 		"@skeletonlabs/skeleton": "^0.76.3",
 		"@sveltejs/adapter-static": "^1.0.0",
 		"@sveltejs/kit": "^1.0.1",
+		"@tailwindcss/forms": "^0.5.3",
 		"@types/cookie": "^0.5.1",
 		"@types/d3": "^7.4.0",
 		"@typescript-eslint/eslint-plugin": "^5.27.0",
