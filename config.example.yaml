@@ -164,7 +164,12 @@ nodes:
     stationary: false
     point: [-2, 15, 0]
     floors: ["outside"]
+
 # Devices to track
 devices:
-  - name: Darrell Watch
-    id: darrells-watch
+#  - id: "*" # Track all devices
+  - name: "*" # Track all named devices
+  - id: darrells-watch
+    name: Darrell's Watch
+  - id: darrells-phone
+    name: Darrell's Phone

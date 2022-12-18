@@ -12,7 +12,7 @@ public class Device
         return $"{nameof(Id)}: {Id}";
     }
 
-    public string? Id { get; set; }
+    public string? Id { get; init; }
     public string? Name { get; set; }
     [JsonConverter(typeof(Point3DConverter))]
     public Point3D Location { get; set; }
@@ -23,4 +23,7 @@ public class Device
     public double Scale { get; set; } = 1;
     [JsonConverter(typeof(RoomConverter))]
     public Room? Room { get; set; }
+
+    public bool Check { get; set; }
+    public bool Track { get; set; }
 }
