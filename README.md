@@ -10,6 +10,8 @@ ESPresense nodes as well.
 
 ![image](https://user-images.githubusercontent.com/1491145/208941000-66c5bf50-17fb-4666-b87b-09cdf9958e93.png)
 
+# Installation
+
 To install add this repo to your add-ons store in HASS:
 
 Step 1: Add Repository:
