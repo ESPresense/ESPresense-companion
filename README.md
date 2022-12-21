@@ -3,6 +3,11 @@
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/ESPresense/ESPresense-companion)
 ![Docker Pulls](https://badgen.net/docker/pulls/espresense/espresense-companion)
 
+This is a work in progress!  It attempts to locate your BLE items in the floorplan of your house.  It will eventually be extended to allow you to manage
+ESPresense nodes as well.
+
+![image](https://user-images.githubusercontent.com/1491145/208941000-66c5bf50-17fb-4666-b87b-09cdf9958e93.png)
+
 To install add this repo to your add-ons store in HASS:
 
 Step 1: Add Repository:
