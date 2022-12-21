@@ -8,7 +8,7 @@
 It attempts to locate your BLE items in the floorplan of your house.  It will eventually be extended to allow you to manage
 ESPresense nodes as well.
 
-![image](https://user-images.githubusercontent.com/1491145/208941000-66c5bf50-17fb-4666-b87b-09cdf9958e93.png)
+![image](https://user-images.githubusercontent.com/1491145/208942192-d8716e50-c822-48a7-a6d3-46b53ab9373e.png)
 
 # Installation
 
