@@ -80,7 +80,7 @@ namespace ESPresense.Models
     {
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
-        
+
         [YamlMember(Alias = "name")]
         public string? Name { get; set; }
 
@@ -112,5 +112,4 @@ namespace ESPresense.Models
 
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
-
 }

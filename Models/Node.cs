@@ -31,13 +31,16 @@ public class Node
         }
     }
 
-    public void Update(Config c, ConfigNode node)
+    public void Update(Config c, ConfigNode node, IEnumerable<Floor> floors)
     {
         Config = c;
         Name = node.Name;
         Id = node.GetId();
+        Floors = floors.ToArray();
         Location = new Point3D(node?.Point?[0] ?? 0, node?.Point?[1] ?? 0, node?.Point?[2] ?? 0);
     }
+
+    public Floor[]? Floors { get; private set; }
 
     public override string ToString()
     {

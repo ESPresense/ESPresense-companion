@@ -9,6 +9,7 @@
   import logo from '$lib/images/logo.svg';
 	import github from '$lib/images/github.svg';
   import map from '$lib/images/map.svg';
+  import nodes from '$lib/images/nodes.svg';
 
   const storeValue: Writable<number> = writable(1);
 </script>
@@ -24,8 +25,12 @@
 					</AppRailTile>
 				</svelte:fragment>
 
-        <AppRailTile label="Map" tag="a" href="{base}/"  value={1}>
-          <img src={map} alt="Map"  />
+        <AppRailTile label="Map" tag="a" href="{base}/" value={1}>
+          <img src={map} alt="Map" />
+				</AppRailTile>
+
+        <AppRailTile label="Nodes" tag="a" href="{base}/nodes" value={2}>
+          <img src={nodes} alt="Nodes" />
 				</AppRailTile>
 
 				<svelte:fragment slot="trail">
@@ -41,5 +46,7 @@
 
 
 <style>
-
+  img {
+    fill: white;
+  }
 </style>

@@ -67,10 +67,10 @@ public class ConfigLoader : BackgroundService
         foreach (var floor in config.Floors ?? Enumerable.Empty<ConfigFloor>())
             floor.Id ??= floor.GetId();
 
-        foreach (var room in config?.Floors?.SelectMany(a => a?.Rooms ?? Enumerable.Empty<ConfigRoom>()) ?? Enumerable.Empty<ConfigRoom>())
+        foreach (var room in config.Floors?.SelectMany(a => a.Rooms ?? Enumerable.Empty<ConfigRoom>()) ?? Enumerable.Empty<ConfigRoom>())
             room.Id ??= room.GetId();
 
-        return config ?? new Config();
+        return config;
     }
 
     public event EventHandler<Config>? ConfigChanged;

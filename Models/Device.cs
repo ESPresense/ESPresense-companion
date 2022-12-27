@@ -14,16 +14,20 @@ public class Device
 
     public string? Id { get; init; }
     public string? Name { get; set; }
-    [JsonConverter(typeof(Point3DConverter))]
-    public Point3D Location { get; set; }
-    [JsonConverter(typeof(Point3DConverter))]
-    public Point3D ReportedLocation { get; set; }
+
+    [JsonIgnore] public Point3D ReportedLocation { get; set; }
+
     [JsonConverter(typeof(NodeDistanceConverter))]
     public ConcurrentDictionary<string, DeviceNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
-    public double Scale { get; set; } = 1;
-    [JsonConverter(typeof(RoomConverter))]
-    public Room? Room { get; set; }
+
+    [JsonConverter(typeof(RoomConverter))] public Room? Room => BestScenario.Room;
 
     public bool Check { get; set; }
     public bool Track { get; set; }
+
+    [JsonIgnore] public Scenario BestScenario => Scenarios.OrderByDescending(a => a.Confidence).First();
+    [JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
+
+    [JsonConverter(typeof(Point3DConverter))]
+    public Point3D Location => BestScenario.Location;
 }
