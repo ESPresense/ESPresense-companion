@@ -14,8 +14,7 @@
 	"devDependencies": {
 		"@fontsource/fira-mono": "^4.5.0",
 		"@neoconfetti/svelte": "^1.0.0",
-		"@playwright/test": "1.25.0",
-		"@skeletonlabs/skeleton": "^0.76.3",
+		"@skeletonlabs/skeleton": "^0.86.9",
 		"@sveltejs/adapter-static": "^1.0.0",
 		"@sveltejs/kit": "^1.0.1",
 		"@tailwindcss/forms": "^0.5.3",
@@ -28,18 +27,18 @@
 		"eslint": "^8.16.0",
 		"eslint-config-prettier": "^8.3.0",
 		"eslint-plugin-svelte3": "^4.0.0",
-		"layercake": "^7.1.0",
+		"layercake": "^7.2.2",
 		"postcss": "^8.4.14",
 		"postcss-load-config": "^4.0.1",
 		"prettier": "^2.6.2",
 		"prettier-plugin-svelte": "^2.7.0",
-		"svelte": "^3.46.0",
-		"svelte-check": "^2.7.1",
-		"svelte-preprocess": "^4.10.7",
+		"svelte": "^3.55.0",
+		"svelte-check": "^3.0.1",
+		"svelte-preprocess": "^5.0.0",
 		"tailwindcss": "^3.1.5",
 		"tslib": "^2.3.1",
 		"typescript": "^4.7.4",
-		"vite": "^4.0.1"
+		"vite": "^4.0.3"
 	},
 	"type": "module"
 }

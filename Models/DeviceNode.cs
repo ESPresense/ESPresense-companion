@@ -43,7 +43,7 @@ public class DeviceNode
         return moved;
     }
 
-    private void NewName(string name)
+    private void NewName(string? name)
     {
         if (Device == null) return;
         if (string.IsNullOrEmpty(name)) return;

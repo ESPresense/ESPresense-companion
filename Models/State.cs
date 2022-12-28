@@ -7,6 +7,14 @@ public class State
 {
     public State(ConfigLoader cl)
     {
+        IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
+        {
+            if (floorIds == null) yield break;
+            foreach (var floorId in floorIds)
+                if (Floors.TryGetValue(floorId, out var floor))
+                    yield return floor;
+        }
+        
         ConcurrentDictionary<string, ConfigDevice> GetConfigDeviceById(Config c)
         {
             ConcurrentDictionary<string, ConfigDevice> devices = new(StringComparer.OrdinalIgnoreCase);
@@ -27,8 +35,9 @@ public class State
 
         void LoadConfig(Config c)
         {
-            foreach (var node in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(node.GetId(), a => new Node()).Update(c, node);
             foreach (var floor in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(floor.GetId(), a => new Floor()).Update(c, floor);
+            foreach (var node in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(node.GetId(), a => new Node()).Update(c, node, GetFloorsByIds(node.Floors));
+
             ConfigDeviceById = GetConfigDeviceById(c);
             ConfigDeviceByName = GetConfigDeviceByName(c);
             foreach (var device in Devices.Values) device.Check = true;

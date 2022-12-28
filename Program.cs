@@ -1,3 +1,5 @@
+using ESPresense.Extensions;
+using ESPresense.Locators;
 using ESPresense.Middleware;
 using ESPresense.Models;
 using ESPresense.Services;
@@ -32,7 +34,7 @@ builder.Services.AddSingleton(a =>
 });
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton(MqttConnection.GetClient);
-builder.Services.AddHostedService<Multilateralizer>();
+builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddSingleton<State>();
 
 var app = builder.Build();

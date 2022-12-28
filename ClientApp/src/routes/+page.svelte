@@ -23,8 +23,9 @@
 </script>
 
 <svelte:head>
-	<title>ESPresense Companion</title>
+	<title>ESPresense Companion: Map</title>
 </svelte:head>
+
 {#if bounds }
 <div class="w-full h-full">
   <FloorTabs selected={floor} />

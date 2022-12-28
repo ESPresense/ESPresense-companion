@@ -171,5 +171,5 @@ devices:
   - name: "*" # Track all named devices
   - id: darrells-watch
     name: Darrell's Watch
-  - id: darrells-phone
-    name: Darrell's Phone
+  - id: darrells-iphone
+    name: Darrell's iPhone
