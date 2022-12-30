@@ -5,6 +5,7 @@
   import type { Config, Device, Node, Room } from '../lib/types';
   import { scaleOrdinal, schemeCategory10 } from "d3";
   import { setContext } from 'svelte';
+  import { Drawer, drawerStore } from '@skeletonlabs/skeleton';
 
   import Rooms from './Rooms.svelte';
   import Devices from './Devices.svelte';
@@ -12,14 +13,21 @@
   import Nodes from './Nodes.svelte';
   import AxisX from './AxisX.svelte';
   import AxisY from './AxisY.svelte';
+  import DeviceDetails from './DeviceDetails.svelte';
 
-  const selected = writable<Device>();
-  const hovered = writable<Device>();
+  const selected = writable<Device | null>();
+  const hovered = writable<Device| null>();
   const floor = writable<number>(0);
 
   setContext('colors', scaleOrdinal(schemeCategory10))
 
+
   $: bounds = $config?.floors[$floor]?.bounds
+
+  function selecteda (d:Device | null) {
+		$selected = d;
+    drawerStore.open({id:"device"});
+	}
 </script>
 
 <svelte:head>
@@ -35,9 +43,16 @@
       <AxisY />
       <Rooms floor={$floor} />
       <Nodes radarId={$hovered?.id ?? $selected?.id} floor={$floor} />
-      <Devices floor={$floor} on:selected={ r => $selected = r.detail } on:hovered={ r => $hovered = r.detail } />
+      <Devices floor={$floor} on:selected={ d => selecteda(d.detail) } on:hovered={ d => $hovered = d.detail } />
     </Svg>
   </LayerCake>
+  <Drawer width="400px">
+    {#if $drawerStore.id === 'device'}
+     <DeviceDetails deviceId={$selected?.id} />
+    {:else}
+     <p>(fallback contents)</p>
+    {/if}
+  </Drawer>
 </div>
 {:else}
 <div>Loading...</div>
