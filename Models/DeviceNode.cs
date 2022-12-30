@@ -54,7 +54,7 @@ public class DeviceNode
 
     private bool NewDistance(double d)
     {
-        var moved = Math.Abs(LastDistance - d) > 0.5;
+        var moved = Math.Abs(LastDistance - d) > 0.25;
         if (moved) LastDistance = d;
         Distance = d;
         LastHit = DateTime.UtcNow;

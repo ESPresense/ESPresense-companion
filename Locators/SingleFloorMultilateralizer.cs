@@ -4,6 +4,7 @@ using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
 using Serilog;
+using YamlDotNet.Serialization.NodeDeserializers;
 
 namespace ESPresense.Locators;
 
@@ -22,12 +23,17 @@ public class SingleFloorMultilateralizer : ILocate
     {
         var confidence = scenario.Confidence;
         var solver = new NelderMeadSimplex(1e-7, 10000);
-        var obj = ObjectiveFunction.Value(x => { return Math.Pow(100, Math.Abs(1 - x[3])) + _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).Sum(dn => Math.Pow(new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - x[3] * dn.Distance, 2)); });
-        var pos = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).Select(a => a.Node!.Location).ToList();
+
+        var nodes = _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).OrderBy(a => a.Distance).ToArray();
+        var pos = nodes.Select(a => a.Node!.Location).ToList();
+        var obj = ObjectiveFunction.Value(x => nodes.Select((dn,i)=> new {dn, weight = Math.Pow((float)nodes.Length - i, 3) / Math.Pow(nodes.Length,3)}).Sum(a =>
+        {
+            var distanceTo = new Point3D(x[0], x[1], x[2]).DistanceTo(a.dn.Node!.Location) - a.dn.Distance;
+            return a.weight * Math.Pow(distanceTo, distanceTo > 0 ? 2 : 10);
+        }));
 
         if (pos.Count <= 0)
         {
-            scenario.Scale = 1;
             confidence = 0;
         }
         else
@@ -49,30 +55,26 @@ public class SingleFloorMultilateralizer : ILocate
                         guess.X,
                         guess.Y,
                         guess.Z,
-                        scenario.Scale
                     });
                     var result = solver.FindMinimum(obj, init);
                     scenario.Location = new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
-                    scenario.Scale = result.MinimizingPoint[3];
                     scenario.Fixes = pos.Count;
-                    confidence = (int)Math.Max(Math.Min(100, (100 * pos.Count - 1) / 4.0), Math.Min(100, 100 * pos.Count / 4.0) - result.FunctionInfoAtMinimum.Value);
+                    confidence = (int)Math.Min(Math.Min(100, (100 * pos.Count - 1) / 4.0), Math.Min(100, 100 * pos.Count / 4.0) - result.FunctionInfoAtMinimum.Value);
                 }
                 else
                 {
                     confidence = 1;
-                    scenario.Scale = 1;
                     scenario.Location = guess;
                 }
             }
             catch (Exception ex)
             {
                 confidence = 1;
-                scenario.Scale = 1;
                 scenario.Location = guess;
                 Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
             }
         }
-        
+
         scenario.Confidence = confidence;
 
         if (confidence <= 0) return false;
