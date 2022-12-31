@@ -33,7 +33,7 @@ builder.Services.AddSingleton(a =>
     return new SQLiteConnection(databasePath);
 });
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
-builder.Services.AddSingleton(MqttConnection.GetClient);
+builder.Services.AddScoped(MqttConnection.GetClient);
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddSingleton<State>();
 
