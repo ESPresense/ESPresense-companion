@@ -1,7 +1,5 @@
 <script lang="ts">
   import { getContext, setContext } from 'svelte';
-	import { page } from '$app/stores';
-  import { assets, base } from '$app/paths';
   import { config, devices } from '../lib/stores';
   import { writable } from 'svelte/store';
   import FloorTab from './FloorTab.svelte';
@@ -12,58 +10,59 @@
 </script>
 
 <header>
-	<nav class="h-50">
-		<svg viewBox="0 0 2 3" aria-hidden="true">
-			<path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
-		</svg>
-		<ul>
-      {#if $config?.floors }
-      {#each $config?.floors as { name }, value}
-        <FloorTab {name} {value} />
-      {/each}
-      {/if}
-      <Filter />
-		</ul>
-		<svg viewBox="0 0 2 3" aria-hidden="true">
-			<path d="M0,0 L0,3 C0.5,3 0.5,3 1,2 L2,0 Z" />
-		</svg>
-	</nav>
+  <nav class="h-50">
+    <svg viewBox="0 0 2 3" aria-hidden="true">
+        <path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
+    </svg>
+    <ul>
+  {#if $config?.floors }
+  {#each $config?.floors as { name }, value}
+    <FloorTab {name} {value} />
+  {/each}
+  {/if}
+  <Filter />
+    </ul>
+    <svg viewBox="0 0 2 3" aria-hidden="true">
+        <path d="M0,0 L0,3 C0.5,3 0.5,3 1,2 L2,0 Z" />
+    </svg>
+  </nav>
 </header>
 
 <style>
-	header {
-    	z-index: 1;
-		display: flex;
-		justify-content: space-between;
-	}
+  header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+  }
 
-	nav {
+  nav {
     width: 200em;
-		display: flex;
-		justify-content: center;
-		--background: rgba(255, 255, 255, 0.7);
-	}
+    display: flex;
+    justify-content: center;
+    --background: rgba(255, 255, 255, 0.7);
+  }
 
-	svg {
-		width: 2em;
-		height: 3em;
-		display: block;
-	}
+  svg {
+    width: 2em;
+    height: 3em;
+    display: block;
+  }
 
-	path {
-		fill: var(--background);
-	}
+  path {
+    fill: var(--background);
+  }
 
-	ul {
-		position: relative;
-		padding: 0;
-		margin: 0;
-		height: 3em;
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		list-style: none;
-		background: var(--background);
-		background-size: contain;
-	}
+  ul {
+    position: relative;
+    padding: 0;
+    margin: 0;
+    height: 3em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    list-style: none;
+    background: var(--background);
+    background-size: contain;
+  }
 </style>
