@@ -38,14 +38,14 @@ namespace ESPresense.Controllers
         [HttpGet("api/state/devices")]
         public IEnumerable<Device> GetDevices()
         {
-            return _state.Devices.Values.Where(a => a.Track && a.BestScenario.Fixes > 1);
+            return _state.Devices.Values.Where(a => a.Track && a.Nodes.Values.Any(n => n.Current));
         }
 
         // GET: api/config
         [HttpGet("api/state/config")]
         public Config GetConfig()
         {
-            return _config?.Config ?? new Config();
+            return _config.Config ?? new Config();
         }
 
         [Route("/ws")]

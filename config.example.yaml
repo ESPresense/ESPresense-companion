@@ -135,34 +135,34 @@ nodes:
     floors: ["second"]
   - name: Bathroom
     point: [0.1, 10, 4.2]
+    floors: ["second", "outside"]
+  - name: Upstairs Hallway
+    point: [10, 10, 4.2]
     floors: ["second"]
   - name: Garage
     point: [0.75, 17.9, 0.5]
-    floors: ["first"]
+    floors: ["first", "second", "outside"]
   - name: Office
     point: [5, 15.25, 0.5]
     floors: ["first"]
-  - name: Office 2
-    point: [5, 12.1, 0.25]
-    floors: ["first"]
   - name: Family
     point: [0.5, 0.5, 0.25]
-    floors: ["first"]
+    floors: ["first", "outside"]
   - name: Kitchen
     point: [8, 7.5, 0.5]
     floors: ["first"]
   - name: Dining
     point: [18.25, 3.1, 0.5]
-    floors: ["first"]
+    floors: ["first", "outside"]
   - name: Basement
     point: [17, 12.5, -1.5]
-    floors: ["first"]
+    floors: ["first", "second", "outside"]
   - name: Laundry
     point: [5, 9, 2]
     floors: ["first"]
   - name: VW EOS
     stationary: false
-    point: [-2, 15, 0]
+    point: [-2, 15, 0.5]
     floors: ["outside"]
 
 # Devices to track

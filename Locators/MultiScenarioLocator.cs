@@ -7,20 +7,21 @@ namespace ESPresense.Locators;
 
 internal class MultiScenarioLocator : BackgroundService
 {
-    private readonly Task<IManagedMqttClient> _mc;
     private readonly State _state;
+    private readonly IServiceProvider _serviceProvider;
 
     private ConcurrentHashSet<Device> _dirty = new();
 
-    public MultiScenarioLocator(Task<IManagedMqttClient> mc, State state)
+    public MultiScenarioLocator(State state, IServiceProvider serviceProvider)
     {
-        _mc = mc;
         _state = state;
+        _serviceProvider = serviceProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var mc = await _mc;
+        using var scope = _serviceProvider.CreateScope();
+        var mc = await scope.ServiceProvider.GetRequiredService<Task<IManagedMqttClient>>();
 
         await mc.SubscribeAsync("espresense/devices/#");
 
@@ -53,10 +54,12 @@ internal class MultiScenarioLocator : BackgroundService
                         device.Track = cdByName.Track;
                     else if (_state.ConfigDeviceById.TryGetValue("*", out var cdByIdWild))
                         device.Track = cdByIdWild.Track;
+
                     if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue("*", out var cdByNameWild))
                         device.Track = cdByNameWild.Track;
                     device.Check = false;
                 }
+
                 if (device.Track && dirty)
                     _dirty.Add(device);
             }
@@ -69,10 +72,10 @@ internal class MultiScenarioLocator : BackgroundService
         {
             while (_dirty.IsEmpty)
                 await Task.Delay(500, stoppingToken);
-            
+
             var todo = _dirty;
             _dirty = new ConcurrentHashSet<Device>();
-            
+
             foreach (var device in todo.Where(d => d.Scenarios.AsParallel().Count(s => s.Locate()) > 0))
             {
                 var bs = device.BestScenario;
