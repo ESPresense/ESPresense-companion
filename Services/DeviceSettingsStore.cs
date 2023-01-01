@@ -2,6 +2,7 @@
 using ESPresense.Models;
 using MQTTnet;
 using MQTTnet.Extensions.ManagedClient;
+using MQTTnet.Protocol;
 using Newtonsoft.Json;
 
 namespace ESPresense.Services
@@ -36,7 +37,7 @@ namespace ESPresense.Services
                 DefaultValueHandling = DefaultValueHandling.Ignore
             };
             ds.OriginalId = null;
-            await _mc.EnqueueAsync("espresense/settings/" + id + "/config", JsonConvert.SerializeObject(ds, jss));
+            await _mc.EnqueueAsync("espresense/settings/" + id + "/config", JsonConvert.SerializeObject(ds, jss), MqttQualityOfServiceLevel.AtMostOnce, true);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
