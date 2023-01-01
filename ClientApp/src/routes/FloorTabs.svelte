@@ -31,13 +31,15 @@
 <style>
   header {
     position: relative;
-    z-index: 1;
     display: flex;
     justify-content: space-between;
   }
 
   nav {
-    width: 200em;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
     display: flex;
     justify-content: center;
     --background: rgba(255, 255, 255, 0.7);
@@ -54,6 +56,7 @@
   }
 
   ul {
+    z-index: 1;
     position: relative;
     padding: 0;
     margin: 0;
