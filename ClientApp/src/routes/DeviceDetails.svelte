@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import { drawerStore } from '@skeletonlabs/skeleton';
 
   export let deviceId = '';
@@ -13,7 +14,7 @@
   let device:DeviceSetting|null = null;
 
    onMount(() => {
-      fetch(`/api/device/${deviceId}`)
+      fetch(`${base}/api/device/${deviceId}`)
           .then((response) => {
             if (response.status != 200) throw new Error(response.statusText);
             return response.json();
@@ -24,7 +25,7 @@
 
   function save() {
     if (device) {
-      fetch(`/api/device/${device.originalId}`, {
+      fetch(`${base}/api/device/${device.originalId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
