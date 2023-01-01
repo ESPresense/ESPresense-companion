@@ -45,7 +45,7 @@ namespace ESPresense.Controllers
         [HttpGet("api/state/config")]
         public Config GetConfig()
         {
-            return _config?.Config ?? new Config();
+            return _config.Config ?? new Config();
         }
 
         [Route("/ws")]

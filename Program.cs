@@ -3,6 +3,7 @@ using ESPresense.Locators;
 using ESPresense.Middleware;
 using ESPresense.Models;
 using ESPresense.Services;
+using MathNet.Numerics;
 using MQTTnet.Diagnostics;
 using Serilog;
 using Serilog.Events;
@@ -25,7 +26,6 @@ var configLoader = new ConfigLoader(configDir);
 builder.Services.AddSingleton(a => configLoader);
 builder.Services.AddHostedService(a => configLoader);
 
-builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton(a =>
 {
     var databasePath = Path.Combine(storageDir, "config.db");
@@ -34,8 +34,13 @@ builder.Services.AddSingleton(a =>
 });
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddScoped(MqttConnection.GetClient);
+
+builder.Services.AddSingleton<DeviceSettingsStore>();
+
 builder.Services.AddHostedService<MultiScenarioLocator>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
 builder.Services.AddSingleton<State>();
+builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
