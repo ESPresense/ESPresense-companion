@@ -46,6 +46,7 @@
   }
 
   svg {
+    z-index: 1;
     width: 2em;
     height: 3em;
     display: block;
