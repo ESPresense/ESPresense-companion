@@ -141,7 +141,7 @@ nodes:
     floors: ["second"]
   - name: Garage
     point: [0.75, 17.9, 0.5]
-    floors: ["second", "outside"]
+    floors: ["first", "second", "outside"]
   - name: Office
     point: [5, 15.25, 0.5]
     floors: ["first"]
