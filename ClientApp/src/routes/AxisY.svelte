@@ -2,10 +2,21 @@
   @component
   Generates an HTML y-axis.
  -->
-<script>
+<script lang="ts">
   import { getContext } from 'svelte';
+  import { zoomIdentity } from 'd3-zoom';
+  import type { Readable } from 'svelte/store';
+  import type { ZoomScale } from 'd3-zoom';
 
-  const { padding, xRange, yScale } = getContext('LayerCake');
+  const context: {padding:Readable<Object>, xRange:Readable<Object>, xScale:Readable<ZoomScale>, yScale:Readable<ZoomScale>} = getContext('LayerCake');
+  const { padding, xRange, xScale, yScale } = context;
+
+  export let transform = zoomIdentity;
+
+  let x = $xScale;
+  let y = $yScale;
+  $: x = transform.rescaleX($xScale);
+  $: y = transform.rescaleY($yScale);
 
   /** @type {Boolean} [gridlines=true] - Extend lines from the ticks into the chart space */
   export let gridlines = false;
@@ -34,25 +45,25 @@
   /** @type {String} [textAnchor='start'] The CSS `text-anchor` passed to the label. This is automatically set to "end" if the scale has a bandwidth method, like in ordinal scales. */
   export let textAnchor = 'start';
 
-  $: isBandwidth = typeof $yScale.bandwidth === 'function';
+  $: isBandwidth = typeof y.bandwidth === 'function';
 
   $: tickVals = Array.isArray(ticks) ? ticks :
     isBandwidth ?
-      $yScale.domain() :
+      y.domain() :
       typeof ticks === 'function' ?
-        ticks($yScale.ticks()) :
-          $yScale.ticks(ticks);
+        ticks(y.ticks()) :
+          y.ticks(ticks);
 </script>
 
 <g class='axis y-axis' transform='translate({-$padding.left}, 0)'>
   {#each tickVals as tick (tick)}
-    <g class='tick tick-{tick}' transform='translate({$xRange[0] + (isBandwidth ? $padding.left : 0)}, {$yScale(tick)})'>
+    <g class='tick tick-{tick}' transform='translate({$xRange[0] + (isBandwidth ? $padding.left : 0)}, {y(tick)})'>
       {#if gridlines !== false}
         <line
           class="gridline"
           x2='100%'
-          y1={yTick + (isBandwidth ? ($yScale.bandwidth() / 2) : 0)}
-          y2={yTick + (isBandwidth ? ($yScale.bandwidth() / 2) : 0)}
+          y1={yTick + (isBandwidth ? (y.bandwidth() / 2) : 0)}
+          y2={yTick + (isBandwidth ? (y.bandwidth() / 2) : 0)}
         ></line>
       {/if}
       {#if tickMarks === true}
@@ -60,13 +71,13 @@
           class='tick-mark'
           x1='0'
           x2='{isBandwidth ? -6 : 6}'
-          y1={yTick + (isBandwidth ? ($yScale.bandwidth() / 2) : 0)}
-          y2={yTick + (isBandwidth ? ($yScale.bandwidth() / 2) : 0)}
+          y1={yTick + (isBandwidth ? (y.bandwidth() / 2) : 0)}
+          y2={yTick + (isBandwidth ? (y.bandwidth() / 2) : 0)}
         ></line>
       {/if}
       <text
         x='{xTick}'
-        y='{yTick + (isBandwidth ? $yScale.bandwidth() / 2 : 0)}'
+        y='{yTick + (isBandwidth ? y.bandwidth() / 2 : 0)}'
         dx='{isBandwidth ? -9 : dxTick}'
         dy='{isBandwidth ? 4 : dyTick}'
         style="text-anchor:{isBandwidth ? 'end' : textAnchor};"

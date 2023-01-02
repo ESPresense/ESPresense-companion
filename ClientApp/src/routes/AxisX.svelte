@@ -2,9 +2,19 @@
   @component
   Generates an SVG x-axis. This component is also configured to detect if your x-scale is an ordinal scale. If so, it will place the markers in the middle of the bandwidth.
  -->
-<script>
+<script lang="ts">
   import { getContext } from 'svelte';
-  const { width, height, xScale, yRange } = getContext('LayerCake');
+  import { zoomIdentity } from 'd3-zoom';
+
+  const context: {padding:Readable<Object>, yRange:Readable<Object>, xScale:Readable<ZoomScale>, yScale:Readable<ZoomScale>} = getContext('LayerCake');
+  const { width, height, padding, yRange, xScale, yScale } = context;
+
+  export let transform = zoomIdentity;
+
+  let x = $xScale;
+  let y = $yScale;
+  $: x = transform.rescaleX($xScale);
+  $: y = transform.rescaleY($yScale);
 
   /** @type {Boolean} [gridlines=true] - Extend lines from the ticks into the chart space */
   export let gridlines = false;
@@ -30,14 +40,14 @@
   /** @type {Number} [yTick=16] - The distance from the baseline to place each tick value. */
   export let yTick = 16;
 
-  $: isBandwidth = typeof $xScale.bandwidth === 'function';
+  $: isBandwidth = typeof x.bandwidth === 'function';
 
   $: tickVals = Array.isArray(ticks) ? ticks :
     isBandwidth ?
-      $xScale.domain() :
+      x.domain() :
       typeof ticks === 'function' ?
-        ticks($xScale.ticks()) :
-          $xScale.ticks(ticks);
+        ticks(x.ticks()) :
+          x.ticks(ticks);
 
   function textAnchor(i) {
     if (snapTicks === true) {
@@ -54,7 +64,7 @@
 
 <g class="axis x-axis" class:snapTicks>
   {#each tickVals as tick, i (tick)}
-    <g class="tick tick-{i}" transform="translate({$xScale(tick)},{Math.max(...$yRange)})">
+    <g class="tick tick-{i}" transform="translate({x(tick)},{Math.max(...$yRange)})">
       {#if gridlines !== false}
         <line class="gridline" y1={$height * -1} y2="0" x1="0" x2="0" />
       {/if}
@@ -63,12 +73,12 @@
           class="tick-mark"
           y1={0}
           y2={6}
-          x1={xTick || isBandwidth ? $xScale.bandwidth() / 2 : 0}
-          x2={xTick || isBandwidth ? $xScale.bandwidth() / 2 : 0}
+          x1={xTick || isBandwidth ? x.bandwidth() / 2 : 0}
+          x2={xTick || isBandwidth ? x.bandwidth() / 2 : 0}
         />
       {/if}
       <text
-        x={xTick || isBandwidth ? $xScale.bandwidth() / 2 : 0}
+        x={xTick || isBandwidth ? x.bandwidth() / 2 : 0}
         y={yTick}
         dx=""
         dy=""
