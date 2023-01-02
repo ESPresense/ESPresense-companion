@@ -1,11 +1,14 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { config, devices } from '../lib/stores';
-  import type { ScaleOrdinal } from "d3";
+  import { zoomIdentity } from 'd3-zoom';
+
   import type { Node, Device } from '../lib/types';
+  import type { ScaleOrdinal } from "d3";
 
   const { xScale, yScale } = getContext('LayerCake');
 
+  export let transform = zoomIdentity;
   export let radarId:string = "";
   export let floor = 0;
 
@@ -18,6 +21,7 @@
   $: nodes = $config?.nodes?.filter(n => n.floors.includes(floorId));
   </script>
 
+<g transform={transform.toString()}>
 {#if nodes }
   {#each nodes as n}
     <path d="M{$xScale(n.point[0])},{$yScale(n.point[1])} m -5,0 5,-5 5,5 -5,5 z" fill={colors(n.id)} />
@@ -28,3 +32,4 @@
     {/if}
   {/each}
 {/if}
+</g>>

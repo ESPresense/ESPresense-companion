@@ -2,12 +2,13 @@
   import { writable } from 'svelte/store';
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
   import { config, devices } from '../lib/stores';
-  import type { Config, Device, Node, Room } from '../lib/types';
   import { scaleOrdinal, schemeCategory10 } from "d3";
   import { select } from "d3-selection";
-  import { zoom } from 'd3-zoom';
+  import { zoom, zoomIdentity } from 'd3-zoom';
   import { setContext } from 'svelte';
   import { Drawer, drawerStore } from '@skeletonlabs/skeleton';
+
+  import type { Device } from '../lib/types';
 
   import Rooms from './Rooms.svelte';
   import Devices from './Devices.svelte';
@@ -18,18 +19,14 @@
   import DeviceDetails from './DeviceDetails.svelte';
 
   let svg:Element;
+  let transform = zoomIdentity;
   const selected = writable<Device | null>();
   const hovered = writable<Device| null>();
   const floor = writable<number>(0);
 
-  function zoomed({ transform }) {
-    select(svg).attr("transform", transform);
-  }
-
   const handler = zoom()
     .scaleExtent([1, 40])
-    .on("zoom", zoomed);
-
+    .on("zoom", e => {transform = e.transform} );
 
   setContext('colors', scaleOrdinal(schemeCategory10))
 
@@ -51,11 +48,11 @@
   <FloorTabs selected={floor} />
   <LayerCake x='0' y='1' flatData={ bounds } xReverse={ false } yReverse={ true } padding={ {top: 0, left: 0, bottom: 16, right: 0} }>
     <Svg bind:element={svg}>
-      <AxisX />
-      <AxisY />
-      <Rooms floor={$floor} />
-      <Nodes radarId={$hovered?.id ?? $selected?.id} floor={$floor} />
-      <Devices floor={$floor} on:selected={ d => detail(d.detail) } on:hovered={ d => $hovered = d.detail } />
+      <AxisX {transform} />
+      <AxisY {transform} />
+      <Rooms {transform} floor={$floor} />
+      <Nodes {transform} radarId={$hovered?.id ?? $selected?.id} floor={$floor} />
+      <Devices {transform} floor={$floor} on:selected={ d => detail(d.detail) } on:hovered={ d => $hovered = d.detail } />
     </Svg>
   </LayerCake>
   <Drawer width="400px">
