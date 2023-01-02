@@ -1,11 +1,9 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { scaleCanvas } from 'layercake';
-  import { scaleLinear, polygonHull, polygonCentroid } from "d3";
-  import { config, devices } from '../lib/stores';
-  import type { Config, Node, Room } from '../lib/types';
+  import { polygonCentroid } from "d3";
+  import type { Room } from '../lib/types';
 
-  const { data, xGet, yGet, width, height, xScale, yScale } = getContext('LayerCake');
+  const { xScale, yScale } = getContext('LayerCake');
 
   export let room:Room;
   let colors = getContext('colors');
@@ -16,5 +14,10 @@
   });
 </script>
 
-<path stroke='white' fill={colors(room.id)} fill-opacity="0.1" d={`M${scaledHull.join("L")}Z`} />
+<linearGradient id="{room.id}" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0.0%" stop-color="{colors(room.id)}00"></stop>
+    <stop offset="100.0%" stop-color="{colors(room.id)}FF"></stop>
+</linearGradient>
+
+<path stroke='white' style:fill={ "url(#" + room.id + ")" } fill-opacity="0.25" d={`M${scaledHull.join("L")}Z`} />
 <text dominant-baseline='middle' text-anchor='middle' x='{ $xScale(centroid[0]) }' y='{ $yScale(centroid[1]) }' fill='white' font-size='10px'>{room.name}</text>
