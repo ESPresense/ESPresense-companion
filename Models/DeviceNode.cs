@@ -8,6 +8,8 @@ public class DeviceNode
     public Node? Node { get; set; }
 
     public double Distance { get; set; }
+    public double Rssi { get; set; }
+
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
 
@@ -32,7 +34,15 @@ public class DeviceNode
                     if (prop == "name") NewName(reader.GetString());
                     break;
                 case JsonTokenType.Number:
-                    if (prop == "distance") moved |= NewDistance(reader.GetDouble());
+                    switch (prop)
+                    {
+                        case "distance":
+                            moved |= NewDistance(reader.GetDouble());
+                            break;
+                        case "rssi":
+                            Rssi = reader.GetDouble();
+                            break;
+                    }
                     break;
                 default:
                     reader.Skip();

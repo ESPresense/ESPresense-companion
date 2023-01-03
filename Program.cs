@@ -8,6 +8,7 @@ using MQTTnet.Diagnostics;
 using Serilog;
 using Serilog.Events;
 using SQLite;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,7 +41,10 @@ builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
 builder.Services.AddSingleton<State>();
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
+{
+    opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 var app = builder.Build();
 
