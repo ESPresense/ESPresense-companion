@@ -4,7 +4,6 @@ using System.Text.Json;
 using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
-using SQLite;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -13,14 +12,12 @@ namespace ESPresense.Controllers
     [ApiController]
     public class StateController : ControllerBase
     {
-        private readonly SQLiteConnection _db;
-        private readonly ILogger<RoomController> _logger;
+        private readonly ILogger<StateController> _logger;
         private readonly State _state;
         private readonly ConfigLoader _config;
 
-        public StateController(SQLiteConnection db, ILogger<RoomController> logger, State state, ConfigLoader config)
+        public StateController(ILogger<StateController> logger, State state, ConfigLoader config)
         {
-            _db = db;
             _logger = logger;
             _state = state;
             _config = config;

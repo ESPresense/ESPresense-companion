@@ -1,9 +1,6 @@
 ﻿using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
-using SQLite;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace ESPresense.Controllers
 {
@@ -11,21 +8,25 @@ namespace ESPresense.Controllers
     [ApiController]
     public class DeviceController : ControllerBase
     {
-        private readonly SQLiteConnection _db;
-        private readonly ILogger<RoomController> _logger;
+        private readonly ILogger<DeviceController> _logger;
         private readonly DeviceSettingsStore _deviceSettingsStore;
+        private readonly State _state;
 
-        public DeviceController(SQLiteConnection db, ILogger<RoomController> logger, DeviceSettingsStore deviceSettingsStore)
+        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, State state)
         {
-            _db = db;
             _logger = logger;
             _deviceSettingsStore = deviceSettingsStore;
+            _state = state;
         }
 
         [HttpGet("{id}")]
-        public async Task<DeviceSettings?> Get(string id)
+        public async Task<DeviceSettingsDetails> Get(string id)
         {
-            return await _deviceSettingsStore.Get(id);
+            var deviceSettings = await _deviceSettingsStore.Get(id);
+            var details = new List<KeyValuePair<string, string>>();
+            if (deviceSettings?.Id != null && _state.Devices.TryGetValue(deviceSettings.Id, out var device))
+                details.AddRange(device.GetDetails());
+            return new DeviceSettingsDetails(deviceSettings, details);
         }
 
         [HttpPut("{id}")]
@@ -34,4 +35,6 @@ namespace ESPresense.Controllers
             await _deviceSettingsStore.Set(id, value);
         }
     }
+
+    public readonly record struct DeviceSettingsDetails(DeviceSettings? settings, IList<KeyValuePair<string, string>> details);
 }
