@@ -1,5 +1,6 @@
 ﻿using ConcurrentCollections;
 using ESPresense.Models;
+using ESPresense.Services;
 using MQTTnet.Extensions.ManagedClient;
 using Serilog;
 
@@ -7,22 +8,20 @@ namespace ESPresense.Locators;
 
 internal class MultiScenarioLocator : BackgroundService
 {
+    private readonly MqttConnectionFactory _mqttConnectionFactory;
     private readonly State _state;
-    private readonly IServiceProvider _serviceProvider;
 
     private ConcurrentHashSet<Device> _dirty = new();
 
-    public MultiScenarioLocator(State state, IServiceProvider serviceProvider)
+    public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory)
     {
         _state = state;
-        _serviceProvider = serviceProvider;
+        _mqttConnectionFactory = mqttConnectionFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var scope = _serviceProvider.CreateScope();
-        var mc = await scope.ServiceProvider.GetRequiredService<Task<IManagedMqttClient>>();
-
+        var mc = await _mqttConnectionFactory.GetClient(true);
         await mc.SubscribeAsync("espresense/devices/#");
 
         mc.ApplicationMessageReceivedAsync += arg =>
@@ -88,10 +87,7 @@ internal class MultiScenarioLocator : BackgroundService
 
     private IEnumerable<Scenario> GetScenarios(Device device)
     {
-        foreach (var floor in _state.Floors.Values)
-        {
-            yield return new Scenario(new NelderMeadMultilateralizer(device, floor), floor.Name);
-        }
+        foreach (var floor in _state.Floors.Values) yield return new Scenario(new NelderMeadMultilateralizer(device, floor), floor.Name);
         yield return new Scenario(new NearestNode(device), "NearestNode");
     }
 }

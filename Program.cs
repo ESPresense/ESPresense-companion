@@ -34,7 +34,7 @@ builder.Services.AddSingleton(a =>
     return new SQLiteConnection(databasePath);
 });
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
-builder.Services.AddScoped(MqttConnection.GetClient);
+builder.Services.AddSingleton<MqttConnectionFactory>();
 
 builder.Services.AddSingleton<DeviceSettingsStore>();
 
