@@ -4,21 +4,30 @@
   import type { Node, Device } from '../lib/types';
 
   let nodes: Node[] | undefined;
-  $: nodes = $config?.nodes;
 </script>
 
 <div class="table-container">
-  {#if nodes }
+  {#if $devices }
   <table class="table table-hover">
 		<thead>
 			<tr>
+        <th>Id</th>
 				<th>Name</th>
+        <th>Room / Floor</th>
+        <th>X</th>
+        <th>Y</th>
+        <th>Z</th>
 			</tr>
 		</thead>
 		<tbody>
-      {#each nodes as n}
+      {#each $devices as d}
 			<tr>
-				<td>{@html n.name}</td>
+        <td>{@html d.id}</td>
+				<td>{@html d.name}</td>
+        <td>{@html d.room?.name ?? d.floor.name}</td>
+        <td>{@html d.location.x}</td>
+        <td>{@html d.location.y}</td>
+        <td>{@html d.location.z}</td>
 			</tr>
       {/each}
 		</tbody>

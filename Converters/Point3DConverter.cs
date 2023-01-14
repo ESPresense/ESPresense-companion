@@ -64,13 +64,13 @@ public class Point3DConverter : JsonConverter<Point3D>
         throw new JsonException();
     }
 
-    public override void Write(Utf8JsonWriter writer, Point3D person, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, Point3D p, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
 
-        writer.WriteNumber("x", person.X);
-        writer.WriteNumber("y", person.Y);
-        writer.WriteNumber("z", person.Z);
+        writer.WriteNumber("x", Math.Round(p.X, 3));
+        writer.WriteNumber("y", Math.Round(p.Y, 3));
+        writer.WriteNumber("z", Math.Round(p.Z, 3));
 
         writer.WriteEndObject();
     }
