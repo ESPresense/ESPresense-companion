@@ -75,12 +75,18 @@ internal class MultiScenarioLocator : BackgroundService
             var todo = _dirty;
             _dirty = new ConcurrentHashSet<Device>();
 
+            var now = DateTime.UtcNow;
+            var idleTimeout = TimeSpan.FromSeconds(_state.Config?.Timeout ?? 30);
+
+            foreach (var idle in _state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
+
             foreach (var device in todo.Where(d => d.Scenarios.AsParallel().Count(s => s.Locate()) > 0))
             {
                 var bs = device.BestScenario = device.Scenarios.Select((scenario, i) => new { scenario, i }).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).First().scenario;
                 await mc.EnqueueAsync("espresense/ips/" + device.Id, $"{{ \"x\":{bs.Location.X}, \"y\":{bs.Location.Y}, \"z\":{bs.Location.Z}, \"name\":\"{device.Name ?? device.Id}\", \"confidence\":\"{bs.Confidence}\", \"fixes\":\"{bs.Fixes}\", \"scenario\":\"{bs.Name}\" }}");
                 device.ReportedLocation = bs.Location;
                 device.ReportedRoom = bs.Room;
+                device.LastCalculated = now;
             }
         }
     }

@@ -25,11 +25,10 @@ public class Device
 
     [JsonConverter(typeof(FloorConverter))] public Floor? Floor => BestScenario?.Floor;
 
-
     public int Confidence => BestScenario?.Confidence ?? 0;
 
-    public bool Check { get; set; }
-    public bool Track { get; set; }
+    [JsonIgnore] public bool Check { get; set; }
+    [JsonIgnore] public bool Track { get; set; }
 
     [JsonIgnore] public Scenario? BestScenario { get; set; }
     [JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
@@ -38,6 +37,8 @@ public class Device
     public Point3D? Location => BestScenario?.Location;
 
     [JsonIgnore] public Room? ReportedRoom { get; set; }
+
+    [JsonIgnore] public DateTime? LastCalculated { get; set; }
 
     public IEnumerable<KeyValuePair<string, string>> GetDetails()
     {
