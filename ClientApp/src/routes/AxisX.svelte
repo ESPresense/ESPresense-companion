@@ -26,7 +26,7 @@
   export let baseline = true;
 
   /** @type {Boolean} [snapTicks=false] - Instead of centering the text on the first and the last items, align them to the edges of the chart. */
-  export let snapTicks = true;
+  export let snapTicks = false;
 
   /** @type {Function} [formatTick=d => d] - A function that passes the current tick value and expects a nicely formatted value in return. */
   export let formatTick = d => d;
@@ -38,7 +38,13 @@
   export let xTick = 0;
 
   /** @type {Number} [yTick=16] - The distance from the baseline to place each tick value. */
-  export let yTick = 16;
+  export let yTick = -16;
+
+  /** @type {Number} [dxTick=0] - Any optional value passed to the `dx` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+  export let dxTick = 4;
+
+  /** @type {Number} [dyTick=-4] - Any optional value passed to the `dy` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+  export let dyTick = 16;
 
   $: isBandwidth = typeof x.bandwidth === 'function';
 
@@ -50,19 +56,11 @@
           x.ticks(ticks);
 
   function textAnchor(i) {
-    if (snapTicks === true) {
-      if (i === 0) {
-        return 'start';
-      }
-      if (i === tickVals.length - 1) {
-        return 'end';
-      }
-    }
-    return 'middle';
+    return 'start';
   }
 </script>
 
-<g class="axis x-axis" class:snapTicks>
+<g class="axis x-axis" class:snapTicks transform='translate(0, {$padding.bottom})'>
   {#each tickVals as tick, i (tick)}
     <g class="tick tick-{i}" transform="translate({x(tick)},{Math.max(...$yRange)})">
       {#if gridlines !== false}
@@ -72,7 +70,7 @@
         <line
           class="tick-mark"
           y1={0}
-          y2={6}
+          y2={-6}
           x1={xTick || isBandwidth ? x.bandwidth() / 2 : 0}
           x2={xTick || isBandwidth ? x.bandwidth() / 2 : 0}
         />
@@ -80,8 +78,8 @@
       <text
         x={xTick || isBandwidth ? x.bandwidth() / 2 : 0}
         y={yTick}
-        dx=""
-        dy=""
+        dx='{isBandwidth ? -9 : dxTick}'
+        dy='{isBandwidth ? 4 : dyTick}'
         text-anchor={textAnchor(i)}>{formatTick(tick)}</text
       >
     </g>
@@ -110,12 +108,5 @@
   .tick .tick-mark,
   .baseline {
     stroke-dasharray: 0;
-  }
-  /* This looks slightly better */
-  .axis.snapTicks .tick:last-child text {
-    transform: translateX(3px);
-  }
-  .axis.snapTicks .tick.tick-0 text {
-    transform: translateX(-3px);
   }
 </style>

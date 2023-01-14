@@ -46,7 +46,7 @@
 {#if bounds }
 <div class="w-full h-full">
   <FloorTabs selected={floor} />
-  <LayerCake x='0' y='1' flatData={ bounds } xReverse={ false } yReverse={ true } padding={ {top: 0, left: 0, bottom: 16, right: 0} }>
+  <LayerCake x='0' y='1' flatData={ bounds } xReverse={ false } yReverse={ true } padding={ {top: 16, left: 16, bottom: 16, right: 16} }>
     <Svg bind:element={svg}>
       <AxisX {transform} />
       <AxisY {transform} />
