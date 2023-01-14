@@ -35,6 +35,7 @@ public class State
 
         void LoadConfig(Config c)
         {
+            Config = c;
             foreach (var floor in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(floor.GetId(), a => new Floor()).Update(c, floor);
             foreach (var node in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(node.GetId(), a => new Node()).Update(c, node, GetFloorsByIds(node.Floors));
 
@@ -47,6 +48,7 @@ public class State
         if (cl.Config != null) LoadConfig(cl.Config);
     }
 
+    public Config? Config;
     public ConcurrentDictionary<string, Node> Nodes { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Device> Devices { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Floor> Floors { get; } = new(StringComparer.OrdinalIgnoreCase);

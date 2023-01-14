@@ -9,11 +9,18 @@ using Serilog;
 
 namespace ESPresense.Services
 {
-    public static class MqttConnection
+    public class MqttConnectionFactory
     {
-        public static async Task<IManagedMqttClient> GetClient(IServiceProvider serviceProvider)
+        private readonly IServiceProvider _serviceProvider;
+
+        public MqttConnectionFactory(IServiceProvider serviceProvider)
         {
-            var cfg = serviceProvider.GetRequiredService<ConfigLoader>();
+            _serviceProvider = serviceProvider;
+        }
+
+        public async Task<IManagedMqttClient> GetClient(bool primary)
+        {
+            var cfg = _serviceProvider.GetRequiredService<ConfigLoader>();
             var c = await cfg.ConfigAsync();
 
             c.Mqtt ??= new ConfigMqtt();
@@ -47,15 +54,22 @@ namespace ESPresense.Services
                 }
             }
 
-            var mqttFactory = new MqttFactory(serviceProvider.GetRequiredService<IMqttNetLogger>());
+            var mqttFactory = new MqttFactory(_serviceProvider.GetRequiredService<IMqttNetLogger>());
 
             var mc = mqttFactory.CreateManagedMqttClient();
-            var mqttClientOptions = new MqttClientOptionsBuilder()
-                .WithConfig(c.Mqtt)
-                .WithWillTopic("espresense/companion/status")
-                .WithWillRetain()
-                .WithWillPayload("offline")
-                .Build();
+
+            var mqttClientOptions =
+                primary
+                    ? new MqttClientOptionsBuilder()
+                        .WithConfig(c.Mqtt)
+                        .WithClientId("espresense-companion")
+                        .WithWillTopic("espresense/companion/status")
+                        .WithWillRetain()
+                        .WithWillPayload("offline")
+                        .Build()
+                    : new MqttClientOptionsBuilder()
+                        .WithConfig(c.Mqtt)
+                        .Build();
 
             var managedMqttClientOptions = new ManagedMqttClientOptionsBuilder()
                 .WithClientOptions(mqttClientOptions)
@@ -63,9 +77,13 @@ namespace ESPresense.Services
 
             await mc.StartAsync(managedMqttClientOptions);
 
-            await mc.EnqueueAsync("espresense/companion/status", "online");
+            mc.ConnectedAsync += async (s) =>
+            {
+                Log.Information("MQTT connected {primary}", primary);
+                if (primary) await mc.EnqueueAsync("espresense/companion/status", "online");
+            };
 
-            mc.ConnectingFailedAsync += (s)=>
+            mc.ConnectingFailedAsync += (s) =>
             {
                 Log.Error("MQTT connection failed {@error}: {@inner}", s.Exception.Message, s.Exception?.InnerException?.Message);
                 return Task.CompletedTask;

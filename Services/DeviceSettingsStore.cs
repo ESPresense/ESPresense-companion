@@ -9,18 +9,17 @@ namespace ESPresense.Services
 {
     public class DeviceSettingsStore : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly MqttConnectionFactory _mqttConnectionFactory;
 
         private readonly ConcurrentDictionary<string, DeviceSettings> _storeById = new();
         private readonly ConcurrentDictionary<string, DeviceSettings> _storeByAlias = new();
 
         private IManagedMqttClient? _mc;
 
-        public DeviceSettingsStore(IServiceProvider serviceProvider)
+        public DeviceSettingsStore(MqttConnectionFactory mqttConnectionFactory)
         {
-            _serviceProvider = serviceProvider;
+            _mqttConnectionFactory = mqttConnectionFactory;
         }
-
 
         public Task<DeviceSettings?> Get(string id)
         {
@@ -42,9 +41,7 @@ namespace ESPresense.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var scope = _serviceProvider.CreateScope();
-            using var mc = _mc = await scope.ServiceProvider.GetRequiredService<Task<IManagedMqttClient>>();
-
+            using var mc = _mc = await _mqttConnectionFactory.GetClient(false);
             await mc.SubscribeAsync("espresense/settings/#");
 
             mc.ApplicationMessageReceivedAsync += arg =>
@@ -52,7 +49,7 @@ namespace ESPresense.Services
                 var parts = arg.ApplicationMessage.Topic.Split('/');
                 if (parts.Length >= 4 && parts[3] == "config")
                 {
-      
+
                     var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString());
                     ds.OriginalId = parts[2];
                     _storeById.AddOrUpdate(parts[2], _ => ds, (_, _) => ds);

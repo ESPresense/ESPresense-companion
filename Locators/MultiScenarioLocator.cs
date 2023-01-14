@@ -1,5 +1,6 @@
 ﻿using ConcurrentCollections;
 using ESPresense.Models;
+using ESPresense.Services;
 using MQTTnet.Extensions.ManagedClient;
 using Serilog;
 
@@ -7,22 +8,20 @@ namespace ESPresense.Locators;
 
 internal class MultiScenarioLocator : BackgroundService
 {
+    private readonly MqttConnectionFactory _mqttConnectionFactory;
     private readonly State _state;
-    private readonly IServiceProvider _serviceProvider;
 
     private ConcurrentHashSet<Device> _dirty = new();
 
-    public MultiScenarioLocator(State state, IServiceProvider serviceProvider)
+    public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory)
     {
         _state = state;
-        _serviceProvider = serviceProvider;
+        _mqttConnectionFactory = mqttConnectionFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var scope = _serviceProvider.CreateScope();
-        var mc = await scope.ServiceProvider.GetRequiredService<Task<IManagedMqttClient>>();
-
+        var mc = await _mqttConnectionFactory.GetClient(true);
         await mc.SubscribeAsync("espresense/devices/#");
 
         mc.ApplicationMessageReceivedAsync += arg =>
@@ -76,22 +75,25 @@ internal class MultiScenarioLocator : BackgroundService
             var todo = _dirty;
             _dirty = new ConcurrentHashSet<Device>();
 
+            var now = DateTime.UtcNow;
+            var idleTimeout = TimeSpan.FromSeconds(_state.Config?.Timeout ?? 30);
+
+            foreach (var idle in _state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
+
             foreach (var device in todo.Where(d => d.Scenarios.AsParallel().Count(s => s.Locate()) > 0))
             {
                 var bs = device.BestScenario = device.Scenarios.Select((scenario, i) => new { scenario, i }).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).First().scenario;
                 await mc.EnqueueAsync("espresense/ips/" + device.Id, $"{{ \"x\":{bs.Location.X}, \"y\":{bs.Location.Y}, \"z\":{bs.Location.Z}, \"name\":\"{device.Name ?? device.Id}\", \"confidence\":\"{bs.Confidence}\", \"fixes\":\"{bs.Fixes}\", \"scenario\":\"{bs.Name}\" }}");
                 device.ReportedLocation = bs.Location;
                 device.ReportedRoom = bs.Room;
+                device.LastCalculated = now;
             }
         }
     }
 
     private IEnumerable<Scenario> GetScenarios(Device device)
     {
-        foreach (var floor in _state.Floors.Values)
-        {
-            yield return new Scenario(new NelderMeadMultilateralizer(device, floor), floor.Name);
-        }
+        foreach (var floor in _state.Floors.Values) yield return new Scenario(new NelderMeadMultilateralizer(device, floor), floor.Name);
         yield return new Scenario(new NearestNode(device), "NearestNode");
     }
 }
