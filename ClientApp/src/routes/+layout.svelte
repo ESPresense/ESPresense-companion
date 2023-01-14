@@ -7,9 +7,10 @@
   import { writable, type Writable } from 'svelte/store';
 
   import logo from '$lib/images/logo.svg';
-	import github from '$lib/images/github.svg';
+  import github from '$lib/images/github.svg';
   import map from '$lib/images/map.svg';
   import nodes from '$lib/images/nodes.svg';
+  import devices from '$lib/images/devices.svg';
 
   const storeValue: Writable<number> = writable(1);
 </script>
@@ -20,24 +21,29 @@
       <AppRail selected={storeValue} width="w-16">
 
         <svelte:fragment slot="lead">
-					<AppRailTile tag="a" href="https://espresense.com/companion" target="_blank" >
+          <AppRailTile tag="a" href="https://espresense.com/companion" target="_blank" >
             <img src={logo} alt="ESPresense Companion"/>
-					</AppRailTile>
-				</svelte:fragment>
+          </AppRailTile>
+        </svelte:fragment>
 
         <AppRailTile label="Map" tag="a" href="{base}/" value={1}>
           <img src={map} alt="Map" />
-				</AppRailTile>
+        </AppRailTile>
 
-        <AppRailTile label="Nodes" tag="a" href="{base}/nodes" value={2}>
+        <AppRailTile label="Devices" tag="a" href="{base}/devices" value={2}>
+          <img src={devices} alt="Devices" />
+        </AppRailTile>
+
+        <AppRailTile label="Nodes" tag="a" href="{base}/nodes" value={3}>
           <img src={nodes} alt="Nodes" />
-				</AppRailTile>
+        </AppRailTile>
 
-				<svelte:fragment slot="trail">
-					<AppRailTile regionIcon="w-8" tag="a" href="https://github.com/ESPresense/ESPresense-companion" target="_blank" title="Trail">
+
+        <svelte:fragment slot="trail">
+          <AppRailTile regionIcon="w-8" tag="a" href="https://github.com/ESPresense/ESPresense-companion" target="_blank" title="Trail">
             <img src={github} alt="GitHub" />
-					</AppRailTile>
-				</svelte:fragment>
+          </AppRailTile>
+        </svelte:fragment>
     </AppRail>
    </svelte:fragment>
     <slot />
