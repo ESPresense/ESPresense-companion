@@ -22,8 +22,10 @@ export interface Node {
 export interface Device {
 	id: string;
 	name: string;
-	nodes: { [index: string]: number }
-	room: { id: string, floor: string };
+	nodes: { [index: string]: number };
+	room: { id: string, name: string };
+	floor: { id: string, name: string };
+	location: { x: number, y: number, z: number };
 }
 
 export interface Config {

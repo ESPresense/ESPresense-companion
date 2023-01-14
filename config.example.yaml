@@ -16,7 +16,7 @@ floors:
   - id: first
     name: First Floor
   # Bounds (x,y,z) of map in meters
-    bounds: [[-0.5, -1, 0], [19, 20, 3.1]]
+    bounds: [[0, 0, 0], [18.5, 19.2, 1.5]]
     rooms:
       - name: Powder
         points:
@@ -94,7 +94,7 @@ floors:
           - [0, 9]
   - id: second
     name: Second Floor
-    bounds: [[-1, -1, 3.1], [18, 20, 6.2]]
+    bounds: [[0, 0, 3.1], [18.5, 19.2, 4.6]]
     rooms:
       - name: Master
         points:
@@ -126,18 +126,18 @@ floors:
           - [0, 18]
   - id: outside
     name: Outside
-    bounds: [[-10, -10, 0], [28, 30, 20]]
+    bounds: [[-10, -10, -10], [28, 30, 20]]
 
 # Locations of espresense nodes in meters
 nodes:
   - name: Master
-    point: [6.5, 12, 4.2]
+    point: [6.5, 12, 3.6]
     floors: ["second"]
   - name: Bathroom
-    point: [0.1, 10, 4.2]
+    point: [0.1, 10, 3.9]
     floors: ["second", "outside"]
   - name: Upstairs Hallway
-    point: [10, 10, 4.2]
+    point: [10, 10, 3.2]
     floors: ["second"]
   - name: Garage
     point: [0.75, 17.9, 0.5]
@@ -155,10 +155,10 @@ nodes:
     point: [18.25, 3.1, 0.5]
     floors: ["first", "outside"]
   - name: Basement
-    point: [17, 12.5, -1.5]
+    point: [17, 12.5, -0.8]
     floors: ["first", "second", "outside"]
   - name: Laundry
-    point: [5, 9, 2]
+    point: [5, 9, 1]
     floors: ["first"]
   - name: VW EOS
     stationary: false

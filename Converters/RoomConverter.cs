@@ -15,7 +15,7 @@ public class RoomConverter : JsonConverter<Room>
     {
         writer.WriteStartObject();
         writer.WriteString("id", room.Id);
-        writer.WriteString("floor", room.Floor?.Id);
+        writer.WriteString("name", room.Name);
         writer.WriteEndObject();
     }
 }
