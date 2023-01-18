@@ -45,12 +45,12 @@ namespace ESPresense.Services
                     catch (FlurlHttpException ex)
                     {
                         var error = await ex.GetResponseJsonAsync<HassIoResult>();
-                        Log.Warning($"Failed to get MQTT config from Hass.io: {error.Message}");
+                        Log.Warning($"Failed to get MQTT config from Hass Supervisor: {error.Message}");
                     }
                 }
                 catch (Exception e)
                 {
-                    Log.Error(e, "Failed to get MQTT config from Hass.io");
+                    Log.Error(e, "Failed to get MQTT config from Hass Supervisor");
                 }
             }
 
@@ -79,8 +79,13 @@ namespace ESPresense.Services
 
             mc.ConnectedAsync += async (s) =>
             {
-                Log.Information("MQTT connected {primary}", primary);
+                Log.Information("MQTT connected {@p}",  new { primary });
                 if (primary) await mc.EnqueueAsync("espresense/companion/status", "online");
+            };
+
+            mc.DisconnectedAsync += (s) => {
+                Log.Information("MQTT disconnected {@p}", new { primary });
+                return Task.CompletedTask;
             };
 
             mc.ConnectingFailedAsync += (s) =>

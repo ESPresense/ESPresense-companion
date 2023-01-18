@@ -69,9 +69,9 @@ public class Device
 
         foreach (var s in scenarios)
         {
-            yield return new KeyValuePair<string, string>($"{s.Name} X", $"{s.Location.X}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Y", $"{s.Location.Y}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Z", $"{s.Location.Z}");
+            yield return new KeyValuePair<string, string>($"{s.Name} X", $"{s.Location.X:##.000}");
+            yield return new KeyValuePair<string, string>($"{s.Name} Y", $"{s.Location.Y:##.000}");
+            yield return new KeyValuePair<string, string>($"{s.Name} Z", $"{s.Location.Z:##.000}");
         }
     }
 }

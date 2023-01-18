@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Serilog;
 
 namespace ESPresense.Models;
 
@@ -21,39 +22,47 @@ public class DeviceNode
     public bool ReadMessage(byte[] payload)
     {
         bool moved = false;
-        var reader = new Utf8JsonReader(payload);
-        string? prop = null;
-        while (reader.Read())
-            switch (reader.TokenType)
-            {
-                case JsonTokenType.StartObject:
-                    break;
-                case JsonTokenType.PropertyName:
-                    prop = reader.GetString();
-                    break;
-                case JsonTokenType.String:
-                    if (prop == "name") NewName(reader.GetString());
-                    break;
-                case JsonTokenType.Number:
-                    switch (prop)
-                    {
-                        case "distance":
-                            moved |= NewDistance(reader.GetDouble());
-                            break;
-                        case "rssi":
-                            Rssi = reader.GetDouble();
-                            break;
-                        case "rssi@1m":
-                            RefRssi = reader.GetDouble();
-                            break;
-                    }
-                    break;
-                default:
-                    reader.Skip();
-                    break;
-            }
 
+        try
+        {
+            var reader = new Utf8JsonReader(payload);
+            string? prop = null;
+            while (reader.Read())
+                switch (reader.TokenType)
+                {
+                    case JsonTokenType.StartObject:
+                        break;
+                    case JsonTokenType.PropertyName:
+                        prop = reader.GetString();
+                        break;
+                    case JsonTokenType.String:
+                        if (prop == "name") NewName(reader.GetString());
+                        break;
+                    case JsonTokenType.Number:
+                        switch (prop)
+                        {
+                            case "distance":
+                                moved |= NewDistance(reader.GetDouble());
+                                break;
+                            case "rssi":
+                                Rssi = reader.GetDouble();
+                                break;
+                            case "rssi@1m":
+                                RefRssi = reader.GetDouble();
+                                break;
+                        }
 
+                        break;
+                    default:
+                        reader.Skip();
+                        break;
+                }
+
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Error reading mqtt message");
+        }
         return moved;
     }
 
