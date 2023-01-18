@@ -3,7 +3,6 @@ using ESPresense.Locators;
 using ESPresense.Middleware;
 using ESPresense.Models;
 using ESPresense.Services;
-using MathNet.Numerics;
 using MQTTnet.Diagnostics;
 using Serilog;
 using Serilog.Events;
@@ -29,10 +28,19 @@ builder.Services.AddHostedService(a => configLoader);
 
 builder.Services.AddSingleton(a =>
 {
-    var databasePath = Path.Combine(storageDir, "config.db");
+    SQLitePCL.Batteries.Init();
+    var databasePath = Path.Combine(storageDir, "history.db");
     Directory.CreateDirectory(Path.GetDirectoryName(databasePath) ?? throw new InvalidOperationException("HOME not found"));
-    return new SQLiteConnection(databasePath);
+    var sqLiteConnection = new SQLiteAsyncConnection(databasePath)
+    {
+        Trace = true,
+        Tracer = Log.Information
+    };
+
+    return sqLiteConnection;
 });
+
+builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttConnectionFactory>();
 

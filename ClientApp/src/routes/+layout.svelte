@@ -1,7 +1,7 @@
 <script lang="ts">
   import '@skeletonlabs/skeleton/themes/theme-crimson.css';
   import '@skeletonlabs/skeleton/styles/all.css';
-  import '../app.postcss';
+  import "../app.css";
   import { assets, base } from '$app/paths';
   import { AppShell, AppBar, AppRail, AppRailTile } from '@skeletonlabs/skeleton';
   import { writable, type Writable } from 'svelte/store';

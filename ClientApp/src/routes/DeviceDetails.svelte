@@ -50,6 +50,7 @@
 </script>
 
 {#if device}
+<span class="text-lg font-medium leading-6 badge badge-filled-primary m-2">{@html device.name ?? device.originalId }</span>
 <AccordionGroup>
   <AccordionItem spacing="space-y-4" open>
     <svelte:fragment slot="summary">

@@ -12,16 +12,20 @@ internal class MultiScenarioLocator : BackgroundService
     private readonly State _state;
 
     private ConcurrentHashSet<Device> _dirty = new();
+    private readonly DatabaseFactory _databaseFactory;
 
-    public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory)
+    public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory)
     {
         _state = state;
         _mqttConnectionFactory = mqttConnectionFactory;
+        _databaseFactory = databaseFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var dh = await _databaseFactory.GetDeviceHistory();
         var mc = await _mqttConnectionFactory.GetClient(true);
+
         await mc.SubscribeAsync("espresense/devices/#");
 
         mc.ApplicationMessageReceivedAsync += arg =>
@@ -84,6 +88,12 @@ internal class MultiScenarioLocator : BackgroundService
             {
                 var bs = device.BestScenario = device.Scenarios.Select((scenario, i) => new { scenario, i }).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).First().scenario;
                 await mc.EnqueueAsync("espresense/ips/" + device.Id, $"{{ \"x\":{bs.Location.X}, \"y\":{bs.Location.Y}, \"z\":{bs.Location.Z}, \"name\":\"{device.Name ?? device.Id}\", \"confidence\":\"{bs.Confidence}\", \"fixes\":\"{bs.Fixes}\", \"scenario\":\"{bs.Name}\" }}");
+                foreach (var ds in device.Scenarios)
+                {
+                    if (ds.Confidence == 0) continue;
+                    await dh.Add(new DeviceHistory { Id = device.Id, When = DateTime.UtcNow, X = ds.Location.X, Y = ds.Location.Y, Z = ds.Location.Z, Confidence = ds.Confidence ?? 0, Fixes = ds.Fixes ?? 0, Scenario = ds.Name, Best = ds == bs });
+                }
+
                 device.ReportedLocation = bs.Location;
                 device.ReportedRoom = bs.Room;
                 device.LastCalculated = now;
