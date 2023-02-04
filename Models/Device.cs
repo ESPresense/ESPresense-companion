@@ -25,7 +25,13 @@ public class Device
 
     [JsonConverter(typeof(FloorConverter))] public Floor? Floor => BestScenario?.Floor;
 
-    public int Confidence => BestScenario?.Confidence ?? 0;
+    public int? Confidence => BestScenario?.Confidence;
+
+    public double? Scale => BestScenario?.Scale;
+
+    public int? Fixes => BestScenario?.Fixes;
+
+    public DateTime? LastHit => BestScenario?.LastHit;
 
     [JsonIgnore] public bool Check { get; set; }
     [JsonIgnore] public bool Track { get; set; }
@@ -55,6 +61,8 @@ public class Device
             yield return new KeyValuePair<string, string>($"{s.Name} Error", $"{s.Error}");
         foreach (var s in scenarios.Where(a => a.Iterations != null))
             yield return new KeyValuePair<string, string>($"{s.Name} Iterations", $"{s.Iterations}");
+        foreach (var s in scenarios.Where(a => a.Scale != null))
+            yield return new KeyValuePair<string, string>($"{s.Name} Scale", $"{s.Scale}");
         foreach (var s in scenarios.Where(a => a.ReasonForExit != ExitCondition.None))
             yield return new KeyValuePair<string, string>($"{s.Name} ReasonForExit", $"{s.ReasonForExit}");
         var deviceNodes = Nodes.Values.Where(dn => dn.Node != null).OrderBy(dn => dn.Distance).ToList();

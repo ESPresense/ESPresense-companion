@@ -86,7 +86,7 @@ internal class MultiScenarioLocator : BackgroundService
 
             foreach (var device in todo.Where(d => d.Scenarios.AsParallel().Count(s => s.Locate()) > 0))
             {
-                var bs = device.BestScenario = device.Scenarios.Select((scenario, i) => new { scenario, i }).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).First().scenario;
+                var bs = device.BestScenario = device.Scenarios.Select((scenario, i) => new { scenario, i }).Where(a => a.scenario.Current).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).First().scenario;
                 await mc.EnqueueAsync("espresense/ips/" + device.Id, $"{{ \"x\":{bs.Location.X}, \"y\":{bs.Location.Y}, \"z\":{bs.Location.Z}, \"name\":\"{device.Name ?? device.Id}\", \"confidence\":\"{bs.Confidence}\", \"fixes\":\"{bs.Fixes}\", \"scenario\":\"{bs.Name}\" }}");
                 foreach (var ds in device.Scenarios)
                 {
@@ -103,7 +103,7 @@ internal class MultiScenarioLocator : BackgroundService
 
     private IEnumerable<Scenario> GetScenarios(Device device)
     {
-        foreach (var floor in _state.Floors.Values) yield return new Scenario(new NelderMeadMultilateralizer(device, floor), floor.Name);
-        yield return new Scenario(new NearestNode(device), "NearestNode");
+        foreach (var floor in _state.Floors.Values) yield return new Scenario(_state.Config, new NelderMeadMultilateralizer(device, floor), floor.Name);
+        yield return new Scenario(_state.Config, new NearestNode(device), "NearestNode");
     }
 }
