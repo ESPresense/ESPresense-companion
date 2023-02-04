@@ -25,7 +25,11 @@ export interface Device {
 	nodes: { [index: string]: number };
 	room: { id: string, name: string };
 	floor: { id: string, name: string };
-	location: { x: number, y: number, z: number };
+  location: { x: number, y: number, z: number };
+  confidence: number;
+  scale: number;
+  fixes: number;
+  lastHit: Date;
 }
 
 export interface Config {

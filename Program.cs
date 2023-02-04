@@ -34,7 +34,7 @@ builder.Services.AddSingleton(a =>
     var sqLiteConnection = new SQLiteAsyncConnection(databasePath)
     {
         Trace = true,
-        Tracer = Log.Information
+        Tracer = Log.Debug
     };
 
     return sqLiteConnection;

@@ -49,7 +49,7 @@ public class MultiFloorMultilateralizer : ILocate
                         guess.X,
                         guess.Y,
                         guess.Z,
-                        scenario.Scale
+                        scenario.Scale ?? 1.0
                     });
                     var result = solver.FindMinimum(obj, init);
                     scenario.Location = new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
