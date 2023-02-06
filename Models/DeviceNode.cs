@@ -16,7 +16,7 @@ public class DeviceNode
 
     public double LastDistance { get; set; }
 
-    public bool Current => DateTime.Now - LastHit < TimeSpan.FromSeconds(Node?.Config?.Timeout ?? 30);
+    public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Node?.Config?.Timeout ?? 30);
     public double RefRssi { get; set; }
 
     public bool ReadMessage(byte[] payload)

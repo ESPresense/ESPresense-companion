@@ -9,6 +9,7 @@ namespace ESPresense.Locators
         public int Tracked { get; internal set; }
         public int Skipped { get; internal set; }
         public int Malformed { get; internal set; }
+        public int Moved { get; internal set; }
 
         public ConcurrentHashSet<string> UnknownNodes = new();
     }
