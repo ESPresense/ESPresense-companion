@@ -53,7 +53,9 @@ internal class MultiScenarioLocator : BackgroundService
                     return d;
                 });
                 tele.Devices = _state.Devices.Count;
-                var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload);
+                var dirty = false;
+                if (dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload))
+                    tele.Moved++;
 
                 if (device.Check)
                 {
@@ -87,7 +89,7 @@ internal class MultiScenarioLocator : BackgroundService
             return Task.CompletedTask;
         };
 
-        var telemetryLastSent = DateTime.UtcNow;
+        var telemetryLastSent = DateTime.MinValue;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -97,7 +99,7 @@ internal class MultiScenarioLocator : BackgroundService
             if (DateTime.UtcNow - telemetryLastSent > TimeSpan.FromSeconds(30))
             {
                 telemetryLastSent = DateTime.UtcNow;
-                await mc.EnqueueAsync("espresense/companion/telemetry", $"{{ \"messages\":{tele.Messages}, \"devices\":{tele.Devices}, \"tracked\":{tele.Tracked}, \"skipped\":{tele.Skipped}, \"malformed\":{tele.Malformed}, \"unknownNodes\":{tele.UnknownNodes.Count} }}");
+                await mc.EnqueueAsync("espresense/companion/telemetry", System.Text.Json.JsonSerializer.Serialize(tele));
             }
 
             var todo = _dirty;
