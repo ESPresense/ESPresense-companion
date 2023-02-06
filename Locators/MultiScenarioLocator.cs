@@ -97,7 +97,7 @@ internal class MultiScenarioLocator : BackgroundService
             if (DateTime.UtcNow - telemetryLastSent > TimeSpan.FromSeconds(30))
             {
                 telemetryLastSent = DateTime.UtcNow;
-                await mc.EnqueueAsync("espresense/telemetry", $"{{ \"messages\":{tele.Messages}, \"devices\":{tele.Devices}, \"tracked\":{tele.Tracked}, \"skipped\":{tele.Skipped}, \"malformed\":{tele.Malformed}, \"unknownNodes\":{tele.UnknownNodes.Count} }}");
+                await mc.EnqueueAsync("espresense/companion/telemetry", $"{{ \"messages\":{tele.Messages}, \"devices\":{tele.Devices}, \"tracked\":{tele.Tracked}, \"skipped\":{tele.Skipped}, \"malformed\":{tele.Malformed}, \"unknownNodes\":{tele.UnknownNodes.Count} }}");
             }
 
             var todo = _dirty;
