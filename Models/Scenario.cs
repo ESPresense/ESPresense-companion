@@ -17,7 +17,7 @@ namespace ESPresense.Models
         }
 
         [JsonIgnore] public Config? Config { get; private set; }
-        public bool Current => DateTime.Now - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
+        public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
         public int? Confidence { get; set; }
         public double? Minimum { get; set; }
         [JsonIgnore] public Point3D LastLocation { get; set; }
