@@ -30,6 +30,7 @@ internal class MultiScenarioLocator : BackgroundService
 
         mc.ApplicationMessageReceivedAsync += arg =>
         {
+            Console.WriteLine("Got Message: " + arg.ApplicationMessage.Topic);
             var parts = arg.ApplicationMessage.Topic.Split('/');
 
             var deviceId = parts[2];
