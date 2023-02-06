@@ -28,10 +28,10 @@
       <tr>
         <td>{@html d.id}</td>
         <td>{@html d.name}</td>
-        <td>{@html d.room?.name ?? d.floor.name}</td>
-        <td>{@html d.location.x}</td>
-        <td>{@html d.location.y}</td>
-        <td>{@html d.location.z}</td>
+        <td>{@html d.room?.name ?? d.floor?.name ?? "n/a"}</td>
+        <td>{@html d.location?.x}</td>
+        <td>{@html d.location?.y}</td>
+        <td>{@html d.location?.z}</td>
         <td>{@html d.fixes ?? "n/a"}</td>
         <td>{@html d.scale ?? "n/a"}</td>
         <td>{@html d.confidence ?? "n/a"}</td>
