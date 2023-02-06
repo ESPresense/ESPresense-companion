@@ -12,6 +12,8 @@ internal class MultiScenarioLocator : BackgroundService
     private readonly State _state;
 
     private ConcurrentHashSet<Device> _dirty = new();
+    private Telemetry tele = new();
+
     private readonly DatabaseFactory _databaseFactory;
 
     public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory)
@@ -30,20 +32,27 @@ internal class MultiScenarioLocator : BackgroundService
 
         mc.ApplicationMessageReceivedAsync += arg =>
         {
-            Console.WriteLine("Got Message: " + arg.ApplicationMessage.Topic);
-            var parts = arg.ApplicationMessage.Topic.Split('/');
+            var parts = arg.ApplicationMessage.Topic.Split('/', 4);
+
+            if (parts.Length != 4 || parts[0] != "espresense" || parts[1] != "devices")
+            {
+                tele.Malformed++;
+                return Task.CompletedTask;
+            }
 
             var deviceId = parts[2];
             var nodeId = parts[3];
 
             if (_state.Nodes.TryGetValue(nodeId, out var node))
             {
+                tele.Messages++;
                 var device = _state.Devices.GetOrAdd(deviceId, a =>
                 {
                     var d = new Device { Id = a, Check = true };
                     foreach (var scenario in GetScenarios(d)) d.Scenarios.Add(scenario);
                     return d;
                 });
+                tele.Devices = _state.Devices.Count;
                 var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload);
 
                 if (device.Check)
@@ -62,20 +71,34 @@ internal class MultiScenarioLocator : BackgroundService
                     if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue("*", out var cdByNameWild))
                         device.Track = cdByNameWild.Track;
                     device.Check = false;
+
+                    tele.Tracked = _state.Devices.Values.Where(a=>a.Track).Count();
                 }
 
                 if (device.Track && dirty)
                     _dirty.Add(device);
+
             }
-            else Log.Warning("Unknown node {nodeId}", nodeId);
+            else {
+                tele.Skipped++;
+                if (tele.UnknownNodes.Add(nodeId))
+                    Log.Warning("Unknown node {nodeId}", nodeId); }
 
             return Task.CompletedTask;
         };
+
+        var telemetryLastSent = DateTime.UtcNow;
 
         while (!stoppingToken.IsCancellationRequested)
         {
             while (_dirty.IsEmpty)
                 await Task.Delay(500, stoppingToken);
+
+            if (DateTime.UtcNow - telemetryLastSent > TimeSpan.FromSeconds(30))
+            {
+                telemetryLastSent = DateTime.UtcNow;
+                await mc.EnqueueAsync("espresense/telemetry", $"{{ \"messages\":{tele.Messages}, \"devices\":{tele.Devices}, \"tracked\":{tele.Tracked}, \"skipped\":{tele.Skipped}, \"malformed\":{tele.Malformed}, \"unknownNodes\":{tele.UnknownNodes.Count} }}");
+            }
 
             var todo = _dirty;
             _dirty = new ConcurrentHashSet<Device>();
