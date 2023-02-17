@@ -26,7 +26,7 @@ namespace ESPresense.Controllers
             var details = new List<KeyValuePair<string, string>>();
             if (deviceSettings?.Id != null && _state.Devices.TryGetValue(deviceSettings.Id, out var device))
                 details.AddRange(device.GetDetails());
-            return new DeviceSettingsDetails(deviceSettings, details);
+            return new DeviceSettingsDetails(deviceSettings ?? new DeviceSettings { Id = id, OriginalId = id }, details);
         }
 
         [HttpPut("{id}")]
