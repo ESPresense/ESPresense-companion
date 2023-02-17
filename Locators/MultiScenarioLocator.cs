@@ -1,4 +1,5 @@
-﻿using ConcurrentCollections;
+﻿using System.Text.Json;
+using ConcurrentCollections;
 using ESPresense.Models;
 using ESPresense.Services;
 using MQTTnet.Extensions.ManagedClient;
@@ -8,13 +9,12 @@ namespace ESPresense.Locators;
 
 internal class MultiScenarioLocator : BackgroundService
 {
+    private readonly DatabaseFactory _databaseFactory;
     private readonly MqttConnectionFactory _mqttConnectionFactory;
     private readonly State _state;
 
     private ConcurrentHashSet<Device> _dirty = new();
-    private Telemetry tele = new();
-
-    private readonly DatabaseFactory _databaseFactory;
+    private readonly Telemetry tele = new();
 
     public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory)
     {
@@ -53,38 +53,40 @@ internal class MultiScenarioLocator : BackgroundService
                     return d;
                 });
                 tele.Devices = _state.Devices.Count;
-                var dirty = false;
-                if (dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload))
-                    tele.Moved++;
+                var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload);
+                if (dirty) tele.Moved++;
 
                 if (device.Check)
                 {
                     if (_state.ConfigDeviceById.TryGetValue(deviceId, out var cdById))
                     {
-                        device.Track = cdById.Track;
+                        device.Track = true;
                         if (!string.IsNullOrWhiteSpace(cdById.Name))
                             device.Name = cdById.Name;
                     }
-                    else if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue(device.Name, out var cdByName))
-                        device.Track = cdByName.Track;
-                    else if (_state.ConfigDeviceById.TryGetValue("*", out var cdByIdWild))
-                        device.Track = cdByIdWild.Track;
+                    else if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue(device.Name, out _))
+                        device.Track = true;
+                    else if (!string.IsNullOrWhiteSpace(device.Id) && _state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
+                        device.Track = true;
+                    else if (!string.IsNullOrWhiteSpace(device.Name) && _state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
+                        device.Track = true;
+                    else
+                        device.Track = false;
 
-                    if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue("*", out var cdByNameWild))
-                        device.Track = cdByNameWild.Track;
                     device.Check = false;
 
-                    tele.Tracked = _state.Devices.Values.Where(a=>a.Track).Count();
+                    tele.Tracked = _state.Devices.Values.Count(a => a.Track);
                 }
 
                 if (device.Track && dirty)
                     _dirty.Add(device);
-
             }
-            else {
+            else
+            {
                 tele.Skipped++;
                 if (tele.UnknownNodes.Add(nodeId))
-                    Log.Warning("Unknown node {nodeId}", nodeId); }
+                    Log.Warning("Unknown node {nodeId}", nodeId);
+            }
 
             return Task.CompletedTask;
         };
@@ -99,7 +101,7 @@ internal class MultiScenarioLocator : BackgroundService
             if (DateTime.UtcNow - telemetryLastSent > TimeSpan.FromSeconds(30))
             {
                 telemetryLastSent = DateTime.UtcNow;
-                await mc.EnqueueAsync("espresense/companion/telemetry", System.Text.Json.JsonSerializer.Serialize(tele));
+                await mc.EnqueueAsync("espresense/companion/telemetry", JsonSerializer.Serialize(tele));
             }
 
             var todo = _dirty;
@@ -114,7 +116,7 @@ internal class MultiScenarioLocator : BackgroundService
             {
                 var bs = device.BestScenario = device.Scenarios.Select((scenario, i) => new { scenario, i }).Where(a => a.scenario.Current).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).FirstOrDefault()?.scenario;
                 if (bs == null) continue;
-                
+
                 await mc.EnqueueAsync("espresense/ips/" + device.Id, $"{{ \"x\":{bs.Location.X}, \"y\":{bs.Location.Y}, \"z\":{bs.Location.Z}, \"name\":\"{device.Name ?? device.Id}\", \"confidence\":\"{bs.Confidence}\", \"fixes\":\"{bs.Fixes}\", \"scenario\":\"{bs.Name}\" }}");
                 foreach (var ds in device.Scenarios)
                 {

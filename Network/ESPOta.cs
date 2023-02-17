@@ -54,8 +54,8 @@ public class ESPOta
 
             _logger("Waiting for device to connect...");
 
-            var startTime = DateTime.Now;
-            while (DateTime.Now - startTime < TimeSpan.FromSeconds(10))
+            var startTime = DateTime.UtcNow;
+            while (DateTime.UtcNow - startTime < TimeSpan.FromSeconds(10))
             {
                 if (listener.Pending())
                 {

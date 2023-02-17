@@ -51,6 +51,7 @@ namespace ESPresense.Services
                 {
 
                     var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString());
+                    if (ds == null) return Task.CompletedTask;
                     ds.OriginalId = parts[2];
                     _storeById.AddOrUpdate(parts[2], _ => ds, (_, _) => ds);
                     if (ds.Id != null) _storeByAlias.AddOrUpdate(ds.Id, _ => ds, (_, _) => ds);
