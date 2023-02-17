@@ -167,7 +167,9 @@ nodes:
 
 # Devices to track
 devices:
-#  - id: "*" # Track all devices
+  - id: "tile:*" # Track all tiles
+  - id: "irk:*" # Track all IRKs
+  - id: "apple:*" # Track all apple devices
   - name: "*" # Track all named devices
   - id: darrells-watch
     name: Darrell's Watch
