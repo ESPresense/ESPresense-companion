@@ -2,6 +2,9 @@
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { AccordionGroup, AccordionItem, drawerStore } from '@skeletonlabs/skeleton';
+  import { Toast, toastStore } from '@skeletonlabs/skeleton';
+
+  import type { ToastSettings } from '@skeletonlabs/skeleton';
 
   export let deviceId = '';
 
@@ -26,9 +29,11 @@
             details = d.details;
             return d;
           })
-          .catch((error) => {
+          .catch((e) => {
             device = {"originalId": deviceId, "id": null, "name": null, "rssi@1m": null};
-            console.log(error);
+            console.log(e);
+            const t: ToastSettings = {	message: e,	preset: 'error' };
+            toastStore.trigger(t);
           });
         });
 
@@ -41,10 +46,15 @@
         },
         body: JSON.stringify(device),
       })
-        .then((response) => {
-          if (response.status != 200) throw new Error(response.statusText);
-          drawerStore.close();
-        })
+      .then((response) => {
+        if (response.status != 200) throw new Error(response.statusText);
+        drawerStore.close();
+      })
+      .catch((e) => {
+          console.log(e);
+          const t: ToastSettings = {	message: e,	preset: 'error' };
+          toastStore.trigger(t);
+        });
     }
   }
 </script>

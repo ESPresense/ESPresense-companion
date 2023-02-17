@@ -1,7 +1,7 @@
 <script lang="ts">
   import { writable } from 'svelte/store';
   import { LayerCake, Svg, Html, Canvas } from 'layercake';
-  import { config, devices } from '../lib/stores';
+  import { config, devices, selected } from '../lib/stores';
   import { scaleOrdinal, schemeCategory10 } from "d3";
   import { select } from "d3-selection";
   import { zoom, zoomIdentity } from 'd3-zoom';
@@ -16,11 +16,9 @@
   import Nodes from './Nodes.svelte';
   import AxisX from './AxisX.svelte';
   import AxisY from './AxisY.svelte';
-  import DeviceDetails from './DeviceDetails.svelte';
 
   let svg:Element;
   let transform = zoomIdentity;
-  const selected = writable<Device | null>();
   const hovered = writable<Device| null>();
   const floor = writable<number>(0);
 
@@ -55,13 +53,7 @@
       <Devices {transform} floor={$floor} on:selected={ d => detail(d.detail) } on:hovered={ d => $hovered = d.detail } />
     </Svg>
   </LayerCake>
-  <Drawer width="400px">
-    {#if $drawerStore.id === 'device'}
-     <DeviceDetails deviceId={$selected?.id} />
-    {:else}
-     <p>(fallback contents)</p>
-    {/if}
-  </Drawer>
+
 </div>
 {:else}
 <div>Loading...</div>
