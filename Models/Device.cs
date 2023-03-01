@@ -8,12 +8,18 @@ namespace ESPresense.Models;
 
 public class Device
 {
+    public Device(string id)
+    {
+        Id = id;
+        HassAutoDiscovery.Add(new AutoDiscovery(this, "device_tracker"));
+    }
+
     public override string ToString()
     {
         return $"{nameof(Id)}: {Id}";
     }
 
-    public string? Id { get; init; }
+    public string Id { get; init; }
     public string? Name { get; set; }
 
     [JsonIgnore] public Point3D ReportedLocation { get; set; }
@@ -42,9 +48,10 @@ public class Device
     [JsonConverter(typeof(Point3DConverter))]
     public Point3D? Location => BestScenario?.Location;
 
-    [JsonIgnore] public Room? ReportedRoom { get; set; }
-
     [JsonIgnore] public DateTime? LastCalculated { get; set; }
+
+    [JsonIgnore] public IList<AutoDiscovery> HassAutoDiscovery { get; set; } = new List<AutoDiscovery>();
+    [JsonIgnore] public string? ReportedState { get; set; }
 
     public IEnumerable<KeyValuePair<string, string>> GetDetails()
     {
