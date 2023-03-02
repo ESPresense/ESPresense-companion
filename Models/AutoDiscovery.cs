@@ -1,5 +1,4 @@
-﻿using System.Xml;
-using System.Xml.Linq;
+﻿using ESPresense.Utils;
 using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
 
@@ -41,7 +40,7 @@ namespace ESPresense.Models
             if (_sent) return;
             _sent = true;
 
-            await mc.EnqueueAsync($"homeassistant/{_component}/{_dev.Id}/config", JsonConvert.SerializeObject(this, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore }));
+            await mc.EnqueueAsync($"homeassistant/{_component}/{_dev.Id}/config", JsonConvert.SerializeObject(this, SerializerSettings.NullIgnore));
         }
     }
 

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using ESPresense.Models;
+using ESPresense.Utils;
 using MQTTnet;
 using MQTTnet.Extensions.ManagedClient;
 using MQTTnet.Protocol;
@@ -30,13 +31,8 @@ namespace ESPresense.Services
 
         public async Task Set(string id, DeviceSettings ds)
         {
-            JsonSerializerSettings jss = new()
-            {
-                NullValueHandling = NullValueHandling.Ignore,
-                DefaultValueHandling = DefaultValueHandling.Ignore
-            };
             ds.OriginalId = null;
-            await _mc.EnqueueAsync("espresense/settings/" + id + "/config", JsonConvert.SerializeObject(ds, jss), MqttQualityOfServiceLevel.AtMostOnce, true);
+            await _mc.EnqueueAsync("espresense/settings/" + id + "/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), MqttQualityOfServiceLevel.AtMostOnce, true);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

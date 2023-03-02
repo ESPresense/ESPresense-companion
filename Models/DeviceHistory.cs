@@ -39,9 +39,9 @@ public class DeviceHistoryStore
         return await _sqliteConnection.InsertAsync(dh);
     }
 
-    public async Task<DeviceHistory[]> List(string id)
+    public async Task<IList<DeviceHistory>> List(string id)
     {
-        return await _sqliteConnection.Table<DeviceHistory>().Where(x => x.Id == id).ToArrayAsync();
+        return await _sqliteConnection.Table<DeviceHistory>().Where(x => x.Id == id).ToListAsync();
     }
 }
 

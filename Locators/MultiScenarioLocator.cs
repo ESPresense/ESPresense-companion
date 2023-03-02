@@ -1,12 +1,11 @@
 ﻿using ConcurrentCollections;
 using ESPresense.Models;
 using ESPresense.Services;
+using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
 using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using Serilog;
-using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace ESPresense.Locators;
 
@@ -16,10 +15,8 @@ internal class MultiScenarioLocator : BackgroundService
     private readonly MqttConnectionFactory _mqttConnectionFactory;
     private readonly State _state;
 
-    static JsonSerializerSettings jsj = new() { NullValueHandling = NullValueHandling.Ignore, ContractResolver = new CamelCasePropertyNamesContractResolver() };
-
     private ConcurrentHashSet<Device> _dirty = new();
-    private readonly Telemetry tele = new();
+    private readonly Telemetry _telemetry = new();
 
     public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory)
     {
@@ -41,7 +38,7 @@ internal class MultiScenarioLocator : BackgroundService
 
             if (parts.Length != 4 || parts[0] != "espresense" || parts[1] != "devices")
             {
-                tele.Malformed++;
+                _telemetry.Malformed++;
                 return;
             }
 
@@ -50,16 +47,16 @@ internal class MultiScenarioLocator : BackgroundService
 
             if (_state.Nodes.TryGetValue(nodeId, out var node))
             {
-                tele.Messages++;
+                _telemetry.Messages++;
                 var device = _state.Devices.GetOrAdd(deviceId, id =>
                 {
                     var d = new Device(id) { Check = true };
                     foreach (var scenario in GetScenarios(d)) d.Scenarios.Add(scenario);
                     return d;
                 });
-                tele.Devices = _state.Devices.Count;
+                _telemetry.Devices = _state.Devices.Count;
                 var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload);
-                if (dirty) tele.Moved++;
+                if (dirty) _telemetry.Moved++;
 
                 if (device.Check)
                 {
@@ -80,7 +77,7 @@ internal class MultiScenarioLocator : BackgroundService
 
                     device.Check = false;
 
-                    tele.Tracked = _state.Devices.Values.Count(a => a.Track);
+                    _telemetry.Tracked = _state.Devices.Values.Count(a => a.Track);
                 }
 
                 if (device.Track)
@@ -92,8 +89,8 @@ internal class MultiScenarioLocator : BackgroundService
             }
             else
             {
-                tele.Skipped++;
-                if (tele.UnknownNodes.Add(nodeId))
+                _telemetry.Skipped++;
+                if (_telemetry.UnknownNodes.Add(nodeId))
                     Log.Warning("Unknown node {nodeId}", nodeId);
             }
         };
@@ -108,7 +105,7 @@ internal class MultiScenarioLocator : BackgroundService
             if (DateTime.UtcNow - telemetryLastSent > TimeSpan.FromSeconds(30))
             {
                 telemetryLastSent = DateTime.UtcNow;
-                await mc.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(tele, jsj));
+                await mc.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(_telemetry, SerializerSettings.NullIgnore));
             }
 
             var todo = _dirty;
@@ -145,7 +142,7 @@ internal class MultiScenarioLocator : BackgroundService
                             bs?.Confidence,
                             bs?.Fixes,
                             BestScenario = bs?.Name
-                        }, jsj)
+                        }, SerializerSettings.NullIgnore)
                     );
 
                     foreach (var ds in device.Scenarios)
