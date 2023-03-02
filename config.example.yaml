@@ -6,6 +6,12 @@ mqtt:
   username:
   password:
 
+# This gets added to the x,y,z to derive a gps location
+gps:
+  latitude: 40.1153354
+  longitude: -75.7742686
+  elevation: 146
+
 # How long before device considered stale
 timeout: 30
 # How long before device is considered away
