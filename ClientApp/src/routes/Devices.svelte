@@ -12,7 +12,7 @@
 <g transform={transform.toString()}>
   {#if $devices }
   {#each $devices.filter(a => $showAll || ((a?.floor?.id ?? floorId) == floorId)) as d (d.id)}
-    {#if d.location}
+    {#if d.confidence > 1 && d.location}
       <DeviceDot { d } on:hovered on:selected />
     {/if}
   {/each}
