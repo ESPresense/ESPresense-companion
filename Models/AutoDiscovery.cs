@@ -1,6 +1,7 @@
 ﻿using ESPresense.Utils;
 using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
+using TextExtensions;
 
 namespace ESPresense.Models
 {
@@ -40,7 +41,7 @@ namespace ESPresense.Models
             if (_sent) return;
             _sent = true;
 
-            await mc.EnqueueAsync($"homeassistant/{_component}/{_dev.Id}/config", JsonConvert.SerializeObject(this, SerializerSettings.NullIgnore));
+            await mc.EnqueueAsync($"homeassistant/{_component}/{_dev.Id.ToSnakeCase()}/config", JsonConvert.SerializeObject(this, SerializerSettings.NullIgnore));
         }
     }
 
