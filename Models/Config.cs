@@ -30,6 +30,18 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "devices")]
         public ConfigDevice[]? Devices { get; set; }
+
+        [YamlMember(Alias = "weighting")]
+        public ConfigWeighting? Weighting { get; set; }
+    }
+
+    public class ConfigWeighting
+    {
+        [YamlMember(Alias = "algorithm")]
+        public string Algorithm { get; set; } = "gaussian";
+
+        [YamlMember(Alias = "props")]
+        public Dictionary<string, double>? Props { get; set; }
     }
 
     public class ConfigGps
