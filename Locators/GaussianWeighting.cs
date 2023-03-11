@@ -8,7 +8,6 @@ public class GaussianWeighting : IWeighting
     public GaussianWeighting(Dictionary<string, double> props)
     {
         _sigma = props.TryGetValue("sigma", out var sigma) ? sigma : 0.3;
-        //_mu = props.TryGetValue("mu", out var mu) ? mu : 1;
     }
 
     public double Get(int index, int total)
