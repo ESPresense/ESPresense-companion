@@ -61,7 +61,6 @@ namespace ESPresense.Controllers
             _config.ConfigChanged += OnConfigChanged;
             try
             {
-                var buffer = new byte[1024 * 4];
                 using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
 
                 while (!webSocket.CloseStatus.HasValue)
@@ -74,7 +73,6 @@ namespace ESPresense.Controllers
                         var bytes = Encoding.UTF8.GetBytes(json);
                         await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
-
                 }
 
                 await webSocket.CloseAsync(

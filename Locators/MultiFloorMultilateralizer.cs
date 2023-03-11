@@ -22,7 +22,16 @@ public class MultiFloorMultilateralizer : ILocate
     {
         var confidence = scenario.Confidence;
         var solver = new NelderMeadSimplex(1e-7, 10000);
-        var obj = ObjectiveFunction.Value(x => { return Math.Pow(100, Math.Abs(1 - x[3])) + _device.Nodes.Values.Where(a => a.Current).Sum(dn => Math.Pow(new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - x[3] * dn.Distance, 2)); });
+
+        double Error(IList<double> x, DeviceNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
+        var nodes = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
+
+        var obj = ObjectiveFunction.Value(x =>
+        {
+            return Math.Pow(5*(1 - x[3]), 2) + nodes
+                .Select((dn, i) => new { err = Error(x, dn), weight = _state.Weighting?.Get(i, nodes.Length) ?? 1.0 })
+                .Average(a => a.weight * Math.Pow(a.err, 2));
+        });
         var pos = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).Select(a => a.Node!.Location).ToList();
 
         if (pos.Count <= 0)
@@ -55,6 +64,9 @@ public class MultiFloorMultilateralizer : ILocate
                     scenario.Location = new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
                     scenario.Scale = result.MinimizingPoint[3];
                     scenario.Fixes = pos.Count;
+                    scenario.Minimum = nodes.Min(a => (double?) a.Distance);
+                    scenario.LastHit = nodes.Max(a => a.LastHit);
+
                     confidence = (int)Math.Max(Math.Min(100, (100 * pos.Count - 1) / 4.0), Math.Min(100, 100 * pos.Count / 4.0) - result.FunctionInfoAtMinimum.Value);
                 }
                 else

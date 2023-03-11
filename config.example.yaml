@@ -17,6 +17,11 @@ timeout: 30
 # How long before device is considered away
 away_timeout: 120
 
+weighting:
+  algorithm: gaussian
+  props:
+    sigma: 0.10
+
 # Floors w/ the points to draw it in meters
 floors:
   - id: first

@@ -62,7 +62,7 @@ namespace ESPresense.Services
                 primary
                     ? new MqttClientOptionsBuilder()
                         .WithConfig(c.Mqtt)
-                        .WithClientId("espresense-companion")
+                        .WithClientId(c.Mqtt.ClientId)
                         .WithWillTopic("espresense/companion/status")
                         .WithWillRetain()
                         .WithWillPayload("offline")
@@ -73,24 +73,26 @@ namespace ESPresense.Services
 
             var managedMqttClientOptions = new ManagedMqttClientOptionsBuilder()
                 .WithClientOptions(mqttClientOptions)
+                .WithAutoReconnectDelay(TimeSpan.FromSeconds(30))
                 .Build();
 
             await mc.StartAsync(managedMqttClientOptions);
+            mc.Options.ConnectionCheckInterval = TimeSpan.FromSeconds(30);
 
             mc.ConnectedAsync += async (s) =>
             {
-                Log.Information("MQTT connected {@p}",  new { primary });
+                Log.Information("MQTT {@p} connected",  new { primary });
                 if (primary) await mc.EnqueueAsync("espresense/companion/status", "online");
             };
 
             mc.DisconnectedAsync += (s) => {
-                Log.Information("MQTT disconnected {@p}", new { primary });
+                Log.Information("MQTT {@p} disconnected", new { primary });
                 return Task.CompletedTask;
             };
 
             mc.ConnectingFailedAsync += (s) =>
             {
-                Log.Error("MQTT connection failed {@error}: {@inner}", s.Exception.Message, s.Exception?.InnerException?.Message);
+                Log.Error("MQTT {@p} connection failed {@error}: {@inner}", new { primary }, s.Exception.Message, s.Exception?.InnerException?.Message);
                 return Task.CompletedTask;
             };
             return mc;

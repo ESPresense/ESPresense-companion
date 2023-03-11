@@ -9,13 +9,11 @@ public class DeviceSettings
     [JsonPropertyName("id")]
     [JsonProperty("id")]
     [StringLength(32)]
-    [RegularExpression("^\\w*$")]
     public string? Id { get; set; }
 
     [JsonPropertyName("originalId")]
     [JsonProperty("originalId")]
     [StringLength(32)]
-    [RegularExpression("^\\w*$")]
     public string? OriginalId { get; set; }
 
     [JsonPropertyName("name")]

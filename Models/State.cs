@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DotNet.Globbing;
 using DotNet.Globbing.Token;
+using ESPresense.Locators;
 using ESPresense.Services;
 
 namespace ESPresense.Models;
@@ -52,6 +53,7 @@ public class State
             NamesToTrack = namesToTrack;
             ConfigDeviceByName = configDeviceByName;
 
+            Weighting = c.Weighting.Algorithm == "gaussian" ? new GaussianWeighting(c.Weighting.Props) : new ExponentialWeighting(c.Weighting.Props);
             foreach (var device in Devices.Values) device.Check = true;
         }
 
@@ -68,4 +70,5 @@ public class State
     public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceById { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<Glob> IdsToTrack { get; private set; } = new();
     public List<Glob> NamesToTrack { get; private set; } = new();
+    public IWeighting? Weighting { get; set; }
 }

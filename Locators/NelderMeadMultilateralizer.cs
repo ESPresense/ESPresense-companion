@@ -11,11 +11,13 @@ public class NelderMeadMultilateralizer : ILocate
 {
     private readonly Device _device;
     private readonly Floor _floor;
+    private readonly State _state;
 
-    public NelderMeadMultilateralizer(Device device, Floor floor)
+    public NelderMeadMultilateralizer(Device device, Floor floor, State state)
     {
         _device = device;
         _floor = floor;
+        _state = state;
     }
 
     public bool Locate(Scenario scenario)
@@ -30,7 +32,6 @@ public class NelderMeadMultilateralizer : ILocate
             return false;
         }
 
-        double Weight(int index, int total) => Math.Pow((float)total - index, 3) / Math.Pow(total, 3);
         double Error(IList<double> x, DeviceNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
 
         var confidence = scenario.Confidence;
@@ -72,7 +73,7 @@ public class NelderMeadMultilateralizer : ILocate
                     {
                         if (OutOfBounds(x, lowerBound, upperBound)) return double.PositiveInfinity;
                         return Math.Pow(5*(1 - x[3]), 2) + nodes
-                            .Select((dn, i) => new { err = Error(x, dn), weight = Weight(i, nodes.Length) })
+                            .Select((dn, i) => new { err = Error(x, dn), weight = _state?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
                             .Average(a => a.weight * Math.Pow(a.err, 2));
                     });
 

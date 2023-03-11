@@ -19,7 +19,7 @@ public class ConfigLoader : BackgroundService
         _configPath = Path.Combine(configDir, "config.yaml");
         _deserializer = new DeserializerBuilder()
             .IgnoreUnmatchedProperties()
-            .WithNamingConvention(HyphenatedNamingConvention.Instance)
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .Build();
 
         _toWait = Load();
