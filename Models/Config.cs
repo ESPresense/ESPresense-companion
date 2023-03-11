@@ -6,7 +6,7 @@ namespace ESPresense.Models
 {
     public class Config
     {
-        [JsonProperty("mqtt")]
+        [YamlMember(Alias = "mqtt")]
         public ConfigMqtt? Mqtt { get; set; }
 
         [YamlMember(Alias = "bounds")]
@@ -18,6 +18,10 @@ namespace ESPresense.Models
         [YamlMember(Alias = "away_timeout")]
         public long AwayTimeout { get; set; } = 120;
 
+        [YamlMember(Alias = "gps")]
+        public ConfigGps? Gps { get; set; }
+
+
         [YamlMember(Alias = "floors")]
         public ConfigFloor[]? Floors { get; set; }
 
@@ -26,6 +30,13 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "devices")]
         public ConfigDevice[]? Devices { get; set; }
+    }
+
+    public class ConfigGps
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double Elevation { get; set; }
     }
 
     public partial class ConfigMqtt
@@ -44,6 +55,10 @@ namespace ESPresense.Models
 
         [JsonProperty("password")]
         public string? Password { get; set; }
+
+        [JsonProperty("client_id")]
+        [YamlMember(Alias = "client_id")]
+        public string ClientId { get; set; } = "espresense-companion";
     }
 
     public class ConfigDevice
