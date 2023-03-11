@@ -45,8 +45,7 @@ namespace ESPresense.Services
                 var parts = arg.ApplicationMessage.Topic.Split('/');
                 if (parts.Length >= 4 && parts[3] == "config")
                 {
-
-                    var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString());
+                    var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString() ?? "");
                     if (ds == null) return Task.CompletedTask;
                     ds.OriginalId = parts[2];
                     _storeById.AddOrUpdate(parts[2], _ => ds, (_, _) => ds);
