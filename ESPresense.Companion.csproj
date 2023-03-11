@@ -27,12 +27,12 @@
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="7.0.3" />
     <PackageReference Include="MQTTnet" Version="4.1.4.563" />
     <PackageReference Include="MQTTnet.Extensions.ManagedClient" Version="4.1.4.563" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Serilog.AspNetCore" Version="6.1.0" />
     <PackageReference Include="sqlite-net-base" Version="1.8.116" />
     <PackageReference Include="sqlitepclraw.bundle_e_sqlite3" Version="2.1.4" />
     <PackageReference Include="TextExtensions" Version="1.0.0" />
-    <PackageReference Include="YamlDotNet" Version="13.0.0" />
+    <PackageReference Include="YamlDotNet" Version="13.0.2" />
   </ItemGroup>
 
   <ItemGroup>
