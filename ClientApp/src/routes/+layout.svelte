@@ -8,6 +8,8 @@
   import { Drawer, drawerStore } from '@skeletonlabs/skeleton';
   import { Toast, toastStore } from '@skeletonlabs/skeleton';
   import { selected } from '../lib/stores';
+  import { beforeNavigate } from '$app/navigation';
+  import { updated } from '$app/stores';
 
   import type { Device } from '../lib/types';
 
@@ -19,6 +21,12 @@
   import DeviceDetails from './DeviceDetails.svelte';
 
   const storeValue: Writable<number> = writable(1);
+
+  beforeNavigate(({ willUnload, to }) => {
+    if ($updated && !willUnload && to?.url) {
+      location.href = to.url.href;
+    }
+  });
 </script>
 
 <div class="app h-full">

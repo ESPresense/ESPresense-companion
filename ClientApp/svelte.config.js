@@ -13,14 +13,20 @@ const config = {
 		})
 	],
 
-	kit: {
+  kit: {
+    embedded: true,
+    inlineStyleThreshold: 4096,
 		prerender: {
 			crawl: false
 		},
 		adapter: adapter({
 			fallback: 'index.html',
 			strict: false
-		})
+    }),
+    version: {
+      name: child_process.execSync('git rev-parse HEAD').toString().trim()
+    },
+    pollInterval: 5000,
 	}
 };
 
