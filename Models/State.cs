@@ -53,7 +53,7 @@ public class State
             NamesToTrack = namesToTrack;
             ConfigDeviceByName = configDeviceByName;
 
-            Weighting = c.Weighting.Algorithm == "gaussian" ? new GaussianWeighting(c.Weighting.Props) : new ExponentialWeighting(c.Weighting.Props);
+            Weighting = c.Weighting?.Algorithm == "gaussian" ? new GaussianWeighting(c.Weighting?.Props) : new ExponentialWeighting(c.Weighting?.Props);
             foreach (var device in Devices.Values) device.Check = true;
         }
 
