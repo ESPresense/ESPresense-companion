@@ -3,11 +3,10 @@ namespace ESPresense.Locators;
 public class GaussianWeighting : IWeighting
 {
     private readonly double _sigma;
-    private readonly double _mu;
 
-    public GaussianWeighting(Dictionary<string, double> props)
+    public GaussianWeighting(Dictionary<string, double>? props)
     {
-        _sigma = props.TryGetValue("sigma", out var sigma) ? sigma : 0.3;
+        _sigma = props != null && props.TryGetValue("sigma", out var sigma) ? sigma : 0.3;
     }
 
     public double Get(int index, int total)
