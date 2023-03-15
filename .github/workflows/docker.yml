@@ -21,7 +21,7 @@ jobs:
         id: version
         uses: paulhatch/semantic-version@v5.0.2
         with:
-          version_format: "${major}.${minor}.${patch}-prerelease${increment}"
+          version_format: "${major}.${minor}.${patch}-b${increment}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
