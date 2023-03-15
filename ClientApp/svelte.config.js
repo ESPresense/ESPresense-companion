@@ -6,7 +6,8 @@ import * as child_process from 'node:child_process';
 const config = {
 	compilerOptions: {
 		enableSourcemap: true,
-	},
+  },
+
 	preprocess: [
 		preprocess({
 			sourceMap: true,
