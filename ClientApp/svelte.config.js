@@ -8,6 +8,8 @@ const config = {
 		enableSourcemap: true,
   },
 
+  relative: true,
+
 	preprocess: [
 		preprocess({
 			sourceMap: true,
@@ -20,7 +22,7 @@ const config = {
     inlineStyleThreshold: 4096,
 		prerender: {
 			crawl: false
-		},
+    },
 		adapter: adapter({
 			fallback: 'index.html',
 			strict: false
