@@ -19,7 +19,9 @@ jobs:
           fetch-depth: 0
       - name: Git Semantic Version
         id: version
-        uses: PaulHatch/semantic-version@v5.0.0-beta
+        uses: paulhatch/semantic-version@v5.0.2
+        with:
+          version_format: "${major}.${minor}.${patch}-prerelease${increment}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
