@@ -67,7 +67,7 @@ app.UseSerilogRequestLogging(o =>
     o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Debug;
 });
 
-app.UseMiddleware<FixAbsolutePaths>();
+//app.UseMiddleware<FixAbsolutePaths>();
 app.UseStaticFiles();
 app.UseRouting();
 
