@@ -24,7 +24,6 @@ const config = {
 			crawl: false
     },
 		adapter: adapter({
-			fallback: 'index.html',
 			strict: false
     }),
     version: {

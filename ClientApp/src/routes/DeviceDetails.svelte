@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { AccordionGroup, AccordionItem, drawerStore } from '@skeletonlabs/skeleton';
+  import { Accordion, AccordionItem, drawerStore } from '@skeletonlabs/skeleton';
   import { Toast, toastStore } from '@skeletonlabs/skeleton';
 
   import type { ToastSettings } from '@skeletonlabs/skeleton';
@@ -61,7 +61,7 @@
 
 {#if device}
 <span class="text-lg font-medium leading-6 badge badge-filled-primary m-2">{@html device.name ?? device.originalId }</span>
-<AccordionGroup>
+<Accordion>
   <AccordionItem spacing="space-y-4" open>
     <svelte:fragment slot="summary">
       <h3>Settings</h3>
@@ -103,7 +103,7 @@
       {/if}
     </svelte:fragment>
   </AccordionItem>
-</AccordionGroup>
+</Accordion>
 {:else}
   <div class="text-center">Loading...</div>
 {/if}
