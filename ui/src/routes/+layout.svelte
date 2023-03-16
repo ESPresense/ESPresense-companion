@@ -1,7 +1,11 @@
 <script lang="ts">
-  import '@skeletonlabs/skeleton/themes/theme-crimson.css';
-  import '@skeletonlabs/skeleton/styles/all.css';
-  import "../app.css";
+	// The ordering of these imports is critical to your app working properly
+	import '@skeletonlabs/skeleton/themes/theme-crimson.css';
+	// If you have source.organizeImports set to true in VSCode, then it will auto change this ordering
+	import '@skeletonlabs/skeleton/styles/all.css';
+	// Most of your app wide CSS should be put in this file
+	import '../app.postcss';
+
   import { assets, base } from '$app/paths';
   import { AppShell, AppBar, AppRail, AppRailTile } from '@skeletonlabs/skeleton';
   import { writable, type Writable } from 'svelte/store';
@@ -70,7 +74,6 @@
     </Drawer>
   </AppShell>
 </div>
-
 
 <style>
   img {

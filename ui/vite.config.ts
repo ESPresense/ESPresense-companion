@@ -1,9 +1,10 @@
-import { defineConfig } from 'vite'
 import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  build: {
-    minify: false,
+	plugins: [sveltekit()],
+	test: {
+		include: ['src/**/*.{test,spec}.{js,ts}']
   },
 
   server: {
@@ -17,8 +18,4 @@ export default defineConfig({
     },
     host: true
   },
-
-  plugins: [
-    sveltekit()
-  ]
 });

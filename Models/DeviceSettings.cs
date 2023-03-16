@@ -8,16 +8,17 @@ public class DeviceSettings
 {
     [JsonPropertyName("id")]
     [JsonProperty("id")]
-    [StringLength(32)]
+    [StringLength(64)]
     public string? Id { get; set; }
 
     [JsonPropertyName("originalId")]
     [JsonProperty("originalId")]
-    [StringLength(32)]
+    [StringLength(64)]
     public string? OriginalId { get; set; }
 
     [JsonPropertyName("name")]
     [JsonProperty("name")]
+    [StringLength(128)]
     public string? Name { get; set; }
 
     [JsonPropertyName("rssi@1m")]
