@@ -9,7 +9,7 @@ updates:
 
   # Maintain dependencies for npm
   - package-ecosystem: "npm"
-    directory: "ClientApp/"
+    directory: "ui/"
     schedule:
       interval: "daily"
 

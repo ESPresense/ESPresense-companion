@@ -1,21 +1,12 @@
 import adapter from '@sveltejs/adapter-static';
-import preprocess from 'svelte-preprocess';
 import * as child_process from 'node:child_process';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-	compilerOptions: {
-		enableSourcemap: true,
-  },
+  preprocess: vitePreprocess(),
 
   relative: true,
-
-	preprocess: [
-		preprocess({
-			sourceMap: true,
-			postcss: true
-		})
-	],
 
   kit: {
     embedded: true,

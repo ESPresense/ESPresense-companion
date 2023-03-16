@@ -68,23 +68,23 @@
     </svelte:fragment>
     <svelte:fragment slot="content">
       <form class="border border-surface-500 p-4 space-y-4">
-        <label>
+        <label class="label">
           <span>ID</span>
-          <input type="text" disabled bind:value={ device.originalId } />
+          <input class="input" type="text" disabled bind:value={ device.originalId } />
         </label>
         <label>
           <span>Alias</span>
-          <input type="text" bind:value={ device.id } />
+          <input class="input" type="text" bind:value={ device.id } />
         </label>
         <label>
           <span>Name</span>
-          <input type="text" bind:value={ device.name } />
+          <input class="input" type="text" bind:value={ device.name } />
         </label>
         <label>
           <span>Rssi@1m</span>
-          <input type="text" placeholder="" bind:value={ device["rssi@1m"] } />
+          <input class="input" type="text" placeholder="" bind:value={ device["rssi@1m"] } />
         </label>
-        <button class="btn btn-filled-primary" on:click={ e => save() }>Save</button>
+        <button class="btn bg-success-700 text-black" on:click={ e => save() }>Save</button>
       </form>
     </svelte:fragment>
   </AccordionItem>
@@ -97,7 +97,7 @@
       {#each details as d}
       <label>
         <span>{d.key}</span>
-        <input type="text" disabled bind:value={ d.value } />
+        <input class="input" type="text" disabled bind:value={ d.value } />
       </label>
       {/each}
       {/if}
