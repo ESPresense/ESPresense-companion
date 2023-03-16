@@ -11,12 +11,13 @@ namespace ESPresense.Locators;
 
 internal class MultiScenarioLocator : BackgroundService
 {
+    private const double R = 6378137; // Earth's mean radius in meters
     private readonly DatabaseFactory _databaseFactory;
     private readonly MqttConnectionFactory _mqttConnectionFactory;
     private readonly State _state;
+    private readonly Telemetry _telemetry = new();
 
     private ConcurrentHashSet<Device> _dirty = new();
-    private readonly Telemetry _telemetry = new();
 
     public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory)
     {
@@ -116,6 +117,8 @@ internal class MultiScenarioLocator : BackgroundService
 
             foreach (var idle in _state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
 
+            var gps = _state.Config?.Gps;
+
             foreach (var device in todo)
             {
                 device.LastCalculated = now;
@@ -133,15 +136,22 @@ internal class MultiScenarioLocator : BackgroundService
                 if (moved > 0)
                 {
                     device.ReportedLocation = bs?.Location ?? new Point3D();
+
+                    var (latitude, longitude) = Add(bs?.Location.X, bs?.Location.Y, gps?.Latitude, gps?.Longitude);
+
                     await mc.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
                         JsonConvert.SerializeObject(new
                         {
-                            bs?.Location.X,
-                            bs?.Location.Y,
-                            bs?.Location.Z,
-                            bs?.Confidence,
-                            bs?.Fixes,
-                            BestScenario = bs?.Name
+                            source_type = "espresense",
+                            latitude,
+                            longitude,
+                            elevation = bs?.Location.Z + gps?.Elevation,
+                            x = bs?.Location.X,
+                            y = bs?.Location.Y,
+                            z = bs?.Location.Z,
+                            confidence = bs?.Confidence,
+                            fixes = bs?.Fixes,
+                            best_scenario = bs?.Name
                         }, SerializerSettings.NullIgnore)
                     );
 
@@ -153,6 +163,14 @@ internal class MultiScenarioLocator : BackgroundService
                 }
             }
         }
+    }
+
+    private static (double? lat, double? lon) Add(double? x, double? y, double? lat, double? lon)
+    {
+        var dLat = x / R;
+        var dLon = y / (R * Math.Cos(Math.PI * lat / 180 ?? 0));
+
+        return (lat: lat + dLat * 180 / Math.PI, lon: lon + dLon * 180 / Math.PI);
     }
 
     private IEnumerable<Scenario> GetScenarios(Device device)
