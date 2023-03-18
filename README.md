@@ -25,3 +25,20 @@ Step 2: Install
 [![Open your Home Assistant instance and show the Supervisor add-on store.](https://my.home-assistant.io/badges/supervisor_store.svg)](https://my.home-assistant.io/redirect/supervisor_store/)
 
 Click Install, Click Start, Click Show in Sidebar
+
+# Node Placement
+
+To accurately determine the location of a device, it is necessary to have base station nodes positioned on the corners of the locating area, with an additional node fairly close (1-3m). That's 5 fixes for an optimal location solution.  The more fixes, the better the accuracy. The algorithm uses the distances in order from closest to farthest. The nearest distance is like 40% of the location (uses the gaussian distribution).
+
+# Node Configuration
+
+For ESPresense nodes you should set the maximum distance to zero to obtain distance readings from all nodes (no filtering).  You can do this easily by retaining a message like this:
+
+```
+key: espresense/rooms/*/max_distance/set
+value: 0
+```
+
+# Fine Tuning
+
+By hovering over the device on the map, it is possible to check if the circles align with its actual location. If the circles are too large or small, the RSS@1m value can be adjusted to improve accuracy.  If the device isn't seen on the map you can check the devices tab to see how many nodes are seeing it (the fixes column).  If it is only seeing one or two nodes, you can try moving the nodes closer or add more nodes.
