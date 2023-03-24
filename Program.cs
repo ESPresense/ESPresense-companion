@@ -47,10 +47,12 @@ builder.Services.AddSingleton<MqttConnectionFactory>();
 builder.Services.AddSingleton<AbsorptionAndRxAdjOptimizer>();
 
 builder.Services.AddSingleton<DeviceSettingsStore>();
+builder.Services.AddSingleton<NodeSettingsStore>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
+builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {

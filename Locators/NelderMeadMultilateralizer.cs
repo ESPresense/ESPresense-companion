@@ -32,14 +32,14 @@ public class NelderMeadMultilateralizer : ILocate
             return false;
         }
 
-        double Error(IList<double> x, DeviceNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
+        double Error(IList<double> x, DeviceNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) * x[3] - dn.Distance;
 
         var confidence = scenario.Confidence;
 
         var nodes = _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).OrderBy(a => a.Distance).ToArray();
         var pos = nodes.Select(a => a.Node!.Location).ToArray();
 
-        scenario.Minimum = nodes.Min(a => (double?) a.Distance);
+        scenario.Minimum = nodes.Min(a => (double?)a.Distance);
         scenario.LastHit = nodes.Max(a => a.LastHit);
         scenario.Fixes = pos.Length;
 
@@ -72,7 +72,7 @@ public class NelderMeadMultilateralizer : ILocate
                     x =>
                     {
                         if (OutOfBounds(x, lowerBound, upperBound)) return double.PositiveInfinity;
-                        return Math.Pow(5*(1 - x[3]), 2) + nodes
+                        return Math.Pow(5 * (1 - x[3]), 2) + nodes
                             .Select((dn, i) => new { err = Error(x, dn), weight = _state?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
                             .Average(a => a.weight * Math.Pow(a.err, 2));
                     });
@@ -98,7 +98,7 @@ public class NelderMeadMultilateralizer : ILocate
                 };
 
                 scenario.ReasonForExit = result.ReasonForExit;
-                confidence = (int)Math.Min(100, Math.Max(10, 100.0 - (Math.Pow(scenario.Minimum ?? 1, 2) + Math.Pow(10*(1 - (scenario.Scale ?? 1)), 2) + ((scenario.Minimum + result.FunctionInfoAtMinimum.Value) ?? 10.00))));
+                confidence = (int)Math.Min(100, Math.Max(10, 100.0 - (Math.Pow(scenario.Minimum ?? 1, 2) + Math.Pow(10 * (1 - (scenario.Scale ?? 1)), 2) + (scenario.Minimum + result.FunctionInfoAtMinimum.Value ?? 10.00))));
             }
         }
         catch (Exception ex)
