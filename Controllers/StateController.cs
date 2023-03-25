@@ -1,6 +1,7 @@
 ﻿using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using ESPresense.Extensions;
 using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -43,6 +44,26 @@ namespace ESPresense.Controllers
         public Config GetConfig()
         {
             return _config.Config ?? new Config();
+        }
+
+        [HttpGet("api/state/calibration")]
+        public Calibration GetCalibration()
+        {
+            var c = new Calibration();
+            foreach (var (fromId, from) in _state.Nodes)
+            {
+                var m = c.Matrix.GetOrAdd(fromId);
+                foreach (var (toId, to) in from.Nodes)
+                {
+                    var m2 = m.GetOrAdd(toId);
+                    m2["map_dist"] = to.MapDistance;
+                    m2["dist"] = to.Distance;
+                    m2["rssi"] = to.Rssi;
+                    m2["err"] = to.Distance - to.MapDistance;
+                }
+            }
+
+            return c;
         }
 
         [Route("/ws")]

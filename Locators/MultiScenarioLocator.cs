@@ -45,6 +45,12 @@ internal class MultiScenarioLocator : BackgroundService
             var deviceId = parts[2];
             var nodeId = parts[3];
 
+            if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var from) && _state.Nodes.TryGetValue(nodeId, out var to))
+            {
+                from.Nodes.GetOrAdd(nodeId, new NodeToNode { From = from, To = to }).ReadMessage(arg.ApplicationMessage.Payload);
+            }
+
+
             if (_state.Nodes.TryGetValue(nodeId, out var node))
             {
                 _telemetry.Messages++;
