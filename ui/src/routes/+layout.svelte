@@ -56,6 +56,10 @@
           <img src={nodes} alt="Nodes" />
         </AppRailTile>
 
+        <AppRailTile label="Calibration" tag="a" href="{base}/calibration" value={4}>
+          <img src={nodes} alt="Calibration" />
+        </AppRailTile>
+
         <svelte:fragment slot="trail">
           <AppRailTile regionIcon="w-8" tag="a" href="https://github.com/ESPresense/ESPresense-companion" target="_blank" title="Trail">
             <img src={github} alt="GitHub" />

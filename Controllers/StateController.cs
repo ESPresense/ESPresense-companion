@@ -50,7 +50,7 @@ namespace ESPresense.Controllers
         public Calibration GetCalibration()
         {
             var c = new Calibration();
-            foreach (var (fromId, from) in _state.Nodes)
+            foreach (var (fromId, from) in _state.Nodes.Where(a=>a.Value.Nodes.Any()))
             {
                 var m = c.Matrix.GetOrAdd(fromId);
                 foreach (var (toId, to) in from.Nodes)
