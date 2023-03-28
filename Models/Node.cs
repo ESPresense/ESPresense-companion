@@ -42,7 +42,7 @@ public class Node
 
     public Floor[]? Floors { get; private set; }
 
-    public ConcurrentDictionary<string, NodeToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, RxNode> RxNodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
     public override string ToString()
     {

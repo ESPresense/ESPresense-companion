@@ -3,10 +3,10 @@ using Serilog;
 
 namespace ESPresense.Models;
 
-public class NodeToNode
+public class RxNode
 {
-    public Node? From { get; set; }
-    public Node? To { get; set; }
+    public Node? Tx { get; set; }
+    public Node? Rx { get; set; }
 
     public double Distance { get; set; }
     public double Rssi { get; set; }
@@ -14,11 +14,11 @@ public class NodeToNode
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
 
-    public double MapDistance => From?.Location.DistanceTo(To!.Location) ?? -1;
+    public double MapDistance => Tx?.Location.DistanceTo(Rx!.Location) ?? -1;
 
     public double LastDistance { get; set; }
 
-    public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(From?.Config?.Timeout ?? 30);
+    public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Tx?.Config?.Timeout ?? 30);
     public double RefRssi { get; set; }
 
     public bool ReadMessage(byte[] payload)

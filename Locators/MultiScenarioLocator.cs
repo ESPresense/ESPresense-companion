@@ -36,7 +36,7 @@ internal class MultiScenarioLocator : BackgroundService
         {
             var parts = arg.ApplicationMessage.Topic.Split('/', 4);
 
-            if (parts.Length != 4 || parts[0] != "espresense" || parts[1] != "devices")
+            if (parts is not ["espresense", "devices", _, _])
             {
                 _telemetry.Malformed++;
                 return;
@@ -45,11 +45,10 @@ internal class MultiScenarioLocator : BackgroundService
             var deviceId = parts[2];
             var nodeId = parts[3];
 
-            if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var from) && _state.Nodes.TryGetValue(nodeId, out var to))
+            if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx) && _state.Nodes.TryGetValue(nodeId, out var rx))
             {
-                from.Nodes.GetOrAdd(nodeId, new NodeToNode { From = from, To = to }).ReadMessage(arg.ApplicationMessage.Payload);
+                tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.Payload);
             }
-
 
             if (_state.Nodes.TryGetValue(nodeId, out var node))
             {

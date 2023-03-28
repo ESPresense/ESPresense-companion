@@ -32,7 +32,7 @@
 		return await response.json();
 	}
 
-	let cal = null;
+	let cal = { matrix: {}};
 	const interval = setInterval(() => {
 		calibration().then((data) => {
 			cal = data;
@@ -43,6 +43,13 @@
 		event: 'hover',
 		target: 'examplePopup'
 	};
+
+  let rxColumns:Array<string> = [];
+  $: {
+    let rx = new Set(Object.keys(cal?.matrix ?? {}));
+    Object.entries(cal?.matrix ?? {}).flatMap(([key, value]) => Object.keys(value)).forEach((key) => rx.add(key));
+    rxColumns = new Array(...rx);
+  }
 </script>
 
 <svelte:head>
@@ -64,16 +71,16 @@
 				<thead>
 					<tr>
 						<th>Name</th>
-						{#each Object.entries(cal.matrix) as [id, n]}
-							<th>{@html id}</th>
+						{#each rxColumns as id}
+							<th>Rx: {@html id}</th>
 						{/each}
 					</tr>
 				</thead>
 				<tbody>
 					{#each Object.entries(cal.matrix) as [id1, n1]}
 						<tr>
-							<td>{@html id1}</td>
-							{#each Object.entries(cal.matrix) as [id2, n2]}
+							<td>Tx: {@html id1}</td>
+							{#each rxColumns as id2}
 								<td use:popup={popupSettings} data-err="{n1[id2]?.err?.toPrecision(3)}" data-dist="{n1[id2]?.dist?.toPrecision(3)}" data-map-dist="{n1[id2]?.map_dist?.toPrecision(3)}" class={coloring(n1[id2]?.err)}
 									>{@html n1[id2]?.err?.toPrecision(3) ?? ''}</td
 								>
