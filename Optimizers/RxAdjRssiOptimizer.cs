@@ -42,7 +42,7 @@ public class RxAdjRssiOptimizer : IOptimizer
                     return error;
                 });
 
-            var initialGuess = Vector<double>.Build.DenseOfArray(new[] { 0d });
+            var initialGuess = Vector<double>.Build.DenseOfArray(new[] { ns?.RxAdjRssi ?? 0d });
 
             var solver = new NelderMeadSimplex(1e-7, 10000);
             var result = solver.FindMinimum(obj, initialGuess);

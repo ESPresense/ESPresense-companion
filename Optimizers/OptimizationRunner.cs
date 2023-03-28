@@ -27,7 +27,7 @@ internal class OptimizationRunner : BackgroundService
         int run = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
-            var absorption = run % 10 < 9;
+            var absorption = run % 2 == 0;
             Log.Information("Optimizing {0}", absorption ? "absorption" : "rx adj rssi");
 
             foreach (var (id, node) in _state.Nodes)
@@ -35,15 +35,11 @@ internal class OptimizationRunner : BackgroundService
                 var ns = _nsd.Get(id);
                 var a = absorption ? _absorption.Optimize(node, ns) : _rxAdjRssi.Optimize(node, ns);
                 if (a == null) continue;
-                if (a.Value.error > 10)
-                {
-                    Console.WriteLine($"Bad optimization {node.Id,-32} to Absorption: {a.Value.absorption:0.00} RxAdj: {a.Value.rxAdjRssi:00} Error: {a.Value.error}");
-                    continue;
-                }
-                ns.RxAdjRssi += (int)a.Value.rxAdjRssi;
-                ns.Absorption = a.Value.absorption;
+                var valueRxAdjRssi = a.Value.rxAdjRssi;
+                ns.RxAdjRssi += valueRxAdjRssi >= 2 ? +1 : valueRxAdjRssi <= -2 ? -1 : 0;
+                ns.Absorption += a.Value.absorption > ns.Absorption ? +0.01d : a.Value.absorption < ns.Absorption ? -0.01d : 0;
                 await _nsd.Set(id, ns);
-                Console.WriteLine($"Optimized {node.Id,-32} to Absorption: {a.Value.absorption:0.00} RxAdj: {a.Value.rxAdjRssi:00} Error: {a.Value.error}");
+                Console.WriteLine($"Optimized {node.Id,-32} to Absorption: {ns.Absorption:0.00} RxAdj: {ns.RxAdjRssi:00} Error: {a.Value.error}");
             }
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             run++;

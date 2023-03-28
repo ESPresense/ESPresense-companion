@@ -12,14 +12,16 @@ namespace ESPresense.Services
     public class NodeSettingsStore : BackgroundService
     {
         private readonly MqttConnectionFactory _mqttConnectionFactory;
+        private readonly ILogger<NodeSettingsStore> _logger;
 
         private readonly ConcurrentDictionary<string, NodeSettings> _storeById = new();
 
         private IManagedMqttClient? _mc;
 
-        public NodeSettingsStore(MqttConnectionFactory mqttConnectionFactory)
+        public NodeSettingsStore(MqttConnectionFactory mqttConnectionFactory, ILogger<NodeSettingsStore> logger)
         {
             _mqttConnectionFactory = mqttConnectionFactory;
+            _logger = logger;
         }
 
         public NodeSettings Get(string id)
@@ -45,30 +47,37 @@ namespace ESPresense.Services
 
             mc.ApplicationMessageReceivedAsync += async arg =>
             {
-                var parts = arg.ApplicationMessage.Topic.Split('/');
-                if (parts.Length != 4 || parts[3] == "telemetry") return;
-
-                var pay = arg.ApplicationMessage.ConvertPayloadToString() ?? "";
-                var ns = Get(parts[2]);
-                switch (parts[3])
+                try
                 {
-                    case "absorption":
-                        ns.Absorption = double.Parse(pay);
-                        break;
-                    case "rx_adj_rssi":
-                        ns.RxAdjRssi = int.Parse(pay);
-                        break;
-                    case "tx_ref_rssi":
-                        ns.TxRefRssi = int.Parse(pay);
-                        break;
-                    case "max_distance":
-                        ns.MaxDistance = double.Parse(pay);
-                        break;
-                    default:
-                        return;
-                }
+                    var parts = arg.ApplicationMessage.Topic.Split('/');
+                    if (parts.Length != 4 || parts[3] == "telemetry") return;
 
-                _storeById.AddOrUpdate(parts[2], _ => ns, (_, _) => ns);
+                    var pay = arg.ApplicationMessage.ConvertPayloadToString() ?? "";
+                    var ns = Get(parts[2]);
+                    switch (parts[3])
+                    {
+                        case "absorption":
+                            ns.Absorption = double.Parse(pay);
+                            break;
+                        case "rx_adj_rssi":
+                            ns.RxAdjRssi = int.Parse(pay);
+                            break;
+                        case "tx_ref_rssi":
+                            ns.TxRefRssi = int.Parse(pay);
+                            break;
+                        case "max_distance":
+                            ns.MaxDistance = double.Parse(pay);
+                            break;
+                        default:
+                            return;
+                    }
+
+                    _storeById.AddOrUpdate(parts[2], _ => ns, (_, _) => ns);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,"Error parsing {0}", arg.ApplicationMessage.Topic);
+                }
             };
 
             await Task.Delay(-1, stoppingToken);
