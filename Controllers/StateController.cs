@@ -55,7 +55,7 @@ namespace ESPresense.Controllers
                 var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
                 foreach (var (rxId, rx) in tx.RxNodes)
                 {
-                    var rxM = txM.GetOrAdd(rx.Rx.Name ?? rxId);
+                    var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
                     rxM["map_dist"] = rx.MapDistance;
                     rxM["dist"] = rx.Distance;
                     rxM["rssi"] = rx.Rssi;

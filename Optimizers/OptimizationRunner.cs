@@ -38,8 +38,8 @@ internal class OptimizationRunner : BackgroundService
                 var valueRxAdjRssi = a.Value.rxAdjRssi;
                 ns.RxAdjRssi += valueRxAdjRssi >= 2 ? +1 : valueRxAdjRssi <= -2 ? -1 : 0;
                 ns.Absorption += a.Value.absorption > ns.Absorption ? +0.01d : a.Value.absorption < ns.Absorption ? -0.01d : 0;
-                await _nsd.Set(id, ns);
-                Console.WriteLine($"Optimized {node.Id,-32} to Absorption: {ns.Absorption:0.00} RxAdj: {ns.RxAdjRssi:00} Error: {a.Value.error}");
+                //await _nsd.Set(id, ns);
+                Console.WriteLine($"Optimizer found {node.Id,-32} to Absorption: {ns.Absorption:0.00} RxAdj: {ns.RxAdjRssi:00} Error: {a.Value.error}");
             }
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             run++;
