@@ -6,6 +6,9 @@
 	// Most of your app wide CSS should be put in this file
 	import '../app.postcss';
 
+  import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
+  import { storePopup } from '@skeletonlabs/skeleton';
+
   import { assets, base } from '$app/paths';
   import { AppShell, AppBar, AppRail, AppRailTile } from '@skeletonlabs/skeleton';
   import { writable, type Writable } from 'svelte/store';
@@ -23,6 +26,8 @@
   import nodes from '$lib/images/nodes.svg';
   import devices from '$lib/images/devices.svg';
   import DeviceDetails from './DeviceDetails.svelte';
+
+  storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
 
   const storeValue: Writable<number> = writable(1);
 
@@ -54,6 +59,10 @@
 
         <AppRailTile label="Nodes" tag="a" href="{base}/nodes" value={3}>
           <img src={nodes} alt="Nodes" />
+        </AppRailTile>
+
+        <AppRailTile label="Calibration" tag="a" href="{base}/calibration" value={4}>
+          <img src={nodes} alt="Calibration" />
         </AppRailTile>
 
         <svelte:fragment slot="trail">

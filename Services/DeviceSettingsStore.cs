@@ -22,11 +22,11 @@ namespace ESPresense.Services
             _mqttConnectionFactory = mqttConnectionFactory;
         }
 
-        public Task<DeviceSettings?> Get(string id)
+        public DeviceSettings? Get(string id)
         {
             _storeById.TryGetValue(id, out var dsId);
             _storeByAlias.TryGetValue(id, out var dsAlias);
-            return Task.FromResult(dsId ?? dsAlias);
+            return dsId ?? dsAlias;
         }
 
         public async Task Set(string id, DeviceSettings ds)

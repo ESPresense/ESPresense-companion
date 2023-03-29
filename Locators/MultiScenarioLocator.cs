@@ -11,7 +11,6 @@ namespace ESPresense.Locators;
 
 internal class MultiScenarioLocator : BackgroundService
 {
-    private const double R = 6378137; // Earth's mean radius in meters
     private readonly DatabaseFactory _databaseFactory;
     private readonly MqttConnectionFactory _mqttConnectionFactory;
     private readonly State _state;
@@ -37,7 +36,7 @@ internal class MultiScenarioLocator : BackgroundService
         {
             var parts = arg.ApplicationMessage.Topic.Split('/', 4);
 
-            if (parts.Length != 4 || parts[0] != "espresense" || parts[1] != "devices")
+            if (parts is not ["espresense", "devices", _, _])
             {
                 _telemetry.Malformed++;
                 return;
@@ -45,6 +44,11 @@ internal class MultiScenarioLocator : BackgroundService
 
             var deviceId = parts[2];
             var nodeId = parts[3];
+
+            if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx) && _state.Nodes.TryGetValue(nodeId, out var rx))
+            {
+                tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.Payload);
+            }
 
             if (_state.Nodes.TryGetValue(nodeId, out var node))
             {
@@ -137,7 +141,7 @@ internal class MultiScenarioLocator : BackgroundService
                 {
                     device.ReportedLocation = bs?.Location ?? new Point3D();
 
-                    var (latitude, longitude) = Add(bs?.Location.X, bs?.Location.Y, gps?.Latitude, gps?.Longitude);
+                    var (latitude, longitude) = GpsUtil.Add(bs?.Location.X, bs?.Location.Y, gps?.Latitude, gps?.Longitude);
 
                     await mc.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
                         JsonConvert.SerializeObject(new
@@ -163,14 +167,6 @@ internal class MultiScenarioLocator : BackgroundService
                 }
             }
         }
-    }
-
-    private static (double? lat, double? lon) Add(double? x, double? y, double? lat, double? lon)
-    {
-        var dLat = x / R;
-        var dLon = y / (R * Math.Cos(Math.PI * lat / 180 ?? 0));
-
-        return (lat: lat + dLat * 180 / Math.PI, lon: lon + dLon * 180 / Math.PI);
     }
 
     private IEnumerable<Scenario> GetScenarios(Device device)

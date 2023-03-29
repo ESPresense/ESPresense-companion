@@ -8,6 +8,7 @@ using Serilog;
 using Serilog.Events;
 using SQLite;
 using System.Text.Json.Serialization;
+using ESPresense.Optimizers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,11 +44,15 @@ builder.Services.AddSingleton(a =>
 builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttConnectionFactory>();
+builder.Services.AddSingleton<AbsorptionAndRxAdjOptimizer>();
 
 builder.Services.AddSingleton<DeviceSettingsStore>();
+builder.Services.AddSingleton<NodeSettingsStore>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
+builder.Services.AddHostedService<OptimizationRunner>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
+builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {

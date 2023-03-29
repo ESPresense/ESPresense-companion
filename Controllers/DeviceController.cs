@@ -20,9 +20,9 @@ namespace ESPresense.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<DeviceSettingsDetails> Get(string id)
+        public DeviceSettingsDetails Get(string id)
         {
-            var deviceSettings = await _deviceSettingsStore.Get(id);
+            var deviceSettings = _deviceSettingsStore.Get(id);
             var details = new List<KeyValuePair<string, string>>();
             if (deviceSettings?.Id != null && _state.Devices.TryGetValue(deviceSettings.Id, out var device))
                 details.AddRange(device.GetDetails());
