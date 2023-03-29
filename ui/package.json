@@ -30,7 +30,7 @@
 		"eslint-plugin-svelte3": "^4.0.0",
 		"layercake": "^7.3.4",
 		"postcss": "^8.4.21",
-		"prettier": "^2.8.6",
+		"prettier": "^2.8.7",
 		"prettier-plugin-svelte": "^2.10.0",
 		"svelte": "^3.55.0",
 		"svelte-check": "^3.1.4",
