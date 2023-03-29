@@ -28,7 +28,7 @@ Click Install, Click Start, Click Show in Sidebar
 
 # Node Placement
 
-To accurately determine the location of a device, it is necessary to have base station nodes positioned on the corners of the locating area, with an additional node fairly close (1-3m). That's 5 fixes for an optimal location solution.  The more fixes, the better the accuracy. The algorithm uses the distances in order from closest to farthest. The nearest distance is like 40% of the location (uses the gaussian distribution).
+To accurately determine the location of a device, it is necessary to have base station nodes positioned on the corners of the locating area (floorplan), with an additional node fairly close (1-3m). That's 5 fixes for an optimal location solution.  The more fixes, the better the accuracy. The algorithm uses the distances in order from closest to farthest. The nearest distance is like 40% of the location (uses the gaussian distribution).
 
 # Node Configuration
 
@@ -41,4 +41,4 @@ value: 0
 
 # Fine Tuning
 
-By hovering over the device on the map, it is possible to check if the circles align with its actual location. If the circles are too large or small, the RSS@1m value can be adjusted to improve accuracy.  If the device isn't seen on the map you can check the devices tab to see how many nodes are seeing it (the fixes column).  If it is only seeing one or two nodes, you can try moving the nodes closer or add more nodes.
+By hovering over the device on the map, it is possible to check if the circles align with its actual location. If the circles are too large or small, the RSS@1m value can be adjusted to improve accuracy (click on the device on map to edit).  If the device isn't seen on the map you can check the devices tab to see how many nodes are seeing it (the fixes column).  If it is only seeing one or two nodes, you can try moving the nodes closer or add more nodes.
