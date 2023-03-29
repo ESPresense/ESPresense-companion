@@ -41,4 +41,4 @@ value: 0
 
 # Fine Tuning
 
-By hovering over the device on the map, it is possible to check if the circles align with its actual location. If the circles are too large or small, the RSS@1m value can be adjusted to improve accuracy.  If the device isn't seen on the map you can check the devices tab to see how many nodes are seeing it (the fixes column).  If it is only seeing one or two nodes, you can try moving the nodes closer or add more nodes.
+By hovering over the device on the map, it is possible to check if the circles align with its actual location. If the circles are too large or small, the RSS@1m value can be adjusted to improve accuracy (click on the device on map to edit).  If the device isn't seen on the map you can check the devices tab to see how many nodes are seeing it (the fixes column).  If it is only seeing one or two nodes, you can try moving the nodes closer or add more nodes.
