@@ -50,10 +50,10 @@ namespace ESPresense.Controllers
         public Calibration GetCalibration()
         {
             var c = new Calibration();
-            foreach (var (txId, tx) in _state.Nodes.Where(a => a.Value.RxNodes.Any()))
+            foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)))
             {
                 var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
-                foreach (var (rxId, rx) in tx.RxNodes)
+                foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current))
                 {
                     var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
                     rxM["map_dist"] = rx.MapDistance;
