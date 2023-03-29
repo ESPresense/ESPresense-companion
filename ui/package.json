@@ -21,7 +21,7 @@
 		"@types/cookie": "^0.5.1",
 		"@types/d3": "^7.4.0",
 		"@typescript-eslint/eslint-plugin": "^5.56.0",
-		"@typescript-eslint/parser": "^5.56.0",
+		"@typescript-eslint/parser": "^5.57.0",
 		"autoprefixer": "^10.4.14",
 		"d3": "^7.8.3",
 		"d3-zoom": "^3.0.0",
