@@ -39,7 +39,7 @@
 		"tslib": "^2.4.1",
 		"typescript": "^5.0.2",
 		"vite": "^4.2.1",
-		"vitest": "^0.29.7"
+		"vitest": "^0.29.8"
 	},
 	"type": "module"
 }
