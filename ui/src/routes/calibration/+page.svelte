@@ -32,7 +32,12 @@
 		return await response.json();
 	}
 
-	let cal = { matrix: {}};
+  let selected = {};
+
+	let cal = { };
+	calibration().then((data) => {
+			cal = data;
+		});
 	const interval = setInterval(() => {
 		calibration().then((data) => {
 			cal = data;
@@ -60,9 +65,12 @@
 	<h1>Calibration</h1>
 
 	<div class="card variant-filled-secondary p-4" data-popup="examplePopup">
-		Some text goes here.
-		<!-- Append the arrow element -->
-		<div class="arrow variant-filled-secondary" />
+  {#if selected}
+		Map Distance {@html Number(selected?.map_dist?.toPrecision(3))} - Measured {@html Number(selected?.dist?.toPrecision(3))} = Error {@html Number(selected?.err?.toPrecision(3))}
+  {:else}
+    	No beacon Received in last 30 seconds
+	{/if}
+    <div class="arrow variant-filled-secondary" />
 	</div>
 
 	<div class="table-container">
@@ -81,14 +89,20 @@
 						<tr>
 							<td>Tx: {@html id1}</td>
 							{#each rxColumns as id2}
-								<td use:popup={popupSettings} data-err="{n1[id2]?.err?.toPrecision(3)}" data-dist="{n1[id2]?.dist?.toPrecision(3)}" data-map-dist="{n1[id2]?.map_dist?.toPrecision(3)}" class={coloring(n1[id2]?.err)}
-									>{@html n1[id2]?.err?.toPrecision(3) ?? ''}</td
+								{#if n1[id2]}
+								<td use:popup={popupSettings} on:mouseover="{()=> selected = n1[id2]}" class={coloring(n1[id2]?.err)}
+									>{@html Number(n1[id2]?.err?.toPrecision(3)) ?? ''}</td
 								>
+								{:else}
+								<td></td>
+								{/if}
 							{/each}
 						</tr>
 					{/each}
 				</tbody>
 			</table>
+		{:else}
+			<p>Loading...</p>
 		{/if}
 	</div>
 
