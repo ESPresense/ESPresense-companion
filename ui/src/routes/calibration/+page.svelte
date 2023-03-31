@@ -4,12 +4,12 @@
 	import { popup } from '@skeletonlabs/skeleton';
 	import type { PopupSettings } from '@skeletonlabs/skeleton';
 
-	function coloring(err: number) {
-		if (err == null) {
+	function coloring(percent: number) {
+		if (percent == null) {
 			return '';
 		}
 		return (
-			'background-color: hsl(' + (240 - Math.min(Math.max(err * 10 + 120, 0), 240)) + ', 50%, 50%)'
+			'background-color: hsl(' + (240 - Math.min(Math.max(percent * 120, 0), 240)) + ', 50%, 50%)'
 		);
 	}
 
@@ -112,7 +112,7 @@
 											use:popup={popupSettings}
 											on:mouseover={() => (selected = n1[id2])}
 											on:focus={() => (selected = n1[id2])}
-											style={coloring(n1[id2]?.err)}>{@html value(n1[id2], data_point)}</td
+											style={coloring(n1[id2]?.percent)}>{@html value(n1[id2], data_point)}</td
 										>
 									{:else}
 										<td />

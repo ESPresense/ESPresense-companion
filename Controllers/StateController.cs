@@ -52,11 +52,11 @@ namespace ESPresense.Controllers
         public Calibration GetCalibration()
         {
             var c = new Calibration();
-            foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)))
+            foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
             {
                 var txNs = _nsd.Get(txId);
                 var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
-                foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current))
+                foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
                 {
                     var rxNs = _nsd.Get(rxId);
                     var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
@@ -67,7 +67,7 @@ namespace ESPresense.Controllers
                     rxM["actual"] = rx.Distance;
                     rxM["rssi"] = rx.Rssi;
                     rxM["err"] = rx.Expected - rx.Distance;
-                    rxM["percent"] = rx.Distance/rx.Expected;
+                    rxM["percent"] = rx.Distance / rx.Expected;
                 }
             }
 
