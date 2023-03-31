@@ -1,11 +1,7 @@
 ﻿using System.Collections.Concurrent;
-using System.Reflection.Metadata;
 using ESPresense.Models;
-using ESPresense.Utils;
 using MQTTnet;
 using MQTTnet.Extensions.ManagedClient;
-using MQTTnet.Protocol;
-using Newtonsoft.Json;
 
 namespace ESPresense.Services
 {

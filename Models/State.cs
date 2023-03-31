@@ -76,5 +76,26 @@ public class State
     public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceById { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<Glob> IdsToTrack { get; private set; } = new();
     public List<Glob> NamesToTrack { get; private set; } = new();
+    public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
     public IWeighting? Weighting { get; set; }
+
+    public OptimizationSnapshot TakeOptimizationSnapshot()
+    {
+        var os = new OptimizationSnapshot();
+        foreach (var node in Nodes)
+        {
+            var optTxNode = new OptTxNode
+            {
+                Id = node.Key,
+                Name = node.Value.Name,
+                Location = node.Value.Location,
+            };
+            optTxNode.RxNodes = node.Value.RxNodes.ToDictionary(a => a.Key, a => a.Value.ToRxNode(optTxNode));
+
+            os.Nodes.Add(optTxNode);
+        }
+        OptimizationSnaphots.Add(os);
+        return os;
+    }
 }
+

@@ -16,12 +16,14 @@ namespace ESPresense.Controllers
         private readonly ILogger<StateController> _logger;
         private readonly State _state;
         private readonly ConfigLoader _config;
+        private readonly NodeSettingsStore _nsd;
 
-        public StateController(ILogger<StateController> logger, State state, ConfigLoader config)
+        public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd)
         {
             _logger = logger;
             _state = state;
             _config = config;
+            _nsd = nsd;
         }
 
         // GET: api/rooms
@@ -52,14 +54,20 @@ namespace ESPresense.Controllers
             var c = new Calibration();
             foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)))
             {
+                var txNs = _nsd.Get(txId);
                 var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
                 foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current))
                 {
+                    var rxNs = _nsd.Get(rxId);
                     var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
-                    rxM["map_dist"] = rx.MapDistance;
-                    rxM["dist"] = rx.Distance;
+                    if (txNs.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.TxRefRssi.Value;
+                    if (rxNs.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.RxAdjRssi.Value;
+                    if (rxNs.Absorption is not null) rxM["absorption"] = rxNs.Absorption.Value;
+                    rxM["expected"] = rx.Expected;
+                    rxM["actual"] = rx.Distance;
                     rxM["rssi"] = rx.Rssi;
-                    rxM["err"] = rx.Distance - rx.MapDistance;
+                    rxM["err"] = rx.Expected - rx.Distance;
+                    rxM["percent"] = rx.Distance/rx.Expected;
                 }
             }
 

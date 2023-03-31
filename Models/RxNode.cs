@@ -14,7 +14,7 @@ public class RxNode
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
 
-    public double MapDistance => Tx?.Location.DistanceTo(Rx!.Location) ?? -1;
+    public double Expected => Tx?.Location.DistanceTo(Rx!.Location) ?? -1;
 
     public double LastDistance { get; set; }
 
@@ -73,5 +73,18 @@ public class RxNode
         LastHit = DateTime.UtcNow;
         Hits++;
         return moved;
+    }
+
+    public OptRxNode ToRxNode(OptTxNode optTxNode)
+    {
+        return new OptRxNode()
+        {
+            Current = Current,
+            Distance = Distance,
+            Location = Rx?.Location,
+            RefRssi = RefRssi,
+            Rssi = Rssi,
+            Tx = optTxNode
+        };
     }
 }

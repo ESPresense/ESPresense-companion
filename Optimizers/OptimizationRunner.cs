@@ -1,6 +1,4 @@
-﻿using ConcurrentCollections;
-using ESPresense.Locators;
-using ESPresense.Models;
+﻿using ESPresense.Models;
 using ESPresense.Services;
 using Serilog;
 
@@ -13,12 +11,12 @@ internal class OptimizationRunner : BackgroundService
     private readonly RxAdjRssiOptimizer _rxAdjRssi;
     private readonly AbsorptionOptimizer _absorption;
 
-    public OptimizationRunner(State state, DatabaseFactory databaseFactory, NodeSettingsStore nsd)
+    public OptimizationRunner(State state, NodeSettingsStore nsd)
     {
         _state = state;
         _nsd = nsd;
-        _absorption = new AbsorptionOptimizer(_state);
-        _rxAdjRssi = new RxAdjRssiOptimizer(_state);
+        _absorption = new AbsorptionOptimizer();
+        _rxAdjRssi = new RxAdjRssiOptimizer();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -30,17 +28,19 @@ internal class OptimizationRunner : BackgroundService
             var absorption = run % 2 == 0;
             Log.Information("Optimizing {0}", absorption ? "absorption" : "rx adj rssi");
 
-            foreach (var (id, node) in _state.Nodes)
+            var os = _state.TakeOptimizationSnapshot();
+            var optimizationResults = absorption ? _absorption.Optimize(os) : _rxAdjRssi.Optimize(os);
+            foreach (var result in optimizationResults)
             {
-                var ns = _nsd.Get(id);
-                var a = absorption ? _absorption.Optimize(node, ns) : _rxAdjRssi.Optimize(node, ns);
-                if (a == null) continue;
-                var valueRxAdjRssi = a.Value.rxAdjRssi;
+                var ns = _nsd.Get(result.NodeId!);
+                if (optimizationResults == null) continue;
+                var valueRxAdjRssi = result.RxAdjRssi;
                 ns.RxAdjRssi += valueRxAdjRssi >= 2 ? +1 : valueRxAdjRssi <= -2 ? -1 : 0;
-                ns.Absorption += a.Value.absorption > ns.Absorption ? +0.01d : a.Value.absorption < ns.Absorption ? -0.01d : 0;
+                ns.Absorption += result.Absorption > ns.Absorption ? +0.01d : result.Absorption < ns.Absorption ? -0.01d : 0;
                 //await _nsd.Set(id, ns);
-                Console.WriteLine($"Optimizer found {node.Id,-32} to Absorption: {ns.Absorption:0.00} RxAdj: {ns.RxAdjRssi:00} Error: {a.Value.error}");
+                Console.WriteLine($"Optimizer found {result.NodeId,-32} to Absorption: {result.Absorption:0.00} RxAdj: {result.RxAdjRssi:00} Error: {result.Error}");
             }
+
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             run++;
         }
