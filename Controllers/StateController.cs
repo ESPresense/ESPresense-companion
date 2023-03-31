@@ -63,10 +63,11 @@ namespace ESPresense.Controllers
                     if (txNs.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.TxRefRssi.Value;
                     if (rxNs.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.RxAdjRssi.Value;
                     if (rxNs.Absorption is not null) rxM["absorption"] = rxNs.Absorption.Value;
-                    rxM["map_dist"] = rx.MapDistance;
-                    rxM["dist"] = rx.Distance;
+                    rxM["expected"] = rx.Expected;
+                    rxM["actual"] = rx.Distance;
                     rxM["rssi"] = rx.Rssi;
-                    rxM["err"] = rx.Distance - rx.MapDistance;
+                    rxM["err"] = rx.Expected - rx.Distance;
+                    rxM["percent"] = rx.Distance/rx.Expected;
                 }
             }
 
