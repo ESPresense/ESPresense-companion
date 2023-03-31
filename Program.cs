@@ -44,7 +44,6 @@ builder.Services.AddSingleton(a =>
 builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttConnectionFactory>();
-builder.Services.AddSingleton<AbsorptionAndRxAdjOptimizer>();
 
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();

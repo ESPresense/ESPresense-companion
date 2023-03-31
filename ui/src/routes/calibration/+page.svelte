@@ -90,7 +90,7 @@
 							<td>Tx: {@html id1}</td>
 							{#each rxColumns as id2}
 								{#if n1[id2]}
-								<td use:popup={popupSettings} on:mouseover="{()=> selected = n1[id2]}" class={coloring(n1[id2]?.err)}
+								<td use:popup={popupSettings} on:mouseover="{()=> selected = n1[id2]}" on:focus="{()=> selected = n1[id2]}" class={coloring(n1[id2]?.err)}
 									>{@html Number(n1[id2]?.err?.toPrecision(3)) ?? ''}</td
 								>
 								{:else}

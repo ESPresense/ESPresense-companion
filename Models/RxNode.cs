@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Microsoft.AspNetCore.Components;
 using Serilog;
 
 namespace ESPresense.Models;
@@ -73,5 +74,18 @@ public class RxNode
         LastHit = DateTime.UtcNow;
         Hits++;
         return moved;
+    }
+
+    public OptRxNode ToRxNode(OptTxNode optTxNode)
+    {
+        return new OptRxNode()
+        {
+            Current = Current,
+            Distance = Distance,
+            Location = Rx?.Location,
+            RefRssi = RefRssi,
+            Rssi = Rssi,
+            Tx = optTxNode
+        };
     }
 }
