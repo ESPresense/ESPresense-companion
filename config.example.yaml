@@ -17,6 +17,17 @@ timeout: 30
 # How long before device is considered away
 away_timeout: 120
 
+optimization:
+  enabled: true
+  interval_secs: 60
+  limits:
+    absorption_min: 2
+    absorption_max: 4
+    tx_ref_rssi_min: -70
+    tx_ref_rssi_max: -50
+    rx_adj_rssi_min: -20
+    rx_adj_rssi_max: 20
+
 weighting:
   algorithm: gaussian
   props:

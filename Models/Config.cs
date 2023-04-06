@@ -19,20 +19,36 @@ namespace ESPresense.Models
         public long AwayTimeout { get; set; } = 120;
 
         [YamlMember(Alias = "gps")]
-        public ConfigGps? Gps { get; set; }
+        public ConfigGps Gps { get; set; } = new();
 
 
-        [YamlMember(Alias = "floors")]
-        public ConfigFloor[]? Floors { get; set; }
+        [YamlMember(Alias = "floors")] public ConfigFloor[] Floors { get; set; } = Array.Empty<ConfigFloor>();
 
         [YamlMember(Alias = "nodes")]
-        public ConfigNode[]? Nodes { get; set; }
+        public ConfigNode[] Nodes { get; set; } = Array.Empty<ConfigNode>();
 
-        [YamlMember(Alias = "devices")]
-        public ConfigDevice[]? Devices { get; set; }
+        [YamlMember(Alias = "devices")] public ConfigDevice[] Devices { get; set; } = Array.Empty<ConfigDevice>();
 
         [YamlMember(Alias = "weighting")]
-        public ConfigWeighting? Weighting { get; set; }
+        public ConfigWeighting Weighting { get; set; } = new();
+
+        [YamlMember(Alias = "optimization")] public ConfigOptimization Optimization { get; set; } = new();
+    }
+
+    public class ConfigOptimization
+    {
+        [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
+        [YamlMember(Alias = "interval_secs")] public int IntervalSecs { get; set; } = 60;
+        [YamlMember(Alias = "max_snapshots")] public int MaxSnapshots { get; set; } = 60;
+
+        [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set;  } = new();
+
+        [YamlIgnore] public double AbsorptionMin => Limits.TryGetValue("absorption_min", out var val) ? val : 2;
+        [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 4;
+        [YamlIgnore] public double TxRefRssiMin => Limits.TryGetValue("tx_ref_rssi_min", out var val) ? val : -70;
+        [YamlIgnore] public double TxRefRssiMax => Limits.TryGetValue("tx_ref_rssi_max", out var val) ? val : -50;
+        [YamlIgnore] public double RxAdjRssiMin => Limits.TryGetValue("rx_adj_rssi_min", out var val) ? val : -20;
+        [YamlIgnore] public double RxAdjRssiMax => Limits.TryGetValue("rx_adj_rssi_max", out var val) ? val : 20;
     }
 
     public class ConfigWeighting
@@ -40,8 +56,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "algorithm")]
         public string Algorithm { get; set; } = "gaussian";
 
-        [YamlMember(Alias = "props")]
-        public Dictionary<string, double>? Props { get; set; }
+        [YamlMember(Alias = "props")] public Dictionary<string, double> Props { get; set; } = new();
     }
 
     public class ConfigGps

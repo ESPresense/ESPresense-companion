@@ -101,10 +101,16 @@ public class NelderMeadMultilateralizer : ILocate
                 confidence = (int)Math.Min(100, Math.Max(10, 100.0 - (Math.Pow(scenario.Minimum ?? 1, 2) + Math.Pow(10 * (1 - (scenario.Scale ?? 1)), 2) + (scenario.Minimum + result.FunctionInfoAtMinimum.Value ?? 10.00))));
             }
         }
-        catch (Exception ex)
+        catch (MaximumIterationsException ex)
         {
+            scenario.ReasonForExit = ExitCondition.ExceedIterations;
             confidence = 1;
             scenario.Location = guess;
+        }
+        catch (Exception ex)
+        {
+            confidence = 0;
+            scenario.Location = new Point3D();
             Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
         }
 
