@@ -1,8 +1,12 @@
 using System.Collections.Concurrent;
 using DotNet.Globbing;
 using DotNet.Globbing.Token;
+using ESPresense.Extensions;
 using ESPresense.Locators;
 using ESPresense.Services;
+using MathNet.Numerics;
+using MathNet.Spatial.Euclidean;
+using Microsoft.AspNetCore.Mvc.Diagnostics;
 
 namespace ESPresense.Models;
 
@@ -81,20 +85,28 @@ public class State
 
     public OptimizationSnapshot TakeOptimizationSnapshot()
     {
+        Dictionary<string, OptNode> nodes = new();
         var os = new OptimizationSnapshot();
-        foreach (var node in Nodes)
-        {
-            var optTxNode = new OptTxNode
+        foreach (var (txId, txNode) in Nodes)
+            foreach (var (rxId, meas) in txNode.RxNodes)
             {
-                Id = node.Key,
-                Name = node.Value.Name,
-                Location = node.Value.Location,
-            };
-            optTxNode.RxNodes = node.Value.RxNodes.ToDictionary(a => a.Key, a => a.Value.ToRxNode(optTxNode));
+                var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
+                var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx!.Name, Location = meas.Rx.Location });
+                os.Measures.Add(new Measure()
+                {
+                    Current = meas.Current,
+                    Distance = meas.Distance,
+                    RefRssi = meas.RefRssi,
+                    Rssi = meas.Rssi,
+                    Tx = tx,
+                    Rx = rx,
+                });
+      
+            }
 
-            os.Nodes.Add(optTxNode);
-        }
+        if (OptimizationSnaphots.Count > Config.Optimization.MaxSnapshots) OptimizationSnaphots.RemoveAt(0);
         OptimizationSnaphots.Add(os);
+
         return os;
     }
 }

@@ -1,3 +1,4 @@
+using ESPresense.Extensions;
 using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Models;
@@ -5,24 +6,37 @@ namespace ESPresense.Models;
 public class OptimizationSnapshot
 {
     public DateTime Timestamp { get; set; }
-    public List<OptTxNode> Nodes { get; set; } = new();
-    public object Id { get; set; }
+    public List<Measure> Measures { get; set; } = new();
+
+    public OptimizationSnapshot()
+    {
+        Timestamp = DateTime.UtcNow;
+    }
+
+    public ILookup<OptNode, Measure> ByRx()
+    {
+       return Measures.ToLookup(a => a.Rx);
+    }
+
+    public ILookup<OptNode, Measure> ByTx()
+    {
+        return Measures.ToLookup(a => a.Tx);
+    }
 }
 
-public class OptTxNode
+public class OptNode
 {
     public string Id { get; set; }
     public string? Name { get; set; }
-    public Dictionary<string, OptRxNode> RxNodes { get; set; } = new();
     public Point3D Location { get; set; }
 }
 
-public class OptRxNode
+public class Measure
 {
-    public double Distance { get; set; }
-    public Point3D? Location { get; set; }
     public bool Current { get; set; }
-    public OptTxNode Tx { get; set; }
+    public OptNode Rx { get; set; }
+    public OptNode Tx { get; set; }
     public double RefRssi { get; set; }
     public double Rssi { get; set; }
+    public double Distance { get; set; }
 }
