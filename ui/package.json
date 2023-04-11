@@ -26,7 +26,7 @@
 		"autoprefixer": "^10.4.14",
 		"d3": "^7.8.4",
 		"d3-zoom": "^3.0.0",
-		"eslint": "^8.37.0",
+		"eslint": "^8.38.0",
 		"eslint-config-prettier": "^8.8.0",
 		"eslint-plugin-svelte3": "^4.0.0",
 		"layercake": "^7.3.5",
