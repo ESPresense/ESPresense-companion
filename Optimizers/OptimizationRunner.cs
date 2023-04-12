@@ -20,6 +20,17 @@ internal class OptimizationRunner : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        double best;
+
+        var reEvaluate = Task.Run(async () =>
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                best = new OptimizationResults().Evaluate(_state.OptimizationSnaphots, _nsd);
+            }
+        }, stoppingToken);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             var optimization = _state.Config?.Optimization;
@@ -40,7 +51,7 @@ internal class OptimizationRunner : BackgroundService
                 await Task.Delay(TimeSpan.FromSeconds(optimization?.IntervalSecs ?? 60), stoppingToken);
             }
 
-            var best = new OptimizationResults().Evaluate(_state.OptimizationSnaphots, _nsd);
+            best = new OptimizationResults().Evaluate(_state.OptimizationSnaphots, _nsd);
 
             run = 0;
             while (optimization is { Enabled: true })
@@ -51,7 +62,11 @@ internal class OptimizationRunner : BackgroundService
                 {
                     var results = optimizer.Optimize(os);
                     var d = results.Evaluate(_state.OptimizationSnaphots, _nsd);
-                    if (d > best || double.IsNaN(d) || double.IsInfinity(d)) continue;
+                    if (d >= best || double.IsNaN(d) || double.IsInfinity(d))
+                    {
+                        Log.Information("Optimizer {0} found worse results, rms {1}>{2}", optimizer.Name, d, best);
+                        continue;
+                    }
                     Log.Information("Optimizer {0} found better results, rms {1}<{2}", optimizer.Name, d, best);
                     foreach (var (id, result) in results.RxNodes)
                     {
@@ -70,7 +85,7 @@ internal class OptimizationRunner : BackgroundService
 
             }
         }
+
+        await reEvaluate;
     }
-
-
 }

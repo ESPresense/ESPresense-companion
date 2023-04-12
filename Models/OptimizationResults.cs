@@ -20,14 +20,13 @@ public class OptimizationResults
                 var rx = nss.Get(m.Rx.Id);
 
                 RxNodes.TryGetValue(m.Rx.Id, out var pv);
-                double rxAdjRssi = pv?.RxAdjRssi ?? 0;
+                double rxAdjRssi = pv?.RxAdjRssi ?? rx.RxAdjRssi ?? 0;
                 double txPower = tx.TxRefRssi ?? -59;
                 double pathLossExponent = pv?.Absorption ?? rx.Absorption ?? 3;
                 double distance = m.Rx.Location.DistanceTo(m.Tx.Location);
-                double predictedRssi = txPower - 10 * pathLossExponent * Math.Log10(distance) + rxAdjRssi;
+                double predictedRssi = txPower + rxAdjRssi - 10 * pathLossExponent * Math.Log10(distance);
 
-                double squaredError = Math.Pow(predictedRssi - m.Rssi, 2);
-                squaredErrorSum += squaredError;
+                squaredErrorSum += Math.Pow(predictedRssi - m.Rssi, 2);
                 count++;
             }
         }
