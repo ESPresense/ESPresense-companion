@@ -24,7 +24,7 @@ public class OptimizationResults
                 double txPower = tx.TxRefRssi ?? -59;
                 double pathLossExponent = pv?.Absorption ?? rx.Absorption ?? 3;
                 double distance = m.Rx.Location.DistanceTo(m.Tx.Location);
-                double predictedRssi = txPower - 10 * pathLossExponent * Math.Log10(distance) - rxAdjRssi;
+                double predictedRssi = txPower - 10 * pathLossExponent * Math.Log10(distance) + rxAdjRssi;
 
                 double squaredError = Math.Pow(predictedRssi - m.Rssi, 2);
                 squaredErrorSum += squaredError;

@@ -28,14 +28,14 @@ public class AbsorptionErrOptimizer : IOptimizer
             double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (dn.RefRssi - dn.Rssi) / (10.0d * x[0]));
 
             if (rxNodes.Length < 3) continue;
-            var configOptimization = _state.Config?.Optimization;
+            var optimization = _state.Config?.Optimization;
 
             try
             {
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
-                        if (x[0] <= configOptimization?.AbsorptionMin || x[0] >= configOptimization?.AbsorptionMax) return double.PositiveInfinity;
+                        if (x[0] <= optimization?.AbsorptionMin || x[0] >= optimization?.AbsorptionMax) return double.PositiveInfinity;
 
                         var error = rxNodes
                             .Select((dn, i) => new { err = pos[i] - Distance(x, dn), weight = 1 })
@@ -44,15 +44,15 @@ public class AbsorptionErrOptimizer : IOptimizer
                         return error;
                     });
 
-                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { 3d });
+                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { (optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d });
 
                 var solver = new NelderMeadSimplex(1e-4, 10000);
                 var result = solver.FindMinimum(obj, initialGuess);
 
                 var absorption = result.MinimizingPoint[0];
-                if (absorption < configOptimization?.AbsorptionMin) continue;
-                if (absorption > configOptimization?.AbsorptionMax) continue;
-                results.RxNodes.Add(g.Key.Id,new ProposedValues {  RxAdjRssi = null, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
+                if (absorption < optimization?.AbsorptionMin) continue;
+                if (absorption > optimization?.AbsorptionMax) continue;
+                results.RxNodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = null, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
             }
             catch (Exception ex)
             {
