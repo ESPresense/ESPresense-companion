@@ -59,7 +59,7 @@ internal class OptimizationRunner : BackgroundService
                         var a = _nsd.Get(id);
                         if (optimization == null) continue;
                         if (result.Absorption != null && result.Absorption > optimization.AbsorptionMin && result.Absorption < optimization.AbsorptionMax) a.Absorption = result.Absorption;
-                        if (result.RxAdjRssi != null && result.RxAdjRssi > optimization.RxAdjRssiMin && result.RxAdjRssi < optimization.RxAdjRssiMax) a.RxAdjRssi = (int?)result.RxAdjRssi;
+                        if (result.RxAdjRssi != null && result.RxAdjRssi > optimization.RxAdjRssiMin && result.RxAdjRssi < optimization.RxAdjRssiMax) a.RxAdjRssi = result.RxAdjRssi == null ? 0 : (int?)Math.Round(result.RxAdjRssi.Value);
                         await _nsd.Set(id, a);
                     }
 

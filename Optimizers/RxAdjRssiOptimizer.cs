@@ -18,17 +18,18 @@ public class RxAdjRssiOptimizer : IOptimizer
 
     public OptimizationResults Optimize(OptimizationSnapshot os)
     {
-        var absorption = 3d;
 
         OptimizationResults or = new();
         var optimization = _state.Config?.Optimization;
+
+        var absorption = ((optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2d) + optimization?.AbsorptionMin ?? 3d;
 
         foreach (var g in os.ByRx())
         {
             var rxNodes = g.Where(b => b.Current).ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
-            double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (dn.RefRssi - dn.Rssi + x[0]) / (10.0d * absorption));
+            double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (-59 + x[0] - dn.Rssi ) / (10.0d * absorption));
 
             if (rxNodes.Length < 3) continue;
 
@@ -37,7 +38,7 @@ public class RxAdjRssiOptimizer : IOptimizer
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
-                        if (x[0] < -30 || x[0] > 30) return double.PositiveInfinity;
+                        if (x[0] < optimization?.RxAdjRssiMin || x[0] > optimization?.RxAdjRssiMax) return double.PositiveInfinity;
 
                         var error = rxNodes
                             .Select((dn, i) => new { err = pos[i] - Distance(x, dn), weight = 1 })
