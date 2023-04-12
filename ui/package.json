@@ -14,7 +14,7 @@
 	},
 	"devDependencies": {
 		"@floating-ui/dom": "^1.2.6",
-		"@playwright/test": "^1.32.2",
+		"@playwright/test": "^1.32.3",
 		"@skeletonlabs/skeleton": "^1.1.0",
 		"@sveltejs/adapter-static": "^2.0.1",
 		"@sveltejs/kit": "^1.15.4",
