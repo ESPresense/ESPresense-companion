@@ -2,11 +2,12 @@
 indent_style = space
 tab_width = 2
 trim_trailing_whitespace = true
+max_line_length = 999
 
 [*.cs]
 indent_style = space
 tab_width = 4
 
 [*.svelte]
-indent_style = tab
+indent_style = space
 tab_width = 2
