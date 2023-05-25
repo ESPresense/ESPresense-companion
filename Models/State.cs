@@ -101,10 +101,10 @@ public class State
                     Tx = tx,
                     Rx = rx,
                 });
-      
+
             }
 
-        if (OptimizationSnaphots.Count > Config.Optimization.MaxSnapshots) OptimizationSnaphots.RemoveAt(0);
+        if (OptimizationSnaphots.Count > Config?.Optimization.MaxSnapshots) OptimizationSnaphots.RemoveAt(0);
         OptimizationSnaphots.Add(os);
 
         return os;

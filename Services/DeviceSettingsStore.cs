@@ -32,7 +32,7 @@ namespace ESPresense.Services
         public async Task Set(string id, DeviceSettings ds)
         {
             ds.OriginalId = null;
-            await _mc.EnqueueAsync("espresense/settings/" + id + "/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), MqttQualityOfServiceLevel.AtMostOnce, true);
+            await _mc.EnqueueAsync($"espresense/settings/{id}/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), MqttQualityOfServiceLevel.AtMostOnce, true);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

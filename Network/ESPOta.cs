@@ -121,7 +121,7 @@ public class ESPOta
         {
             var message = $"{command} {_localPort} {_contentSize} {_fileMd5}\n";
             var messageBytes = Encoding.UTF8.GetBytes(message);
-            _logger("Sending invitation to " + remoteIp);
+            _logger($"Sending invitation to {remoteIp}");
 
             using var udp = new UdpClient();
             var ep = new IPEndPoint(IPAddress.Parse(remoteIp), remotePort);

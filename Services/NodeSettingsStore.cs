@@ -29,11 +29,11 @@ namespace ESPresense.Services
         {
             var old = Get(id);
             if (ds.Absorption != null && ds.Absorption != old.Absorption)
-                await _mc.EnqueueAsync("espresense/rooms/" + id + "/absorption/set", $"{ds.Absorption:0.00}");
+                await _mc.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Absorption:0.00}");
             if (ds.RxAdjRssi != null && ds.RxAdjRssi != old.RxAdjRssi)
-                await _mc.EnqueueAsync("espresense/rooms/" + id + "/rx_adj_rssi/set", $"{ds.RxAdjRssi}");
+                await _mc.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.RxAdjRssi}");
             if (ds.TxRefRssi != null && ds.TxRefRssi != old.TxRefRssi)
-                await _mc.EnqueueAsync("espresense/rooms/" + id + "/tx_ref_rssi/set", $"{ds.TxRefRssi}");
+                await _mc.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.TxRefRssi}");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -41,12 +41,12 @@ namespace ESPresense.Services
             using var mc = _mc = await _mqttConnectionFactory.GetClient(false);
             await mc.SubscribeAsync("espresense/rooms/+/+");
 
-            mc.ApplicationMessageReceivedAsync += async arg =>
+            mc.ApplicationMessageReceivedAsync += arg =>
             {
                 try
                 {
                     var parts = arg.ApplicationMessage.Topic.Split('/');
-                    if (parts.Length != 4 || parts[3] == "telemetry") return;
+                    if (parts.Length != 4 || parts[3] == "telemetry") return Task.CompletedTask;
 
                     var pay = arg.ApplicationMessage.ConvertPayloadToString() ?? "";
                     var ns = Get(parts[2]);
@@ -65,7 +65,7 @@ namespace ESPresense.Services
                             ns.MaxDistance = double.Parse(pay);
                             break;
                         default:
-                            return;
+                            return Task.CompletedTask;
                     }
 
                     _storeById.AddOrUpdate(parts[2], _ => ns, (_, _) => ns);
@@ -74,6 +74,7 @@ namespace ESPresense.Services
                 {
                     _logger.LogWarning(ex,"Error parsing {0}", arg.ApplicationMessage.Topic);
                 }
+                return Task.CompletedTask;
             };
 
             await Task.Delay(-1, stoppingToken);

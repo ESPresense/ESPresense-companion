@@ -64,7 +64,7 @@
 <Accordion>
   <AccordionItem spacing="space-y-4" open>
     <svelte:fragment slot="summary">
-      <h3>Settings</h3>
+      <h3 class="h3">Settings</h3>
     </svelte:fragment>
     <svelte:fragment slot="content">
       <form class="border border-surface-500 p-4 space-y-4">
@@ -90,7 +90,7 @@
   </AccordionItem>
   <AccordionItem spacing="space-y-4">
     <svelte:fragment slot="summary">
-      <h3>Details</h3>
+      <h3 class="h3">Details</h3>
     </svelte:fragment>
     <svelte:fragment slot="content">
       {#if details }

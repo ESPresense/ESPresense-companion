@@ -11,7 +11,7 @@
 </svelte:head>
 
 <div class="text-column">
-	<h1>Devices</h1>
+	<h1 class="h1">Devices</h1>
 
 	<DevicesTable  />
 </div>

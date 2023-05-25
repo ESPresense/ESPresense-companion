@@ -9,12 +9,14 @@ internal class OptimizationRunner : BackgroundService
 {
     private readonly State _state;
     private readonly NodeSettingsStore _nsd;
+    private readonly ILogger<OptimizationRunner> _logger;
     private readonly IList<IOptimizer> _optimizers;
 
-    public OptimizationRunner(State state, NodeSettingsStore nsd)
+    public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger)
     {
         _state = state;
         _nsd = nsd;
+        _logger = logger;
         _optimizers = new List<IOptimizer> { new RxAdjRssiOptimizer(_state), new AbsorptionAvgOptimizer(_state), new AbsorptionErrOptimizer(_state) };
     }
 
@@ -70,7 +72,7 @@ internal class OptimizationRunner : BackgroundService
                     Log.Information("Optimizer {0} found better results, rms {1}<{2}", optimizer.Name, d, best);
                     foreach (var (id, result) in results.RxNodes)
                     {
-                        Console.WriteLine($"Optimizer set {id,-32} to Absorption: {result.Absorption,5:0.00} RxAdj: {result.RxAdjRssi,3:00} Error: {result.Error}");
+                        _logger.LogInformation($"Optimizer set {id,-32} to Absorption: {result.Absorption,5:0.00} RxAdj: {result.RxAdjRssi,3:00} Error: {result.Error}");
                         var a = _nsd.Get(id);
                         if (optimization == null) continue;
                         if (result.Absorption != null && result.Absorption > optimization.AbsorptionMin && result.Absorption < optimization.AbsorptionMax) a.Absorption = result.Absorption;

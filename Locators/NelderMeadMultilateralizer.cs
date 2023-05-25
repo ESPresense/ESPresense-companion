@@ -101,7 +101,7 @@ public class NelderMeadMultilateralizer : ILocate
                 confidence = (int)Math.Min(100, Math.Max(10, 100.0 - (Math.Pow(scenario.Minimum ?? 1, 2) + Math.Pow(10 * (1 - (scenario.Scale ?? 1)), 2) + (scenario.Minimum + result.FunctionInfoAtMinimum.Value ?? 10.00))));
             }
         }
-        catch (MaximumIterationsException ex)
+        catch (MaximumIterationsException)
         {
             scenario.ReasonForExit = ExitCondition.ExceedIterations;
             confidence = 1;

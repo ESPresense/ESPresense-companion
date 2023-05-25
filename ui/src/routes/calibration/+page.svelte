@@ -66,7 +66,7 @@
 </svelte:head>
 
 <div class="text-column">
-	<h1>Calibration</h1>
+	<h1 class="h1">Calibration</h1>
 
 	<div class="card variant-filled-secondary p-4" data-popup="examplePopup">
 		{#if selected}
