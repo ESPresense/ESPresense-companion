@@ -3,13 +3,13 @@ import { writable } from 'svelte/store';
 import { base } from '$app/paths';
 import type { Config, Node, Device } from './types';
 
-export const selected = writable<Device | null>();
-
 export const showAll: SvelteStore<boolean> = writable(false);
 
 export const config = writable<Config>();
 
 let socket: WebSocket;
+
+export const history = writable(['/']);
 
 async function getConfig() {
   const response = await fetch(`${base}/api/state/config`);

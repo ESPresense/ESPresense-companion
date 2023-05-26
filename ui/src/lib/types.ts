@@ -39,3 +39,10 @@ export interface Config {
 	nodes: Node[];
 	devices: Device[];
 }
+
+export type DeviceSetting = {
+  originalId: string;
+  id: string | null;
+  name: string | null;
+  "rssi@1m": number | null;
+ };

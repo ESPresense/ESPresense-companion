@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { polygonCentroid } from "d3";
-  import type { Room } from '../lib/types';
+  import type { Room } from '$lib/types';
 
   const { xScale, yScale } = getContext('LayerCake');
 
