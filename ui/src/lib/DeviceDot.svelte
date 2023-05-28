@@ -4,7 +4,7 @@
 	import { cubicOut } from 'svelte/easing';
 
 	import type { ScaleOrdinal } from 'd3';
-	import type { Device } from '../lib/types';
+	import type { Device } from '$lib/types';
 
 	let colors: ScaleOrdinal<string, string> = getContext('colors');
 

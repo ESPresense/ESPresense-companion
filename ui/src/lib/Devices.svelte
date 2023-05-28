@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { config, devices, showAll } from '../lib/stores';
+	import { config, devices, showAll } from '$lib/stores';
 	import { zoomIdentity } from 'd3-zoom';
 
 	import DeviceDot from './DeviceDot.svelte';

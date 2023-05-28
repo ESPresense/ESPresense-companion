@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { writable } from 'svelte/store';
 	import { LayerCake, Svg, Html, Canvas } from 'layercake';
-	import { config, devices } from '../lib/stores';
+	import { config, devices } from '$lib/stores';
 	import { scaleOrdinal, schemeCategory10 } from 'd3';
 	import { select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
 	import { setContext } from 'svelte';
 
-	import type { Device } from '../lib/types';
+	import type { Device } from '$lib/types';
 
 	import Rooms from './Rooms.svelte';
 	import Devices from './Devices.svelte';

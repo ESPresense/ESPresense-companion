@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import { spring, tweened } from 'svelte/motion';
+	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 
-	import { config, devices } from '../lib/stores';
+	import { devices } from '$lib/stores';
 
-	import type { Node, Device } from '../lib/types';
+	import type { Node, Device } from '$lib/types';
 	import type { ScaleOrdinal } from 'd3';
 
 	const { xScale, yScale } = getContext('LayerCake');
 
 	const r = tweened(0, { duration: 100, easing: cubicOut });
 
-	export let radarId: string = '';
+	export let radarId: string | null = null;
 	export let n: Node;
 
 	let radar: Device | undefined;
