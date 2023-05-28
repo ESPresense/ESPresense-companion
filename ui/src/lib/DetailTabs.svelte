@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { config, devices, history } from './stores';
-	import { goto } from '$app/navigation';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
 
@@ -10,9 +10,14 @@
 
 	$: device = $devices.find((d) => d.id === deviceId);
 	$: floor = $config?.floors.find((f) => f.id === floorId);
+	let previousPage: string = base;
+
+	afterNavigate(({ from }) => {
+		previousPage = from?.url.pathname || previousPage;
+	});
 
 	function goBack(defaultRoute = base) {
-		goto($history.length >= 2 ? $history[1] : defaultRoute);
+		goto(previousPage || defaultRoute);
 	}
 </script>
 
@@ -22,8 +27,8 @@
 	</svg>
 	<nav class="h-50 text-black">
 		<button on:click={() => goBack()}>
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-			<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
 			</svg>
 		</button>
 		{#if device}

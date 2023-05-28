@@ -30,6 +30,7 @@
 	});
 
 	$: current = $history[0]
+	$: console.log("Current: ", current)
 </script>
 
 <div class="app h-full">
