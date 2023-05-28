@@ -1,9 +1,5 @@
 <script lang="ts">
-	import { writable } from 'svelte/store';
-	import { scaleOrdinal, schemeCategory10 } from "d3";
-	import { setContext } from 'svelte';
-
-	import NodesTable from '../NodesTable.svelte';
+	import NodesTable from '$lib/NodesTable.svelte';
 </script>
 
 <svelte:head>

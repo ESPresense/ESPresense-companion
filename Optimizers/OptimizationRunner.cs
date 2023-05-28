@@ -66,13 +66,13 @@ internal class OptimizationRunner : BackgroundService
                     var d = results.Evaluate(_state.OptimizationSnaphots, _nsd);
                     if (d >= best || double.IsNaN(d) || double.IsInfinity(d))
                     {
-                        Log.Information("Optimizer {0} found worse results, rms {1}>{2}", optimizer.Name, d, best);
+                        Log.Information("Optimizer {0,-24} found worse  results, rms {1:0.000}>{2:0.000}", optimizer.Name, d, best);
                         continue;
                     }
-                    Log.Information("Optimizer {0} found better results, rms {1}<{2}", optimizer.Name, d, best);
+                    Log.Information("Optimizer {0,-24} found better results, rms {1:0.000}<{2:0.000}", optimizer.Name, d, best);
                     foreach (var (id, result) in results.RxNodes)
                     {
-                        _logger.LogInformation($"Optimizer set {id,-32} to Absorption: {result.Absorption,5:0.00} RxAdj: {result.RxAdjRssi,3:00} Error: {result.Error}");
+                        Log.Information("Optimizer set {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} Error: {3}", id, result.Absorption, result.RxAdjRssi, result.Error);
                         var a = _nsd.Get(id);
                         if (optimization == null) continue;
                         if (result.Absorption != null && result.Absorption > optimization.AbsorptionMin && result.Absorption < optimization.AbsorptionMax) a.Absorption = result.Absorption;

@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { writable } from 'svelte/store';
-	import { scaleOrdinal, schemeCategory10 } from "d3";
-	import { setContext } from 'svelte';
+	import DevicesTable from '$lib/DevicesTable.svelte';
+	import { goto } from '$app/navigation';
+	import type { Device } from '$lib/types';
 
-	import DevicesTable from '../DevicesTable.svelte';
+	function detail(d: Device | null) {
+		goto(`/devices/${d?.id}`);
+	}
 </script>
 
 <svelte:head>
@@ -12,6 +14,5 @@
 
 <div class="text-column">
 	<h1 class="h1">Devices</h1>
-
-	<DevicesTable  />
+	<DevicesTable on:selected={(d) => detail(d.detail)} />
 </div>
