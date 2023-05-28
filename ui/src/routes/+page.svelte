@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { goto } from '$app/navigation';
 	import type { Device } from '$lib/types';
 	import Map from '$lib/Map.svelte';
@@ -7,7 +8,7 @@
 	export let floorId: string | null = null;
 
 	function detail (d:Device | null) {
-		goto(`/devices/${d?.id}`);
+		goto(`${base}/devices/${d?.id}`);
 	}
 </script>
 
