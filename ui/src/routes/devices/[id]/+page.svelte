@@ -1,10 +1,10 @@
 <script lang="ts">
+	import { devices } from '$lib/stores';
 	import type { Device, DeviceSetting } from '$lib/types';
 
 	import Map from '$lib/Map.svelte';
 	import DetailTabs from '$lib/DetailTabs.svelte';
 	import DeviceDetails from '$lib/DeviceDetails.svelte';
-	import { devices } from '$lib/stores';
 
 	export let tab = 'map';
 	export let data: { settings?: DeviceSetting; details?: Device } = {};

@@ -18,6 +18,7 @@
 	import map from '$lib/images/map.svg';
 	import nodes from '$lib/images/nodes.svg';
 	import devices from '$lib/images/devices.svg';
+	import calibration from '$lib/images/calibration.svg';
 
 	storePopup.set({ computePosition, autoUpdate, offset, shift, flip, arrow });
 
@@ -36,30 +37,30 @@
 <div class="app h-full">
 	<AppShell>
 		<svelte:fragment slot="sidebarLeft">
-			<AppRail width="w-16">
+			<AppRail>
 				<svelte:fragment slot="lead">
 					<AppRailAnchor href="https://espresense.com/companion" target="_blank" group="main">
-						<img src={logo} class="px-4" alt="ESPresense Companion" />
+						<img src={logo} class="px-6" alt="ESPresense Companion" />
 					</AppRailAnchor>
 				</svelte:fragment>
 
 				<AppRailAnchor href="{base}/" name="map" selected={current == `${base}/`}>
-					<svelte:fragment slot="lead"><img src={map} class="px-4" alt="Map" /></svelte:fragment>
+					<img src={map} class="px-6" alt="Map" />
 					<span>Map</span>
 				</AppRailAnchor>
 
 				<AppRailAnchor href="{base}/devices" name="devices" selected={current == `${base}/devices`}>
-					<svelte:fragment slot="lead"><img src={devices} class="px-4" alt="Devices" /></svelte:fragment>
+					<img src={devices} class="px-6" alt="Devices" />
 					<span>Devices</span>
 				</AppRailAnchor>
 
 				<AppRailAnchor href="{base}/nodes" name="nodes" selected={current == `${base}/nodes`}>
-					<svelte:fragment slot="lead"><img src={nodes} class="px-4" alt="Nodes" /></svelte:fragment>
+					<img src={nodes} class="px-6" alt="Nodes" />
 					<span>Nodes</span>
 				</AppRailAnchor>
 
 				<AppRailAnchor href="{base}/calibration" name="calibration" selected={current == `${base}/calibration`}>
-					<svelte:fragment slot="lead"><img src={nodes} class="px-4" alt="Calibration" /></svelte:fragment>
+					<img src={calibration} class="px-4" alt="Calibration" />
 					<span>Calibration</span>
 				</AppRailAnchor>
 

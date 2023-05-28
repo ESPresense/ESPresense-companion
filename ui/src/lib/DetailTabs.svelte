@@ -33,7 +33,7 @@
 		</button>
 		{#if device}
 			<div class="pl-4 px-4 py-1">
-				<h4 class="h4">{device?.name} on {floor?.name}</h4>
+				<h4 class="h4">{device?.name || device?.id} on {floor?.name ?? "Unknown"}</h4>
 			</div>
 		{/if}
 		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
