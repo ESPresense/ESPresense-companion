@@ -31,9 +31,6 @@
 </script>
 
 {#if settings}
-	<span class="text-lg font-medium leading-6 badge badge-filled-primary m-2"
-		>{@html settings.name ?? settings.originalId}</span
-	>
 	<Accordion>
 		<AccordionItem spacing="space-y-4" open>
 			<svelte:fragment slot="summary">
@@ -59,21 +56,6 @@
 					</label>
 					<button class="btn bg-success-700 text-black" on:click={(e) => save()}>Save</button>
 				</form>
-			</svelte:fragment>
-		</AccordionItem>
-		<AccordionItem spacing="space-y-4">
-			<svelte:fragment slot="summary">
-				<h3 class="h3">Details</h3>
-			</svelte:fragment>
-			<svelte:fragment slot="content">
-				{#if details}
-					{#each details as d}
-						<label>
-							<span>{d.key}</span>
-							<input class="input" type="text" disabled bind:value={d.value} />
-						</label>
-					{/each}
-				{/if}
 			</svelte:fragment>
 		</AccordionItem>
 	</Accordion>

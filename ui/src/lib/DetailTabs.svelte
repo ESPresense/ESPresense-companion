@@ -13,7 +13,7 @@
 	let previousPage: string = base;
 
 	afterNavigate(({ from }) => {
-		previousPage = from?.url.pathname || previousPage;
+		previousPage = from?.url?.pathname || previousPage;
 	});
 
 	function goBack(defaultRoute = base) {
@@ -38,7 +38,7 @@
 		{/if}
 		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
 			<RadioItem bind:group={tab} name="Map" value="map">Map</RadioItem>
-			<RadioItem bind:group={tab} name="Details" value="details">Details</RadioItem>
+			<RadioItem bind:group={tab} name="Settings" value="settings">Settings</RadioItem>
 		</RadioGroup>
 	</nav>
 	<svg viewBox="0 0 2 3" aria-hidden="true">
