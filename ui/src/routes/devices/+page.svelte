@@ -1,11 +1,6 @@
 <script lang="ts">
 	import DevicesTable from '$lib/DevicesTable.svelte';
-	import { goto } from '$app/navigation';
-	import type { Device } from '$lib/types';
-
-	function detail(d: Device | null) {
-		goto(`/devices/${d?.id}`);
-	}
+	import { detail } from '$lib/urls';
 </script>
 
 <svelte:head>
