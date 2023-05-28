@@ -5,7 +5,7 @@
 	import Filter from './Filter.svelte';
 
 	export let floorId: string | null = null;
-	$: if (floorId == null) floorId = $config.floors[0].id;
+	$: if (floorId == null) floorId = $config?.floors[0].id;
 </script>
 
 <header>

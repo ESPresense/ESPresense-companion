@@ -14,7 +14,7 @@
 	let target: any;
 
 	let nodes: Node[] | undefined;
-	$: nodes = $config?.nodes?.filter((n) => n.floors.includes(floorId));
+	$: nodes = $config?.nodes?.filter((n) => n?.floors.includes(floorId));
 </script>
 
 <Moveable {target} draggable="true" edge={false} />

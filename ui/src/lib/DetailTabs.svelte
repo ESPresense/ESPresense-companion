@@ -9,7 +9,7 @@
 	export let tab = 'map';
 
 	$: device = $devices.find((d) => d.id === deviceId);
-	$: floor = $config.floors.find((f) => f.id === floorId);
+	$: floor = $config?.floors.find((f) => f.id === floorId);
 
 	function goBack(defaultRoute = base) {
 		goto($history.length >= 2 ? $history[1] : defaultRoute);

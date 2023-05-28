@@ -23,8 +23,7 @@
 	export let deviceId: string | null = null;
 
 	$: device = $devices.find((d) => d.id === deviceId);
-	$: floor =
-		$config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
+	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
 
 	const handler = zoom()
