@@ -11,6 +11,8 @@ namespace ESPresense.Locators;
 
 internal class MultiScenarioLocator : BackgroundService
 {
+    private const int ConfidenceThreshold = 2;
+
     private readonly DatabaseFactory _databaseFactory;
     private readonly MqttConnectionFactory _mqttConnectionFactory;
     private readonly State _state;
@@ -127,7 +129,11 @@ internal class MultiScenarioLocator : BackgroundService
             {
                 device.LastCalculated = now;
                 var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
-                var bs = device.BestScenario = device.Scenarios.Select((scenario, i) => new { scenario, i }).Where(a => a.scenario.Current).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).FirstOrDefault()?.scenario;
+                var bs = device.Scenarios.Select((scenario, i) => new { scenario, i }).Where(a => a.scenario.Current).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).FirstOrDefault()?.scenario;
+                if (device.BestScenario == null || bs == null || bs.Confidence - device.BestScenario.Confidence > ConfidenceThreshold)
+                    device.BestScenario = bs;
+                else
+                    bs = device.BestScenario;
                 var state = bs?.Room?.Name ?? bs?.Floor?.Name ?? "not_home";
 
                 if (state != device.ReportedState)
