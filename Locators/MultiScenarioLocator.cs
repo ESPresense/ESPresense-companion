@@ -190,7 +190,7 @@ internal class MultiScenarioLocator : BackgroundService
 
     private IEnumerable<Scenario> GetScenarios(Device device)
     {
-        foreach (var floor in _state.Floors.Values) yield return new Scenario(_state.Config, new NelderMeadMultilateralizer(device, floor, _state), floor.Name);
+        foreach (var floor in _state.Floors.Values) yield return new Scenario(_state.Config, new GaussNewtonMultilateralizer(device, floor, _state), floor.Name);
         //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
         yield return new Scenario(_state.Config, new NearestNode(device), "NearestNode");
     }
