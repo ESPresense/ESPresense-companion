@@ -1,6 +1,8 @@
 ﻿using System.Numerics;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Double;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
 using Serilog;
@@ -9,71 +11,73 @@ namespace ESPresense.Locators;
 
 public class GaussNewtonMultilateralizer : ILocate
 {
-    public class Multilateration
+    class GaussNewton
+{
+    private Vector3[] transmitters;
+    private float[] ranges;
+    private Vector3 lowerBounds;
+    private Vector3 upperBounds;
+
+    public GaussNewton(Vector3[] transmitters, float[] ranges, Vector3 lowerBounds, Vector3 upperBounds)
     {
-        private const double Epsilon = 0.001;
-        private const int MaxIterations = 100;
-
-        // Locations of the transmitters
-        private readonly Vector3[] _transmitters;
-
-        // Distances from the transmitters
-        private readonly double[] ranges;
-        private readonly Vector3 _lowerBounds;
-        private readonly Vector3 _upperBounds;
-
-        public Multilateration(Vector3[] transmitters, double[] ranges, Vector3 lowerBounds, Vector3 upperBounds)
-        {
-            this._transmitters = transmitters;
-            this.ranges = ranges;
-            _lowerBounds = lowerBounds;
-            _upperBounds = upperBounds;
-        }
+        this.transmitters = transmitters;
+        this.ranges = ranges;
+        this.lowerBounds = lowerBounds;
+        this.upperBounds = upperBounds;
+    }
 
         public int? Iterations { get; set; }
+    private bool OutOfBounds(Vector3 x)
+    {
+        return x.X < lowerBounds.X || x.X > upperBounds.X || x.Y < lowerBounds.Y || x.Y > upperBounds.Y || x.Z < lowerBounds.Z || x.Z > upperBounds.Z;
+    }
 
-        public Vector3 FindPosition(Vector3 initialGuess)
+    private double Error(Vector3 x, Vector3 dnLocation, float dnDistance)
+    {
+        return Vector3.Distance(x, dnLocation) - dnDistance;
+    }
+    public Vector3 FindPosition(Vector3 initialGuess)
+    {
+        var guess = initialGuess;
+
+            int iter;
+        for (iter = 0; iter < 100; ++iter)
         {
-            Vector3 x = initialGuess;
-
-            int k = 0;
-            for (; k < MaxIterations; k++)
+            // Construct the Jacobian matrix
+            var jacobian = DenseMatrix.OfArray(new double[transmitters.Length, 3]);
+            for (int i = 0; i < transmitters.Length; ++i)
             {
-                var J = new Matrix4x4();
-                var r = new Vector4();
-
-                for (int i = 0; i < _transmitters.Length; i++)
+                for (int j = 0; j < 3; ++j)
                 {
-                    var diff = x - _transmitters[i];
-                    float rangeEstimate = diff.Length();
-
-                    J[i, 0] = diff.X / rangeEstimate;
-                    J[i, 1] = diff.Y / rangeEstimate;
-                    J[i, 2] = diff.Z / rangeEstimate;
-
-                    r[i] = (float)(rangeEstimate - ranges[i]);
+                    jacobian[i, j] = 2 * (guess - transmitters[i])[j];
                 }
-
-                var jt = Matrix4x4.Transpose(J);
-                var jtj = Matrix4x4.Multiply(jt, J);
-                var invJtj = jtj.Inverse();
-                var delta = Vector4.Transform(-r, invJtj * jt);
-
-                x += new Vector3(delta.X, delta.Y, delta.Z);
-
-                x = Vector3.Max(_lowerBounds, Vector3.Min(_upperBounds, x));
-
-
-                // Stopping criterion
-                if (delta.Length() < Epsilon)
-                    break;
             }
 
-            Iterations = k;
+            // Construct the residual vector
+            var residuals = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(transmitters.Length);
+            for (int i = 0; i < transmitters.Length; ++i)
+            {
+                residuals[i] = Error(guess, transmitters[i], ranges[i]);
+            }
 
-            return x;
+            // Solve the normal equations
+            var step = (jacobian.TransposeThisAndMultiply(jacobian)).Inverse() * jacobian.Transpose() * residuals;
+
+            // Update the guess
+            guess -= new Vector3((float)step[0], (float)step[1], (float)step[2]);
+
+            // If the step size is small enough, stop iterating
+            if (step.L2Norm() < 1e-5)
+            {
+                break;
+            }
         }
+
+            Iterations = iter;
+        return guess;
     }
+}
+
 
     private readonly Device _device;
     private readonly Floor _floor;
@@ -129,7 +133,7 @@ public class GaussNewtonMultilateralizer : ILocate
                     Math.Max((float)_floor.Bounds[0].Y, Math.Min((float)_floor.Bounds[1].Y, (float)guess.Y)),
                     Math.Max((float)_floor.Bounds[0].Z, Math.Min((float)_floor.Bounds[1].Z, (float)guess.Z)));
 
-                var multilateration = new Multilateration(pos.Select(a => a.ToVector3()).ToArray(), nodes.Select(dn => dn.Distance).ToArray(), lowerBound, upperBound);
+                var multilateration = new GaussNewton(pos.Select(a => a.ToVector3()).ToArray(), nodes.Select(dn => (float)dn.Distance).ToArray(), lowerBound, upperBound);
                 var result = multilateration.FindPosition(initialGuess);
 
                 scenario.Location = new Point3D(result.X, result.Y, result.Z);
