@@ -21,16 +21,13 @@ public class GaussNewtonMultilateralizer : ILocate
         _state = state;
     }
 
+
     public bool Locate(Scenario scenario)
     {
         var confidence = scenario.Confidence;
 
-        var nodes = _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).OrderBy(a => a.Distance).ToArray();
-        var pos = nodes.Select(a => a.Node!.Location).ToArray();
-
-        scenario.Minimum = nodes.Min(a => (double?)a.Distance);
-        scenario.LastHit = nodes.Max(a => a.LastHit);
-        scenario.Fixes = pos.Length;
+        var nodes = _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).ToArray();
+        var (pos, ranges) = SelectNonColinearTransmitters(nodes, 4);
 
         if (pos.Length <= 1)
         {
@@ -41,10 +38,14 @@ public class GaussNewtonMultilateralizer : ILocate
             return false;
         }
 
+        scenario.Minimum = ranges.Min(a => a);
+        scenario.LastHit = nodes.Max(a => a.LastHit);
+        scenario.Fixes = pos.Length;
+
         scenario.Floor = _floor;
 
         var guess = confidence < 5
-            ? Point3D.MidPoint(pos[0], pos[1])
+            ? Point3D.MidPoint(pos[0].ToPoint3D(), pos[1].ToPoint3D())
             : scenario.Location;
         try
         {
@@ -64,14 +65,14 @@ public class GaussNewtonMultilateralizer : ILocate
                     Math.Max((float)_floor.Bounds[0].Y, Math.Min((float)_floor.Bounds[1].Y, (float)guess.Y)),
                     Math.Max((float)_floor.Bounds[0].Z, Math.Min((float)_floor.Bounds[1].Z, (float)guess.Z)));
 
-                var multilateration = new GaussNewton(pos.Select(a => a.ToVector3()).ToArray(), nodes.Select(dn => (float)dn.Distance).ToArray(), lowerBound, upperBound);
-                var result = multilateration.FindPosition(initialGuess);
+                var gaussNewton = new GaussNewton(pos, ranges, lowerBound, upperBound);
+                var result = gaussNewton.FindPosition(initialGuess);
 
                 scenario.Location = new Point3D(result.X, result.Y, result.Z);
                 scenario.Fixes = pos.Length;
                 //scenario.Error = nodes.Select(dn => Math.Pow(multilateration.Error(result, dn.Node!.Location.ToVector3(), dn.Distance), 2)).Average();
                 scenario.Scale = 1.0; // Gauss-Newton method doesn't estimate scale, so we'll just set it to 1.0
-                scenario.Iterations = multilateration.Iterations;
+                scenario.Iterations = gaussNewton.Iterations;
 
                 // Gauss-Newton method doesn't provide a reason for exit, so we'll just say it converged
                 scenario.ReasonForExit = ExitCondition.Converged;
@@ -102,6 +103,55 @@ public class GaussNewtonMultilateralizer : ILocate
         return true;
     }
 
+    private Tuple<Vector3[], float[]> SelectNonColinearTransmitters(DeviceNode[] dns, int numberOfTransmitters = 4)
+    {
+        var orderedTransmitters = dns.OrderBy(a => a.Distance).ToArray();
+
+        var selectedTransmitters = new List<Vector3>();
+        var selectedRanges = new List<float>();
+
+        for (var i = 0; i < orderedTransmitters.Length; ++i)
+        {
+            if (selectedTransmitters.Count < 1)
+            {
+                selectedTransmitters.Add(orderedTransmitters[i].Node!.Location.ToVector3());
+                selectedRanges.Add((float)orderedTransmitters[i].Distance);
+            }
+            else
+            {
+                var isColinear = false;
+                for (var j = 0; j < selectedTransmitters.Count - 1; ++j)
+                {
+                    for (var k = j + 1; k < selectedTransmitters.Count; ++k)
+                    {
+                        var v1 = selectedTransmitters[j] - orderedTransmitters[i].Node!.Location.ToVector3();
+                        var v2 = selectedTransmitters[k] - orderedTransmitters[i].Node!.Location.ToVector3();
+                        if (Math.Abs(Vector3.Cross(v1, v2).Length()) < 1e-5)
+                        {
+                            isColinear = true;
+                            break;
+                        }
+                    }
+
+                    if (isColinear) break;
+                }
+
+                if (!isColinear)
+                {
+                    selectedTransmitters.Add(orderedTransmitters[i].Node!.Location.ToVector3());
+                    selectedRanges.Add((float)orderedTransmitters[i].Distance);
+                }
+            }
+
+            if (selectedTransmitters.Count >= numberOfTransmitters) break;
+        }
+
+        if (selectedTransmitters.Count < numberOfTransmitters)
+            return new Tuple<Vector3[], float[]>(dns.Select(a=>a.Node!.Location.ToVector3()).ToArray(), dns.Select(a=>(float)a.Distance).ToArray());
+
+        return new Tuple<Vector3[], float[]>(selectedTransmitters.ToArray(), selectedRanges.ToArray());
+    }
+
     private class GaussNewton
     {
         private readonly Vector3 _lowerBounds;
@@ -111,10 +161,10 @@ public class GaussNewtonMultilateralizer : ILocate
 
         public GaussNewton(Vector3[] transmitters, float[] ranges, Vector3 lowerBounds, Vector3 upperBounds)
         {
-            this._transmitters = transmitters;
-            this._ranges = ranges;
-            this._lowerBounds = lowerBounds;
-            this._upperBounds = upperBounds;
+            _transmitters = transmitters;
+            _ranges = ranges;
+            _lowerBounds = lowerBounds;
+            _upperBounds = upperBounds;
         }
 
         public int? Iterations { get; set; }
