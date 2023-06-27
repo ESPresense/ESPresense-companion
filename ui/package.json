@@ -13,7 +13,7 @@
 		"format": "prettier --plugin-search-dir . --write ."
 	},
 	"devDependencies": {
-		"@floating-ui/dom": "^1.2.9",
+		"@floating-ui/dom": "^1.4.2",
 		"@playwright/test": "^1.35.1",
 		"@skeletonlabs/skeleton": "^1.6.2",
 		"@sveltejs/adapter-static": "^2.0.2",
