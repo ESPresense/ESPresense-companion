@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "svelte-table": "^0.6.1"
+  }
+}
