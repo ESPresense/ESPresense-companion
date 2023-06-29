@@ -43,4 +43,4 @@ jobs:
             --no-cache \
             --file ./Dockerfile . \
             --compress \
-            --tag "espresense/espresense-companion:${{ steps.version.outputs.version }},espresense/espresense-companion:latest"
+            --tag "espresense/espresense-companion:${{ steps.version.outputs.version }}","espresense/espresense-companion:latest"
