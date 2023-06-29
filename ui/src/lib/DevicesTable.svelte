@@ -2,6 +2,7 @@
 	import { devices } from '$lib/stores';
 	import type { Device } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
+	import SvelteTable from 'svelte-table';
 
 	let dispatcher = createEventDispatcher();
 	let selected = '';
@@ -11,50 +12,32 @@
 		dispatcher('selected', d);
 	}
 
-	const createSelectionHandler =
-		(device: Device) =>
-		(event: MouseEvent & { currentTarget: EventTarget & HTMLTableRowElement }) => {
-			select(device);
-		};
+	let columns = [
+		{ title: 'Id', value: (d) => d.id },
+		{ title: 'Name', value: (d) => d.name },
+		{ title: 'Room / Floor', value: (d) => d.room?.name ?? d.floor?.name ?? 'n/a' },
+		{ title: 'X', value: (d) => d.location?.x },
+		{ title: 'Y', value: (d) => d.location?.y },
+		{ title: 'Z', value: (d) => d.location?.z },
+		{ title: 'Fixes', value: (d) => d.fixes ?? 'n/a' },
+		{ title: 'Scale', value: (d) => d.scale ?? 'n/a' },
+		{ title: 'Confidence', value: (d) => d.confidence ?? 'n/a' },
+		{ title: 'LastHit', value: (d) => d.lastHit ?? 'n/a' }
+	];
+
+	function onRowClick(e) {
+		select(e.detail.row);
+	}
 </script>
 
 <div class="table-container">
 	{#if $devices}
-		<table class="table table-hover">
-			<thead>
-				<tr>
-					<th>Id</th>
-					<th>Name</th>
-					<th>Room / Floor</th>
-					<th>X</th>
-					<th>Y</th>
-					<th>Z</th>
-					<th>Fixes</th>
-					<th>Scale</th>
-					<th>Confidence</th>
-					<th>LastHit</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each $devices as d}
-					<tr on:click={createSelectionHandler(d)}>
-						<td>{@html d.id}</td>
-						<td>{@html d.name}</td>
-						<td>{@html d.room?.name ?? d.floor?.name ?? 'n/a'}</td>
-						<td>{@html d.location?.x}</td>
-						<td>{@html d.location?.y}</td>
-						<td>{@html d.location?.z}</td>
-						<td>{@html d.fixes ?? 'n/a'}</td>
-						<td>{@html d.scale ?? 'n/a'}</td>
-						<td>{@html d.confidence ?? 'n/a'}</td>
-						<td>{@html d.lastHit ?? 'n/a'}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
+		<SvelteTable {columns} classNameTable="table table-hover" rows={$devices} on:clickRow={onRowClick} />
 	{/if}
 </div>
 
 <style>
-  .table-container { padding: 10px; }
+	.table-container {
+		padding: 10px;
+	}
 </style>
