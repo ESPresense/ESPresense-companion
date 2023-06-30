@@ -37,7 +37,7 @@ public class Device
 
     public int? Fixes => BestScenario?.Fixes;
 
-    public DateTime? LastHit => BestScenario?.LastHit;
+    public DateTime? LastHit => BestScenario?.LastHit ?? Nodes.Values.Max(a => a.LastHit);
 
     [JsonIgnore] public bool Check { get; set; }
     [JsonIgnore] public bool Track { get; set; }
