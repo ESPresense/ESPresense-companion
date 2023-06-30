@@ -33,6 +33,7 @@
 		"postcss": "^8.4.24",
 		"prettier": "^2.8.8",
 		"prettier-plugin-svelte": "^2.10.1",
+		"s-ago": "^2.2.0",
 		"svelte": "^3.59.2",
 		"svelte-check": "^3.4.4",
 		"svelte-table": "^0.6.1",
