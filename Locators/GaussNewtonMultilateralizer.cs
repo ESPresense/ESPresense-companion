@@ -24,6 +24,8 @@ public class GaussNewtonMultilateralizer : ILocate
 
     public bool Locate(Scenario scenario)
     {
+        double Error(Point3D pos1, Point3D pos2, double dist) => pos1.DistanceTo(pos2) - dist;
+
         var confidence = scenario.Confidence;
 
         var nodes = _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).ToArray();
@@ -41,7 +43,6 @@ public class GaussNewtonMultilateralizer : ILocate
         scenario.Minimum = ranges.Min(a => a);
         scenario.LastHit = nodes.Max(a => a.LastHit);
         scenario.Fixes = pos.Length;
-
         scenario.Floor = _floor;
 
         var guess = confidence < 5
@@ -49,8 +50,6 @@ public class GaussNewtonMultilateralizer : ILocate
             : scenario.Location;
         try
         {
-            // ...
-
             if (pos.Length < 3 || _floor.Bounds == null)
             {
                 confidence = 1;
@@ -70,17 +69,13 @@ public class GaussNewtonMultilateralizer : ILocate
 
                 scenario.Location = new Point3D(result.X, result.Y, result.Z);
                 scenario.Fixes = pos.Length;
-                //scenario.Error = nodes.Select(dn => Math.Pow(multilateration.Error(result, dn.Node!.Location.ToVector3(), dn.Distance), 2)).Average();
-                scenario.Scale = 1.0; // Gauss-Newton method doesn't estimate scale, so we'll just set it to 1.0
+                scenario.Error = pos.Select((p, i) => Math.Pow(Error(result.ToPoint3D(), p.ToPoint3D(), ranges[i]), 2)).Average();
                 scenario.Iterations = gaussNewton.Iterations;
 
-                // Gauss-Newton method doesn't provide a reason for exit, so we'll just say it converged
                 scenario.ReasonForExit = ExitCondition.Converged;
 
                 confidence = (int)Math.Min(100, Math.Max(10, 100.0 - Math.Pow(scenario.Minimum ?? 1, 2)));
             }
-
-            // ...
         }
         catch (MaximumIterationsException)
         {
@@ -198,6 +193,8 @@ public class GaussNewtonMultilateralizer : ILocate
 
                 // Update the guess
                 guess -= new Vector3((float)step[0], (float)step[1], (float)step[2]);
+
+                guess = Vector3.Max(_lowerBounds, Vector3.Min(_upperBounds, guess));
 
                 // If the step size is small enough, stop iterating
                 if (step.L2Norm() < 1e-5) break;
