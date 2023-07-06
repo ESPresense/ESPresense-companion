@@ -8,8 +8,8 @@ mqtt:
 
 # This gets added to the x,y,z to derive a gps location
 gps:
-  latitude: 40.1153354
-  longitude: -75.7742686
+  latitude: 38.897957
+  longitude: -77.036560
   elevation: 146
 
 # How long before device considered stale
@@ -21,11 +21,11 @@ optimization:
   enabled: true
   interval_secs: 60
   limits:
-    absorption_min: 2
-    absorption_max: 4
+    absorption_min: 2.5
+    absorption_max: 3.5
     tx_ref_rssi_min: -70
     tx_ref_rssi_max: -50
-    rx_adj_rssi_min: -20
+    rx_adj_rssi_min: -15
     rx_adj_rssi_max: 20
 
 weighting:
@@ -86,18 +86,18 @@ floors:
           - [0, 18]
       - name: Living
         points:
-          - [18.5, 13.25]
-          - [18.5, 7.75]
-          - [14.5, 7.75]
-          - [14.5, 13.25]
-          - [18.5, 13.25]
+          - [16.5, 13.25]
+          - [16.5, 7.75]
+          - [12.5, 7.75]
+          - [12.5, 13.25]
+          - [16.5, 13.25]
       - name: Dining
         points:
-          - [18.5, 2.75]
-          - [18.5, 7.75]
-          - [14.5, 7.75]
-          - [14.5, 2.75]
-          - [18.5, 2.75]
+          - [16.5, 2.75]
+          - [16.5, 7.75]
+          - [12.5, 7.75]
+          - [12.5, 2.75]
+          - [16.5, 2.75]
       - name: Foyer
         points:
           - [7.6, 13.5]
@@ -165,24 +165,24 @@ nodes:
     point: [0.75, 17.9, 0.5]
     floors: ["first", "second", "outside"]
   - name: Office
-    point: [5, 15.25, 0.5]
+    point: [5, 15.25, 1.5]
     floors: ["first"]
   - name: Family
     point: [0.5, 0.5, 0.25]
-    floors: ["first", "outside"]
+    floors: ["outside"]
   - name: Kitchen
     point: [8, 7.5, 0.5]
     floors: ["first"]
   - name: Dining
-    point: [18.25, 3.1, 0.5]
-    floors: ["first", "outside"]
+    point: [16.25, 3.1, 1.29]
+    floors: ["first", "second", "outside"]
   - name: Basement
-    point: [17, 12.5, -0.8]
+    point: [16, 13, -1]
     floors: ["first", "second", "outside"]
   - name: Laundry
     point: [5, 9, 1]
     floors: ["first"]
-  - name: VW EOS
+  - name: Mini
     stationary: false
     point: [-2, 15, 0.5]
     floors: ["outside"]
@@ -191,9 +191,11 @@ nodes:
 devices:
   - id: "tile:*" # Track all tiles
   - id: "irk:*" # Track all IRKs
-  - id: "apple:*" # Track all apple devices
+  - id: "watch:*"
+  - id: "phone:*"
+  - id: "iBeacon:*"
   - name: "*" # Track all named devices
-  - id: darrells-watch
+  - id: watch:darrell
     name: Darrell's Watch
-  - id: darrells-iphone
+  - id: phone:darrell
     name: Darrell's iPhone
