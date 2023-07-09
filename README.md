@@ -26,6 +26,26 @@ Step 2: Install
 
 Click Install, Click Start, Click Show in Sidebar
 
+# Room Measurement Guide
+
+Start at the **bottom left corner** of the building/area, which will serve as the **origin (0,0)**. Measurements are taken from this south-west corner. When plotting the measurements, choose either a clockwise or counter-clockwise approach. For this guide, we will use a **clockwise** direction.
+
+## Room 1
+
+1. **First point:** `(0,0)`
+2. Move north along the outside wall about 9 feet (or 3 meters). This gives the point: `(3,0)`
+3. Move to the right for 12 feet (or 4 meters). This gives the point: `(3,4)`
+4. Return to the outside wall. This gives the point: `(0,4)`
+
+## Room 2
+
+Starting with an adjacent wall, the measurements would be:
+
+1. **First point:** `(3,0)`
+2. The room is narrower, 6 feet wide (or 2 meters). This gives the point: `(5,0)`
+3. The room depth is 10.5 feet (or roughly 3.5 meters). This gives the point: `(5,3.5)`
+4. Return to the remaining unmarked corner. This gives the point: `(3,3.5)`
+
 # Node Placement
 
 To accurately determine the location of a device, it is necessary to have base station nodes positioned on the corners of the locating area (floorplan), with an additional node fairly close (1-3m). That's 5 fixes for an optimal location solution.  The more fixes, the better the accuracy. The algorithm uses the distances in order from closest to farthest. The nearest distance is like 40% of the location (uses the gaussian distribution).
