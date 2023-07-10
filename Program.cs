@@ -47,11 +47,13 @@ builder.Services.AddSingleton<MqttConnectionFactory>();
 
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
+builder.Services.AddSingleton<NodeTelemetryStore>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
+builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
