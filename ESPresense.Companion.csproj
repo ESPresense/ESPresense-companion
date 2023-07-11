@@ -24,7 +24,7 @@
     <PackageReference Include="MathNet.Numerics.MKL.Win" Version="3.0.0" />
     <PackageReference Include="MathNet.Numerics.Providers.MKL" Version="5.0.0" />
     <PackageReference Include="MathNet.Spatial" Version="0.6.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="7.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="7.0.9" />
     <PackageReference Include="MQTTnet" Version="4.1.4.563" />
     <PackageReference Include="MQTTnet.Extensions.ManagedClient" Version="4.1.4.563" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
