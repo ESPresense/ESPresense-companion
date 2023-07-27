@@ -9,6 +9,8 @@ using Serilog.Events;
 using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
+using Flurl;
+using Swashbuckle.AspNetCore.SwaggerUI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +51,8 @@ builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
 
+builder.Services.AddSingleton<MappingService>();
+
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
@@ -59,6 +63,8 @@ builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
     opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
@@ -72,6 +78,9 @@ app.UseSerilogRequestLogging(o =>
     o.EnrichDiagnosticContext = (dc, ctx) => dc.Set("UserAgent", ctx?.Request.Headers["User-Agent"]);
     o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Debug;
 });
+
+app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");
+app.UseSwaggerUI(c => c.RoutePrefix = "api/swagger");
 
 //app.UseMiddleware<FixAbsolutePaths>();
 app.UseStaticFiles();
