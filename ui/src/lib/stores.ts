@@ -57,3 +57,28 @@ export const devices = readable<Device[]>([], function start(set) {
   };
 });
 
+export const nodes = readable<Node[]>([], function start(set) {
+  var errors = 0;
+  var outstanding = false;
+  const interval = setInterval(() => {
+    if (outstanding) return;
+    outstanding = true;
+    fetch(`${base}/api/state/nodes?includeTele=true`)
+      .then(d => d.json())
+      .then(r => {
+        outstanding = false;
+        errors = 0;
+        set(r);
+      })
+      .catch((ex) => {
+        outstanding = false;
+        if (errors > 5) set([]);
+        console.log(ex);
+      });
+  }, 1000)
+
+  return function stop() {
+    clearInterval(interval);
+  };
+});
+

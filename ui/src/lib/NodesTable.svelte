@@ -1,30 +1,35 @@
 <script lang="ts">
-	import { config } from '$lib/stores';
+	import SvelteTable from 'svelte-table';
+	import { nodes } from '$lib/stores';
 	import type { Node } from '$lib/types';
+	import { createEventDispatcher } from 'svelte';
+	import NodeActions from './NodeActions.svelte';
 
-	let nodes: Node[] | undefined;
-	$: nodes = $config?.nodes;
+	let columns = [
+		{ key: 'id', title: 'ID', value: (d) => d.id, sortable: true },
+		{ key: 'name', title: 'Name', value: (d) => d.name, sortable: true },
+		{ key: 'telemetry.version', title: 'Version', value: (d) => d.telemetry?.version ?? "n/a", sortable: true },
+		{ key: 'actions', title: "", renderComponent: { component: NodeActions }},
+	];
+
+	let dispatcher = createEventDispatcher();
+	let selected = '';
+
+	function select(n: Node) {
+		selected = n?.id ?? '';
+		dispatcher('selected', n);
+	}
+
+	function onRowClick(e) {
+		select(e.detail.row);
+	}
 </script>
 
-<div class="table-container">
-	{#if nodes}
-		<table class="table table-hover">
-			<thead>
-				<tr>
-					<th>Name</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each nodes as n}
-					<tr>
-						<td>{@html n.name}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	{/if}
+<div class="table-container p-2">
+{#if $nodes }
+<SvelteTable {columns} rows={$nodes} classNameTable="table table-hover table-compact" on:clickRow={onRowClick} sortBy="id" />
+{/if}
 </div>
 
 <style>
-  .table-container { padding: 10px; }
 </style>
