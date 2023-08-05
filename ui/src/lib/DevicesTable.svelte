@@ -3,7 +3,7 @@
 	import type { Device } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
 	import SvelteTable from 'svelte-table';
-  import ago from 's-ago';
+	import ago from 's-ago';
 
 	let dispatcher = createEventDispatcher();
 	let selected = '';
@@ -31,14 +31,11 @@
 	}
 </script>
 
-<div class="table-container">
+<div class="table-container p-2">
 	{#if $devices}
 		<SvelteTable {columns} classNameTable="table table-hover table-compact" rows={$devices} on:clickRow={onRowClick} sortBy="id" />
 	{/if}
 </div>
 
 <style>
-	.table-container {
-		padding: 10px;
-	}
 </style>

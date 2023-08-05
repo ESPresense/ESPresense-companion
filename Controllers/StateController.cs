@@ -17,22 +17,23 @@ namespace ESPresense.Controllers
         private readonly State _state;
         private readonly ConfigLoader _config;
         private readonly NodeSettingsStore _nsd;
+        private readonly MappingService _ms;
 
-        public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd)
+        public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, MappingService ms)
         {
             _logger = logger;
             _state = state;
             _config = config;
             _nsd = nsd;
+            _ms = ms;
         }
 
         // GET: api/rooms
         [HttpGet("api/state/nodes")]
-        public IEnumerable<Node> GetNodes()
+        public IEnumerable<NodeState> GetNodes(bool includeTele = true)
         {
-            return _state.Nodes.Values;
+            return includeTele ? _ms.Mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values) : _ms.Mapper.Map<IEnumerable<NodeState>>(_state.Nodes.Values);
         }
-
 
         // GET: api/rooms
         [HttpGet("api/state/devices")]
@@ -74,6 +75,7 @@ namespace ESPresense.Controllers
             return c;
         }
 
+        [ApiExplorerSettings(IgnoreApi = true)]
         [Route("/ws")]
         public async Task Get()
         {
