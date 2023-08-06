@@ -25,9 +25,9 @@ public class NodeController : ControllerBase
         return _nodeSettingsStore.Set(id, ds);
     }
 
-    [HttpPost("{id}/upgrade")]
+    [HttpPost("{id}/update")]
     public async Task Set(string id)
     {
-        await _nodeSettingsStore.Upgrade(id);
+        await _nodeSettingsStore.Update(id);
     }
 }

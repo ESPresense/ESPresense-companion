@@ -80,9 +80,9 @@ namespace ESPresense.Services
             await Task.Delay(-1, stoppingToken);
         }
 
-        public async Task Upgrade(string id)
+        public async Task Update(string id)
         {
-            await _mc.EnqueueAsync($"espresense/rooms/{id}/upgrade/set", $"PRESS");
+            await _mc.EnqueueAsync($"espresense/rooms/{id}/update/set", $"PRESS");
         }
     }
 }
