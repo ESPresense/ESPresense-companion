@@ -10,7 +10,7 @@ export async function load({ fetch, params }) {
     })
     .catch((e) => {
       console.log(e);
-      const t: ToastSettings = { message: e, classes: 'error' };
+      const t: ToastSettings = { message: e, background: 'variant-filled-error' };
       toastStore.trigger(t);
       return { settings: { "originalId": params.id, "id": null, "name": null, "rssi@1m": null } };
     });

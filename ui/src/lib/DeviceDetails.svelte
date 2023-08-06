@@ -23,7 +23,7 @@
 				})
 				.catch((e) => {
 					console.log(e);
-					const t: ToastSettings = { message: e, classes: 'error' };
+					const t: ToastSettings = { message: e, background: 'variant-filled-error' };
 					toastStore.trigger(t);
 				});
 		}
