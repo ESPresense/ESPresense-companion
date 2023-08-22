@@ -9,6 +9,8 @@ The ESPresense-companion attempts to locate your Bluetooth Low Energy (BLE) item
 
 ## Installation
 
+### HAOS
+
 To install add this repo to your add-ons store in HASS:
 
 **Step 1: Add Repository:**
@@ -22,6 +24,21 @@ Click `Add`
 [![Open your Home Assistant instance and show the Supervisor add-on store.](https://my.home-assistant.io/badges/supervisor_store.svg)](https://my.home-assistant.io/redirect/supervisor_store/)
 
 Click `Install`, Click `Start`, Click `Show in Sidebar`
+
+### HA Container
+
+Example config for docker-compose
+
+```yaml
+version: '3.7'
+services:
+  espresense:
+    image: espresense/espresense-companion
+    ports:
+      - 8267:8267
+    volumes:
+      - ./data/espresense/config.yaml:/config/espresense/config.yaml
+```
 
 ## Room Measurement Guide
 
