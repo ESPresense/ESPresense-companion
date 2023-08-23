@@ -15,7 +15,7 @@ jobs:
           fetch-depth: 0
       - name: Git Semantic Version
         id: version
-        uses: paulhatch/semantic-version@v5.0.2
+        uses: paulhatch/semantic-version@v5.2.0
         with:
           version_format: "${major}.${minor}.${patch}"
 
