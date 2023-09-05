@@ -22,7 +22,7 @@ public class RxNode
     public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Tx?.Config?.Timeout ?? 30);
     public double RefRssi { get; set; }
 
-    public bool ReadMessage(byte[] payload)
+    public bool ReadMessage(ArraySegment<byte> payload)
     {
         bool moved = false;
 

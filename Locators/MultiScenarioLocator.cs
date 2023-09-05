@@ -56,7 +56,7 @@ internal class MultiScenarioLocator : BackgroundService
 
             if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx) && _state.Nodes.TryGetValue(nodeId, out var rx))
                 if (rx.HasLocation && tx.HasLocation && rx.Stationary && tx.Stationary)
-                    tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.Payload);
+                    tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
 
             if (node.HasLocation)
             {
@@ -68,7 +68,7 @@ internal class MultiScenarioLocator : BackgroundService
                     return d;
                 });
                 _telemetry.Devices = _state.Devices.Count;
-                var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.Payload);
+                var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
                 if (dirty) _telemetry.Moved++;
 
                 if (device.Check)
