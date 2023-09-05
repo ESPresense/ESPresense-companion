@@ -4,11 +4,13 @@
 	import type { Node } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
 	import NodeActions from './NodeActions.svelte';
+	import NodeOnline from './NodeOnline.svelte';
 
 	let columns = [
-		{ key: 'id', title: 'ID', value: (d) => d.id, sortable: true },
-		{ key: 'name', title: 'Name', value: (d) => d.name, sortable: true },
-		{ key: 'telemetry.version', title: 'Version', value: (d) => d.telemetry?.version ?? "n/a", sortable: true },
+		{ key: 'id', title: 'ID', value: (d:Node) => d.id, sortable: true },
+		{	key: 'active', title: 'Active', renderComponent: { component: NodeOnline }},
+		{ key: 'name', title: 'Name', value: (d:Node) => d.name ?? "", sortable: true },
+		{ key: 'telemetry.version', title: 'Version', value: (d:Node) => d.telemetry?.version ?? "n/a", sortable: true },
 		{ key: 'actions', title: "", renderComponent: { component: NodeActions }},
 	];
 

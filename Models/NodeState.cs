@@ -17,4 +17,5 @@ public class NodeState
 public class NodeStateTele : NodeState
 {
     public NodeTelemetry? Telemetry { get; set; }
+    public bool Online { get; set; }
 }

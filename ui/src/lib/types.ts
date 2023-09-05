@@ -1,30 +1,34 @@
 
 export interface Room {
-	id: string;
-	name: string;
-	points: [number, number][];
+  id: string;
+  name: string;
+  points: [number, number][];
 }
 
 export interface Floor {
-	id: string;
-	name: string;
-	bounds: number[][];
-	rooms: Room[];
+  id: string;
+  name: string;
+  bounds: number[][];
+  rooms: Room[];
 }
 
 export interface Node {
-	id: string;
-	name: string;
-	point: number[];
-	floors: string[];
+  telemetry: {
+    version: string;
+  }
+  online: boolean;
+  id: string;
+  name: string;
+  point: number[];
+  floors: string[];
 }
 
 export interface Device {
-	id: string;
-	name: string;
-	nodes: { [index: string]: number };
-	room: { id: string, name: string };
-	floor: { id: string, name: string };
+  id: string;
+  name: string;
+  nodes: { [index: string]: number };
+  room: { id: string, name: string };
+  floor: { id: string, name: string };
   location: { x: number, y: number, z: number };
   confidence: number;
   scale: number;
@@ -33,11 +37,11 @@ export interface Device {
 }
 
 export interface Config {
-	timeout: number;
-	awayTimeout: number;
-	floors: Floor[];
-	nodes: Node[];
-	devices: Device[];
+  timeout: number;
+  awayTimeout: number;
+  floors: Floor[];
+  nodes: Node[];
+  devices: Device[];
 }
 
 export type DeviceSetting = {

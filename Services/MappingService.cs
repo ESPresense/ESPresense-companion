@@ -16,7 +16,8 @@ public class MappingService
                 .ForMember(dest => dest.Floors, opt => opt.MapFrom(a => a.Floors.Select(a => a.Id).ToArray()));
             cfg.CreateMap<Node, NodeStateTele>()
                 .ForMember(dest => dest.Floors, opt => opt.MapFrom(a => a.Floors.Select(a => a.Id).ToArray()))
-                .AfterMap((src, dest) => dest.Telemetry = _nts.Get(src.Id));
+                .AfterMap((src, dest) => dest.Telemetry = _nts.Get(src.Id ?? ""))
+                .AfterMap((src, dest) => dest.Online = _nts.Online(src.Id ?? ""));
         }).CreateMapper();
     }
 
