@@ -8,21 +8,28 @@ namespace ESPresense.Models;
 
 public class Node
 {
+    public Node(string? id)
+    {
+        Id = id;
+    }
+
     [JsonIgnore]
     public Config? Config { get; private set; }
 
     [PrimaryKey]
-    public string? Id { get;private  set; }
+    public string? Id { get; private set; }
     public string? Name { get; private set; }
 
-    public double X { get; private set; }
-    public double Y { get; private set; }
-    public double Z { get; private set; }
+    public double? X { get; private set; }
+    public double? Y { get; private set; }
+    public double? Z { get; private set; }
+    public bool HasLocation => X.HasValue && Y.HasValue && Z.HasValue;
+    public bool Stationary { get; private set; }
 
     [Ignore][JsonConverter(typeof(Point3DConverter))]
     public Point3D Location
     {
-        get => new Point3D(X, Y, Z);
+        get => new(X ?? 0, Y ?? 0, Z ?? 0);
         private set
         {
             X = value.X;
@@ -31,13 +38,13 @@ public class Node
         }
     }
 
-    public void Update(Config c, ConfigNode node, IEnumerable<Floor> floors)
+    public void Update(Config c, ConfigNode cn, IEnumerable<Floor> floors)
     {
         Config = c;
-        Name = node.Name;
-        Id = node.GetId();
+        Name = cn.Name;
         Floors = floors.ToArray();
-        Location = new Point3D(node?.Point?[0] ?? 0, node?.Point?[1] ?? 0, node?.Point?[2] ?? 0);
+        Location = new Point3D(cn.Point?[0] ?? 0, cn.Point?[1] ?? 0, cn.Point?[2] ?? 0);
+        Stationary = cn.Stationary;
     }
 
     public Floor[]? Floors { get; private set; }

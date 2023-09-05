@@ -4,9 +4,6 @@ using DotNet.Globbing.Token;
 using ESPresense.Extensions;
 using ESPresense.Locators;
 using ESPresense.Services;
-using MathNet.Numerics;
-using MathNet.Spatial.Euclidean;
-using Microsoft.AspNetCore.Mvc.Diagnostics;
 
 namespace ESPresense.Models;
 
@@ -25,8 +22,8 @@ public class State
         void LoadConfig(Config c)
         {
             Config = c;
-            foreach (var floor in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(floor.GetId(), a => new Floor()).Update(c, floor);
-            foreach (var node in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(node.GetId(), a => new Node()).Update(c, node, GetFloorsByIds(node.Floors));
+            foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId(), a => new Floor()).Update(c, cf);
+            foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId())).Update(c, cn, GetFloorsByIds(cn.Floors));
 
             var idsToTrack = new List<Glob>();
             var configDeviceById = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);

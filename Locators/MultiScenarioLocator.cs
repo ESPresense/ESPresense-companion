@@ -32,11 +32,11 @@ internal class MultiScenarioLocator : BackgroundService
         var dh = await _databaseFactory.GetDeviceHistory();
         var mc = await _mqttConnectionFactory.GetClient(true);
 
-        await mc.SubscribeAsync("espresense/devices/#");
+        await mc.SubscribeAsync("espresense/devices/+/+");
 
         mc.ApplicationMessageReceivedAsync += async arg =>
         {
-            var parts = arg.ApplicationMessage.Topic.Split('/', 4);
+            var parts = arg.ApplicationMessage.Topic.Split('/');
 
             if (parts is not ["espresense", "devices", _, _])
             {
@@ -47,12 +47,18 @@ internal class MultiScenarioLocator : BackgroundService
             var deviceId = parts[2];
             var nodeId = parts[3];
 
-            if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx) && _state.Nodes.TryGetValue(nodeId, out var rx))
+            if (!_state.Nodes.TryGetValue(nodeId, out var node))
             {
-                tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.Payload);
+                _state.Nodes[nodeId] = node = new Node(nodeId);
+                if (_telemetry.UnknownNodes.Add(nodeId))
+                    Log.Warning("Unknown node {nodeId}", nodeId);
             }
 
-            if (_state.Nodes.TryGetValue(nodeId, out var node))
+            if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx) && _state.Nodes.TryGetValue(nodeId, out var rx))
+                if (rx.HasLocation && tx.HasLocation && rx.Stationary && tx.Stationary)
+                    tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.Payload);
+
+            if (node.HasLocation)
             {
                 _telemetry.Messages++;
                 var device = _state.Devices.GetOrAdd(deviceId, id =>
@@ -97,8 +103,6 @@ internal class MultiScenarioLocator : BackgroundService
             else
             {
                 _telemetry.Skipped++;
-                if (_telemetry.UnknownNodes.Add(nodeId))
-                    Log.Warning("Unknown node {nodeId}", nodeId);
             }
         };
 

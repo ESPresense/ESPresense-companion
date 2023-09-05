@@ -21,8 +21,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "gps")]
         public ConfigGps Gps { get; set; } = new();
 
-
-        [YamlMember(Alias = "floors")] public ConfigFloor[] Floors { get; set; } = Array.Empty<ConfigFloor>();
+        [YamlMember(Alias = "floors")] public ConfigFloor[]  Floors { get; set; } = Array.Empty<ConfigFloor>();
 
         [YamlMember(Alias = "nodes")]
         public ConfigNode[] Nodes { get; set; } = Array.Empty<ConfigNode>();
