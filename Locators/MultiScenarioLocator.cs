@@ -46,63 +46,73 @@ internal class MultiScenarioLocator : BackgroundService
 
             var deviceId = parts[2];
             var nodeId = parts[3];
+            bool isNode = deviceId.StartsWith("node:");
 
-            if (!_state.Nodes.TryGetValue(nodeId, out var node))
+            if (!_state.Nodes.TryGetValue(nodeId, out var rx))
             {
-                _state.Nodes[nodeId] = node = new Node(nodeId);
+                _state.Nodes[nodeId] = rx = new Node(nodeId);
                 if (_telemetry.UnknownNodes.Add(nodeId))
                     Log.Warning("Unknown node {nodeId}", nodeId);
             }
 
-            if (deviceId.StartsWith("node:") && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx) && _state.Nodes.TryGetValue(nodeId, out var rx))
-                if (rx.HasLocation && tx.HasLocation && rx.Stationary && tx.Stationary)
-                    tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
-
-            if (node.HasLocation)
+            if (isNode && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx))
             {
-                _telemetry.Messages++;
-                var device = _state.Devices.GetOrAdd(deviceId, id =>
+                if (tx is { HasLocation: true, Stationary: true })
                 {
-                    var d = new Device(id) { Check = true };
-                    foreach (var scenario in GetScenarios(d)) d.Scenarios.Add(scenario);
-                    return d;
-                });
-                _telemetry.Devices = _state.Devices.Count;
-                var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = node }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
-                if (dirty) _telemetry.Moved++;
-
-                if (device.Check)
-                {
-                    if (_state.ConfigDeviceById.TryGetValue(deviceId, out var cdById))
-                    {
-                        device.Track = true;
-                        if (!string.IsNullOrWhiteSpace(cdById.Name))
-                            device.Name = cdById.Name;
-                    }
-                    else if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue(device.Name, out _))
-                        device.Track = true;
-                    else if (!string.IsNullOrWhiteSpace(device.Id) && _state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
-                        device.Track = true;
-                    else if (!string.IsNullOrWhiteSpace(device.Name) && _state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
-                        device.Track = true;
-                    else
-                        device.Track = false;
-
-                    device.Check = false;
-
-                    _telemetry.Tracked = _state.Devices.Values.Count(a => a.Track);
+                    if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
+                        tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
                 }
+                else isNode = false; // if transmitter is not stationary, treat it as a device
+            } else isNode = false; // if transmitter is not configured, treat it as a device
 
-                if (device.Track)
-                    foreach (var ad in device.HassAutoDiscovery)
-                        await ad.Send(mc);
-
-                if (device.Track && dirty)
-                    _dirty.Add(device);
-            }
-            else
+            if (!isNode)
             {
-                _telemetry.Skipped++;
+                if (rx.HasLocation)
+                {
+                    _telemetry.Messages++;
+                    var device = _state.Devices.GetOrAdd(deviceId, id =>
+                    {
+                        var d = new Device(id) { Check = true };
+                        foreach (var scenario in GetScenarios(d)) d.Scenarios.Add(scenario);
+                        return d;
+                    });
+                    _telemetry.Devices = _state.Devices.Count;
+                    var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
+                    if (dirty) _telemetry.Moved++;
+
+                    if (device.Check)
+                    {
+                        if (_state.ConfigDeviceById.TryGetValue(deviceId, out var cdById))
+                        {
+                            device.Track = true;
+                            if (!string.IsNullOrWhiteSpace(cdById.Name))
+                                device.Name = cdById.Name;
+                        }
+                        else if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue(device.Name, out _))
+                            device.Track = true;
+                        else if (!string.IsNullOrWhiteSpace(device.Id) && _state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
+                            device.Track = true;
+                        else if (!string.IsNullOrWhiteSpace(device.Name) && _state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
+                            device.Track = true;
+                        else
+                            device.Track = false;
+
+                        device.Check = false;
+
+                        _telemetry.Tracked = _state.Devices.Values.Count(a => a.Track);
+                    }
+
+                    if (device.Track)
+                        foreach (var ad in device.HassAutoDiscovery)
+                            await ad.Send(mc);
+
+                    if (device.Track && dirty)
+                        _dirty.Add(device);
+                }
+                else
+                {
+                    _telemetry.Skipped++;
+                }
             }
         };
 
