@@ -26,9 +26,9 @@
 		"autoprefixer": "^10.4.15",
 		"d3": "^7.8.5",
 		"d3-zoom": "^3.0.0",
-		"eslint": "^8.48.0",
+		"eslint": "^8.49.0",
 		"eslint-config-prettier": "^9.0.0",
-		"eslint-plugin-svelte": "^2.33.0",
+		"eslint-plugin-svelte": "^2.33.1",
 		"layercake": "^7.6.1",
 		"postcss": "^8.4.29",
 		"prettier": "^2.8.8",
@@ -41,7 +41,7 @@
 		"tslib": "^2.6.2",
 		"typescript": "^5.2.2",
 		"vite": "^4.4.9",
-		"vitest": "^0.34.3"
+		"vitest": "^0.34.4"
 	},
 	"type": "module"
 }
