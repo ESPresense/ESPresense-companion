@@ -37,7 +37,7 @@ services:
     ports:
       - 8267:8267
     volumes:
-      - ./data/espresense/config.yaml:/config/espresense/config.yaml
+      - ./data/espresense:/config/espresense
 ```
 
 ## Room Measurement Guide
