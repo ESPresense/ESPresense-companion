@@ -12,7 +12,7 @@
 	<title>ESPresense Companion: Map</title>
 </svelte:head>
 
-<div class="w-full h-full">
+<div class="w-full h-full bg-slate-900">
 	<FloorTabs bind:floorId />
 	<Map on:selected={d => detail(d.detail)} bind:floorId />
 </div>

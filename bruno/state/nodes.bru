@@ -1,0 +1,15 @@
+meta {
+  name: /api/state-nodes
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{ base_url }}/api/state/nodes
+  body: none
+  auth: none
+}
+
+query {
+  ~includeTele: true
+}

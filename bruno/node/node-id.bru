@@ -1,0 +1,24 @@
+meta {
+  name: -api-node--id-
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{ base_url }}/api/node/{{ id }}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "absorption": 0,
+    "rx_adj_rssi": 0,
+    "tx_ref_rssi": 0,
+    "max_distance": 0
+  }
+}

@@ -1,0 +1,15 @@
+meta {
+  name: /api/node/{ id }/update/ota
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{ base_url }}/api/node/{{ id }}/update/ota
+  body: none
+  auth: none
+}
+
+query {
+  url: https://github.com/ESPresense/ESPresense/releases/download/v3.3.0b8/esp32s3-cdc.bin
+}

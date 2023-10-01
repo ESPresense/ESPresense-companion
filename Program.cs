@@ -43,6 +43,7 @@ builder.Services.AddSingleton(a =>
     return sqLiteConnection;
 });
 
+builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttConnectionFactory>();
@@ -50,6 +51,7 @@ builder.Services.AddSingleton<MqttConnectionFactory>();
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
+builder.Services.AddSingleton<FirmwareTypeStore>();
 
 builder.Services.AddSingleton<MappingService>();
 

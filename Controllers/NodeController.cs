@@ -8,15 +8,11 @@ namespace ESPresense.Controllers;
 [ApiController]
 public class NodeController : ControllerBase
 {
-    private readonly ILogger<DeviceController> _logger;
     private readonly NodeSettingsStore _nodeSettingsStore;
-    private readonly State _state;
 
-    public NodeController(ILogger<DeviceController> logger, NodeSettingsStore nodeSettingsStore, State state)
+    public NodeController(ILogger<DeviceController> logger, NodeSettingsStore nodeSettingsStore, State state, NodeTelemetryStore nts)
     {
-        _logger = logger;
         _nodeSettingsStore = nodeSettingsStore;
-        _state = state;
     }
 
     [HttpPut("{id}")]
@@ -26,8 +22,14 @@ public class NodeController : ControllerBase
     }
 
     [HttpPost("{id}/update")]
-    public async Task Set(string id)
+    public async Task Update(string id)
     {
         await _nodeSettingsStore.Update(id);
+    }
+
+    [HttpPost("{id}/restart")]
+    public async Task Restart(string id)
+    {
+        await _nodeSettingsStore.Restart(id);
     }
 }

@@ -15,7 +15,10 @@ export interface Floor {
 export interface Node {
   telemetry: {
     version: string;
+    ip: string;
   }
+  cpu: CPU;
+  flavor: Flavor;
   online: boolean;
   id: string;
   name: string;
@@ -49,4 +52,27 @@ export type DeviceSetting = {
   id: string | null;
   name: string | null;
   "rssi@1m": number | null;
- };
+};
+
+export type Firmware = {
+  name: string;
+  cpu: string;
+  flavor: string;
+};
+
+export type Flavor = {
+  name: string;
+  value: string;
+  cpus: string[];
+};
+
+export type CPU = {
+  name: string;
+  value: string;
+};
+
+export type FirmwareManifest = {
+  firmware: Firmware[];
+  flavors: Flavor[];
+  cpus: CPU[];
+};
