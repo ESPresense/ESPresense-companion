@@ -16,7 +16,6 @@
 		"@floating-ui/dom": "^1.5.3",
 		"@skeletonlabs/skeleton": "^2.2.0",
 		"@skeletonlabs/tw-plugin": "^0.2.1",
-		"@square/svelte-store": "^1.0.17",
 		"@sveltejs/adapter-static": "^2.0.3",
 		"@sveltejs/kit": "^1.25.1",
 		"@tailwindcss/forms": "^0.5.6",

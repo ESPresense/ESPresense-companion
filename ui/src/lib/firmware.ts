@@ -1,4 +1,5 @@
-import { readable, writable, derived, asyncReadable } from '@square/svelte-store';
+import { readable, writable, derived } from 'svelte/store';
+import { asyncable } from '$lib/asyncable';
 import { base } from '$app/paths';
 
 export const updateMethod: SvelteStore<string> = writable("self");
@@ -6,14 +7,12 @@ export const flavor: SvelteStore<string> = writable();
 export const version: SvelteStore<string> = writable();
 export const artifact: SvelteStore<string> = writable();
 
-export const firmwareTypes = asyncReadable(
-  {},
+export const firmwareTypes = asyncable(
+  () => {},
   async () => {
     const response = await fetch(`${base}/api/firmware/types`);
-    const userObject = await response.json();
-    return userObject;
-  },
-  { reloadable: true }
+    return await response.json();
+  }
 );
 
 export const cpuNames = derived(firmwareTypes, a => a.cpus?.reduce((acc, cur) => {
