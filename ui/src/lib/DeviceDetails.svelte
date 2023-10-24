@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
-	import { toastStore } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '@skeletonlabs/skeleton';
 
 	import type { ToastSettings } from '@skeletonlabs/skeleton';
 	import type { DeviceSetting } from './types';
 
 	export let settings: DeviceSetting | null = null;
 	export let details: any;
+
+  const toastStore = getToastStore();
 
 	function save() {
 		if (settings) {

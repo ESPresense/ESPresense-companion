@@ -1,0 +1,24 @@
+meta {
+  name: /api/device/{id}
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{ base_url }}/api/device/{{ id }}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id": "string",
+    "originalId": "string",
+    "name": "string",
+    "rssi@1m": 0
+  }
+}

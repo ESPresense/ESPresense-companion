@@ -72,7 +72,7 @@ namespace ESPresense.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex,"Error parsing {0}", arg.ApplicationMessage.Topic);
+                    _logger.LogWarning(ex, "Error parsing {0}", arg.ApplicationMessage.Topic);
                 }
                 return Task.CompletedTask;
             };
@@ -82,7 +82,17 @@ namespace ESPresense.Services
 
         public async Task Update(string id)
         {
-            await _mc.EnqueueAsync($"espresense/rooms/{id}/update/set", $"PRESS");
+            await _mc.EnqueueAsync($"espresense/rooms/{id}/update/set", "PRESS");
+        }
+
+        public async Task Arduino(string id, bool on)
+        {
+            await _mc.EnqueueAsync($"espresense/rooms/{id}/arduino_ota/set", on ? "ON" : "OFF");
+        }
+
+        public async Task Restart(string id)
+        {
+            await _mc.EnqueueAsync($"espresense/rooms/{id}/restart/set", "PRESS");
         }
     }
 }

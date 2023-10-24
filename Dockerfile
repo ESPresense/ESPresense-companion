@@ -19,6 +19,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:7.0
 WORKDIR /App
 EXPOSE 8267
 ENV ASPNETCORE_URLS "http://+:8267"
+ENV OTA_UPDATE_PORT 8268
 ENV CONFIG_DIR "/config/espresense"
 COPY --from=build-env /App/out .
 LABEL \

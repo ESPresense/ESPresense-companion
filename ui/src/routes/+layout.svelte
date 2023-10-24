@@ -1,14 +1,9 @@
 <script lang="ts">
-	// The ordering of these imports is critical to your app working properly
-	import '@skeletonlabs/skeleton/themes/theme-crimson.css';
-	// If you have source.organizeImports set to true in VSCode, then it will auto change this ordering
-	import '@skeletonlabs/skeleton/styles/skeleton.css';
-	// Most of your app wide CSS should be put in this file
 	import '../app.postcss';
 
 	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
 	import { base } from '$app/paths';
-	import { AppShell, AppRail, AppRailAnchor, Drawer, Toast, storePopup } from '@skeletonlabs/skeleton';
+	import { AppShell, AppRail, AppRailAnchor, Drawer, Toast, Modal, initializeStores, storePopup } from '@skeletonlabs/skeleton';
 	import { beforeNavigate } from '$app/navigation';
 	import { updated } from '$app/stores';
 	import { history } from '$lib/stores';
@@ -20,6 +15,8 @@
 	import devices from '$lib/images/devices.svg';
 	import calibration from '$lib/images/calibration.svg';
 
+	initializeStores();
+
 	storePopup.set({ computePosition, autoUpdate, offset, shift, flip, arrow });
 
 	beforeNavigate(({ willUnload, to }) => {
@@ -30,11 +27,13 @@
 		}
 	});
 
-	$: current = $history[0]
-	$: console.log("Current: ", current)
+	$: current = $history[0];
+	$: console.log('Current: ', current);
 </script>
 
 <div class="app h-full">
+  <Modal />
+  <Toast />
 	<AppShell>
 		<svelte:fragment slot="sidebarLeft">
 			<AppRail>
@@ -71,7 +70,6 @@
 				</svelte:fragment>
 			</AppRail>
 		</svelte:fragment>
-		<Toast />
 		<slot />
 		<Drawer width="400px" />
 	</AppShell>

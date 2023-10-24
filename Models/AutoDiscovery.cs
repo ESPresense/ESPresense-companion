@@ -29,7 +29,7 @@ namespace ESPresense.Models
         string JsonAttributesTopic => $"espresense/companion/{_dev.Id}/attributes";
 
         [JsonProperty("status_topic")]
-        string EntityStatusTopic => $"espresense/companion/status";
+        string EntityStatusTopic => "espresense/companion/status";
 
         [JsonProperty("device")]
         private DeviceRecord Device => new DeviceRecord(_dev.Name, "ESPresense", "Companion", "0.0.0", new[] { $"espresense-{_dev.Id}" });

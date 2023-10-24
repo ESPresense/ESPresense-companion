@@ -1,9 +1,11 @@
+using Polly;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace ESPresense.Network;
+
 public enum EspOtaCommand
 {
     Flash = 0,
@@ -13,17 +15,17 @@ public enum EspOtaCommand
 
 public class ESPOta
 {
-    private readonly FileStream _fs;
-    private readonly int _localPort;
-    private readonly Action<string> _logger;
+    private readonly Stream _fs;
+    private int? _localPort;
+    private readonly Func<string, int, Task> _progress;
     private readonly string _fileMd5;
     private readonly long _contentSize;
 
-    public ESPOta(FileStream fs, int localPort, Action<string>? logger)
+    public ESPOta(Stream fs, int? localPort, Func<string, int, Task>? progress = default)
     {
         _fs = fs;
         _localPort = localPort;
-        _logger = logger ?? Console.WriteLine;
+        _progress = progress ?? ((a, b) => { return Task.CompletedTask; });
         using var md5 = MD5.Create();
         _fileMd5 = BitConverter.ToString(md5.ComputeHash(_fs)).Replace("-", string.Empty).ToLower();
         _contentSize = _fs.Length;
@@ -33,7 +35,7 @@ public class ESPOta
     {
         _fs.Seek(0, SeekOrigin.Begin);
 
-        var listener = new TcpListener(IPAddress.Any, _localPort)
+        var listener = new TcpListener(IPAddress.Any, _localPort ?? 0)
         {
             Server =
             {
@@ -46,28 +48,35 @@ public class ESPOta
         try
         {
             listener.Start();
-            _logger($"Server started. Listening to TCP clients at 0.0.0.0:{_localPort}");
-            _logger($"Upload size {_contentSize}");
+            _localPort = ((IPEndPoint)listener.LocalEndpoint).Port;
 
-            if (!await Invite())
-                return false;
+            await _progress($"Server started. Listening to TCP clients at 0.0.0.0:{_localPort}", 0);
+            await _progress($"Upload size {_contentSize}", 0);
 
-            _logger("Waiting for device to connect...");
+            DateTime startTime = DateTime.UtcNow;
+            TimeSpan timeout = TimeSpan.FromSeconds(30);
 
-            var startTime = DateTime.UtcNow;
-            while (DateTime.UtcNow - startTime < TimeSpan.FromSeconds(10))
+            while (DateTime.UtcNow - startTime < timeout)
             {
-                if (listener.Pending())
-                {
-                    using var client = await listener.AcceptTcpClientAsync(ct);
-                    if (!await Handle(client)) return false;
-                }
+                var retryPolicy = Policy
+                    .Handle<NoResponseException>()
+                    .WaitAndRetryAsync(3, i => TimeSpan.FromSeconds(1));
+                if (!await retryPolicy.ExecuteAsync(Invite))
+                    return false;
 
-                await Task.Delay(10, ct);
+                await _progress("Waiting for device to connect...", 0);
+
+                var acceptTask = listener.AcceptTcpClientAsync(ct).AsTask();
+                var delayTask = Task.Delay(5000, ct);
+
+                var completedTask = await Task.WhenAny(acceptTask, delayTask);
+
+                if (completedTask != acceptTask) continue;
+                using var client = await acceptTask;
+                if (await Handle(client)) return true;
             }
 
-            _logger("No response from device");
-            return true;
+            throw new NoResponseException();
         }
         finally
         {
@@ -81,7 +90,7 @@ public class ESPOta
             client.SendTimeout = 60000;
             var stream = client.GetStream();
 
-            _logger("Got Connection");
+            await _progress("Got Connection", 2);
             var offset = 0;
             var chunk = new byte[1460];
             var readCount = 0;
@@ -96,7 +105,7 @@ public class ESPOta
                     Console.Write(r1);
                 }
 
-                _logger($"Written {offset} out of {_contentSize} ({offset * 100.0f / _contentSize})");
+                await _progress($"Written {offset} out of {_contentSize}", 2 + (int)(offset * 98.0f / _contentSize));
                 await stream.WriteAsync(chunk, 0, chunkSize, ct);
             }
 
@@ -112,33 +121,37 @@ public class ESPOta
                 Console.Write(resp);
             }
 
-            _logger("All done!");
+            await _progress("All done!", 100);
             client.Close();
             return true;
         }
 
         async Task<bool> Invite()
         {
-            var message = $"{command} {_localPort} {_contentSize} {_fileMd5}\n";
+            var message = $"{command:D} {_localPort} {_contentSize} {_fileMd5}\n";
             var messageBytes = Encoding.UTF8.GetBytes(message);
-            _logger($"Sending invitation to {remoteIp}");
+            await _progress($"Sending invitation to {remoteIp}", 0);
 
             using var udp = new UdpClient();
             var ep = new IPEndPoint(IPAddress.Parse(remoteIp), remotePort);
             await udp.SendAsync(messageBytes, messageBytes.Length, ep);
 
-            var res = udp.ReceiveAsync(ct);
-            var index = Task.WaitAny(new Task[] { res.AsTask() }, 10000, ct);
-            if (index < 0)
-            {
-                _logger("No Response");
-                return false;
-            }
+            var res = udp.ReceiveAsync(ct).AsTask();
+            var index = await Task.WhenAny(res, Task.Delay(10000, ct));
+            if (res != index)
+                throw new NoResponseException();
 
             var resText = Encoding.UTF8.GetString((await res).Buffer);
-            if (resText == "OK") return true;
-            _logger("AUTH required and not implemented");
-            return false;
+            await _progress($"Invitation: {resText}", 1);
+
+            return resText == "OK" ? true : throw new Exception("AUTH required and not implemented");
         }
+    }
+}
+
+public class NoResponseException : Exception
+{
+    public NoResponseException() : base("No Response")
+    {
     }
 }
