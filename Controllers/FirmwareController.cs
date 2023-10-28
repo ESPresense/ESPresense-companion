@@ -1,4 +1,5 @@
 ﻿using System.IO.Compression;
+using System.Net.WebSockets;
 using System.Text;
 using ESPresense.Network;
 using ESPresense.Services;
@@ -7,7 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ESPresense.Controllers;
 
-[Route("api/firmware")]
 [ApiController]
 public class FirmwareController : Controller
 {
@@ -27,16 +27,21 @@ public class FirmwareController : Controller
     }
 
     [HttpGet]
-    [Route("types")]
+    [Route("api/firmware/types")]
     public FirmwareTypes? Types()
     {
         return _firmwareTypeStore.Get();
     }
 
-    [HttpPut("update/{id}")]
-    public async Task Update(string id, string url)
+    [Route("ws/firmware/update/{id}")]
+    public async Task Update(string id, [FromQuery] string url)
     {
-        Response.ContentType = "application/json; charset=utf-8";
+        if (!HttpContext.WebSockets.IsWebSocketRequest)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+        using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
 
         var ms = await GetFirmware(url);
 
@@ -58,12 +63,12 @@ public class FirmwareController : Controller
 
         return;
 
-        async Task Log(string a, int b)
+        async Task Log(string message, int percent)
         {
-            _logger.LogInformation("[{per}] {msg}", b, a);
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { percentComplete = b, message = a });
-            await Response.WriteAsync(json + "\r\n");
-            await Response.Body.FlushAsync();
+            _logger.LogInformation("[{per}] {msg}", percent, message);
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { percentComplete = percent, message = message });
+            var buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(json));
+            await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
         }
     }
 
