@@ -1,5 +1,4 @@
 import { readable, writable, derived } from 'svelte/store';
-import { asyncable } from '$lib/asyncable';
 import { base } from '$app/paths';
 import type { Config, Node, Device } from './types';
 

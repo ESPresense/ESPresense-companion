@@ -76,3 +76,29 @@ export type FirmwareManifest = {
   flavors: Flavor[];
   cpus: CPU[];
 };
+
+export interface PullRequest {
+  id: number;
+  url: string;
+}
+
+export interface Asset {
+  id: number;
+  name: string;
+}
+
+export interface WorkflowRun {
+  id: number;
+  pull_requests: PullRequest[];
+  head_repository: { full_name: string; };
+  head_branch: string;
+  head_sha: string;
+  head_commit: { message: string; };
+}
+
+export interface Release {
+  assets: Asset[];
+  prerelease: boolean;
+  tag_name: string;
+  name: string;
+}
