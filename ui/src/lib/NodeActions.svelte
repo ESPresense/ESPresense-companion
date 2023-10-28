@@ -3,7 +3,7 @@
 	import link from '$lib/images/link.svg';
 	import type { Node } from '$lib/types';
 	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
-	import { updateMethod, flavor, version, artifact } from '$lib/firmware';
+	import { updateMethod, flavor, version, artifact, flavorNames } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 
 	const modalStore = getModalStore();
@@ -23,20 +23,21 @@
 	function onUpdate(i: Node) {
 		var f = $flavor;
 		if (f == '-') f = i.flavor?.value;
+    var fn = $flavorNames?.get(f);
 		var body = (function () {
 			switch ($updateMethod) {
 				case 'release':
-					return 'Update ' + i.name + ' to version ' + $version;
+					return 'with github version ' + $version;
 				case 'artifact':
-					return 'Update ' + i.name + ' to artifact ' + $artifact;
+					return 'with github artifact ' + $artifact;
 			}
 		})();
-		if (f != null) {
-			body = body + ' using flavor ' + f;
+		if (fn != null) {
+			body = body + ' ' + fn;
 		}
 		if ($updateMethod != 'self') {
 			modalStore.trigger({
-				title: 'Firmware Update',
+				title: 'Update ' + (i.name ?? i.id) + ' Firmware',
 				body: body,
 				type: 'component',
 				component: { ref: Firmware, props: { node: i, updateMethod: $updateMethod, flavor: f, cpu: i.cpu?.value, version: $version, artifact: $artifact } }

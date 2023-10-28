@@ -90,7 +90,8 @@ public class ESPOta
             client.SendTimeout = 60000;
             var stream = client.GetStream();
 
-            await _progress("Got Connection", 2);
+            var ip = client.Client.RemoteEndPoint as IPEndPoint;
+            await _progress($"Connection from {ip?.Address}", 2);
             var offset = 0;
             var chunk = new byte[1460];
             var readCount = 0;

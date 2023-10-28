@@ -26,7 +26,7 @@
 		return str.replace(/\d+/g, '');
 	}
 
-	let state: State = false;
+	let state: State = State.Form;
 	let percentComplete: number = 0;
 	let firmware: string;
 	let url: string;
@@ -61,8 +61,8 @@
 		}
 	}
 
-	$: selectedFlavor = $firmwareTypes.flavors?.find((d) => d.value === flavor);
-	$: possibleFirmware = $firmwareTypes.firmware?.filter((d) => d.cpu === cpu && d.flavor == flavor);
+	$: selectedFlavor = $firmwareTypes?.flavors?.find((d) => d.value === flavor);
+	$: possibleFirmware = $firmwareTypes?.firmware?.filter((d) => d.cpu === cpu && d.flavor == flavor);
 
 	// Base Classes
 	const cBase = 'card p-4 w-modal shadow-xl space-y-4';
@@ -72,28 +72,28 @@
 
 {#if state > State.Form}
 	<div class={cBase}>
-		<header class={cHeader}>Updating {percentComplete ?? 0}%...</header>
+		<header class={cHeader}>{$modalStore[0].title ?? '(title missing)'}: {percentComplete ?? 0}%...</header>
 		{#each log as item}
 			<p>{item}</p>
 		{/each}
 		<ProgressBar bind:value={percentComplete} max={100} />
     {#if state > State.Updating}
     <footer class="modal-footer {parent.regionFooter}">
-      <button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
       {#if state == State.Success}
       <button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Close</button>
       {:else}
+      <button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
       <button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Retry</button>
       {/if}
     </footer>
     {/if}
 	</div>
 {:else}
-	{#await firmwareTypes.load()}
+	{#if !$firmwareTypes }
 		<div class={cBase}>
 			<p>Loading...</p>
 		</div>
-	{:then}
+	{:else}
 		{#if $modalStore[0]}
 			<div class={cBase}>
 				<header class={cHeader}>{$modalStore[0].title ?? '(title missing)'}</header>
@@ -112,7 +112,7 @@
 						<span>CPU</span>
 						<select id="cpu" class="flex-grow select" bind:value={cpu}>
 							{#each selectedFlavor?.cpus ?? [] as item}
-								<option value={item}>{$cpuNames[item]}</option>
+								<option value={item}>{$cpuNames?.get(item)}</option>
 							{/each}
 						</select>
 					</label>
@@ -135,7 +135,5 @@
 				</footer>
 			</div>
 		{/if}
-	{:catch error}
-		<p style="color: red">{error.message}</p>
-	{/await}
+	{/if}
 {/if}
