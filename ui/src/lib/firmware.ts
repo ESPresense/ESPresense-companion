@@ -118,47 +118,43 @@ export function getFirmwareUrl(updateMethod: string, version: string, artifact: 
 type Callback = (percentComplete: number, message: string) => void;
 
 export async function firmwareUpdate(id: string, url: string, callback: Callback): Promise<void> {
-  const response = await fetch(`${base}/api/firmware/update/${id}?` + new URLSearchParams({ url: url }), { method: 'PUT' });
-  if (!response.ok) {
-    throw new Error(`HTTP Error! Status: ${response.status}`);
-  }
+  var loc = new URL(`${base}/ws/firmware/update/${id}`, window.location.href);
+  var wsUrl = (loc.protocol === "https:" ? "wss:" : "ws:") + "//" + loc.host + loc.pathname + `?${new URLSearchParams({ url: url })}`;
+  const ws = new WebSocket(wsUrl);
 
-  const reader = response.body?.getReader();
-  if (!reader) {
-    return;
-  }
+  ws.addEventListener('message', (event) => {
+    const data = event.data;
 
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+    try {
+      const json = JSON.parse(data);
+      const { percentComplete, message } = json;
+      callback(percentComplete, message);
+    } catch (e) {
+      console.error('Could not parse message:', data);
     }
+  });
 
-    buffer += new TextDecoder("utf-8").decode(value);
+  ws.addEventListener('error', (event) => {
+    console.error(`WebSocket Error: ${event}`);
+  });
 
-    let boundary = buffer.lastIndexOf('\n');
-    if (boundary === -1) {
-      continue;
+  ws.addEventListener('close', (event) => {
+    if (event.wasClean) {
+      console.log(`Connection closed cleanly, code=${event.code}, reason=${event.reason}`);
+    } else {
+      console.error(`Connection died`);
     }
+  });
 
-    const completeData = buffer.slice(0, boundary);
-    const lines = completeData.split('\n');
-
-    buffer = buffer.slice(boundary + 1);
-
-    lines.forEach(line => {
-      if (line) {
-        try {
-          const json = JSON.parse(line);
-          const { percentComplete, message } = json;
-          callback(percentComplete, message);
-        } catch (e) {
-          console.error('Could not parse line:', line);
-        }
-      }
+  return new Promise<void>((resolve, reject) => {
+    ws.addEventListener('close', () => {
+      resolve();
     });
-  }
+
+    ws.addEventListener('error', () => {
+      reject(new Error('WebSocket error'));
+    });
+  });
 }
+
 
