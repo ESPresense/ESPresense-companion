@@ -50,7 +50,7 @@
 				})
 					.then((response) => {
 						if (response.status != 200) throw new Error(response.statusText);
-						const t: ToastSettings = { message: i.name + ' asked to update itself', background: 'variant-filled-primary' };
+						const t: ToastSettings = { message: (i.name ?? i.id) + ' asked to update itself', background: 'variant-filled-primary' };
 						toastStore.trigger(t);
 					})
 					.catch((e) => {
