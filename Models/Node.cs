@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using ESPresense.Converters;
 using MathNet.Spatial.Euclidean;
 using SQLite;
+using ESPresense.Utils;
 
 namespace ESPresense.Models;
 
@@ -38,12 +39,14 @@ public class Node
         }
     }
 
+
     public void Update(Config c, ConfigNode cn, IEnumerable<Floor> floors)
     {
         Config = c;
         Name = cn.Name;
         Floors = floors.ToArray();
-        Location = new Point3D(cn.Point?[0] ?? 0, cn.Point?[1] ?? 0, cn.Point?[2] ?? 0);
+        double[]? point = cn.Point?.EnsureLength(3);
+        Location = new Point3D(point?[0] ?? 0, point?[1] ?? 0, point?[2] ?? 0);
         Stationary = cn.Stationary;
     }
 
