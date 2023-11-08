@@ -41,7 +41,6 @@ public class ESPOta
             {
                 SendTimeout = 10000,
                 ReceiveTimeout = 10000,
-                NoDelay = true
             }
         };
 
@@ -67,7 +66,7 @@ public class ESPOta
                 await _progress("Waiting for device to connect...", 0);
 
                 var acceptTask = listener.AcceptTcpClientAsync(ct).AsTask();
-                var delayTask = Task.Delay(5000, ct);
+                var delayTask = Task.Delay(10000, ct);
 
                 var completedTask = await Task.WhenAny(acceptTask, delayTask);
 
@@ -85,9 +84,6 @@ public class ESPOta
 
         async Task<bool> Handle(TcpClient client)
         {
-            client.NoDelay = true;
-            client.ReceiveTimeout = 60000;
-            client.SendTimeout = 60000;
             var stream = client.GetStream();
 
             var ip = client.Client.RemoteEndPoint as IPEndPoint;
