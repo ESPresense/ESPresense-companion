@@ -10,9 +10,9 @@
 	export let deviceId: string | null = null;
 
 	const filter = (devices: Device[]) => {
+    if ($showAll) return devices;
 		if (deviceId != null) return devices.filter((d) => d.id === deviceId);
-		if (showAll) return devices.filter((d) => d.floor?.id === floorId);
-		return devices.filter((d) => d.floor?.id === floorId && d.id !== deviceId);
+		return devices.filter((d) => d.floor?.id === floorId);
 	};
 </script>
 
