@@ -94,6 +94,8 @@ export interface WorkflowRun {
   head_branch: string;
   head_sha: string;
   head_commit: { message: string; };
+  status: string;
+  created_at: string;
 }
 
 export interface Release {
