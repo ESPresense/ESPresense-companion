@@ -22,16 +22,6 @@ public class NelderMeadMultilateralizer : ILocate
 
     public bool Locate(Scenario scenario)
     {
-        bool OutOfBounds(Vector<double> x, Vector<double> lowerBound, Vector<double> upperBound)
-        {
-            if (x[3] < 0.5 || x[3] > 1.5)
-                return true;
-            for (var i = 0; i < 3; i++)
-                if (x[i] < lowerBound[i] || x[i] > upperBound[i])
-                    return true;
-            return false;
-        }
-
         double Error(IList<double> x, DeviceNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) * x[3] - dn.Distance;
 
         var confidence = scenario.Confidence;
@@ -66,13 +56,16 @@ public class NelderMeadMultilateralizer : ILocate
             }
             else
             {
-                var lowerBound = Vector<double>.Build.DenseOfArray(new[] { _floor.Bounds[0].X, _floor.Bounds[0].Y, _floor.Bounds[0].Z });
-                var upperBound = Vector<double>.Build.DenseOfArray(new[] { _floor.Bounds[1].X, _floor.Bounds[1].Y, _floor.Bounds[1].Z });
+                var lowerBound = Vector<double>.Build.DenseOfArray(new[] { _floor.Bounds[0].X, _floor.Bounds[0].Y, _floor.Bounds[0].Z, 0.5 });
+                var upperBound = Vector<double>.Build.DenseOfArray(new[] { _floor.Bounds[1].X, _floor.Bounds[1].Y, _floor.Bounds[1].Z, 1.5 });
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
-                        if (OutOfBounds(x, lowerBound, upperBound)) return double.PositiveInfinity;
-                        return Math.Pow(5 * (1 - x[3]), 2) + nodes
+                        var distanceFromBoundingBox = lowerBound.Subtract(x)
+                            .PointwiseMaximum(x.Subtract(upperBound))
+                            .PointwiseMaximum(0)
+                            .L2Norm();
+                        return (distanceFromBoundingBox > 0 ? Math.Pow(5, 1 + distanceFromBoundingBox) : 0) + Math.Pow(5 * (1 - x[3]), 2) + nodes
                             .Select((dn, i) => new { err = Error(x, dn), weight = _state?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
                             .Average(a => a.weight * Math.Pow(a.err, 2));
                     });
@@ -86,8 +79,9 @@ public class NelderMeadMultilateralizer : ILocate
                 });
                 var solver = new NelderMeadSimplex(1e-7, 10000);
                 var result = solver.FindMinimum(obj, initialGuess);
-                scenario.Location = new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
-                scenario.Scale = result.MinimizingPoint[3];
+                var minimizingPoint = result.MinimizingPoint.PointwiseMinimum(upperBound).PointwiseMaximum(lowerBound);
+                scenario.Location = new Point3D(minimizingPoint[0], minimizingPoint[1], minimizingPoint[2]);
+                scenario.Scale = minimizingPoint[3];
                 scenario.Fixes = pos.Length;
                 scenario.Error = result.FunctionInfoAtMinimum.Value;
                 scenario.Iterations = result switch
