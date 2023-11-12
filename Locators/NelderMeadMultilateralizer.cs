@@ -77,8 +77,12 @@ public class NelderMeadMultilateralizer : ILocate
                     Math.Max(_floor.Bounds[0].Z, Math.Min(_floor.Bounds[1].Z, guess.Z)),
                     scenario.Scale ?? 1.0
                 });
+                var centroid = Point3D.Centroid(nodes.Select(n => n.Node!.Location).Take(3)).ToVector();
+                var vectorToCentroid = centroid.Subtract(initialGuess.SubVector(0, 3)).Normalize(2);
+                var scaleDelta = 0.05 * initialGuess[3];
+                var initialPerturbation = Vector<double>.Build.DenseOfEnumerable(vectorToCentroid.Append(scaleDelta));
                 var solver = new NelderMeadSimplex(1e-7, 10000);
-                var result = solver.FindMinimum(obj, initialGuess);
+                var result = solver.FindMinimum(obj, initialGuess, initialPerturbation);
                 var minimizingPoint = result.MinimizingPoint.PointwiseMinimum(upperBound).PointwiseMaximum(lowerBound);
                 scenario.Location = new Point3D(minimizingPoint[0], minimizingPoint[1], minimizingPoint[2]);
                 scenario.Scale = minimizingPoint[3];
