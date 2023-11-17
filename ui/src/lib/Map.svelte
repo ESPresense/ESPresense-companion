@@ -39,7 +39,7 @@
 </script>
 
 {#if bounds}
-  <LayerCake x='0' y='1' flatData={ bounds } xReverse={ false } yReverse={ true } padding={ {top: 16, left: 16, bottom: 16, right: 16} }>
+  <LayerCake x='0' y='1' xRange={({ height, width }) => [0, Math.min(height, width)]} yRange={({ height, width }) => [Math.min(height, width), 0]} flatData={ bounds } xReverse={ false } yReverse={ true } padding={ {top: 16, left: 16, bottom: 16, right: 16} }>
 		<Svg bind:element={svg}>
 			<AxisX {transform} />
 			<AxisY {transform} />
