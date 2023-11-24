@@ -19,7 +19,7 @@ away_timeout: 120
 
 optimization:
   enabled: true
-  interval_secs: 60
+  interval_secs: 3600
   limits:
     absorption_min: 2.5
     absorption_max: 3.5
@@ -37,25 +37,25 @@ weighting:
 floors:
   - id: first
     name: First Floor
-  # Bounds (x,y,z) of map in meters
-    bounds: [[0, 0, 0], [18.5, 19.2, 1.5]]
+    # Bounds (x,y,z) of map in meters
+    bounds: [[0, 0, 0], [17, 19.2, 1.5]]
     rooms:
       - name: Powder
         points:
-          - [4, 12]
-          - [6.6, 12]
-          - [6.6, 10]
+          - [6, 12]
+          - [8.6, 12]
+          - [8.6, 10]
+          - [8, 9]
           - [6, 9]
-          - [4, 9]
-          - [4, 12]
+          - [6, 12]
       - name: Office
         points:
-          - [4, 16.5]
-          - [7.6, 16.5]
-          - [7.6, 13.5]
-          - [6.6, 12]
-          - [4, 12]
-          - [4, 14.5]
+          - [6, 16.5]
+          - [9.6, 16.5]
+          - [9.6, 13.5]
+          - [8.6, 12]
+          - [6, 12]
+          - [6, 14.5]
       - name: Family
         points:
           - [0, 0.5]
@@ -69,19 +69,19 @@ floors:
       - name: Kitchen
         points:
           - [6, 2]
-          - [6, 6]
-          - [7, 9]
-          - [10, 9]
-          - [12.5, 9]
+          - [6, 9]
+          - [8, 9]
+          - [8.6, 10]
+          - [12.5, 10]
           - [12.5, 2]
           - [6, 2]
       - name: Garage
         points:
           - [0, 18]
           - [1.5, 18]
-          - [1.5, 19.2]
-          - [4, 19.2]
-          - [4, 9]
+          - [1.5, 18.5]
+          - [6, 18.5]
+          - [6, 9]
           - [0, 9]
           - [0, 18]
       - name: Living
@@ -100,13 +100,13 @@ floors:
           - [16.5, 2.75]
       - name: Foyer
         points:
-          - [7.6, 13.5]
-          - [7.6, 15]
+          - [9.6, 13.5]
+          - [9.6, 15]
           - [12.5, 15]
           - [12.5, 10]
-          - [9.6, 10]
-          - [6.6, 10]
-          - [6.6, 12]
+          - [11.6, 10]
+          - [8.6, 10]
+          - [8.6, 12]
       - name: Laundry
         points:
           - [0, 9]
@@ -116,18 +116,18 @@ floors:
           - [0, 9]
   - id: second
     name: Second Floor
-    bounds: [[0, 0, 3.1], [18.5, 19.2, 4.6]]
+    bounds: [[0, 0, 3.1], [17, 19.2, 4.6]]
     rooms:
       - name: Master
         points:
           - [2, 15]
           - [4, 15]
           - [4, 16.5]
-          - [7.6, 16.5]
-          - [7.6, 13.5]
-          - [6.6, 12]
-          - [6.6, 10]
-          - [6, 9]
+          - [9.6, 16.5]
+          - [9.6, 13.5]
+          - [8.6, 12]
+          - [8.6, 10]
+          - [8, 9]
           - [2, 9]
           - [2, 15]
       - name: Master Bathroom
@@ -141,8 +141,8 @@ floors:
         points:
           - [0, 18]
           - [1.5, 18]
-          - [1.5, 19.2]
-          - [4, 19.2]
+          - [1.5, 18.5]
+          - [4, 18.5]
           - [4, 15]
           - [0, 15]
           - [0, 18]
@@ -153,34 +153,34 @@ floors:
 # Locations of espresense nodes in meters
 nodes:
   - name: Master
-    point: [6.5, 12, 3.6]
+    point: [8.5, 12, 3.6]
     floors: ["second"]
   - name: Bathroom
     point: [0.1, 10, 3.9]
     floors: ["second", "outside"]
   - name: Upstairs Hallway
-    point: [10, 10, 3.2]
+    point: [12, 10, 3.2]
     floors: ["second"]
   - name: Garage
     point: [0.75, 17.9, 0.5]
     floors: ["first", "second", "outside"]
   - name: Office
-    point: [5, 15.25, 1.5]
+    point: [7, 15.25, 1.5]
     floors: ["first"]
   - name: Family
     point: [0.5, 0.5, 0.25]
-    floors: ["outside"]
+    floors: ["first", "outside"]
   - name: Kitchen
-    point: [8, 7.5, 0.5]
+    point: [9, 9, 0.85]
     floors: ["first"]
   - name: Dining
     point: [16.25, 3.1, 1.29]
-    floors: ["first", "second", "outside"]
+    floors: ["first", "outside"]
   - name: Basement
     point: [16, 13, -1]
     floors: ["first", "second", "outside"]
   - name: Laundry
-    point: [5, 9, 1]
+    point: [4.2, 9, 1]
     floors: ["first"]
   - name: Mini
     stationary: false
@@ -189,12 +189,14 @@ nodes:
 
 # Devices to track
 devices:
+  - name: "*" # Track all named devices
   - id: "tile:*" # Track all tiles
   - id: "irk:*" # Track all IRKs
   - id: "watch:*"
   - id: "phone:*"
+  - id: "wallet:*"
+  - id: "keys:*"
   - id: "iBeacon:*"
-  - name: "*" # Track all named devices
   - id: watch:darrell
     name: Darrell's Watch
   - id: phone:darrell
