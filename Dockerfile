@@ -28,7 +28,6 @@ EXPOSE 8267 8268
 ENV ASPNETCORE_URLS "http://+:8267"
 ENV OTA_UPDATE_PORT 8268
 ENV CONFIG_DIR "/config/espresense"
-ENV MathNetNumericsLAProvider=MKL
 COPY --from=build-env /App/out .
 LABEL \
   io.hass.version="VERSION" \
