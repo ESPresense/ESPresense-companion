@@ -1,10 +1,10 @@
 # Building
 
-Git Clone, Open folder in VSCode, it'll ask to install dependencies, click yes, you'll need to install .NET SDK 7.0 as well then type into the terminal:
+Git Clone, Open folder in VSCode, it'll ask to install dependencies, click yes, you'll need to install .NET SDK 8.0 as well then type into the terminal:
 
 `dotnet watch`
 
-Browse to [http://localhost:44490/]
+Browse to [http://localhost:5279/]
 
 While developing you use vite as your webserver and it proxies /api and /ws to the dotnet webserver.
 

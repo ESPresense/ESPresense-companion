@@ -1,6 +1,5 @@
 using ESPresense.Extensions;
 using ESPresense.Locators;
-using ESPresense.Middleware;
 using ESPresense.Models;
 using ESPresense.Services;
 using MQTTnet.Diagnostics;
@@ -9,8 +8,6 @@ using Serilog.Events;
 using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
-using Flurl;
-using Swashbuckle.AspNetCore.SwaggerUI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,7 +81,6 @@ app.UseSerilogRequestLogging(o =>
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");
 app.UseSwaggerUI(c => c.RoutePrefix = "api/swagger");
 
-//app.UseMiddleware<FixAbsolutePaths>();
 app.UseStaticFiles();
 app.UseRouting();
 
@@ -93,5 +89,7 @@ app.MapControllerRoute(
     pattern: "{controller}/{action=Index}/{id?}");
 
 app.MapFallbackToFile("index.html");
+
+Log.Logger.Information(MathNet.Numerics.Control.Describe());
 
 app.Run();
