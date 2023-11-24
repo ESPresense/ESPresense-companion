@@ -90,6 +90,7 @@ app.MapControllerRoute(
 
 app.MapFallbackToFile("index.html");
 
+MathNet.Numerics.Control.TryUseNativeMKL();
 Log.Logger.Information(MathNet.Numerics.Control.Describe().Trim('\r','\n'));
 
 app.Run();
