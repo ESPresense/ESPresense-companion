@@ -9,28 +9,18 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-internal class MultiScenarioLocator : BackgroundService
+internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory) : BackgroundService
 {
     private const int ConfidenceThreshold = 2;
 
-    private readonly DatabaseFactory _databaseFactory;
-    private readonly MqttConnectionFactory _mqttConnectionFactory;
-    private readonly State _state;
     private readonly Telemetry _telemetry = new();
 
     private ConcurrentHashSet<Device> _dirty = new();
 
-    public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory)
-    {
-        _state = state;
-        _mqttConnectionFactory = mqttConnectionFactory;
-        _databaseFactory = databaseFactory;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var dh = await _databaseFactory.GetDeviceHistory();
-        var mc = await _mqttConnectionFactory.GetClient(true);
+        var dh = await databaseFactory.GetDeviceHistory();
+        var mc = await mqttConnectionFactory.GetClient(true);
 
         await mc.SubscribeAsync("espresense/devices/+/+");
 
@@ -48,14 +38,14 @@ internal class MultiScenarioLocator : BackgroundService
             var nodeId = parts[3];
             bool isNode = deviceId.StartsWith("node:");
 
-            if (!_state.Nodes.TryGetValue(nodeId, out var rx))
+            if (!state.Nodes.TryGetValue(nodeId, out var rx))
             {
-                _state.Nodes[nodeId] = rx = new Node(nodeId);
+                state.Nodes[nodeId] = rx = new Node(nodeId);
                 if (_telemetry.UnknownNodes.Add(nodeId))
                     Log.Warning("Unknown node {nodeId}", nodeId);
             }
 
-            if (isNode && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx))
+            if (isNode && state.Nodes.TryGetValue(deviceId.Substring(5), out var tx))
             {
                 if (tx is { HasLocation: true, Stationary: true })
                 {
@@ -70,36 +60,36 @@ internal class MultiScenarioLocator : BackgroundService
                 if (rx.HasLocation)
                 {
                     _telemetry.Messages++;
-                    var device = _state.Devices.GetOrAdd(deviceId, id =>
+                    var device = state.Devices.GetOrAdd(deviceId, id =>
                     {
                         var d = new Device(id) { Check = true };
-                        foreach (var scenario in GetScenarios(d)) d.Scenarios.Add(scenario);
+                        foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                         return d;
                     });
-                    _telemetry.Devices = _state.Devices.Count;
+                    _telemetry.Devices = state.Devices.Count;
                     var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
                     if (dirty) _telemetry.Moved++;
 
                     if (device.Check)
                     {
-                        if (_state.ConfigDeviceById.TryGetValue(deviceId, out var cdById))
+                        if (state.ConfigDeviceById.TryGetValue(deviceId, out var cdById))
                         {
                             device.Track = true;
                             if (!string.IsNullOrWhiteSpace(cdById.Name))
                                 device.Name = cdById.Name;
                         }
-                        else if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue(device.Name, out _))
+                        else if (!string.IsNullOrWhiteSpace(device.Name) && state.ConfigDeviceByName.TryGetValue(device.Name, out _))
                             device.Track = true;
-                        else if (!string.IsNullOrWhiteSpace(device.Id) && _state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
+                        else if (!string.IsNullOrWhiteSpace(device.Id) && state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
                             device.Track = true;
-                        else if (!string.IsNullOrWhiteSpace(device.Name) && _state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
+                        else if (!string.IsNullOrWhiteSpace(device.Name) && state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
                             device.Track = true;
                         else
                             device.Track = false;
 
                         device.Check = false;
 
-                        _telemetry.Tracked = _state.Devices.Values.Count(a => a.Track);
+                        _telemetry.Tracked = state.Devices.Values.Count(a => a.Track);
                     }
 
                     if (device.Track)
@@ -133,11 +123,11 @@ internal class MultiScenarioLocator : BackgroundService
             _dirty = new ConcurrentHashSet<Device>();
 
             var now = DateTime.UtcNow;
-            var idleTimeout = TimeSpan.FromSeconds(_state.Config?.Timeout ?? 30);
+            var idleTimeout = TimeSpan.FromSeconds(state.Config?.Timeout ?? 30);
 
-            foreach (var idle in _state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
+            foreach (var idle in state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
 
-            var gps = _state.Config?.Gps;
+            var gps = state.Config?.Gps;
 
             foreach (var device in todo)
             {
@@ -200,12 +190,5 @@ internal class MultiScenarioLocator : BackgroundService
                 }
             }
         }
-    }
-
-    private IEnumerable<Scenario> GetScenarios(Device device)
-    {
-        foreach (var floor in _state.Floors.Values) yield return new Scenario(_state.Config, new NelderMeadMultilateralizer(device, floor, _state), floor.Name);
-        //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
-        yield return new Scenario(_state.Config, new NearestNode(device), "NearestNode");
     }
 }
