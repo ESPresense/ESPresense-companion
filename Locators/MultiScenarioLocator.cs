@@ -9,7 +9,7 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory) : BackgroundService
+internal class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory) : BackgroundService
 {
     private const int ConfidenceThreshold = 2;
 
@@ -20,11 +20,9 @@ internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConne
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var dh = await databaseFactory.GetDeviceHistory();
-        var mc = await mqttConnectionFactory.GetClient(true);
+        await mqtt.SubscribeAsync("espresense/devices/+/+");
 
-        await mc.SubscribeAsync("espresense/devices/+/+");
-
-        mc.ApplicationMessageReceivedAsync += async arg =>
+        mqtt.MqttMessageReceivedAsync += async arg =>
         {
             var parts = arg.ApplicationMessage.Topic.Split('/');
 
@@ -94,7 +92,7 @@ internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConne
 
                     if (device.Track)
                         foreach (var ad in device.HassAutoDiscovery)
-                            await ad.Send(mc);
+                            await ad.Send(mqtt);
 
                     if (device.Track && dirty)
                         _dirty.Add(device);
@@ -116,7 +114,7 @@ internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConne
             if (DateTime.UtcNow - telemetryLastSent > TimeSpan.FromSeconds(30))
             {
                 telemetryLastSent = DateTime.UtcNow;
-                await mc.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(_telemetry, SerializerSettings.NullIgnore));
+                await mqtt.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(_telemetry, SerializerSettings.NullIgnore));
             }
 
             var todo = _dirty;
@@ -143,7 +141,7 @@ internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConne
                 if (state != device.ReportedState)
                 {
                     moved += 1;
-                    await mc.EnqueueAsync($"espresense/companion/{device.Id}", state);
+                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", state);
                     device.ReportedState = state;
                 }
 
@@ -154,7 +152,7 @@ internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConne
                     var (latitude, longitude) = GpsUtil.Add(bs?.Location.X, bs?.Location.Y, gps?.Latitude, gps?.Longitude);
 
                     if (latitude == null || longitude == null)
-                        await mc.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
+                        await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
                             JsonConvert.SerializeObject(new
                             {
                                 x = bs?.Location.X,
@@ -166,7 +164,7 @@ internal class MultiScenarioLocator(State state, MqttConnectionFactory mqttConne
                             }, SerializerSettings.NullIgnore)
                         );
                     else
-                        await mc.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
+                        await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
                             JsonConvert.SerializeObject(new
                             {
                                 source_type = "espresense",

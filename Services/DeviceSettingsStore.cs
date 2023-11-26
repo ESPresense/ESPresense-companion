@@ -8,19 +8,10 @@ using Newtonsoft.Json;
 
 namespace ESPresense.Services
 {
-    public class DeviceSettingsStore : BackgroundService
+    public class DeviceSettingsStore(MqttCoordinator mqtt) : BackgroundService
     {
-        private readonly MqttConnectionFactory _mqttConnectionFactory;
-
         private readonly ConcurrentDictionary<string, DeviceSettings> _storeById = new();
         private readonly ConcurrentDictionary<string, DeviceSettings> _storeByAlias = new();
-
-        private IManagedMqttClient? _mc;
-
-        public DeviceSettingsStore(MqttConnectionFactory mqttConnectionFactory)
-        {
-            _mqttConnectionFactory = mqttConnectionFactory;
-        }
 
         public DeviceSettings? Get(string id)
         {
@@ -32,15 +23,14 @@ namespace ESPresense.Services
         public async Task Set(string id, DeviceSettings ds)
         {
             ds.OriginalId = null;
-            await _mc.EnqueueAsync($"espresense/settings/{id}/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), MqttQualityOfServiceLevel.AtMostOnce, true);
+            await mqtt.EnqueueAsync($"espresense/settings/{id}/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), true);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var mc = _mc = await _mqttConnectionFactory.GetClient(false);
-            await mc.SubscribeAsync("espresense/settings/#");
+            await mqtt.SubscribeAsync("espresense/settings/#");
 
-            mc.ApplicationMessageReceivedAsync += arg =>
+            mqtt.MqttMessageReceivedAsync += arg =>
             {
                 var parts = arg.ApplicationMessage.Topic.Split('/');
                 if (parts.Length >= 4 && parts[3] == "config")

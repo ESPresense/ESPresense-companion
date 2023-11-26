@@ -5,20 +5,9 @@ using MQTTnet.Extensions.ManagedClient;
 
 namespace ESPresense.Services
 {
-    public class NodeSettingsStore : BackgroundService
+    public class NodeSettingsStore(MqttCoordinator mqtt, ILogger<NodeSettingsStore> logger) : BackgroundService
     {
-        private readonly MqttConnectionFactory _mqttConnectionFactory;
-        private readonly ILogger<NodeSettingsStore> _logger;
-
         private readonly ConcurrentDictionary<string, NodeSettings> _storeById = new();
-
-        private IManagedMqttClient? _mc;
-
-        public NodeSettingsStore(MqttConnectionFactory mqttConnectionFactory, ILogger<NodeSettingsStore> logger)
-        {
-            _mqttConnectionFactory = mqttConnectionFactory;
-            _logger = logger;
-        }
 
         public NodeSettings Get(string id)
         {
@@ -29,19 +18,18 @@ namespace ESPresense.Services
         {
             var old = Get(id);
             if (ds.Absorption != null && ds.Absorption != old.Absorption)
-                await _mc.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Absorption:0.00}");
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Absorption:0.00}");
             if (ds.RxAdjRssi != null && ds.RxAdjRssi != old.RxAdjRssi)
-                await _mc.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.RxAdjRssi}");
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.RxAdjRssi}");
             if (ds.TxRefRssi != null && ds.TxRefRssi != old.TxRefRssi)
-                await _mc.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.TxRefRssi}");
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.TxRefRssi}");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var mc = _mc = await _mqttConnectionFactory.GetClient(false);
-            await mc.SubscribeAsync("espresense/rooms/+/+");
+            await mqtt.SubscribeAsync("espresense/rooms/+/+");
 
-            mc.ApplicationMessageReceivedAsync += arg =>
+            mqtt.MqttMessageReceivedAsync += arg =>
             {
                 try
                 {
@@ -72,7 +60,7 @@ namespace ESPresense.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Error parsing {0}", arg.ApplicationMessage.Topic);
+                    logger.LogWarning(ex, "Error parsing {0}", arg.ApplicationMessage.Topic);
                 }
                 return Task.CompletedTask;
             };
@@ -82,17 +70,17 @@ namespace ESPresense.Services
 
         public async Task Update(string id)
         {
-            await _mc.EnqueueAsync($"espresense/rooms/{id}/update/set", "PRESS");
+            await mqtt.EnqueueAsync($"espresense/rooms/{id}/update/set", "PRESS");
         }
 
         public async Task Arduino(string id, bool on)
         {
-            await _mc.EnqueueAsync($"espresense/rooms/{id}/arduino_ota/set", on ? "ON" : "OFF");
+            await mqtt.EnqueueAsync($"espresense/rooms/{id}/arduino_ota/set", on ? "ON" : "OFF");
         }
 
         public async Task Restart(string id)
         {
-            await _mc.EnqueueAsync($"espresense/rooms/{id}/restart/set", "PRESS");
+            await mqtt.EnqueueAsync($"espresense/rooms/{id}/restart/set", "PRESS");
         }
     }
 }

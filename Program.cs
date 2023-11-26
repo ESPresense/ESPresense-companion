@@ -43,7 +43,7 @@ builder.Services.AddSingleton(a =>
 builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
-builder.Services.AddSingleton<MqttConnectionFactory>();
+builder.Services.AddSingleton<MqttCoordinator>();
 
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
@@ -90,6 +90,6 @@ app.MapControllerRoute(
 
 app.MapFallbackToFile("index.html");
 
-Log.Logger.Information(MathNet.Numerics.Control.Describe());
+Log.Logger.Information(MathNet.Numerics.Control.Describe().Trim('\r','\n'));
 
 app.Run();

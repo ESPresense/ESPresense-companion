@@ -8,25 +8,22 @@ namespace ESPresense.Services;
 
 public class NodeTelemetryStore : BackgroundService
 {
-    private readonly MqttConnectionFactory _mqttConnectionFactory;
+    private readonly MqttCoordinator _mqttCoordinator;
 
     private readonly ConcurrentDictionary<string, NodeTelemetry> _storeById = new();
     private readonly ConcurrentDictionary<string, bool> _onlineById = new();
 
-    private IManagedMqttClient? _mc;
-
-    public NodeTelemetryStore(MqttConnectionFactory mqttConnectionFactory)
+    public NodeTelemetryStore(MqttCoordinator mqttCoordinator)
     {
-        _mqttConnectionFactory = mqttConnectionFactory;
+        _mqttCoordinator = mqttCoordinator;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var mc = _mc = await _mqttConnectionFactory.GetClient(false);
-        await mc.SubscribeAsync("espresense/rooms/+/telemetry");
-        await mc.SubscribeAsync("espresense/rooms/+/status");
+        await _mqttCoordinator.SubscribeAsync("espresense/rooms/+/telemetry");
+        await _mqttCoordinator.SubscribeAsync("espresense/rooms/+/status");
 
-        mc.ApplicationMessageReceivedAsync += arg =>
+        _mqttCoordinator.MqttMessageReceivedAsync += arg =>
         {
             var parts = arg.ApplicationMessage.Topic.Split('/');
             switch (parts)
