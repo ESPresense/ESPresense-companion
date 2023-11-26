@@ -22,33 +22,23 @@ internal class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseF
         var dh = await databaseFactory.GetDeviceHistory();
         await mqtt.SubscribeAsync("espresense/devices/+/+");
 
-        mqtt.MqttMessageReceivedAsync += async arg =>
+        mqtt.DeviceMessageReceivedAsync += async arg =>
         {
-            var parts = arg.ApplicationMessage.Topic.Split('/');
+            bool isNode = arg.DeviceId.StartsWith("node:");
 
-            if (parts is not ["espresense", "devices", _, _])
+            if (!state.Nodes.TryGetValue(arg.NodeId, out var rx))
             {
-                _telemetry.Malformed++;
-                return;
+                state.Nodes[arg.NodeId] = rx = new Node(arg.NodeId);
+                if (_telemetry.UnknownNodes.Add(arg.NodeId))
+                    Log.Warning("Unknown node {nodeId}", arg.NodeId);
             }
 
-            var deviceId = parts[2];
-            var nodeId = parts[3];
-            bool isNode = deviceId.StartsWith("node:");
-
-            if (!state.Nodes.TryGetValue(nodeId, out var rx))
-            {
-                state.Nodes[nodeId] = rx = new Node(nodeId);
-                if (_telemetry.UnknownNodes.Add(nodeId))
-                    Log.Warning("Unknown node {nodeId}", nodeId);
-            }
-
-            if (isNode && state.Nodes.TryGetValue(deviceId.Substring(5), out var tx))
+            if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
             {
                 if (tx is { HasLocation: true, Stationary: true })
                 {
                     if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
-                        tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
+                        tx.RxNodes.GetOrAdd(arg.NodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
                 }
                 else isNode = false; // if transmitter is not stationary, treat it as a device
             } else isNode = false; // if transmitter is not configured, treat it as a device
@@ -58,19 +48,19 @@ internal class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseF
                 if (rx.HasLocation)
                 {
                     _telemetry.Messages++;
-                    var device = state.Devices.GetOrAdd(deviceId, id =>
+                    var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
                     {
                         var d = new Device(id) { Check = true };
                         foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                         return d;
                     });
                     _telemetry.Devices = state.Devices.Count;
-                    var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
+                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.Payload);
                     if (dirty) _telemetry.Moved++;
 
                     if (device.Check)
                     {
-                        if (state.ConfigDeviceById.TryGetValue(deviceId, out var cdById))
+                        if (state.ConfigDeviceById.TryGetValue(arg.DeviceId, out var cdById))
                         {
                             device.Track = true;
                             if (!string.IsNullOrWhiteSpace(cdById.Name))

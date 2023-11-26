@@ -7,6 +7,7 @@ using MQTTnet.Diagnostics;
 using MQTTnet.Extensions.ManagedClient;
 using Serilog;
 using System.Collections.Concurrent;
+using Newtonsoft.Json;
 
 namespace ESPresense.Services;
 
@@ -21,6 +22,7 @@ public class MqttCoordinator
         _serviceProvider = serviceProvider;
         Task.Run(() => GetClient());
     }
+
 
     private async Task<IManagedMqttClient> GetClient()
     {
@@ -105,12 +107,36 @@ public class MqttCoordinator
         return mc;
     }
 
+    public event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
 
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
 
     private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs e)
     {
-        if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(e);
+        var parts = e.ApplicationMessage.Topic.Split('/');
+
+        if (parts is ["espresense", "devices", _, _])
+        {
+            var deviceId = parts[2];
+            var nodeId = parts[3];
+            if (DeviceMessageReceivedAsync != null)
+            {
+                var deserializeObject = JsonConvert.DeserializeObject<DeviceMessage>(e.ApplicationMessage.ConvertPayloadToString());
+                if (deserializeObject != null)
+                {
+                    await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
+                    {
+                        DeviceId = deviceId,
+                        NodeId = nodeId,
+                        Payload = deserializeObject
+                    });
+                }
+            }
+        }
+        else
+        {
+            if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(e);
+        }
     }
 
     public async Task SubscribeAsync(string topic)
@@ -134,4 +160,11 @@ public class MqttCoordinator
     {
         await _mc.EnqueueAsync(topic, payload, retain: retain);
     }
+}
+
+public class DeviceMessageEventArgs
+{
+    public string DeviceId { get; set; }
+    public string NodeId { get; set; }
+    public DeviceMessage Payload { get; set; }
 }

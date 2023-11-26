@@ -1,7 +1,4 @@
-﻿using System.Text.Json;
-using Serilog;
-
-namespace ESPresense.Models;
+﻿namespace ESPresense.Models;
 
 public class DeviceNode
 {
@@ -19,51 +16,12 @@ public class DeviceNode
     public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Node?.Config?.Timeout ?? 30);
     public double RefRssi { get; set; }
 
-    public bool ReadMessage(ArraySegment<byte> payload)
+    public bool ReadMessage(DeviceMessage payload)
     {
-        bool moved = false;
-
-        try
-        {
-            var reader = new Utf8JsonReader(payload);
-            string? prop = null;
-            while (reader.Read())
-                switch (reader.TokenType)
-                {
-                    case JsonTokenType.StartObject:
-                        break;
-                    case JsonTokenType.PropertyName:
-                        prop = reader.GetString();
-                        break;
-                    case JsonTokenType.String:
-                        if (prop == "name") NewName(reader.GetString());
-                        break;
-                    case JsonTokenType.Number:
-                        switch (prop)
-                        {
-                            case "distance":
-                                moved |= NewDistance(reader.GetDouble());
-                                break;
-                            case "rssi":
-                                Rssi = reader.GetDouble();
-                                break;
-                            case "rssi@1m":
-                                RefRssi = reader.GetDouble();
-                                break;
-                        }
-
-                        break;
-                    default:
-                        reader.Skip();
-                        break;
-                }
-
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Error reading mqtt message");
-        }
-        return moved;
+        Rssi = payload.Rssi;
+        RefRssi = payload.RefRssi;
+        NewName(payload.Name);
+        return NewDistance(payload.Distance);
     }
 
     private void NewName(string? name)
