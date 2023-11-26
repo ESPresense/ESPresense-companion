@@ -7,6 +7,7 @@ using MQTTnet.Diagnostics;
 using MQTTnet.Extensions.ManagedClient;
 using Serilog;
 using System.Collections.Concurrent;
+using ESPresense.Events;
 using Newtonsoft.Json;
 
 namespace ESPresense.Services;
@@ -20,9 +21,8 @@ public class MqttCoordinator
     public MqttCoordinator(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
-        Task.Run(() => GetClient());
+        Task.Run(GetClient);
     }
-
 
     private async Task<IManagedMqttClient> GetClient()
     {
@@ -107,35 +107,60 @@ public class MqttCoordinator
         return mc;
     }
 
+    public event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
     public event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
 
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
 
-    private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs e)
+    private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
-        var parts = e.ApplicationMessage.Topic.Split('/');
+        var parts = arg.ApplicationMessage.Topic.Split('/');
 
-        if (parts is ["espresense", "devices", _, _])
+        switch (parts)
         {
-            var deviceId = parts[2];
-            var nodeId = parts[3];
-            if (DeviceMessageReceivedAsync != null)
+            case ["espresense", "devices", _, _]:
             {
-                var deserializeObject = JsonConvert.DeserializeObject<DeviceMessage>(e.ApplicationMessage.ConvertPayloadToString());
-                if (deserializeObject != null)
+                var deviceId = parts[2];
+                var nodeId = parts[3];
+                if (DeviceMessageReceivedAsync != null)
                 {
-                    await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
+                    var deserializeObject = JsonConvert.DeserializeObject<DeviceMessage>(arg.ApplicationMessage.ConvertPayloadToString());
+                    if (deserializeObject != null)
                     {
-                        DeviceId = deviceId,
-                        NodeId = nodeId,
-                        Payload = deserializeObject
-                    });
+                        await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
+                        {
+                            DeviceId = deviceId,
+                            NodeId = nodeId,
+                            Payload = deserializeObject
+                        });
+                    }
                 }
+
+                break;
             }
-        }
-        else
-        {
-            if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(e);
+            case ["espresense", "settings", _, "config"]:
+            {
+                if (DeviceConfigReceivedAsync != null)
+                {
+                    var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString() ?? "");
+                    if (ds != null)
+                    {
+                        ds.OriginalId = parts[2];
+                        await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs()
+                        {
+                            DeviceId = parts[2],
+                            Payload = ds
+                        });
+                    }
+                }
+
+                break;
+            }
+            default:
+            {
+                if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(arg);
+                break;
+            }
         }
     }
 
@@ -160,11 +185,4 @@ public class MqttCoordinator
     {
         await _mc.EnqueueAsync(topic, payload, retain: retain);
     }
-}
-
-public class DeviceMessageEventArgs
-{
-    public string DeviceId { get; set; }
-    public string NodeId { get; set; }
-    public DeviceMessage Payload { get; set; }
 }

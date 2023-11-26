@@ -1,9 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using ESPresense.Models;
 using ESPresense.Utils;
-using MQTTnet;
-using MQTTnet.Extensions.ManagedClient;
-using MQTTnet.Protocol;
 using Newtonsoft.Json;
 
 namespace ESPresense.Services
@@ -30,17 +27,10 @@ namespace ESPresense.Services
         {
             await mqtt.SubscribeAsync("espresense/settings/#");
 
-            mqtt.MqttMessageReceivedAsync += arg =>
+            mqtt.DeviceConfigReceivedAsync += arg =>
             {
-                var parts = arg.ApplicationMessage.Topic.Split('/');
-                if (parts.Length >= 4 && parts[3] == "config")
-                {
-                    var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString() ?? "");
-                    if (ds == null) return Task.CompletedTask;
-                    ds.OriginalId = parts[2];
-                    _storeById.AddOrUpdate(parts[2], _ => ds, (_, _) => ds);
-                    if (ds.Id != null) _storeByAlias.AddOrUpdate(ds.Id, _ => ds, (_, _) => ds);
-                }
+                _storeById.AddOrUpdate(arg.DeviceId, _ => arg.Payload, (_, _) => arg.Payload);
+                if (arg.Payload.Id != null) _storeByAlias.AddOrUpdate(arg.Payload.Id, _ => arg.Payload, (_, _) => arg.Payload);
                 return Task.CompletedTask;
             };
 
