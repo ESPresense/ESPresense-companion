@@ -1,26 +1,26 @@
-﻿using ESPresense.Extensions;
+﻿using ESPresense.Events;
+using ESPresense.Extensions;
 using ESPresense.Models;
 using Flurl.Http;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Diagnostics;
 using MQTTnet.Extensions.ManagedClient;
-using Serilog;
-using System.Collections.Concurrent;
-using ESPresense.Events;
 using Newtonsoft.Json;
+using Serilog;
 
 namespace ESPresense.Services;
 
 public class MqttCoordinator
 {
+    private readonly ILogger<MqttCoordinator> _logger;
     private readonly IServiceProvider _serviceProvider;
     private IManagedMqttClient? _mc;
-    private readonly ConcurrentQueue<string> _pendingSubscriptions = new ConcurrentQueue<string>();
 
-    public MqttCoordinator(IServiceProvider serviceProvider)
+    public MqttCoordinator(IServiceProvider serviceProvider, ILogger<MqttCoordinator> logger)
     {
         _serviceProvider = serviceProvider;
+        _logger = logger;
         Task.Run(GetClient);
     }
 
@@ -33,7 +33,6 @@ public class MqttCoordinator
 
         var supervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN");
         if (string.IsNullOrEmpty(c.Mqtt.Host) && !string.IsNullOrEmpty(supervisorToken))
-        {
             try
             {
                 try
@@ -58,7 +57,6 @@ public class MqttCoordinator
             {
                 Log.Error(e, "Failed to get MQTT config from Hass Supervisor");
             }
-        }
 
         var mqttFactory = new MqttFactory(_serviceProvider.GetRequiredService<IMqttNetLogger>());
 
@@ -82,21 +80,23 @@ public class MqttCoordinator
         mc.Options.ConnectionCheckInterval = TimeSpan.FromSeconds(30);
         _mc = mc;
 
-        mc.ConnectedAsync += async (s) =>
+        mc.ConnectedAsync += async s =>
         {
             Log.Information("MQTT {@p} connected", new { primary = true });
             await mc.EnqueueAsync("espresense/companion/status", "online");
 
-            while (_pendingSubscriptions.TryDequeue(out var topic)) await SubscribeToTopicAsync(topic);
+            await mc.SubscribeAsync("espresense/devices/+/+");
+            await mc.SubscribeAsync("espresense/settings/+/config");
+            await mc.SubscribeAsync("espresense/rooms/+/+");
         };
 
-        mc.DisconnectedAsync += (s) =>
+        mc.DisconnectedAsync += s =>
         {
             Log.Information("MQTT {@p} disconnected", new { primary = true });
             return Task.CompletedTask;
         };
 
-        mc.ConnectingFailedAsync += (s) =>
+        mc.ConnectingFailedAsync += s =>
         {
             Log.Error("MQTT {@p} connection failed {@error}: {@inner}", new { primary = true }, s.Exception.Message, s.Exception?.InnerException?.Message);
             return Task.CompletedTask;
@@ -109,76 +109,85 @@ public class MqttCoordinator
 
     public event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
     public event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
-
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
+    public event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
+    public event Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceivedAsync;
+    public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
+    public event EventHandler? MqttMessageMalformed;
 
     private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
         var parts = arg.ApplicationMessage.Topic.Split('/');
-
-        switch (parts)
+        try
         {
-            case ["espresense", "devices", _, _]:
+            switch (parts)
             {
-                var deviceId = parts[2];
-                var nodeId = parts[3];
-                if (DeviceMessageReceivedAsync != null)
-                {
-                    var deserializeObject = JsonConvert.DeserializeObject<DeviceMessage>(arg.ApplicationMessage.ConvertPayloadToString());
-                    if (deserializeObject != null)
+                case ["espresense", "rooms", _, "telemetry"]:
+                    if (NodeTelemetryReceivedAsync != null)
                     {
-                        await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
-                        {
-                            DeviceId = deviceId,
-                            NodeId = nodeId,
-                            Payload = deserializeObject
-                        });
+                        var ds = JsonConvert.DeserializeObject<NodeTelemetry>(arg.ApplicationMessage.ConvertPayloadToString());
+                        if (ds != null) await NodeTelemetryReceivedAsync(new NodeTelemetryReceivedEventArgs { NodeId = parts[2], Payload = ds });
                     }
-                }
 
-                break;
-            }
-            case ["espresense", "settings", _, "config"]:
-            {
-                if (DeviceConfigReceivedAsync != null)
+                    break;
+                case ["espresense", "rooms", _, "status"]:
+                    var online = arg.ApplicationMessage.ConvertPayloadToString() == "online";
+                    NodeStatusReceivedAsync?.Invoke(new NodeStatusReceivedEventArgs { NodeId = parts[2], Online = online });
+                    break;
+                case ["espresense", "rooms", _, _]:
                 {
-                    var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString() ?? "");
-                    if (ds != null)
-                    {
-                        ds.OriginalId = parts[2];
-                        await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs()
-                        {
-                            DeviceId = parts[2],
-                            Payload = ds
-                        });
-                    }
+                    if (NodeSettingReceivedAsync != null)
+                        await NodeSettingReceivedAsync(new NodeSettingReceivedEventArgs
+                            {
+                                NodeId = parts[2],
+                                Setting = parts[3],
+                                Payload = arg.ApplicationMessage.ConvertPayloadToString()
+                            }
+                        );
+                    break;
                 }
+                case ["espresense", "devices", _, _]:
+                    if (DeviceMessageReceivedAsync != null)
+                    {
+                        var deviceId = parts[2];
+                        var nodeId = parts[3];
+                        var deserializeObject = JsonConvert.DeserializeObject<DeviceMessage>(arg.ApplicationMessage.ConvertPayloadToString());
+                        if (deserializeObject != null)
+                            await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
+                            {
+                                DeviceId = deviceId,
+                                NodeId = nodeId,
+                                Payload = deserializeObject
+                            });
+                    }
 
-                break;
+                    break;
+                case ["espresense", "settings", _, "config"]:
+                    if (DeviceConfigReceivedAsync != null)
+                    {
+                        var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString() ?? "");
+                        if (ds != null)
+                        {
+                            ds.OriginalId = parts[2];
+                            await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs
+                            {
+                                DeviceId = parts[2],
+                                Payload = ds
+                            });
+                        }
+                    }
+
+                    break;
+                default:
+                    if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(arg);
+                    break;
             }
-            default:
-            {
-                if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(arg);
-                break;
-            }
         }
-    }
-
-    public async Task SubscribeAsync(string topic)
-    {
-        if (_mc is { IsConnected: true })
+        catch (Exception ex)
         {
-            await SubscribeToTopicAsync(topic);
+            _logger.LogWarning(ex, "Error parsing mqtt message from {topic}", arg.ApplicationMessage.Topic);
+            MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
-        else
-        {
-            _pendingSubscriptions.Enqueue(topic);
-        }
-    }
-
-    private async Task SubscribeToTopicAsync(string topic)
-    {
-        await _mc.SubscribeAsync(topic);
     }
 
     public async Task EnqueueAsync(string topic, string payload, bool retain = false)

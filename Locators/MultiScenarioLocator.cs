@@ -20,7 +20,11 @@ internal class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseF
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var dh = await databaseFactory.GetDeviceHistory();
-        await mqtt.SubscribeAsync("espresense/devices/+/+");
+
+        mqtt.MqttMessageMalformed += (s,e) =>
+        {
+            _telemetry.Malformed++;
+        };
 
         mqtt.DeviceMessageReceivedAsync += async arg =>
         {

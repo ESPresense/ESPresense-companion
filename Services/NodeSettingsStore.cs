@@ -27,40 +27,34 @@ namespace ESPresense.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await mqtt.SubscribeAsync("espresense/rooms/+/+");
-
-            mqtt.MqttMessageReceivedAsync += arg =>
+            mqtt.NodeSettingReceivedAsync += arg =>
             {
                 try
                 {
-                    var parts = arg.ApplicationMessage.Topic.Split('/');
-                    if (parts.Length != 4 || parts[3] == "telemetry") return Task.CompletedTask;
-
-                    var pay = arg.ApplicationMessage.ConvertPayloadToString() ?? "";
-                    var ns = Get(parts[2]);
-                    switch (parts[3])
+                    var ns = Get(arg.NodeId);
+                    switch (arg.Setting)
                     {
                         case "absorption":
-                            ns.Absorption = double.Parse(pay);
+                            ns.Absorption = double.Parse(arg.Payload);
                             break;
                         case "rx_adj_rssi":
-                            ns.RxAdjRssi = int.Parse(pay);
+                            ns.RxAdjRssi = int.Parse(arg.Payload);
                             break;
                         case "tx_ref_rssi":
-                            ns.TxRefRssi = int.Parse(pay);
+                            ns.TxRefRssi = int.Parse(arg.Payload);
                             break;
                         case "max_distance":
-                            ns.MaxDistance = double.Parse(pay);
+                            ns.MaxDistance = double.Parse(arg.Payload);
                             break;
                         default:
                             return Task.CompletedTask;
                     }
 
-                    _storeById.AddOrUpdate(parts[2], _ => ns, (_, _) => ns);
+                    _storeById.AddOrUpdate(arg.NodeId, _ => ns, (_, _) => ns);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Error parsing {0}", arg.ApplicationMessage.Topic);
+                    logger.LogWarning(ex, "Error parsing {0} for {1}", arg.Setting, arg.NodeId);
                 }
                 return Task.CompletedTask;
             };

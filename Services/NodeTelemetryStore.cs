@@ -20,28 +20,15 @@ public class NodeTelemetryStore : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await _mqttCoordinator.SubscribeAsync("espresense/rooms/+/telemetry");
-        await _mqttCoordinator.SubscribeAsync("espresense/rooms/+/status");
-
-        _mqttCoordinator.MqttMessageReceivedAsync += arg =>
+        _mqttCoordinator.NodeTelemetryReceivedAsync += arg =>
         {
-            var parts = arg.ApplicationMessage.Topic.Split('/');
-            switch (parts)
-            {
-                case [_, _, _, "telemetry"]:
-                {
-                    var ds = JsonConvert.DeserializeObject<NodeTelemetry>(arg.ApplicationMessage.ConvertPayloadToString() ?? "");
-                    if (ds == null) return Task.CompletedTask;
-                    _storeById.AddOrUpdate(parts[2], _ => ds, (_, _) => ds);
-                    return Task.CompletedTask;
-                }
-                case [_, _, _, "status"]:
-                {
-                    var online = arg.ApplicationMessage.ConvertPayloadToString() == "online";
-                    _onlineById.AddOrUpdate(parts[2], _ => online, (_, _) => online);
-                    break;
-                }
-            }
+            _storeById.AddOrUpdate(arg.NodeId, _ => arg.Payload, (_, _) => arg.Payload);
+            return Task.CompletedTask;
+        };
+
+        _mqttCoordinator.NodeStatusReceivedAsync += arg =>
+        {
+            _onlineById.AddOrUpdate(arg.NodeId, _ => arg.Online, (_, _) => arg.Online);
             return Task.CompletedTask;
         };
 

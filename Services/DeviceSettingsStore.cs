@@ -25,8 +25,6 @@ namespace ESPresense.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await mqtt.SubscribeAsync("espresense/settings/#");
-
             mqtt.DeviceConfigReceivedAsync += arg =>
             {
                 _storeById.AddOrUpdate(arg.DeviceId, _ => arg.Payload, (_, _) => arg.Payload);
