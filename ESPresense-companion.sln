@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33103.184
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ESPresense.Companion.Tests", "tests\ESPresense.Companion.Tests.csproj", "{0FB98CB3-7198-4EB9-82D4-AFAA87826905}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ESPresense.Companion", "src\ESPresense.Companion.csproj", "{EA7B1639-7C50-4AA0-9EF0-7C5379926D0E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0FB98CB3-7198-4EB9-82D4-AFAA87826905}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FB98CB3-7198-4EB9-82D4-AFAA87826905}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FB98CB3-7198-4EB9-82D4-AFAA87826905}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FB98CB3-7198-4EB9-82D4-AFAA87826905}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA7B1639-7C50-4AA0-9EF0-7C5379926D0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA7B1639-7C50-4AA0-9EF0-7C5379926D0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA7B1639-7C50-4AA0-9EF0-7C5379926D0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA7B1639-7C50-4AA0-9EF0-7C5379926D0E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3682B11F-7A3C-4E38-81F7-17E362FCC7D2}
+	EndGlobalSection
+EndGlobal

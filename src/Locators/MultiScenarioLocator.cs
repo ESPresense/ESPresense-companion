@@ -9,7 +9,7 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-internal class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory) : BackgroundService
+public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory) : BackgroundService
 {
     private const int ConfidenceThreshold = 2;
 

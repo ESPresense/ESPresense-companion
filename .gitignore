@@ -232,4 +232,4 @@ _Pvt_Extensions
 .fake/
 
 out
-ClientApp/build
+node_modules

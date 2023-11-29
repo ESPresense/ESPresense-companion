@@ -13,21 +13,22 @@ namespace ESPresense.Services;
 
 public class MqttCoordinator
 {
+    private readonly ConfigLoader _cfg;
     private readonly ILogger<MqttCoordinator> _logger;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IMqttNetLogger _mqttNetLogger;
     private IManagedMqttClient? _mc;
 
-    public MqttCoordinator(IServiceProvider serviceProvider, ILogger<MqttCoordinator> logger)
+    public MqttCoordinator(ConfigLoader cfg, ILogger<MqttCoordinator> logger, IMqttNetLogger mqttNetLogger)
     {
-        _serviceProvider = serviceProvider;
+        _cfg = cfg;
         _logger = logger;
+        _mqttNetLogger = mqttNetLogger;
         Task.Run(GetClient);
     }
 
     private async Task<IManagedMqttClient> GetClient()
     {
-        var cfg = _serviceProvider.GetRequiredService<ConfigLoader>();
-        var c = await cfg.ConfigAsync();
+        var c = await _cfg.ConfigAsync();
 
         c.Mqtt ??= new ConfigMqtt();
 
@@ -58,7 +59,7 @@ public class MqttCoordinator
                 Log.Error(e, "Failed to get MQTT config from Hass Supervisor");
             }
 
-        var mqttFactory = new MqttFactory(_serviceProvider.GetRequiredService<IMqttNetLogger>());
+        var mqttFactory = new MqttFactory(_mqttNetLogger);
 
         var mc = mqttFactory.CreateManagedMqttClient();
 
