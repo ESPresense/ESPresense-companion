@@ -1,4 +1,5 @@
-﻿using ESPresense.Utils;
+﻿using ESPresense.Services;
+using ESPresense.Utils;
 using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
 using TextExtensions;
@@ -36,7 +37,7 @@ namespace ESPresense.Models
 
         bool _sent;
 
-        public async Task Send(IManagedMqttClient mc)
+        public async Task Send(MqttCoordinator mc)
         {
             if (_sent) return;
             _sent = true;

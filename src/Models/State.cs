@@ -106,5 +106,12 @@ public class State
 
         return os;
     }
+
+    public IEnumerable<Scenario> GetScenarios(Device device)
+    {
+        foreach (var floor in Floors.Values) yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+        //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
+        yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+    }
 }
 

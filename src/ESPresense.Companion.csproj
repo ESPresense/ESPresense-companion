@@ -45,10 +45,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="espresense-companion.sln.DotSettings" />
-  </ItemGroup>
-
-   <ItemGroup>
     <EmbeddedResource Include="config.example.yaml" />
   </ItemGroup>
 

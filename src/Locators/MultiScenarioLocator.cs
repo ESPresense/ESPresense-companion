@@ -9,58 +9,40 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-internal class MultiScenarioLocator : BackgroundService
+public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory) : BackgroundService
 {
     private const int ConfidenceThreshold = 2;
 
-    private readonly DatabaseFactory _databaseFactory;
-    private readonly MqttConnectionFactory _mqttConnectionFactory;
-    private readonly State _state;
     private readonly Telemetry _telemetry = new();
 
     private ConcurrentHashSet<Device> _dirty = new();
 
-    public MultiScenarioLocator(State state, MqttConnectionFactory mqttConnectionFactory, DatabaseFactory databaseFactory)
-    {
-        _state = state;
-        _mqttConnectionFactory = mqttConnectionFactory;
-        _databaseFactory = databaseFactory;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var dh = await _databaseFactory.GetDeviceHistory();
-        var mc = await _mqttConnectionFactory.GetClient(true);
+        var dh = await databaseFactory.GetDeviceHistory();
 
-        await mc.SubscribeAsync("espresense/devices/+/+");
-
-        mc.ApplicationMessageReceivedAsync += async arg =>
+        mqtt.MqttMessageMalformed += (s,e) =>
         {
-            var parts = arg.ApplicationMessage.Topic.Split('/');
+            _telemetry.Malformed++;
+        };
 
-            if (parts is not ["espresense", "devices", _, _])
+        mqtt.DeviceMessageReceivedAsync += async arg =>
+        {
+            bool isNode = arg.DeviceId.StartsWith("node:");
+
+            if (!state.Nodes.TryGetValue(arg.NodeId, out var rx))
             {
-                _telemetry.Malformed++;
-                return;
+                state.Nodes[arg.NodeId] = rx = new Node(arg.NodeId);
+                if (_telemetry.UnknownNodes.Add(arg.NodeId))
+                    Log.Warning("Unknown node {nodeId}", arg.NodeId);
             }
 
-            var deviceId = parts[2];
-            var nodeId = parts[3];
-            bool isNode = deviceId.StartsWith("node:");
-
-            if (!_state.Nodes.TryGetValue(nodeId, out var rx))
-            {
-                _state.Nodes[nodeId] = rx = new Node(nodeId);
-                if (_telemetry.UnknownNodes.Add(nodeId))
-                    Log.Warning("Unknown node {nodeId}", nodeId);
-            }
-
-            if (isNode && _state.Nodes.TryGetValue(deviceId.Substring(5), out var tx))
+            if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
             {
                 if (tx is { HasLocation: true, Stationary: true })
                 {
                     if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
-                        tx.RxNodes.GetOrAdd(nodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
+                        tx.RxNodes.GetOrAdd(arg.NodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
                 }
                 else isNode = false; // if transmitter is not stationary, treat it as a device
             } else isNode = false; // if transmitter is not configured, treat it as a device
@@ -70,41 +52,41 @@ internal class MultiScenarioLocator : BackgroundService
                 if (rx.HasLocation)
                 {
                     _telemetry.Messages++;
-                    var device = _state.Devices.GetOrAdd(deviceId, id =>
+                    var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
                     {
                         var d = new Device(id) { Check = true };
-                        foreach (var scenario in GetScenarios(d)) d.Scenarios.Add(scenario);
+                        foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                         return d;
                     });
-                    _telemetry.Devices = _state.Devices.Count;
-                    var dirty = device.Nodes.GetOrAdd(nodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.ApplicationMessage.PayloadSegment);
+                    _telemetry.Devices = state.Devices.Count;
+                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.Payload);
                     if (dirty) _telemetry.Moved++;
 
                     if (device.Check)
                     {
-                        if (_state.ConfigDeviceById.TryGetValue(deviceId, out var cdById))
+                        if (state.ConfigDeviceById.TryGetValue(arg.DeviceId, out var cdById))
                         {
                             device.Track = true;
                             if (!string.IsNullOrWhiteSpace(cdById.Name))
                                 device.Name = cdById.Name;
                         }
-                        else if (!string.IsNullOrWhiteSpace(device.Name) && _state.ConfigDeviceByName.TryGetValue(device.Name, out _))
+                        else if (!string.IsNullOrWhiteSpace(device.Name) && state.ConfigDeviceByName.TryGetValue(device.Name, out _))
                             device.Track = true;
-                        else if (!string.IsNullOrWhiteSpace(device.Id) && _state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
+                        else if (!string.IsNullOrWhiteSpace(device.Id) && state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
                             device.Track = true;
-                        else if (!string.IsNullOrWhiteSpace(device.Name) && _state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
+                        else if (!string.IsNullOrWhiteSpace(device.Name) && state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
                             device.Track = true;
                         else
                             device.Track = false;
 
                         device.Check = false;
 
-                        _telemetry.Tracked = _state.Devices.Values.Count(a => a.Track);
+                        _telemetry.Tracked = state.Devices.Values.Count(a => a.Track);
                     }
 
                     if (device.Track)
                         foreach (var ad in device.HassAutoDiscovery)
-                            await ad.Send(mc);
+                            await ad.Send(mqtt);
 
                     if (device.Track && dirty)
                         _dirty.Add(device);
@@ -126,18 +108,18 @@ internal class MultiScenarioLocator : BackgroundService
             if (DateTime.UtcNow - telemetryLastSent > TimeSpan.FromSeconds(30))
             {
                 telemetryLastSent = DateTime.UtcNow;
-                await mc.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(_telemetry, SerializerSettings.NullIgnore));
+                await mqtt.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(_telemetry, SerializerSettings.NullIgnore));
             }
 
             var todo = _dirty;
             _dirty = new ConcurrentHashSet<Device>();
 
             var now = DateTime.UtcNow;
-            var idleTimeout = TimeSpan.FromSeconds(_state.Config?.Timeout ?? 30);
+            var idleTimeout = TimeSpan.FromSeconds(state.Config?.Timeout ?? 30);
 
-            foreach (var idle in _state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
+            foreach (var idle in state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
 
-            var gps = _state.Config?.Gps;
+            var gps = state.Config?.Gps;
 
             foreach (var device in todo)
             {
@@ -153,7 +135,7 @@ internal class MultiScenarioLocator : BackgroundService
                 if (state != device.ReportedState)
                 {
                     moved += 1;
-                    await mc.EnqueueAsync($"espresense/companion/{device.Id}", state);
+                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", state);
                     device.ReportedState = state;
                 }
 
@@ -164,7 +146,7 @@ internal class MultiScenarioLocator : BackgroundService
                     var (latitude, longitude) = GpsUtil.Add(bs?.Location.X, bs?.Location.Y, gps?.Latitude, gps?.Longitude);
 
                     if (latitude == null || longitude == null)
-                        await mc.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
+                        await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
                             JsonConvert.SerializeObject(new
                             {
                                 x = bs?.Location.X,
@@ -176,7 +158,7 @@ internal class MultiScenarioLocator : BackgroundService
                             }, SerializerSettings.NullIgnore)
                         );
                     else
-                        await mc.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
+                        await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
                             JsonConvert.SerializeObject(new
                             {
                                 source_type = "espresense",
@@ -200,12 +182,5 @@ internal class MultiScenarioLocator : BackgroundService
                 }
             }
         }
-    }
-
-    private IEnumerable<Scenario> GetScenarios(Device device)
-    {
-        foreach (var floor in _state.Floors.Values) yield return new Scenario(_state.Config, new NelderMeadMultilateralizer(device, floor, _state), floor.Name);
-        //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
-        yield return new Scenario(_state.Config, new NearestNode(device), "NearestNode");
     }
 }

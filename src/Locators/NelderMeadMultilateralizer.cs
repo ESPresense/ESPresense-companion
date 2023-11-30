@@ -7,26 +7,15 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-public class NelderMeadMultilateralizer : ILocate
+public class NelderMeadMultilateralizer(Device device, Floor floor, State state) : ILocate
 {
-    private readonly Device _device;
-    private readonly Floor _floor;
-    private readonly State _state;
-
-    public NelderMeadMultilateralizer(Device device, Floor floor, State state)
-    {
-        _device = device;
-        _floor = floor;
-        _state = state;
-    }
-
     public bool Locate(Scenario scenario)
     {
         double Error(IList<double> x, DeviceNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) * x[3] - dn.Distance;
 
         var confidence = scenario.Confidence;
 
-        var nodes = _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).OrderBy(a => a.Distance).ToArray();
+        var nodes = device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(floor) ?? false)).OrderBy(a => a.Distance).ToArray();
         var pos = nodes.Select(a => a.Node!.Location).ToArray();
 
         scenario.Minimum = nodes.Min(a => (double?)a.Distance);
@@ -42,22 +31,22 @@ public class NelderMeadMultilateralizer : ILocate
             return false;
         }
 
-        scenario.Floor = _floor;
+        scenario.Floor = floor;
 
         var guess = confidence < 5
             ? Point3D.MidPoint(pos[0], pos[1])
             : scenario.Location;
         try
         {
-            if (pos.Length < 3 || _floor.Bounds == null)
+            if (pos.Length < 3 || floor.Bounds == null)
             {
                 confidence = 1;
                 scenario.Location = guess;
             }
             else
             {
-                var lowerBound = Vector<double>.Build.DenseOfArray(new[] { _floor.Bounds[0].X, _floor.Bounds[0].Y, _floor.Bounds[0].Z, 0.5 });
-                var upperBound = Vector<double>.Build.DenseOfArray(new[] { _floor.Bounds[1].X, _floor.Bounds[1].Y, _floor.Bounds[1].Z, 1.5 });
+                var lowerBound = Vector<double>.Build.DenseOfArray(new[] { floor.Bounds[0].X, floor.Bounds[0].Y, floor.Bounds[0].Z, 0.5 });
+                var upperBound = Vector<double>.Build.DenseOfArray(new[] { floor.Bounds[1].X, floor.Bounds[1].Y, floor.Bounds[1].Z, 1.5 });
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
@@ -66,15 +55,15 @@ public class NelderMeadMultilateralizer : ILocate
                             .PointwiseMaximum(0)
                             .L2Norm();
                         return (distanceFromBoundingBox > 0 ? Math.Pow(5, 1 + distanceFromBoundingBox) : 0) + Math.Pow(5 * (1 - x[3]), 2) + nodes
-                            .Select((dn, i) => new { err = Error(x, dn), weight = _state?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
+                            .Select((dn, i) => new { err = Error(x, dn), weight = state?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
                             .Average(a => a.weight * Math.Pow(a.err, 2));
                     });
 
                 var initialGuess = Vector<double>.Build.DenseOfArray(new[]
                 {
-                    Math.Max(_floor.Bounds[0].X, Math.Min(_floor.Bounds[1].X, guess.X)),
-                    Math.Max(_floor.Bounds[0].Y, Math.Min(_floor.Bounds[1].Y, guess.Y)),
-                    Math.Max(_floor.Bounds[0].Z, Math.Min(_floor.Bounds[1].Z, guess.Z)),
+                    Math.Max(floor.Bounds[0].X, Math.Min(floor.Bounds[1].X, guess.X)),
+                    Math.Max(floor.Bounds[0].Y, Math.Min(floor.Bounds[1].Y, guess.Y)),
+                    Math.Max(floor.Bounds[0].Z, Math.Min(floor.Bounds[1].Z, guess.Z)),
                     scenario.Scale ?? 1.0
                 });
                 var centroid = Point3D.Centroid(nodes.Select(n => n.Node!.Location).Take(3)).ToVector();
@@ -109,14 +98,14 @@ public class NelderMeadMultilateralizer : ILocate
         {
             confidence = 0;
             scenario.Location = new Point3D();
-            Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
+            Log.Error("Error finding location for {0}: {1}", device, ex.Message);
         }
 
         scenario.Confidence = confidence;
 
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
-        scenario.Room = _floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
+        scenario.Room = floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
         return true;
     }
 }
