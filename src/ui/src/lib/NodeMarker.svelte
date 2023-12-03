@@ -12,19 +12,25 @@
 
 	const r = tweened(0, { duration: 100, easing: cubicOut });
 
-	export let radarId: string | null = null;
+	export let radarId: string | undefined = null;
 	export let n: Node;
+  export let floor: Floor | undefined = null;
 
 	let radar: Device | undefined;
 	$: radar = $devices?.find((n) => n.id == radarId);
-	$: r.set(radiusOnIntersectionCircle(radar, n));
+  let radarDist: number | undefined;
+  $: radarDist = radar?.nodes[n.id]?.dist;
+	$: r.set(fixRadiusFromHeight(radarDist));
 	let colors: ScaleOrdinal<string, string> = getContext('colors');
 
-	function radiusOnIntersectionCircle(d: Device | undefined, n: Node): number {
-		if (d == undefined) return 0;
-		var dr = d.nodes[n.id]?.dist;
+	function fixRadiusFromHeight(dr: number | undefined): number {
 		if (dr == undefined) return 0;
-		return dr;
+		var nz = n.point[2];
+		var dz = (floor.bounds[1][2]-floor.bounds[0][2])/2.0;
+		var heightDifference = dz - nz;
+		if (Math.abs(heightDifference) > dr) return 0;
+		var radius = Math.sqrt(Math.pow(dr, 2) - Math.pow(heightDifference, 2));
+		return radius;
 	}
 
 	function errorBarLength(dr: number, variance: number): { x: number; y: number } {
