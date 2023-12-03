@@ -16,5 +16,8 @@ namespace ESPresense.Models
 
         [JsonProperty("name")]
         public string? Name { get; set; }
+
+        [JsonProperty("var")]
+        public double? Variance { get; set; }
     }
 }

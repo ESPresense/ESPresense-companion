@@ -8,22 +8,32 @@
 		if (percent == null) {
 			return '';
 		}
-		return (
-			'background-color: hsl(' + (240 - Math.min(Math.max(percent * 120, 0), 240)) + ', 50%, 50%)'
-		);
+		return 'background-color: hsl(' + (240 - Math.min(Math.max(percent * 120, 0), 240)) + ', 50%, 50%)';
 	}
 
 	function value(n1: any, data_point: number) {
-		if (data_point == 0) {
-			return Number(Math.round(n1?.percent * 100)) + '%';
-		} else if (data_point == 1) {
-			return Number(n1?.err?.toPrecision(3));
-		} else if (data_point == 2) {
-			return Number(n1?.absorption?.toPrecision(3));
-		} else if (data_point == 3) {
-			return Number(n1?.rx_adj_rssi?.toPrecision(3));
-		} else if (data_point == 4) {
-			return Number(n1?.tx_ref_rssi?.toPrecision(3));
+		if (data_point === 0) {
+			return n1 ? Number(Math.round(n1.percent * 100)) + '%' : null;
+		} else if (data_point >= 1 && data_point <= 5) {
+			let num;
+			switch (data_point) {
+				case 1:
+					num = n1?.err;
+					break;
+				case 2:
+					num = n1?.absorption;
+					break;
+				case 3:
+					num = n1?.rx_adj_rssi;
+					break;
+				case 4:
+					num = n1?.tx_ref_rssi;
+					break;
+				case 5:
+					num = n1?.var;
+					break;
+			}
+			return num !== null && num !== undefined ? Number(num.toPrecision(3)) : 'n/a';
 		}
 	}
 
@@ -31,8 +41,6 @@
 		const response = await fetch(`${base}/api/state/calibration`);
 		return await response.json();
 	}
-
-	let selected = {};
 
 	let cal = {};
 	calibration().then((data) => {
@@ -42,12 +50,7 @@
 		calibration().then((data) => {
 			cal = data;
 		});
-	}, 5000);
-
-	let popupSettings: PopupSettings = {
-		event: 'hover',
-		target: 'examplePopup'
-	};
+	}, 1000);
 
 	let rxColumns: Array<string> = [];
 	$: {
@@ -68,16 +71,20 @@
 <div class="text-column">
 	<h1 class="h1">Calibration</h1>
 
-	<div class="card variant-filled-secondary p-4" data-popup="examplePopup">
-		{#if selected}
-			Expected {@html Number(selected?.expected?.toPrecision(3))} - Actual {@html Number(
-				selected?.actual?.toPrecision(3)
-			)} = Error {@html Number(selected?.err?.toPrecision(3))}
-		{:else}
-			No beacon Received in last 30 seconds
-		{/if}
-		<div class="arrow variant-filled-secondary" />
-	</div>
+	{#if cal?.matrix}
+		{#each Object.entries(cal?.matrix) as [id1, n1] (id1)}
+			{#each rxColumns as id2 (id2)}
+				<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
+					{#if n1[id2]}
+						Expected {@html Number(n1[id2].expected?.toPrecision(3))} - Actual {@html Number(n1[id2]?.actual?.toPrecision(3))} = Error {@html Number(n1[id2]?.err?.toPrecision(3))}
+					{:else}
+						No beacon Received in last 30 seconds
+					{/if}
+					<div class="arrow variant-filled-secondary" />
+				</div>
+			{/each}
+		{/each}
+	{/if}
 
 	<div class="card m-4">
 		{#if cal?.matrix}
@@ -89,6 +96,7 @@
 						<RadioItem bind:group={data_point} name="justify" value={2}>Absorption</RadioItem>
 						<RadioItem bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</RadioItem>
 						<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
+						<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
 					</RadioGroup>
 				</div>
 			</header>
@@ -103,17 +111,12 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each Object.entries(cal.matrix) as [id1, n1]}
+						{#each Object.entries(cal.matrix) as [id1, n1] (id1)}
 							<tr>
 								<td>Tx: {@html id1}</td>
-								{#each rxColumns as id2}
+								{#each rxColumns as id2 (id2)}
 									{#if n1[id2]}
-										<td
-											use:popup={popupSettings}
-											on:mouseover={() => (selected = n1[id2])}
-											on:focus={() => (selected = n1[id2])}
-											style={coloring(n1[id2]?.percent)}>{@html value(n1[id2], data_point)}</td
-										>
+										<td use:popup={{ event: 'hover', target: 'popup-' + id1 + '-' + id2, placement: 'top' }} style={coloring(n1[id2]?.percent)}>{@html value(n1[id2], data_point)}</td>
 									{:else}
 										<td />
 									{/if}
