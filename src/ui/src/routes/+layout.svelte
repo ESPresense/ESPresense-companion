@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.postcss';
 
-	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
+	import { computePosition, autoUpdate, offset, shift, flip, arrow } from '@floating-ui/dom';
 	import { base } from '$app/paths';
 	import { AppShell, AppRail, AppRailAnchor, Drawer, Toast, Modal, initializeStores, storePopup } from '@skeletonlabs/skeleton';
 	import { beforeNavigate } from '$app/navigation';
@@ -32,8 +32,8 @@
 </script>
 
 <div class="app h-full">
-  <Modal />
-  <Toast />
+	<Modal />
+	<Toast />
 	<AppShell>
 		<svelte:fragment slot="sidebarLeft">
 			<AppRail>

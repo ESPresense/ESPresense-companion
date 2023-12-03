@@ -11,6 +11,8 @@ public class RxNode
 
     public double Distance { get; set; }
     public double Rssi { get; set; }
+    public double RefRssi { get; set; }
+    public double? Variance { get; set; }
 
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
@@ -20,20 +22,15 @@ public class RxNode
     public double LastDistance { get; set; }
 
     public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Tx?.Config?.Timeout ?? 30);
-    public double RefRssi { get; set; }
 
     public bool ReadMessage(DeviceMessage payload)
     {
-        Distance = payload.Distance;
+        Variance = payload.Variance;
+        Rssi = payload.Rssi;
         RefRssi = payload.RefRssi;
-        return NewDistance(payload.Distance);
-    }
-
-    private bool NewDistance(double d)
-    {
-        var moved = Math.Abs(LastDistance - d) > 0.25;
-        if (moved) LastDistance = d;
-        Distance = d;
+        var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;
+        if (moved) LastDistance = payload.Distance;
+        Distance = payload.Distance;
         LastHit = DateTime.UtcNow;
         Hits++;
         return moved;

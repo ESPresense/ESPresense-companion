@@ -69,6 +69,7 @@ namespace ESPresense.Controllers
                     rxM["rssi"] = rx.Rssi;
                     rxM["err"] = rx.Expected - rx.Distance;
                     rxM["percent"] = rx.Distance / rx.Expected;
+                    if (rx.Variance is not null) rxM["var"] = rx.Variance.Value;
                 }
             }
 
