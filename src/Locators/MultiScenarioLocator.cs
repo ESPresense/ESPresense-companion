@@ -1,4 +1,5 @@
 ﻿using ConcurrentCollections;
+using ESPresense.Controllers;
 using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
@@ -9,7 +10,7 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory) : BackgroundService
+public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
 {
     private const int ConfidenceThreshold = 2;
 
@@ -173,6 +174,8 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
                                 best_scenario = bs?.Name
                             }, SerializerSettings.NullIgnore)
                         );
+
+                    globalEventDispatcher.OnDeviceChanged(device);
 
                     foreach (var ds in device.Scenarios)
                     {

@@ -8,6 +8,7 @@ using Serilog.Events;
 using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
+using ESPresense.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,7 @@ builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();
 
 builder.Services.AddSingleton<MappingService>();
+builder.Services.AddSingleton<GlobalEventDispatcher>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
