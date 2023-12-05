@@ -29,7 +29,7 @@ export interface Node {
 export interface Device {
   id: string;
   name: string;
-  nodes: { [index: string]: number };
+  nodes: { [index: string]: { dist: number, var: number } };
   room: { id: string, name: string };
   floor: { id: string, name: string };
   location: { x: number, y: number, z: number };

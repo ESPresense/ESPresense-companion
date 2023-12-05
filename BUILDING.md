@@ -2,7 +2,7 @@
 
 Git Clone, Open folder in VSCode, it'll ask to install dependencies, click yes, you'll need to install .NET SDK 8.0 as well then type into the terminal:
 
-`dotnet watch`
+`dotnet watch --project src`
 
 Browse to [http://localhost:5279/]
 
