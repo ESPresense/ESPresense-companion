@@ -104,3 +104,7 @@ export interface Release {
   tag_name: string;
   name: string;
 }
+
+export function isNode(d: Device | Node | null): d is Node {
+  return (d as Node)?.telemetry !== undefined;
+}

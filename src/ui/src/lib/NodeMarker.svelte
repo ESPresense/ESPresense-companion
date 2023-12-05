@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
+	import { createEventDispatcher, getContext } from 'svelte';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 
@@ -25,6 +25,10 @@
 	$: v.set(fixRadiusFromHeight(radar?.nodes[n.id]?.var));
 	$: r.set(fixRadiusFromHeight(radarDist));
 	let colors: ScaleOrdinal<string, string> = getContext('colors');
+	let hovered = '';
+	let selected = '';
+
+  let dispatcher = createEventDispatcher();
 
   let innerStop: number = 0;
   let outerStop: number = 1;
@@ -32,7 +36,7 @@
   $: innerStop = 0.5 * ($r / ($r + $v));
   $: outerStop = 1 - innerStop;
 
-	function fixRadiusFromHeight(dr: number | undefined): number {
+  function fixRadiusFromHeight(dr: number | undefined): number {
 		if (dr == undefined) return 0;
 		var nz = n.point[2];
 		var dz = (floor.bounds[1][2] - floor.bounds[0][2]) / 2.0;
@@ -44,6 +48,18 @@
 
 	function errorBarLength(dr: number, variance: number): { x: number; y: number } {
 		return { x: variance, y: variance };
+	}
+
+	function hover(n: Node | null) {
+		hovered = n?.id ?? '';
+		dispatcher('hovered', n);
+	}
+
+	function unselect() {}
+
+	function select(n: Node) {
+		selected = n?.id ?? '';
+		dispatcher('selected', n);
 	}
 </script>
 
@@ -59,7 +75,22 @@
   {/if}
 </defs>
 
-<path d="M{$xScale(n.point[0])},{$yScale(n.point[1])} m -5,0 5,-5 5,5 -5,5 z" fill={colors(n.id)} />
+<path
+	d="M{$xScale(n.point[0])},{$yScale(n.point[1])} m -5,0 5,-5 5,5 -5,5 z"
+	fill={colors(n.id)}
+	on:mouseover={() => {
+		hover(n);
+	}}
+	on:focus={() => {
+		select(n);
+	}}
+	on:mouseout={() => {
+		hover(null);
+	}}
+	on:blur={() => {
+		unselect();
+	}}
+/>
 <text x={$xScale(n.point[0]) + 7} y={$yScale(n.point[1]) + 3.5} fill="white" font-size="10px">{n.name}</text>
 {#if $r > 0 && radar && radar.nodes[n.id]}
 	<ellipse cx={$xScale(n.point[0])} cy={$yScale(n.point[1])} fill="none" stroke={colors(n.id)} rx={Math.abs($xScale(0) - $xScale($r))} ry={Math.abs($yScale(0) - $yScale($r))} stroke-width="2" />

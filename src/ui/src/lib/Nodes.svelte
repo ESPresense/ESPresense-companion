@@ -18,7 +18,7 @@
 <g transform={transform.toString()}>
 	{#if nodes}
 		{#each nodes as n (n.id)}
-			<NodeMarker {n} {radarId} {floor} />
+			<NodeMarker {n} {radarId} {floor} on:hovered on:selected />
 		{/each}
 	{/if}
 </g>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { config, devices, showAll } from '$lib/stores';
+	import { devices, showAll } from '$lib/stores';
 	import { zoomIdentity } from 'd3-zoom';
 
 	import DeviceDot from './DeviceDot.svelte';
@@ -10,7 +10,7 @@
 	export let deviceId: string | null = null;
 
 	const filter = (devices: Device[]) => {
-    if ($showAll) return devices;
+		if ($showAll) return devices;
 		if (deviceId != null) return devices.filter((d) => d.id === deviceId);
 		return devices.filter((d) => d.floor?.id === floorId);
 	};

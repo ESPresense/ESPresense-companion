@@ -6,8 +6,7 @@
 	import { select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
 	import { setContext } from 'svelte';
-
-	import type { Device } from '$lib/types';
+	import { isNode, type Device, type Node } from '$lib/types';
 
 	import Rooms from './Rooms.svelte';
 	import Devices from './Devices.svelte';
@@ -17,7 +16,7 @@
 
 	let svg: Element;
 	let transform = zoomIdentity;
-	const hovered = writable<Device | null>();
+	const hovered = writable<Device | Node | null>();
 
 	export let floorId: string | null = null;
 	export let deviceId: string | null = null;
@@ -32,20 +31,19 @@
 			transform = e.transform;
 		});
 
-  setContext('colors', scaleOrdinal(schemeCategory10))
+	setContext('colors', scaleOrdinal(schemeCategory10));
 
-  $: { if (svg) select(svg).call(handler) }
-
+	$: { if (svg) select(svg).call(handler); }
 </script>
 
 {#if bounds}
-  <LayerCake x='0' y='1' xRange={({ height, width }) => [0, Math.min(height, width)]} yRange={({ height, width }) => [Math.min(height, width), 0]} flatData={ bounds } xReverse={ false } yReverse={ true } padding={ {top: 16, left: 16, bottom: 16, right: 16} }>
+	<LayerCake x="0" y="1" xRange={({ height, width }) => [0, Math.min(height, width)]} yRange={({ height, width }) => [Math.min(height, width), 0]} flatData={bounds} xReverse={false} yReverse={true} padding={{ top: 16, left: 16, bottom: 16, right: 16 }}>
 		<Svg bind:element={svg}>
 			<AxisX {transform} />
 			<AxisY {transform} />
 			<Rooms {transform} {floorId} />
-			<Nodes {transform} {floorId} radarId={$hovered?.id ?? device?.id} />
-      <Devices {transform} { floorId } {deviceId} on:selected on:hovered={ d => $hovered = d.detail } />
+			<Nodes {transform} {floorId} radarId={isNode($hovered) ? 'node:' + $hovered?.id : $hovered?.id ?? device?.id} on:selected on:hovered={(d) => ($hovered = d.detail)} />
+			<Devices {transform} {floorId} {deviceId} on:selected on:hovered={(d) => ($hovered = d.detail)} />
 		</Svg>
 	</LayerCake>
 {:else}
