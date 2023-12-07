@@ -1,6 +1,6 @@
 import { readable, writable, derived } from 'svelte/store';
 import { base } from '$app/paths';
-import type { Config, Node, Device } from './types';
+import type { Device } from './types';
 
 export const showAll: SvelteStore<boolean> = writable(false);
 export const config = writable<Config>();
@@ -13,42 +13,56 @@ async function getConfig() {
   const response = await fetch(`${base}/api/state/config`);
   config.set(await response.json());
 }
+
 getConfig();
 
-function setupWebsocket() {
-  var loc = new URL(`${base}/ws`, window.location.href);
-  var new_uri = (loc.protocol === "https:" ? "wss:" : "ws:") + "//" + loc.host + loc.pathname;
-  socket = new WebSocket(new_uri);
-  socket.addEventListener('message', async function (event) {
-    console.log(event.data);
-    var eventData = JSON.parse(event.data);
-    if (eventData.type == "configChanged") {
-      getConfig();
-    }
-  });
-}
-
-setupWebsocket();
-
 export const devices = readable<Device[]>([], function start(set) {
-  var errors = 0;
-  var outstanding = false;
-  const interval = setInterval(() => {
-    if (outstanding) return;
-    outstanding = true;
+  let deviceMap = new Map();
+  let receivedWebSocketUpdate = false;
+
+  function updateDevicesFromMap() {
+    var a = Array.from(deviceMap.values())
+    set(a);
+  }
+
+  function fetchDevices() {
     fetch(`${base}/api/state/devices`)
       .then(d => d.json())
       .then(r => {
-        outstanding = false;
-        errors = 0;
-        set(r);
+        deviceMap = new Map(r.map(device => [device.id, device]));
+        updateDevicesFromMap();
+        receivedWebSocketUpdate = false;
       })
       .catch((ex) => {
-        outstanding = false;
-        if (errors > 5) set([]);
         console.log(ex);
       });
-  }, 1000)
+  }
+
+  const interval = setInterval(() => {
+    if (!receivedWebSocketUpdate) {
+      fetchDevices();
+    }
+  }, 1000);
+
+  function setupWebsocket() {
+    var loc = new URL(`${base}/ws`, window.location.href);
+    var new_uri = (loc.protocol === "https:" ? "wss:" : "ws:") + "//" + loc.host + loc.pathname;
+    socket = new WebSocket(new_uri);
+    socket.addEventListener('message', async function (event) {
+
+      var eventData = JSON.parse(event.data);
+      if (eventData.type === "deviceChanged" && eventData.data?.id) {
+        deviceMap.set(eventData.data.id, eventData.data);
+        updateDevicesFromMap();
+        receivedWebSocketUpdate = true;
+      } else if (eventData.type == "configChanged") {
+        getConfig();
+      } else
+        console.log(event.data);
+    });
+  }
+
+  setupWebsocket();
 
   return function stop() {
     clearInterval(interval);

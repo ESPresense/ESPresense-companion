@@ -5,7 +5,10 @@ using System.Text.Json;
 using ESPresense.Extensions;
 using ESPresense.Models;
 using ESPresense.Services;
+using ESPresense.Utils;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -90,10 +93,10 @@ public class StateController : ControllerBase
         }
 
         ConcurrentQueue<string> changes = new ConcurrentQueue<string>();
-        void OnConfigChanged(object? sender, Config e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "configChanged" }));
-        void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "calibrationChanged", data = e.Calibration }));
-        void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "nodeStateChanged", data = e.NodeState }));
-        void OnDeviceChanged(object? sender, DeviceEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "deviceChanged", data = e.Device }));
+        void OnConfigChanged(object? sender, Config e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "configChanged" }, new JsonSerializerOptions (JsonSerializerDefaults.Web)));
+        void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "calibrationChanged", data = e.Calibration }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "nodeStateChanged", data = e.NodeState }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        void OnDeviceChanged(object? sender, DeviceEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "deviceChanged", data = e.Device }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
         _config.ConfigChanged += OnConfigChanged;
         _eventDispatcher.CalibrationChanged += OnCalibrationChanged;
