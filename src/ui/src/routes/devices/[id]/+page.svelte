@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { devices } from '$lib/stores';
+	import { readable } from 'svelte/store';
 	import type { DeviceSetting } from '$lib/types';
 	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
 
@@ -9,24 +10,29 @@
 	import DeviceDetails from '$lib/DeviceDetails.svelte';
 
 	export let tab = 'map';
-	export let data: { settings?: DeviceSetting; details?: [] } = {};
+	export let data: { settings?: DeviceSetting } = {};
 	$: device = $devices.find((d) => d.id === data.settings?.id);
 
-	var outstanding = false;
-	const interval = setInterval(() => {
-		if (outstanding) return;
-		outstanding = true;
-		fetch(`${base}/api/device/${data.settings?.id}`)
-			.then((d) => d.json())
-			.then((r) => {
-				outstanding = false;
-				data.details = r.details;
-			})
-			.catch((ex) => {
-				outstanding = false;
-				console.log(ex);
-			});
-	}, 1000);
+	export const deviceDetails = readable([], (set) => {
+		async function fetchAndSet() {
+			try {
+				const response = await fetch(`${base}/api/device/${data.settings?.id}`);
+				const result = await response.json();
+				set(result.details);
+			} catch (ex) {
+				console.error(ex);
+			}
+		}
+
+		fetchAndSet();
+		const interval = setInterval(() => {
+			fetchAndSet();
+		}, 1000);
+
+		return function stop() {
+			clearInterval(interval);
+		};
+	});
 </script>
 
 <svelte:head>
@@ -41,7 +47,7 @@
 			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} />
 		{/if}
 		{#if tab === 'settings'}
-			<DeviceDetails settings={data.settings} details={data.details} />
+			<DeviceDetails settings={data.settings} details={$deviceDetails} />
 		{/if}
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
@@ -51,8 +57,8 @@
 					<h3 class="h3">Details</h3>
 				</svelte:fragment>
 				<svelte:fragment slot="content">
-					{#if data?.details}
-						{#each data?.details as d}
+					{#if $deviceDetails}
+						{#each $deviceDetails as d}
 							<label>
 								<span>{d.key}</span>
 								<input class="input" type="text" disabled bind:value={d.value} />
