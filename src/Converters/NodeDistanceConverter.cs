@@ -1,8 +1,7 @@
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ESPresense.Extensions;
 using ESPresense.Models;
 
 namespace ESPresense.Converters;
@@ -23,7 +22,7 @@ public class NodeDistanceConverter : JsonConverter<ConcurrentDictionary<string, 
         // Creating a dictionary with both dist and var
         var d = distances.Where(a => a.Value.Current).ToDictionary(
             a => a.Key,
-            a => new { dist = a.Value.Distance, var = a.Value.Variance } as object
+            a => new { dist = a.Value.Distance, var = a.Value.Variance, lh = a.Value.LastHit.RelativeMilliseconds() } as object
         );
 
         // Using the dictionary converter to write this new structure

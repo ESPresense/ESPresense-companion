@@ -7,10 +7,8 @@ using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
+using Nito.AsyncEx;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace ESPresense.Controllers;
 
@@ -92,11 +90,18 @@ public class StateController : ControllerBase
             return;
         }
 
+
+        AsyncAutoResetEvent newMessage = new AsyncAutoResetEvent();
         ConcurrentQueue<string> changes = new ConcurrentQueue<string>();
-        void OnConfigChanged(object? sender, Config e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "configChanged" }, new JsonSerializerOptions (JsonSerializerDefaults.Web)));
-        void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "calibrationChanged", data = e.Calibration }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-        void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "nodeStateChanged", data = e.NodeState }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-        void OnDeviceChanged(object? sender, DeviceEventArgs e) => changes.Enqueue(JsonSerializer.Serialize(new { type = "deviceChanged", data = e.Device }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        void EnqueueAndSignal<T>(T value)
+        {
+            changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions (JsonSerializerDefaults.Web)));
+            newMessage.Set();
+        }
+        void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
+        void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => EnqueueAndSignal(new { type = "calibrationChanged", data = e.Calibration });
+        void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => EnqueueAndSignal(new { type = "nodeStateChanged", data = e.NodeState });
+        void OnDeviceChanged(object? sender, DeviceEventArgs e) => EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
 
         _config.ConfigChanged += OnConfigChanged;
         _eventDispatcher.CalibrationChanged += OnCalibrationChanged;
@@ -106,12 +111,14 @@ public class StateController : ControllerBase
         {
             using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
 
+            EnqueueAndSignal(new { type = "time", data = DateTime.UtcNow.RelativeMilliseconds() });
+
             while (!webSocket.CloseStatus.HasValue)
             {
                 while (changes.TryDequeue(out var jsonEvent))
                     await webSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(jsonEvent)), WebSocketMessageType.Text, true, CancellationToken.None);
 
-                await Task.Delay(100);
+                await newMessage.WaitAsync();
             }
 
             await webSocket.CloseAsync(webSocket.CloseStatus.Value, webSocket.CloseStatusDescription, CancellationToken.None);

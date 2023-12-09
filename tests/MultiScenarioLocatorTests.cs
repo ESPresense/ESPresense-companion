@@ -28,7 +28,7 @@ public class MultiScenarioLocatorTests
     public void TestMultiScenarioLocator()
     {
         var configLoader = new ConfigLoader("config");
-        var locator = new MultiScenarioLocator(new State(configLoader), new MqttCoordinator(configLoader, null, null), new DatabaseFactory(null));
+        var locator = new MultiScenarioLocator(new State(configLoader), new MqttCoordinator(configLoader, null, null), new DatabaseFactory(null), null);
         // Use testData to test locator...
         // Assert.That(result, Is.EqualTo(expectedResult));
     }
