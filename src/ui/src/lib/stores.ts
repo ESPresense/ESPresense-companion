@@ -5,6 +5,33 @@ import type { Device, Config } from './types';
 export const showAll: SvelteStore<boolean> = writable(false);
 export const config = writable<Config>();
 
+export const relativeTimer = function () {
+  let interval: NodeJS.Timeout | undefined;
+  let startTime = Date.now();
+  const { subscribe, set: setStore } = writable(0);
+
+  function start() {
+    interval = setInterval(() => {
+      setStore(Date.now() - startTime);
+    }, 1);
+  }
+
+  function set(basis : number) {
+    startTime = Date.now() - basis;
+    setStore(Date.now() - startTime);
+  }
+
+  start();
+
+  return {
+    subscribe,
+    set,
+    stop: () => clearInterval(interval)
+  };
+}
+
+export const relative = relativeTimer();
+
 let socket: WebSocket;
 
 export const history = writable(['/']);
@@ -53,7 +80,9 @@ export const devices = readable<Device[]>([], function start(set) {
         updateDevicesFromMap();
       } else if (eventData.type == "configChanged") {
         getConfig();
-      } else
+      } else if (eventData.type == "time")
+        relative.set(eventData.data);
+      else
         console.log(event.data);
     });
   }
