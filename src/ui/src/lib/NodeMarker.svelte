@@ -35,7 +35,7 @@
 
 	$: innerStop = 0.5 * ($r / ($r + $v));
 	$: outerStop = 1 - innerStop;
-  $: hit = Math.min(1, Math.max(0, radar.timeout - ($relative - radar?.nodes[n.id]?.lh)) / radar.timeout);
+  $: hit = Math.min(1, Math.max(0, radar?.timeout - ($relative - radar?.nodes[n.id]?.lh)) / radar?.timeout);
   $: hr = hit * $r;
 
 	function fixRadiusFromHeight(dr: number | undefined): number {
@@ -43,7 +43,7 @@
 		var nz = n.point[2];
 		var dz = (floor.bounds[1][2] - floor.bounds[0][2]) / 2.0;
 		var heightDifference = dz - nz;
-		if (Math.abs(heightDifference) > dr) return 0;
+		if (Math.abs(heightDifference) > dr) return dr;
 		var radius = Math.sqrt(Math.pow(dr, 2) - Math.pow(heightDifference, 2));
 		return radius;
 	}

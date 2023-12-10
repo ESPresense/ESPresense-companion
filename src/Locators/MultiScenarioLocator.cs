@@ -55,7 +55,7 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
                     _telemetry.Messages++;
                     var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
                     {
-                        var d = new Device(id) { Check = true };
+                        var d = new Device(id, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
                         foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                         return d;
                     });
@@ -116,9 +116,8 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
             _dirty = new ConcurrentHashSet<Device>();
 
             var now = DateTime.UtcNow;
-            var idleTimeout = TimeSpan.FromSeconds(state.Config?.Timeout ?? 30);
 
-            foreach (var idle in state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
+            foreach (var idle in state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > a.Timeout)) todo.Add(idle);
 
             var gps = state.Config?.Gps;
 

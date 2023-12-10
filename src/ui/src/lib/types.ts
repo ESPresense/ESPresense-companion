@@ -36,6 +36,7 @@ export interface Device {
   confidence: number;
   scale: number;
   fixes: number;
+  timeout: number;
   lastHit: Date;
 }
 
