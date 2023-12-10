@@ -22,7 +22,7 @@
 	$: radar = $devices?.find((n) => n.id == radarId);
 	let radarDist: number | undefined;
 	$: radarDist = radar?.nodes[n.id]?.dist;
-	$: v.set(fixRadiusFromHeight(radar?.nodes[n.id]?.var));
+	$: v.set(fixRadiusFromHeight(Math.sqrt(radar?.nodes[n.id]?.var ?? 0)));
 	$: r.set(fixRadiusFromHeight(radarDist));
 	let colors: ScaleOrdinal<string, string> = getContext('colors');
 	let hovered = '';
@@ -100,7 +100,7 @@
 		<line x1={$xScale(n.point[0])} y1={$yScale(n.point[1] - errorBarLength(radar.nodes[n.id]?.dist, radar.nodes[n.id]?.var).y)} x2={$xScale(n.point[0])} y2={$yScale(n.point[1] + errorBarLength(radar.nodes[n.id]?.dist, radar.nodes[n.id]?.var).y)} stroke={colors(n.id)} stroke-width="2" />
 		<text x={$xScale(n.point[0])} y={$yScale(n.point[1]) + 15} fill="white" font-size="10px">
 			{#if radar.nodes[n.id]?.var !== null && radar.nodes[n.id]?.var !== undefined}
-				{radar.nodes[n.id]?.dist.toFixed(2) ?? 'N/A'} ± {radar.nodes[n.id]?.var.toFixed(2)}
+				{radar.nodes[n.id]?.dist.toFixed(2) ?? 'N/A'} ± {Math.sqrt(radar.nodes[n.id]?.var).toFixed(2)}
 			{:else}
 				{radar.nodes[n.id]?.dist.toFixed(2) ?? 'N/A'}
 			{/if}
