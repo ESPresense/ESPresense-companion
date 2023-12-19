@@ -22,7 +22,7 @@
 
 	$: x.set(d?.location?.x);
 	$: y.set(d?.location?.y);
-  $: c.set(d?.room?.id ? colors(d?.room?.id) : "#000");
+  $: c.set(visible && d.confidence > 1 && d.location && d?.room?.id ? colors(d?.room?.id) : "#000");
 
 	let hovered = '';
 	let selected = '';
