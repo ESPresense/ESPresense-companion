@@ -23,7 +23,7 @@
 		"@types/d3": "^7.4.3",
 		"@types/node": "^20.10.4",
 		"@typescript-eslint/eslint-plugin": "^6.14.0",
-		"@typescript-eslint/parser": "^6.13.2",
+		"@typescript-eslint/parser": "^6.15.0",
 		"autoprefixer": "^10.4.16",
 		"d3": "^7.8.5",
 		"d3-zoom": "^3.0.0",
