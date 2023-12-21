@@ -6,7 +6,7 @@
 	import { select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
 	import { setContext } from 'svelte';
-	import { isNode, type Device, type Node } from '$lib/types';
+  import type { Device, Node } from '$lib/types';
 
 	import Rooms from './Rooms.svelte';
 	import Devices from './Devices.svelte';
@@ -16,12 +16,12 @@
 
 	let svg: Element;
 	let transform = zoomIdentity;
-	const hovered = writable<Device | Node | null>();
+	const radarDevice = writable<Device | undefined>();
+  const radarNode = writable<Node | undefined>();
 
 	export let floorId: string | null = null;
 	export let deviceId: string | null = null;
 
-	$: device = $devices.find((d) => d.id === deviceId);
 	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
 
@@ -42,8 +42,8 @@
 			<AxisX {transform} />
 			<AxisY {transform} />
 			<Rooms {transform} {floorId} />
-			<Nodes {transform} {floorId} radarId={isNode($hovered) ? 'node:' + $hovered?.id : $hovered?.id ?? device?.id} on:selected on:hovered={(d) => ($hovered = d.detail)} />
-			<Devices {transform} {floorId} {deviceId} on:selected on:hovered={(d) => ($hovered = d.detail)} />
+			<Nodes {transform} {floorId} radarDevice={$radarDevice} radarNode={$radarNode} on:selected on:hovered={(d) => ($radarNode = d.detail)} />
+			<Devices {transform} {floorId} {deviceId} on:selected on:hovered={(d) => ($radarDevice = d.detail)} />
 		</Svg>
 	</LayerCake>
 {:else}

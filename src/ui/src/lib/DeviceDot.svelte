@@ -46,7 +46,7 @@
 
 {#if visible && d.confidence > 1 && d.location}
 <g in:fade={{ duration: 1000 }} out:fade={{ duration: 1000 }}>
-<circle cx='{ $xScale($x) }' cy='{ $yScale($y) }' fill={ $c } stroke={ d.id == hovered ? 'black' : 'white'} stroke-width={ $s } r={ $r } on:mouseover="{() => { hover(d) }}" on:focus="{() => { select(d) }}" on:mouseout="{() => { hover(null) }}" on:blur="{()=>{unselect()}}" />
+<circle role="none" cx='{ $xScale($x) }' cy='{ $yScale($y) }' fill={ $c } stroke={ d.id == hovered ? 'black' : 'white'} stroke-width={ $s } r={ $r } on:mouseover="{() => { hover(d) }}" on:focus="{() => { select(d) }}" on:mouseout="{() => { hover(null) }}" on:blur="{()=>{unselect()}}" />
 <text x='{ $xScale($x) + 7}' y='{ $yScale($y) + 3 }' fill='white' font-size='10px'>{d.name ?? d.id}</text>
 </g>
 {/if}
