@@ -41,7 +41,7 @@
 
 	function fixRadiusFromHeight(dr: number | undefined): number {
 		if (dr == undefined) return 0;
-		var nz = n.point[2];
+		var nz = n.location.z;
 		var dz = floor ? (floor?.bounds[1][2] - floor?.bounds[0][2]) / 2.0 : 2.5;
 		var heightDifference = dz - nz;
 		if (Math.abs(heightDifference) > dr) return dr;
@@ -75,20 +75,20 @@
 </defs>
 
 <path
-  d="M{$xScale(n.point[0])},{$yScale(n.point[1])} m -5,0 5,-5 5,5 -5,5 z"
+  d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
   fill={colors(n.id)}
   role="figure"
   on:mouseover={() => { hover(n); }} on:mouseout={() => { hover(null); }}
   on:focus={() => { select(n); }} on:blur={() => { unselect(); }}
 />
-<text x={$xScale(n.point[0]) + 7} y={$yScale(n.point[1]) + 3.5} fill="white" font-size="10px">{n.name}</text>
+<text x={$xScale(n.location.x) + 7} y={$yScale(n.location.y) + 3.5} fill="white" font-size="10px">{n.name}</text>
 {#if radarDist && $r > 0}
-	<ellipse cx={$xScale(n.point[0])} cy={$yScale(n.point[1])} fill="none" stroke={colors(n.id)} rx={Math.abs($xScale(0) - $xScale($r))} ry={Math.abs($yScale(0) - $yScale($r))} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
-	<ellipse cx={$xScale(n.point[0])} cy={$yScale(n.point[1])} fill={`url(#variance-gradient-${n.id})`} rx={2 * Math.abs($xScale(0) - $xScale($r + $v))} ry={2 * Math.abs($yScale(0) - $yScale($r + $v))} fill-opacity="0.5" />
+	<ellipse cx={$xScale(n.location.x)} cy={$yScale(n.location.y)} fill="none" stroke={colors(n.id)} rx={Math.abs($xScale(0) - $xScale($r))} ry={Math.abs($yScale(0) - $yScale($r))} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
+	<ellipse cx={$xScale(n.location.x)} cy={$yScale(n.location.y)} fill={`url(#variance-gradient-${n.id})`} rx={2 * Math.abs($xScale(0) - $xScale($r + $v))} ry={2 * Math.abs($yScale(0) - $yScale($r + $v))} fill-opacity="0.5" />
 	<g>
-		<line x1={$xScale(n.point[0] - hr)} y1={$yScale(n.point[1])} x2={$xScale(n.point[0] + hr)} y2={$yScale(n.point[1])} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
-		<line x1={$xScale(n.point[0])} y1={$yScale(n.point[1] - hr)} x2={$xScale(n.point[0])} y2={$yScale(n.point[1] + hr)} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
-		<text x={$xScale(n.point[0])} y={$yScale(n.point[1]) + 15} fill="white" font-size="10px">
+		<line x1={$xScale(n.location.x - hr)} y1={$yScale(n.location.y)} x2={$xScale(n.location.x + hr)} y2={$yScale(n.location.y)} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
+		<line x1={$xScale(n.location.x)} y1={$yScale(n.location.y - hr)} x2={$xScale(n.location.x)} y2={$yScale(n.location.y + hr)} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
+		<text x={$xScale(n.location.x)} y={$yScale(n.location.y) + 15} fill="white" font-size="10px">
 			{#if radarVar !== null && radarVar !== undefined}
 				{radarDist.toFixed(2) ?? 'N/A'} ± {Math.sqrt(radarVar).toFixed(2)}
 			{:else}

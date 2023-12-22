@@ -1,6 +1,6 @@
 import { readable, writable, derived } from 'svelte/store';
 import { base } from '$app/paths';
-import type { Device, Config } from './types';
+import type { Device, Config, Node } from './types';
 
 export const showAll: SvelteStore<boolean> = writable(false);
 export const config = writable<Config>();
@@ -16,7 +16,7 @@ export const relativeTimer = function () {
     }, 1);
   }
 
-  function set(basis : number) {
+  function set(basis: number) {
     startTime = Date.now() - basis;
     setStore(Date.now() - startTime);
   }

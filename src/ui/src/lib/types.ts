@@ -29,7 +29,7 @@ export interface Node {
   online: boolean;
   id: string;
   name: string;
-  point: number[];
+  location: { x: number, y: number, z: number };
   floors: string[];
   nodes: { [index: string]: { dist: number, var: number, lh: number } };
 }
@@ -52,7 +52,6 @@ export interface Config {
   timeout: number;
   awayTimeout: number;
   floors: Floor[];
-  nodes: Node[];
   devices: Device[];
 }
 
