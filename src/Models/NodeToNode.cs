@@ -1,9 +1,9 @@
 ﻿namespace ESPresense.Models;
 
-public class RxNode
+public class NodeToNode(Node tx, Node rx)
 {
-    public Node? Tx { get; set; }
-    public Node? Rx { get; set; }
+    public Node Tx { get; } = tx;
+    public Node Rx { get; } = rx;
 
     public double Distance { get; set; }
     public double Rssi { get; set; }
@@ -13,17 +13,14 @@ public class RxNode
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
 
-    public double Expected => Tx?.Location.DistanceTo(Rx!.Location) ?? -1;
-
     public double LastDistance { get; set; }
-
-    public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Tx?.Config?.Timeout ?? 30);
+    public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(30);
 
     public bool ReadMessage(DeviceMessage payload)
     {
-        Variance = payload.Variance;
         Rssi = payload.Rssi;
         RefRssi = payload.RefRssi;
+        Variance = payload.Variance;
         var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;
         if (moved) LastDistance = payload.Distance;
         Distance = payload.Distance;

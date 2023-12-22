@@ -1,9 +1,9 @@
 ﻿namespace ESPresense.Models;
 
-public class DeviceNode
+public class DeviceToNode(Device device, Node node)
 {
-    public Device? Device { get; set; }
-    public Node? Node { get; set; }
+    public Device Device { get; } = device;
+    public Node Node { get; } = node;
 
     public double Distance { get; set; }
     public double Rssi { get; set; }

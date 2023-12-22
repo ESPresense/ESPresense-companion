@@ -21,7 +21,7 @@ public class BfgsMultilateralizer : ILocate
     public bool Locate(Scenario scenario)
     {
         double Weight(int index, int total) => Math.Pow((float)total - index, 3) / Math.Pow(total, 3);
-        double Error(IList<double> x, DeviceNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - dn.Distance;
+        double Error(IList<double> x, DeviceToNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - dn.Distance;
 
         var confidence = scenario.Confidence;
 

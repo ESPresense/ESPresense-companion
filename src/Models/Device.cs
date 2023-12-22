@@ -26,8 +26,8 @@ public class Device
 
     [JsonIgnore] public Point3D ReportedLocation { get; set; }
 
-    [JsonConverter(typeof(NodeDistanceConverter))]
-    public ConcurrentDictionary<string, DeviceNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
+    [JsonConverter(typeof(DeviceToNodeConverter))]
+    public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
     [JsonConverter(typeof(RoomConverter))] public Room? Room => BestScenario?.Room;
 

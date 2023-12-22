@@ -6,26 +6,23 @@ using ESPresense.Models;
 
 namespace ESPresense.Converters;
 
-public class NodeDistanceConverter : JsonConverter<ConcurrentDictionary<string, DeviceNode>>
+public class NodeToNodeConverter : JsonConverter<ConcurrentDictionary<string, NodeToNode>>
 {
     private static readonly JsonConverter<IDictionary<string, object>> DefaultDictConverter =
         (JsonConverter<IDictionary<string, object>>)JsonSerializerOptions.Default.GetConverter(typeof(IDictionary<string, object>));
 
-    public override ConcurrentDictionary<string, DeviceNode>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override ConcurrentDictionary<string, NodeToNode> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        // Your existing read implementation or throw if not needed.
         throw new NotImplementedException();
     }
 
-    public override void Write(Utf8JsonWriter writer, ConcurrentDictionary<string, DeviceNode> distances, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, ConcurrentDictionary<string, NodeToNode> distances, JsonSerializerOptions options)
     {
-        // Creating a dictionary with both dist and var
         var d = distances.Where(a => a.Value.Current).ToDictionary(
             a => a.Key,
             a => new { dist = a.Value.Distance, var = a.Value.Variance, lh = a.Value.LastHit.RelativeMilliseconds() } as object
         );
 
-        // Using the dictionary converter to write this new structure
         DefaultDictConverter.Write(writer, d, options);
     }
 }

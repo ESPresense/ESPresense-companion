@@ -11,7 +11,7 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
 {
     public bool Locate(Scenario scenario)
     {
-        double Error(IList<double> x, DeviceNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) * x[3] - dn.Distance;
+        double Error(IList<double> x, DeviceToNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) * x[3] - dn.Distance;
 
         var confidence = scenario.Confidence;
 

@@ -22,7 +22,7 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
     {
         var dh = await databaseFactory.GetDeviceHistory();
 
-        mqtt.MqttMessageMalformed += (s,e) =>
+        mqtt.MqttMessageMalformed += (s, e) =>
         {
             _telemetry.Malformed++;
         };
@@ -40,13 +40,15 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
 
             if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
             {
+                rx.Nodes.GetOrAdd(tx.Id ?? "", f => new NodeToNode(tx, rx)).ReadMessage(arg.Payload);
                 if (tx is { HasLocation: true, Stationary: true })
                 {
                     if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
-                        tx.RxNodes.GetOrAdd(arg.NodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
+                        tx.RxNodes.GetOrAdd(arg.NodeId, f => new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
                 }
                 else isNode = false; // if transmitter is not stationary, treat it as a device
-            } else isNode = false; // if transmitter is not configured, treat it as a device
+            }
+            else isNode = false; // if transmitter is not configured, treat it as a device
 
             if (!isNode)
             {
@@ -60,7 +62,7 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
                         return d;
                     });
                     _telemetry.Devices = state.Devices.Count;
-                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.Payload);
+                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
                     if (dirty) _telemetry.Moved++;
 
                     if (device.Check)

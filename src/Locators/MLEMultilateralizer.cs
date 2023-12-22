@@ -11,7 +11,7 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : ILoc
 {
     public bool Locate(Scenario scenario)
     {
-        double Error(IList<double> x, DeviceNode dn)
+        double Error(IList<double> x, DeviceToNode dn)
         {
             double expectedDistance = Math.Sqrt(Math.Pow(dn.Node!.Location.X - x[0], 2) +
                                                 Math.Pow(dn.Node!.Location.Y - x[1], 2) +
