@@ -55,6 +55,15 @@ export interface Config {
   devices: Device[];
 }
 
+export type NodeSetting = {
+  id: string | null;
+  name: string | null;
+  absorption: number | null;
+  rx_adj_rssi: number | null;
+  tx_ref_rssi: number | null;
+  max_distance: number | null;
+};
+
 export type DeviceSetting = {
   originalId: string;
   id: string | null;

@@ -57,4 +57,17 @@ public class Node(string id)
     {
         return $"{nameof(Id)}: {Id}";
     }
+
+    public IEnumerable<KeyValuePair<string, string>> GetDetails()
+    {
+        yield return new("Id", Id);
+        yield return new("Name", Name ?? "");
+        yield return new("X", X?.ToString() ?? "");
+        yield return new("Y", Y?.ToString() ?? "");
+        yield return new("Z", Z?.ToString() ?? "");
+        yield return new("Stationary", Stationary.ToString());
+        yield return new("Floors", Floors?.Length.ToString() ?? "");
+        yield return new("Nodes", Nodes.Count.ToString());
+        yield return new("RxNodes", RxNodes.Count.ToString());
+    }
 }

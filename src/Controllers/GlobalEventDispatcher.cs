@@ -4,9 +4,9 @@ namespace ESPresense.Controllers;
 
 public class GlobalEventDispatcher
 {
-    public event EventHandler<NodeStateEventArgs> NodeStateChanged;
-    public event EventHandler<DeviceEventArgs> DeviceStateChanged;
-    public event EventHandler<CalibrationEventArgs> CalibrationChanged;
+    public event EventHandler<NodeStateEventArgs>? NodeStateChanged;
+    public event EventHandler<DeviceEventArgs>? DeviceStateChanged;
+    public event EventHandler<CalibrationEventArgs>? CalibrationChanged;
 
     public void OnNodeStateChanged(NodeState state)
     {

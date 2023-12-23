@@ -1,22 +1,21 @@
 <script lang="ts">
-	import { config, devices, history } from './stores';
-	import { goto, afterNavigate } from '$app/navigation';
+	import { config, nodes } from './stores';
+  import { goto, afterNavigate } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
 
 	export let floorId: string | null = null;
-	export let deviceId: string | null = null;
-	export let tab = 'map';
+	export let nodeId: string | null = null;
 
-	$: device = $devices.find((d) => d.id === deviceId);
-	$: floor = $config?.floors.find((f) => f.id === floorId);
-	let previousPage: string = base;
+	$: node = $nodes.find((d) => d.id === nodeId);
+	$: if (floorId == null) floorId = $config?.floors[0].id;
+	let previousPage: string | undefined = undefined;
 
 	afterNavigate(({ from }) => {
-		previousPage = from?.url?.pathname || previousPage;
+		previousPage = from?.url?.pathname;
 	});
 
-	function goBack(defaultRoute = base) {
+	function goBack(defaultRoute = (base + '/')) {
 		goto(previousPage || defaultRoute);
 	}
 </script>
@@ -31,14 +30,18 @@
 				<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
 			</svg>
 		</button>
-		{#if device}
+		{#if node}
 			<div class="pl-4 px-4 py-1">
-				<h4 class="h4">{device?.name || device?.id} on {floor?.name ?? "Unknown"}</h4>
+				<h4 class="h4">Node: {node?.name || node?.id}</h4>
 			</div>
 		{/if}
 		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
-			<RadioItem bind:group={tab} name="Map" value="map">Map</RadioItem>
-			<RadioItem bind:group={tab} name="Settings" value="settings">Settings</RadioItem>
+			{#if $config?.floors}
+				{#each $config?.floors as { id, name }}
+					<RadioItem bind:group={floorId} {name} value={id}>{@html name}</RadioItem>
+				{/each}
+			{/if}
+			<RadioItem bind:group={floorId} name="Settings" value="settings">Settings</RadioItem>
 		</RadioGroup>
 	</nav>
 	<svg viewBox="0 0 2 3" aria-hidden="true">

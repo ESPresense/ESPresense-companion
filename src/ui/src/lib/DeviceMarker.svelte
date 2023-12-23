@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { getContext, createEventDispatcher } from 'svelte';
 	import { spring, tweened } from 'svelte/motion';
-	import { cubicOut, circOut } from 'svelte/easing';
+	import { cubicOut } from 'svelte/easing';
   import { interpolateLab } from 'd3-interpolate';
 	import { fade } from 'svelte/transition';
 
 	import type { ScaleOrdinal } from 'd3';
-	import type { Device } from '$lib/types';
+	import type { Device, LayerCakeContext } from '$lib/types';
 
 	let colors: ScaleOrdinal<string, string> = getContext('colors');
 
-	const { xScale, yScale } = getContext('LayerCake');
+	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
 	export let d: Device;
   export let visible: boolean;
 
@@ -22,24 +22,22 @@
 
 	$: x.set(d?.location?.x);
 	$: y.set(d?.location?.y);
-  $: c.set(visible && d.confidence > 1 && d.location && d?.room?.id ? colors(d?.room?.id) : "#000");
+	$: c.set(visible && d?.room?.id ? colors(d?.room?.id) : '#000');
 
 	let hovered = '';
-	let selected = '';
 
 	let dispatcher = createEventDispatcher();
 
 	function hover(d: Device | null) {
 		r.set(d == null ? 5 : 10);
 		s.set(d == null ? 1 : 2);
-		hovered = d?.id ?? '';
+    hovered = d?.id ?? '';
 		dispatcher('hovered', d);
 	}
 
 	function unselect() {}
 
 	function select(d: Device) {
-		selected = d?.id ?? '';
 		dispatcher('selected', d);
 	}
 </script>

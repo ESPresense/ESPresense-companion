@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { writable } from 'svelte/store';
 	import { LayerCake, Svg, Html, Canvas } from 'layercake';
 	import { config, devices } from '$lib/stores';
 	import { scaleOrdinal, schemeCategory10 } from 'd3';
 	import { select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
 	import { setContext } from 'svelte';
-  import type { Device, Node } from '$lib/types';
+	import type { Device, Node } from '$lib/types';
 
 	import Rooms from './Rooms.svelte';
 	import Devices from './Devices.svelte';
@@ -16,11 +15,11 @@
 
 	let svg: Element;
 	let transform = zoomIdentity;
-	const radarDevice = writable<Device | undefined>();
-  const radarNode = writable<Node | undefined>();
 
 	export let floorId: string | null = null;
 	export let deviceId: string | null = null;
+	export let nodeId: string | null = null;
+	export let exclusive: boolean = false;
 
 	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
@@ -31,9 +30,21 @@
 			transform = e.transform;
 		});
 
+	function hoveredDevice(e: CustomEvent<Device>) {
+		if (exclusive) return;
+		deviceId = e.detail?.id;
+	}
+
+	function hoveredNode(e: CustomEvent<Node>) {
+		if (exclusive) return;
+		nodeId = e.detail?.id;
+	}
+
 	setContext('colors', scaleOrdinal(schemeCategory10));
 
-	$: { if (svg) select(svg).call(handler); }
+	$: {
+		if (svg) select(svg).call(handler);
+	}
 </script>
 
 {#if bounds}
@@ -42,8 +53,8 @@
 			<AxisX {transform} />
 			<AxisY {transform} />
 			<Rooms {transform} {floorId} />
-			<Nodes {transform} {floorId} radarDevice={$radarDevice} radarNode={$radarNode} on:selected on:hovered={(d) => ($radarNode = d.detail)} />
-			<Devices {transform} {floorId} {deviceId} on:selected on:hovered={(d) => ($radarDevice = d.detail)} />
+			<Nodes {transform} {floorId} {deviceId} {nodeId} on:selected on:hovered={hoveredNode} />
+			<Devices {transform} {floorId} {deviceId} {exclusive} on:selected on:hovered={hoveredDevice} />
 		</Svg>
 	</LayerCake>
 {:else}
