@@ -62,7 +62,7 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
                         return d;
                     });
                     _telemetry.Devices = state.Devices.Count;
-                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
+                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
                     if (dirty) _telemetry.Moved++;
 
                     if (device.Check)

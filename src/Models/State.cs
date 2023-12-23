@@ -22,7 +22,7 @@ public class State
         void LoadConfig(Config c)
         {
             Config = c;
-            foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId(), a => new Floor()).Update(c, cf);
+            foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
             foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId())).Update(c, cn, GetFloorsByIds(cn.Floors));
 
             var idsToTrack = new List<Glob>();
