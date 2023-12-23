@@ -12,7 +12,7 @@
 	<svg viewBox="0 0 2 3" aria-hidden="true">
 		<path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
 	</svg>
-	<nav class="h-50">
+	<nav class="h-50 text-black">
 		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
 			{#if $config?.floors}
 				{#each $config?.floors as { id, name }}

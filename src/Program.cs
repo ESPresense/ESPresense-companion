@@ -8,6 +8,7 @@ using Serilog.Events;
 using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
+using ESPresense.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,7 @@ builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();
 
 builder.Services.AddSingleton<MappingService>();
+builder.Services.AddSingleton<GlobalEventDispatcher>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
@@ -75,7 +77,7 @@ app.UseWebSockets(new WebSocketOptions
 app.UseSerilogRequestLogging(o =>
 {
     o.EnrichDiagnosticContext = (dc, ctx) => dc.Set("UserAgent", ctx?.Request.Headers["User-Agent"]);
-    o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Debug;
+    o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Information;
 });
 
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");

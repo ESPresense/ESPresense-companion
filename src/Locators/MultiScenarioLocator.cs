@@ -1,4 +1,5 @@
 ﻿using ConcurrentCollections;
+using ESPresense.Controllers;
 using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
@@ -9,7 +10,7 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory) : BackgroundService
+public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFactory databaseFactory, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
 {
     private const int ConfidenceThreshold = 2;
 
@@ -21,7 +22,7 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
     {
         var dh = await databaseFactory.GetDeviceHistory();
 
-        mqtt.MqttMessageMalformed += (s,e) =>
+        mqtt.MqttMessageMalformed += (s, e) =>
         {
             _telemetry.Malformed++;
         };
@@ -39,13 +40,15 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
 
             if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
             {
+                rx.Nodes.GetOrAdd(tx.Id ?? "", f => new NodeToNode(tx, rx)).ReadMessage(arg.Payload);
                 if (tx is { HasLocation: true, Stationary: true })
                 {
                     if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
-                        tx.RxNodes.GetOrAdd(arg.NodeId, new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
+                        tx.RxNodes.GetOrAdd(arg.NodeId, f => new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
                 }
                 else isNode = false; // if transmitter is not stationary, treat it as a device
-            } else isNode = false; // if transmitter is not configured, treat it as a device
+            }
+            else isNode = false; // if transmitter is not configured, treat it as a device
 
             if (!isNode)
             {
@@ -54,12 +57,12 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
                     _telemetry.Messages++;
                     var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
                     {
-                        var d = new Device(id) { Check = true };
+                        var d = new Device(id, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
                         foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                         return d;
                     });
                     _telemetry.Devices = state.Devices.Count;
-                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, new DeviceNode { Device = device, Node = rx }).ReadMessage(arg.Payload);
+                    var dirty = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
                     if (dirty) _telemetry.Moved++;
 
                     if (device.Check)
@@ -115,9 +118,8 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
             _dirty = new ConcurrentHashSet<Device>();
 
             var now = DateTime.UtcNow;
-            var idleTimeout = TimeSpan.FromSeconds(state.Config?.Timeout ?? 30);
 
-            foreach (var idle in state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > idleTimeout)) todo.Add(idle);
+            foreach (var idle in state.Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > a.Timeout)) todo.Add(idle);
 
             var gps = state.Config?.Gps;
 
@@ -173,6 +175,8 @@ public class MultiScenarioLocator(State state, MqttCoordinator mqtt, DatabaseFac
                                 best_scenario = bs?.Name
                             }, SerializerSettings.NullIgnore)
                         );
+
+                    globalEventDispatcher.OnDeviceChanged(device);
 
                     foreach (var ds in device.Scenarios)
                     {

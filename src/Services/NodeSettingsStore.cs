@@ -11,7 +11,7 @@ namespace ESPresense.Services
 
         public NodeSettings Get(string id)
         {
-            return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new NodeSettings();
+            return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new NodeSettings(id);
         }
 
         public async Task Set(string id, NodeSettings ds)

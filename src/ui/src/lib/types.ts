@@ -1,3 +1,10 @@
+import type { ScaleOrdinal, ScaleLinear } from "d3";
+
+export interface LayerCakeContext {
+  xScale: SvelteStore<ScaleLinear<number, number, never>>;
+  yScale: SvelteStore<ScaleLinear<number, number, never>>;
+  colors: ScaleOrdinal<string, string>
+}
 
 export interface Room {
   id: string;
@@ -22,20 +29,22 @@ export interface Node {
   online: boolean;
   id: string;
   name: string;
-  point: number[];
+  location: { x: number, y: number, z: number };
   floors: string[];
+  nodes: { [index: string]: { dist: number, var: number, lh: number } };
 }
 
 export interface Device {
   id: string;
   name: string;
-  nodes: { [index: string]: { dist: number, var: number } };
+  nodes: { [index: string]: { dist: number, var: number, lh: number } };
   room: { id: string, name: string };
   floor: { id: string, name: string };
   location: { x: number, y: number, z: number };
   confidence: number;
   scale: number;
   fixes: number;
+  timeout: number;
   lastHit: Date;
 }
 
@@ -43,9 +52,17 @@ export interface Config {
   timeout: number;
   awayTimeout: number;
   floors: Floor[];
-  nodes: Node[];
   devices: Device[];
 }
+
+export type NodeSetting = {
+  id: string | null;
+  name: string | null;
+  absorption: number | null;
+  rx_adj_rssi: number | null;
+  tx_ref_rssi: number | null;
+  max_distance: number | null;
+};
 
 export type DeviceSetting = {
   originalId: string;
@@ -103,4 +120,8 @@ export interface Release {
   prerelease: boolean;
   tag_name: string;
   name: string;
+}
+
+export function isNode(d: Device | Node | null): d is Node {
+  return (d as Node)?.telemetry !== undefined;
 }

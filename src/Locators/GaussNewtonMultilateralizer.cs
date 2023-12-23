@@ -98,7 +98,7 @@ public class GaussNewtonMultilateralizer : ILocate
         return true;
     }
 
-    private Tuple<Vector3[], float[]> SelectNonColinearTransmitters(DeviceNode[] dns, int numberOfTransmitters = 4)
+    private Tuple<Vector3[], float[]> SelectNonColinearTransmitters(DeviceToNode[] dns, int numberOfTransmitters = 4)
     {
         var orderedTransmitters = dns.OrderBy(a => a.Distance).ToArray();
 

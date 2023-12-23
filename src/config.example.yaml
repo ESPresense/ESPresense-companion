@@ -38,7 +38,7 @@ floors:
   - id: first
     name: First Floor
     # Bounds (x,y,z) of map in meters
-    bounds: [[0, 0, 0], [17, 19.2, 1.5]]
+    bounds: [[0, 0, 0], [17, 18, 1.5]]
     rooms:
       - name: Powder
         points:
@@ -50,8 +50,8 @@ floors:
           - [6, 12]
       - name: Office
         points:
-          - [6, 16.5]
-          - [9.6, 16.5]
+          - [6, 16.2]
+          - [9.6, 16.2]
           - [9.6, 13.5]
           - [8.6, 12]
           - [6, 12]
@@ -77,13 +77,13 @@ floors:
           - [6, 2]
       - name: Garage
         points:
-          - [0, 18]
-          - [1.5, 18]
-          - [1.5, 18.5]
-          - [6, 18.5]
-          - [6, 9]
-          - [0, 9]
-          - [0, 18]
+          - [0, 17]
+          - [1.5, 17]
+          - [1.5, 17.5]
+          - [6, 17.5]
+          - [6, 7.5]
+          - [0, 7.5]
+          - [0, 17]
       - name: Living
         points:
           - [16.5, 13.25]
@@ -109,43 +109,43 @@ floors:
           - [8.6, 12]
       - name: Laundry
         points:
-          - [0, 9]
-          - [3, 9]
-          - [3, 5.5]
+          - [0, 7.5]
+          - [3.6, 7.5]
+          - [3.6, 5.5]
           - [0, 5.5]
-          - [0, 9]
+          - [0, 7.5]
   - id: second
     name: Second Floor
-    bounds: [[0, 0, 3.1], [17, 19.2, 4.6]]
+    bounds: [[0, 0, 3.1], [17, 18, 4.6]]
     rooms:
       - name: Master
         points:
-          - [2, 15]
-          - [4, 15]
-          - [4, 16.5]
-          - [9.6, 16.5]
-          - [9.6, 13.5]
-          - [8.6, 12]
-          - [8.6, 10]
-          - [8, 9]
-          - [2, 9]
-          - [2, 15]
+          - [3.2, 13.5]
+          - [6, 13.5]
+          - [6, 15.0]
+          - [9.6, 15.0]
+          - [9.6, 12.0]
+          - [8.6, 10.5]
+          - [8.6, 8.5]
+          - [8, 7.5]
+          - [3.2, 7.5]
+          - [3.2, 13.5]
       - name: Master Bathroom
         points:
-          - [0, 15]
-          - [2, 15]
-          - [2, 9]
-          - [0, 9]
-          - [0, 15]
+          - [0, 13.5]
+          - [3.2, 13.5]
+          - [3.2, 7.5]
+          - [0, 7.5]
+          - [0, 13.5]
       - name: Master Closet
         points:
-          - [0, 18]
-          - [1.5, 18]
-          - [1.5, 18.5]
-          - [4, 18.5]
-          - [4, 15]
-          - [0, 15]
-          - [0, 18]
+          - [0, 16.5]
+          - [1.5, 16.5]
+          - [1.5, 17.0]
+          - [6, 17.0]
+          - [6, 13.5]
+          - [0, 13.5]
+          - [0, 16.5]
   - id: outside
     name: Outside
     bounds: [[-10, -10, -10], [28, 30, 20]]
@@ -162,25 +162,25 @@ nodes:
     point: [12, 10, 3.2]
     floors: ["second"]
   - name: Garage
-    point: [0.75, 17.9, 0.5]
+    point: [0.75, 16.8, 0.5]
     floors: ["first", "second", "outside"]
   - name: Office
-    point: [7, 15.25, 1.5]
+    point: [6.75, 15, 1.5]
     floors: ["first"]
   - name: Family
-    point: [0.5, 0.5, 0.25]
+    point: [0.25, 0.4, 0.3]
     floors: ["first", "outside"]
   - name: Kitchen
     point: [9, 9, 0.85]
     floors: ["first"]
   - name: Dining
-    point: [16.25, 3.1, 1.29]
+    point: [16.25, 3, 1.29]
     floors: ["first", "outside"]
   - name: Basement
     point: [16, 13, -1]
     floors: ["first", "second", "outside"]
   - name: Laundry
-    point: [4.2, 9, 1]
+    point: [4.6, 7.5, 1]
     floors: ["first"]
   - name: Mini
     stationary: false
@@ -196,8 +196,5 @@ devices:
   - id: "phone:*"
   - id: "wallet:*"
   - id: "keys:*"
+  - id: "therm:*"
   - id: "iBeacon:*"
-  - id: watch:darrell
-    name: Darrell's Watch
-  - id: phone:darrell
-    name: Darrell's iPhone

@@ -13,10 +13,10 @@ namespace ESPresense.Models
         public double[][]? Bounds { get; set; }
 
         [YamlMember(Alias = "timeout")]
-        public long Timeout { get; set; } = 30;
+        public int Timeout { get; set; } = 30;
 
         [YamlMember(Alias = "away_timeout")]
-        public long AwayTimeout { get; set; } = 120;
+        public int AwayTimeout { get; set; } = 120;
 
         [YamlMember(Alias = "gps")]
         public ConfigGps Gps { get; set; } = new();

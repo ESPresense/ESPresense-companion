@@ -1,24 +1,24 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
-	import { config } from '$lib/stores';
-	import type { Node, Floor } from '$lib/types';
+	import { config, nodes } from '$lib/stores';
+	import type { Floor } from '$lib/types';
 
 	import NodeMarker from './NodeMarker.svelte';
 
 	export let transform = zoomIdentity;
 	export let floorId: string | null = null;
-	export let radarId: string | null = null;
+	export let deviceId: string | null = null;
+  export let nodeId: string | null = null;
 
-	let nodes: Node[] | undefined;
-  let floor: Floor | undefined;
-	$: nodes = floorId ? $config?.nodes?.filter((n) => n?.floors.includes(floorId)) : [];
-  $: floor = $config?.floors?.find((f) => f.id == floorId);
+	let floor: Floor | undefined;
+	$: selectedNodes = $nodes?.filter((n) => !floorId || n?.floors.includes(floorId));
+	$: floor = $config?.floors?.find((f) => f.id == floorId);
 </script>
 
 <g transform={transform.toString()}>
 	{#if nodes}
-		{#each nodes as n (n.id)}
-			<NodeMarker {n} {radarId} {floor} />
+		{#each selectedNodes as n (n.id)}
+			<NodeMarker {n} {deviceId} {nodeId} {floor} on:hovered on:selected />
 		{/each}
 	{/if}
 </g>

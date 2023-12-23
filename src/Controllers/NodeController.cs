@@ -6,30 +6,35 @@ namespace ESPresense.Controllers;
 
 [Route("api/node")]
 [ApiController]
-public class NodeController : ControllerBase
+public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : ControllerBase
 {
-    private readonly NodeSettingsStore _nodeSettingsStore;
-
-    public NodeController(ILogger<DeviceController> logger, NodeSettingsStore nodeSettingsStore, State state, NodeTelemetryStore nts)
+    [HttpGet("{id}")]
+    public NodeSettingsDetails Get(string id)
     {
-        _nodeSettingsStore = nodeSettingsStore;
+        var nodeSettings = nodeSettingsStore.Get(id);
+        var details = new List<KeyValuePair<string, string>>();
+        if (nodeSettings?.Id != null && state.Nodes.TryGetValue(id, out var node))
+            details.AddRange(node.GetDetails());
+        return new NodeSettingsDetails(nodeSettings ?? new NodeSettings(id), details);
     }
 
     [HttpPut("{id}")]
     public Task Set(string id, [FromBody] NodeSettings ds)
     {
-        return _nodeSettingsStore.Set(id, ds);
+        return nodeSettingsStore.Set(id, ds);
     }
 
     [HttpPost("{id}/update")]
     public async Task Update(string id)
     {
-        await _nodeSettingsStore.Update(id);
+        await nodeSettingsStore.Update(id);
     }
 
     [HttpPost("{id}/restart")]
     public async Task Restart(string id)
     {
-        await _nodeSettingsStore.Restart(id);
+        await nodeSettingsStore.Restart(id);
     }
+
+    public readonly record struct NodeSettingsDetails(NodeSettings? settings, IList<KeyValuePair<string, string>> details);
 }

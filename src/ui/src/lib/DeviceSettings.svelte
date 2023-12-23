@@ -7,12 +7,11 @@
 	import type { DeviceSetting } from './types';
 
 	export let settings: DeviceSetting | null = null;
-	export let details: any;
 	const toastStore = getToastStore();
 
 	function save() {
 		if (settings) {
-			const rssiRef = parseInt(settings['rssi@1m'] ?? "");
+			const rssiRef = parseInt(settings['rssi@1m'] + "");
 			settings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
 			fetch(`${base}/api/device/${settings.originalId}`, {

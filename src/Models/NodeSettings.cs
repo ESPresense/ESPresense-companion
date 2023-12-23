@@ -4,8 +4,13 @@ using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
-public class NodeSettings
+public class NodeSettings(string id)
 {
+    [JsonPropertyName("id")]
+    [JsonProperty("id")]
+    [StringLength(64)]
+    public string? Id { get; set; } = id;
+
     [JsonPropertyName("absorption")]
     [JsonProperty("absorption")]
     [Range(1, 10)]

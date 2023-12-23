@@ -1,8 +1,7 @@
 <script lang="ts">
+	import { calibration } from '$lib/stores';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-	import { base } from '$app/paths';
 	import { popup } from '@skeletonlabs/skeleton';
-	import type { PopupSettings } from '@skeletonlabs/skeleton';
 
 	function coloring(percent: number) {
 		if (percent == null) {
@@ -37,25 +36,10 @@
 		}
 	}
 
-	async function calibration() {
-		const response = await fetch(`${base}/api/state/calibration`);
-		return await response.json();
-	}
-
-	let cal = {};
-	calibration().then((data) => {
-		cal = data;
-	});
-	const interval = setInterval(() => {
-		calibration().then((data) => {
-			cal = data;
-		});
-	}, 1000);
-
 	let rxColumns: Array<string> = [];
 	$: {
-		let rx = new Set(Object.keys(cal?.matrix ?? {}));
-		Object.entries(cal?.matrix ?? {})
+		let rx = new Set(Object.keys($calibration?.matrix ?? {}));
+		Object.entries($calibration?.matrix ?? {})
 			.flatMap(([key, value]) => Object.keys(value))
 			.forEach((key) => rx.add(key));
 		rxColumns = new Array(...rx);
@@ -71,8 +55,8 @@
 <div class="text-column">
 	<h1 class="h1">Calibration</h1>
 
-	{#if cal?.matrix}
-		{#each Object.entries(cal?.matrix) as [id1, n1] (id1)}
+	{#if $calibration?.matrix}
+		{#each Object.entries($calibration?.matrix) as [id1, n1] (id1)}
 			{#each rxColumns as id2 (id2)}
 				<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
 					{#if n1[id2]}
@@ -87,7 +71,7 @@
 	{/if}
 
 	<div class="card m-4">
-		{#if cal?.matrix}
+		{#if $calibration?.matrix}
 			<header>
 				<div class="flex justify-center p-4">
 					<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
@@ -111,7 +95,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each Object.entries(cal.matrix) as [id1, n1] (id1)}
+						{#each Object.entries($calibration.matrix) as [id1, n1] (id1)}
 							<tr>
 								<td>Tx: {@html id1}</td>
 								{#each rxColumns as id2 (id2)}

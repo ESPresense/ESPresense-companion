@@ -153,7 +153,7 @@ public class IterativeCentroidMultilateralizer(Device device, Floor floor) : ILo
         public double Distance { get; set; } = distance;
         public bool IsVirtual { get; set; } = isVirtual;
 
-        public CalculationNode(DeviceNode deviceNode) : this(deviceNode.Node?.Location ?? Point3D.NaN, deviceNode.Distance, false)
+        public CalculationNode(DeviceToNode deviceToNode) : this(deviceToNode.Node?.Location ?? Point3D.NaN, deviceToNode.Distance, false)
         {
         }
     }

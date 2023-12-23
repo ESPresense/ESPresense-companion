@@ -1,22 +1,22 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { devices } from '$lib/stores';
+	import { nodes } from '$lib/stores';
 	import { readable } from 'svelte/store';
-	import type { DeviceSetting } from '$lib/types';
+	import type { NodeSetting } from '$lib/types';
 	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
 
 	import Map from '$lib/Map.svelte';
-	import DeviceDetailTabs from '$lib/DeviceDetailTabs.svelte';
-	import DeviceSettings from '$lib/DeviceSettings.svelte';
+	import NodeDetailTabs from '$lib/NodeDetailTabs.svelte';
+	import NodeSettings from '$lib/NodeSettings.svelte';
 
-	export let tab = 'map';
-	export let data: { settings?: DeviceSetting } = {};
-	$: device = $devices.find((d) => d.id === data.settings?.id);
+	export let floorId: string | null = null;
+	export let data: { settings?: NodeSetting } = {};
+	$: node = $nodes.find((d) => d.id === data.settings?.id);
 
-	export const deviceDetails = readable([], (set) => {
+	export const nodeDetails = readable([], (set) => {
 		async function fetchAndSet() {
 			try {
-				const response = await fetch(`${base}/api/device/${data.settings?.id}`);
+				const response = await fetch(`${base}/api/node/${node?.id}`);
 				const result = await response.json();
 				set(result.details);
 			} catch (ex) {
@@ -39,15 +39,15 @@
 	<title>ESPresense Companion: Map</title>
 </svelte:head>
 
-<DeviceDetailTabs deviceId={data.settings?.id} floorId={device?.floor?.id} bind:tab />
+<NodeDetailTabs nodeId={data.settings?.id} bind:floorId />
 
 <div class="flex h-full">
 	<div class="flex-grow h-full overflow-clip">
-		{#if tab === 'map'}
-			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
+		{#if floorId !== 'settings'}
+			<Map deviceId="none" nodeId={data.settings?.id} bind:floorId exclusive={true} />
 		{/if}
-		{#if tab === 'settings'}
-			<DeviceSettings settings={data.settings} />
+		{#if floorId === 'settings'}
+			<NodeSettings settings={data.settings} />
 		{/if}
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
@@ -57,8 +57,8 @@
 					<h3 class="h3">Details</h3>
 				</svelte:fragment>
 				<svelte:fragment slot="content">
-					{#if $deviceDetails}
-						{#each $deviceDetails as d}
+					{#if $nodeDetails}
+						{#each $nodeDetails as d}
 							<label>
 								<span>{d.key}</span>
 								<input class="input" type="text" disabled bind:value={d.value} />

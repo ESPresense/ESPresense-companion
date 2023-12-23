@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 using ESPresense.Converters;
 using MathNet.Numerics.Optimization;
@@ -8,9 +9,10 @@ namespace ESPresense.Models;
 
 public class Device
 {
-    public Device(string id)
+    public Device(string id, TimeSpan timeout)
     {
         Id = id;
+        Timeout = timeout;
         HassAutoDiscovery.Add(new AutoDiscovery(this, "device_tracker"));
     }
 
@@ -24,8 +26,8 @@ public class Device
 
     [JsonIgnore] public Point3D ReportedLocation { get; set; }
 
-    [JsonConverter(typeof(NodeDistanceConverter))]
-    public ConcurrentDictionary<string, DeviceNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
+    [JsonConverter(typeof(DeviceToNodeConverter))]
+    public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
     [JsonConverter(typeof(RoomConverter))] public Room? Room => BestScenario?.Room;
 
@@ -52,6 +54,8 @@ public class Device
 
     [JsonIgnore] public IList<AutoDiscovery> HassAutoDiscovery { get; set; } = new List<AutoDiscovery>();
     [JsonIgnore] public string? ReportedState { get; set; }
+    [JsonConverter(typeof(TimeSpanMillisConverter))]
+    public TimeSpan Timeout { get; set; }
 
     public IEnumerable<KeyValuePair<string, string>> GetDetails()
     {
