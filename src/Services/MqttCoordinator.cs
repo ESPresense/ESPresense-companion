@@ -44,8 +44,8 @@ public class MqttCoordinator
 
                     c.Mqtt.Host = string.IsNullOrEmpty(data.Host) ? "localhost" : data.Host;
                     c.Mqtt.Port = int.TryParse(data.Port, out var i) ? i : null;
-                    c.Mqtt.Username = data.Username;
-                    c.Mqtt.Password = data.Password;
+                    if (!string.IsNullOrEmpty(data.Username)) c.Mqtt.Username = data.Username;
+                    if (!string.IsNullOrEmpty(data.Password)) c.Mqtt.Password = data.Password;
                     c.Mqtt.Ssl = data.Ssl;
                 }
                 catch (FlurlHttpException ex)
