@@ -19,6 +19,8 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog((context, cfg) => cfg.ReadFrom.Configuration(context.Configuration));
 
+Log.Logger.Information(MathNet.Numerics.Control.Describe().Trim('\r','\n'));
+
 var configDir = Environment.GetEnvironmentVariable("CONFIG_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".espresense");
 var storageDir = Path.Combine(configDir, ".storage");
 Directory.CreateDirectory(storageDir);
@@ -95,7 +97,5 @@ app.MapControllerRoute(
     pattern: "{controller}/{action=Index}/{id?}");
 
 app.MapFallbackToFile("index.html");
-
-Log.Logger.Information(MathNet.Numerics.Control.Describe().Trim('\r','\n'));
 
 app.Run();

@@ -81,9 +81,11 @@ public class MqttCoordinator
         mc.Options.ConnectionCheckInterval = TimeSpan.FromSeconds(30);
         _mc = mc;
 
+        Log.Logger.Information("Attempting to connect to mqtt server at " + (c.Mqtt.Port != null ? "{@host}:{@port}" : "{@host}") + " as {@username}...", c.Mqtt.Host ?? "localhost", c.Mqtt.Port, c.Mqtt.Username ?? "<anonymous>");
+
         mc.ConnectedAsync += async s =>
         {
-            Log.Information("MQTT {@p} connected", new { primary = true });
+            Log.Information("MQTT connected!");
             await mc.EnqueueAsync("espresense/companion/status", "online");
 
             await mc.SubscribeAsync("espresense/devices/+/+");
@@ -93,13 +95,13 @@ public class MqttCoordinator
 
         mc.DisconnectedAsync += s =>
         {
-            Log.Information("MQTT {@p} disconnected", new { primary = true });
+            Log.Information("MQTT disconnected");
             return Task.CompletedTask;
         };
 
         mc.ConnectingFailedAsync += s =>
         {
-            Log.Error("MQTT {@p} connection failed {@error}: {@inner}", new { primary = true }, s.Exception.Message, s.Exception?.InnerException?.Message);
+            Log.Error("MQTT connection failed {@error}: {@inner}", new { primary = true }, s.Exception.Message, s.Exception?.InnerException?.Message);
             return Task.CompletedTask;
         };
 
