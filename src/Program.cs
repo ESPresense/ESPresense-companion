@@ -9,6 +9,7 @@ using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
 using ESPresense.Controllers;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,9 @@ var configLoader = new ConfigLoader(configDir);
 
 builder.Services.AddSingleton(a => configLoader);
 builder.Services.AddHostedService(a => configLoader);
+
+builder.Services.AddDataProtection()
+    .UseEphemeralDataProtectionProvider();
 
 builder.Services.AddSingleton(a =>
 {
