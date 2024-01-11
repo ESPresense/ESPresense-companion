@@ -1,4 +1,4 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
 using System.Net.WebSockets;
 using System.Text;
 using ESPresense.Network;
@@ -54,6 +54,7 @@ public class FirmwareController : Controller
         }
         catch (Exception e)
         {
+            _logger.LogError(e, "Error updating firmware");
             await Log(e.Message, -1);
         }
         finally
@@ -84,7 +85,14 @@ public class FirmwareController : Controller
         await stream.CopyToAsync(ms1);
         ms1.Position = 0;
 
-        if (response.Content.Headers.ContentType?.MediaType != "application/zip") return ms1;
+        byte[] buffer = new byte[2];
+        ms1.Read(buffer, 0, 2);
+        ms1.Position = 0;
+        bool isZip = buffer[0] == 0x50 && buffer[1] == 0x4B; // Check for 'PK'
+
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+        if (!isZip && mediaType != "application/zip")
+            return ms1;
 
         using (var zipArchive = new ZipArchive(ms1))
         {
