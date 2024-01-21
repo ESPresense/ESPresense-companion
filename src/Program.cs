@@ -10,12 +10,16 @@ using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
 using ESPresense.Controllers;
 using Microsoft.AspNetCore.DataProtection;
+using Flurl.Http.Newtonsoft;
+using Flurl.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
+
+FlurlHttp.Clients.UseNewtonsoft();
 
 builder.Host.UseSerilog((context, cfg) => cfg.ReadFrom.Configuration(context.Configuration));
 
