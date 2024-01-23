@@ -55,6 +55,7 @@ builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttCoordinator>();
+builder.Services.AddSingleton<TelemetryService>();
 
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
@@ -69,6 +70,7 @@ builder.Services.AddHostedService<OptimizationRunner>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
+builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
