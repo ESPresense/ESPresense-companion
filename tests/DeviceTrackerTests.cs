@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace ESPresense.Companion.Tests;
 
-public class MultiScenarioLocatorTests
+public class DeviceTrackerTests
 {
     private IList<TestData> testDatas = new List<TestData>();
 
@@ -28,7 +28,8 @@ public class MultiScenarioLocatorTests
     public void TestMultiScenarioLocator()
     {
         var configLoader = new ConfigLoader("config");
-        var locator = new MultiScenarioLocator(new State(configLoader), new MqttCoordinator(configLoader, null, null), new DatabaseFactory(null), null);
+        var mqtt = new MqttCoordinator(configLoader, null, null);
+        var locator = new DeviceTracker(new State(configLoader), mqtt, new TelemetryService(mqtt));
         // Use testData to test locator...
         // Assert.That(result, Is.EqualTo(expectedResult));
     }

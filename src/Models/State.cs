@@ -113,5 +113,11 @@ public class State
         //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
         yield return new Scenario(Config, new NearestNode(device), "NearestNode");
     }
+
+    public IEnumerable<Device> GetIdleDevices()
+    {
+        var now = DateTime.UtcNow;
+        return Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > a.Timeout);
+    }
 }
 

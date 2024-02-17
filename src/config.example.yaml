@@ -48,7 +48,7 @@ floors:
           - [8, 9]
           - [6, 9]
           - [6, 12]
-      - name: Office
+      - name: Den
         points:
           - [6, 16.2]
           - [9.6, 16.2]
@@ -122,14 +122,21 @@ floors:
         points:
           - [3.2, 13.5]
           - [6, 13.5]
-          - [6, 15.0]
-          - [9.6, 15.0]
-          - [9.6, 12.0]
+          - [6, 12]
+          - [8.6, 12.0]
           - [8.6, 10.5]
           - [8.6, 8.5]
           - [8, 7.5]
           - [3.2, 7.5]
           - [3.2, 13.5]
+      - name: Office
+        points:
+          - [6, 16.2]
+          - [9.6, 16.2]
+          - [9.6, 13.5]
+          - [8.6, 12]
+          - [6, 12]
+          - [6, 14.5]
       - name: Master Bathroom
         points:
           - [0, 13.5]
@@ -153,7 +160,7 @@ floors:
 # Locations of espresense nodes in meters
 nodes:
   - name: Master
-    point: [8.5, 12, 3.6]
+    point: [9.4, 13.7, 3.6]
     floors: ["second"]
   - name: Bathroom
     point: [0.1, 10, 3.9]
@@ -165,8 +172,8 @@ nodes:
     point: [0.75, 16.8, 0.5]
     floors: ["first", "second", "outside"]
   - name: Office
-    point: [6.75, 15, 1.5]
-    floors: ["first"]
+    point: [6.75, 15, 3.6]
+    floors: ["second"]
   - name: Family
     point: [0.25, 0.4, 0.3]
     floors: ["first", "outside"]

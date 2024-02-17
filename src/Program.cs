@@ -55,7 +55,9 @@ builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttCoordinator>();
+builder.Services.AddSingleton<TelemetryService>();
 
+builder.Services.AddSingleton<DeviceHistoryStore>();
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
@@ -63,12 +65,15 @@ builder.Services.AddSingleton<FirmwareTypeStore>();
 
 builder.Services.AddSingleton<MappingService>();
 builder.Services.AddSingleton<GlobalEventDispatcher>();
+builder.Services.AddSingleton<DeviceTracker>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceTracker>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
+builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
