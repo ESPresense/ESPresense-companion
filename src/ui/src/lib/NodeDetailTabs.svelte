@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { config, nodes } from './stores';
-  import { goto, afterNavigate } from '$app/navigation';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
 
@@ -15,7 +15,7 @@
 		previousPage = from?.url?.pathname;
 	});
 
-	function goBack(defaultRoute = (base + '/')) {
+	function goBack(defaultRoute = base + '/') {
 		goto(previousPage || defaultRoute);
 	}
 </script>

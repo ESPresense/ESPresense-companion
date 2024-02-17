@@ -11,7 +11,7 @@
 
 	function save() {
 		if (settings) {
-			const rssiRef = parseInt(settings['rssi@1m'] + "");
+			const rssiRef = parseInt(settings['rssi@1m'] + '');
 			settings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
 			fetch(`${base}/api/device/${settings.originalId}`, {

@@ -23,7 +23,7 @@
 	function onUpdate(i: Node) {
 		var f = $flavor;
 		if (f == '-') f = i.flavor?.value;
-    var fn = $flavorNames?.get(f);
+		var fn = $flavorNames?.get(f);
 		var body = (function () {
 			switch ($updateMethod) {
 				case 'release':

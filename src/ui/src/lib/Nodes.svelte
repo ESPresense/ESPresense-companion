@@ -8,7 +8,7 @@
 	export let transform = zoomIdentity;
 	export let floorId: string | null = null;
 	export let deviceId: string | null = null;
-  export let nodeId: string | null = null;
+	export let nodeId: string | null = null;
 
 	let floor: Floor | undefined;
 	$: selectedNodes = $nodes?.filter((n) => !floorId || n?.floors.includes(floorId));

@@ -50,18 +50,18 @@
 						<span>Absorption</span>
 						<input class="input" type="text" placeholder="" bind:value={settings.absorption} />
 					</label>
-          <label>
-            <span>Rx Adj Rssi</span>
-            <input class="input" type="text" placeholder="" bind:value={settings.rx_adj_rssi} />
-          </label>
-          <label>
-            <span>Tx Ref Rssi</span>
-            <input class="input" type="text" placeholder="" bind:value={settings.tx_ref_rssi} />
-          </label>
-          <label>
-            <span>Max Distance</span>
-            <input class="input" type="text" placeholder="" bind:value={settings.max_distance} />
-          </label>
+					<label>
+						<span>Rx Adj Rssi</span>
+						<input class="input" type="text" placeholder="" bind:value={settings.rx_adj_rssi} />
+					</label>
+					<label>
+						<span>Tx Ref Rssi</span>
+						<input class="input" type="text" placeholder="" bind:value={settings.tx_ref_rssi} />
+					</label>
+					<label>
+						<span>Max Distance</span>
+						<input class="input" type="text" placeholder="" bind:value={settings.max_distance} />
+					</label>
 					<button class="btn bg-success-700 text-black" on:click={(e) => save()}>Save</button>
 				</form>
 			</svelte:fragment>

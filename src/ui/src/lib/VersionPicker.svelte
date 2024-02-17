@@ -35,7 +35,7 @@
 				{#if updateMethod === 'artifact'}
 					<label for="artifact" class="whitespace-nowrap">Artifact:</label>
 					<select id="artifact" class="select" bind:value={artifact}>
-						{#each  Array.from($artifacts.entries()).reverse() as [key, value]}
+						{#each Array.from($artifacts.entries()).reverse() as [key, value]}
 							<optgroup label={key}>
 								{#each value as item}
 									<option value={item.id}>

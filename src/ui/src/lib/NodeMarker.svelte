@@ -73,11 +73,21 @@
 </defs>
 
 <path
-  d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
-  fill={colors(n.id)}
-  role="figure"
-  on:mouseover={() => { hover(n); }} on:mouseout={() => { hover(null); }}
-  on:focus={() => { select(n); }} on:blur={() => { unselect(); }}
+	d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
+	fill={colors(n.id)}
+	role="figure"
+	on:mouseover={() => {
+		hover(n);
+	}}
+	on:mouseout={() => {
+		hover(null);
+	}}
+	on:focus={() => {
+		select(n);
+	}}
+	on:blur={() => {
+		unselect();
+	}}
 />
 <text x={$xScale(n.location.x) + 7} y={$yScale(n.location.y) + 3.5} fill="white" font-size="10px">{n.name}</text>
 {#if radarDist && $r > 0}

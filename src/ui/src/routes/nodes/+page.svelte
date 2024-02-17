@@ -9,5 +9,5 @@
 <div class="text-column">
 	<h1 class="h1">Nodes</h1>
 
-	<NodesTable  />
+	<NodesTable />
 </div>
