@@ -19,7 +19,9 @@ public static class IpUtils
 
     public static string GetLocalIpAddress()
     {
-        var ipAddress = GetLocalIpAddresses().MaxBy(a => a);
+      var ipAddress = GetLocalIpAddresses()
+            .OrderBy(ip => $"{ip}")
+            .FirstOrDefault();
         return $"{ipAddress}";
     }
 }
