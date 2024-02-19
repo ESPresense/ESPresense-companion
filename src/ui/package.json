@@ -18,7 +18,7 @@
 		"@skeletonlabs/tw-plugin": "^0.3.1",
 		"@sveltejs/adapter-static": "^3.0.1",
 		"@sveltejs/kit": "^2.5.0",
-		"@sveltejs/vite-plugin-svelte": "^3.0.1",
+		"@sveltejs/vite-plugin-svelte": "^3.0.2",
 		"@tailwindcss/forms": "^0.5.7",
 		"@types/cookie": "^0.6.0",
 		"@types/d3": "^7.4.3",
