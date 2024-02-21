@@ -28,6 +28,10 @@ optimization:
     rx_adj_rssi_min: -15
     rx_adj_rssi_max: 20
 
+history:
+  enabled: false # Enable to log history to db (Beta)
+  expire_after: 24h # Expire after 24 hours
+
 weighting:
   algorithm: gaussian
   props:
