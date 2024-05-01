@@ -22,7 +22,7 @@
 		"@tailwindcss/forms": "^0.5.7",
 		"@types/cookie": "^0.6.0",
 		"@types/d3": "^7.4.3",
-		"@types/node": "^20.11.16",
+		"@types/node": "^20.12.8",
 		"@typescript-eslint/eslint-plugin": "^7.0.0",
 		"@typescript-eslint/parser": "^6.20.0",
 		"autoprefixer": "^10.4.17",
