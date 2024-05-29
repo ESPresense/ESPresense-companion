@@ -34,7 +34,7 @@
     <PackageReference Include="sqlite-net-base" Version="1.9.172" />
     <PackageReference Include="sqlitepclraw.bundle_e_sqlite3" Version="2.1.8" />
     <PackageReference Include="TextExtensions" Version="1.0.0" />
-    <PackageReference Include="YamlDotNet" Version="13.7.1" />
+    <PackageReference Include="YamlDotNet" Version="15.1.6" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
 
