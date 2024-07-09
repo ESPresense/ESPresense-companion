@@ -24,7 +24,7 @@
     <PackageReference Include="MathNet.Filtering" Version="0.7.0" />
     <PackageReference Include="MathNet.Filtering.Kalman" Version="0.7.0" />
     <PackageReference Include="MathNet.Spatial" Version="0.6.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.7" />
     <PackageReference Include="MQTTnet" Version="4.3.3.952" />
     <PackageReference Include="MQTTnet.Extensions.ManagedClient" Version="4.3.3.952" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
