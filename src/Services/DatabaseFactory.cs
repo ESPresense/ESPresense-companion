@@ -3,19 +3,10 @@ using ESPresense.Models;
 
 namespace ESPresense.Services;
 
-public class DatabaseFactory
+public class DatabaseFactory(SQLiteAsyncConnection sqliteConnection, ConfigLoader cfg)
 {
-    private readonly SQLiteAsyncConnection _sqliteConnection;
-    private readonly Config _config;
-
-    public DatabaseFactory(SQLiteAsyncConnection sqliteConnection, Config config)
-    {
-        _sqliteConnection = sqliteConnection;
-        _config = config;
-    }
-
     public async Task<DeviceHistoryStore> GetDeviceHistory()
     {
-        return new DeviceHistoryStore(_sqliteConnection, _config);
+        return new DeviceHistoryStore(sqliteConnection, cfg);
     }
 }
