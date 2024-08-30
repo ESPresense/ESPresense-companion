@@ -5,12 +5,13 @@ namespace ESPresense.Models;
 public class DeviceHistoryStore
 {
     private readonly SQLiteAsyncConnection _sqliteConnection;
-
+    private readonly Config _config;
     private readonly Lazy<Task> _create;
 
-    public DeviceHistoryStore(SQLiteAsyncConnection sqliteConnection)
+    public DeviceHistoryStore(SQLiteAsyncConnection sqliteConnection, Config config)
     {
         _sqliteConnection = sqliteConnection;
+        _config = config;
         _create = new Lazy<Task>(async () =>
         {
             await _sqliteConnection.CreateTableAsync<DeviceHistory>();
@@ -18,7 +19,7 @@ public class DeviceHistoryStore
             await _sqliteConnection.ExecuteAsync("DROP TRIGGER IF EXISTS DeviceHistory_RollingData;");
             await _sqliteConnection.ExecuteAsync(@$"CREATE TRIGGER DeviceHistory_RollingData AFTER INSERT ON DeviceHistory
    BEGIN
-     DELETE FROM DeviceHistory WHERE `When` <= (NEW.`When`-{TimeSpan.FromHours(36).Ticks});
+     DELETE FROM DeviceHistory WHERE `When` <= (NEW.`When`-{_config.History.ExpireAfterTimeSpan.Ticks});
    END;");
         });
     }

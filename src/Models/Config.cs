@@ -61,6 +61,9 @@ namespace ESPresense.Models
         public string Database { get; set; } = "sqlite:///espresense.db";
 
         [YamlMember(Alias = "expire_after")] public string ExpireAfter { get; set; } = "24h";
+
+        [YamlIgnore]
+        public TimeSpan ExpireAfterTimeSpan => TimeSpan.TryParse(ExpireAfter, out var result) ? result : TimeSpan.FromHours(24);
     }
 
     public class ConfigWeighting
