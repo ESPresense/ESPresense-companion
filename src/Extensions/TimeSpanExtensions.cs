@@ -2,12 +2,13 @@ using System;
 
 namespace ESPresense.Extensions
 {
-    public static class DateTimeExtensions
+    public static class TimeSpanExtensions
     {
-        public static TimeSpan ParseTimeSpan(this string input)
+        public static bool TryParseDurationString(this string input, out TimeSpan ts)
         {
+            ts = default(TimeSpan);
             if (string.IsNullOrWhiteSpace(input))
-                return TimeSpan.FromHours(24);
+                return false;
 
             var total = TimeSpan.Zero;
             var currentNumber = 0;
@@ -35,13 +36,14 @@ namespace ESPresense.Extensions
                             total = total.Add(TimeSpan.FromSeconds(currentNumber));
                             break;
                         default:
-                            throw new FormatException($"Invalid time span format: {input}");
+                            return false;
                     }
                     currentNumber = 0;
                 }
             }
 
-            return total == TimeSpan.Zero ? TimeSpan.FromHours(24) : total;
+            ts = total;
+            return true;
         }
     }
 }

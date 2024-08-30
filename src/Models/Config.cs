@@ -64,7 +64,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "expire_after")] public string ExpireAfter { get; set; } = "24h";
 
         [YamlIgnore]
-        public TimeSpan ExpireAfterTimeSpan => ExpireAfter.ParseTimeSpan();
+        public TimeSpan ExpireAfterTimeSpan => ExpireAfter.TryParseDurationString(out var ts) ? ts : TimeSpan.FromHours(24);
     }
 
     public class ConfigWeighting
