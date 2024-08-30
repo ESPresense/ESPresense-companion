@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using TextExtensions;
 using YamlDotNet.Serialization;
+using ESPresense.Extensions;
 
 namespace ESPresense.Models
 {
@@ -63,47 +64,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "expire_after")] public string ExpireAfter { get; set; } = "24h";
 
         [YamlIgnore]
-        public TimeSpan ExpireAfterTimeSpan => ParseTimeSpan(ExpireAfter);
-
-        private static TimeSpan ParseTimeSpan(string input)
-        {
-            if (string.IsNullOrWhiteSpace(input))
-                return TimeSpan.FromHours(24);
-
-            var total = TimeSpan.Zero;
-            var currentNumber = 0;
-
-            foreach (var c in input)
-            {
-                if (char.IsDigit(c))
-                {
-                    currentNumber = currentNumber * 10 + (c - '0');
-                }
-                else
-                {
-                    switch (char.ToLower(c))
-                    {
-                        case 'd':
-                            total = total.Add(TimeSpan.FromDays(currentNumber));
-                            break;
-                        case 'h':
-                            total = total.Add(TimeSpan.FromHours(currentNumber));
-                            break;
-                        case 'm':
-                            total = total.Add(TimeSpan.FromMinutes(currentNumber));
-                            break;
-                        case 's':
-                            total = total.Add(TimeSpan.FromSeconds(currentNumber));
-                            break;
-                        default:
-                            throw new FormatException($"Invalid time span format: {input}");
-                    }
-                    currentNumber = 0;
-                }
-            }
-
-            return total == TimeSpan.Zero ? TimeSpan.FromHours(24) : total;
-        }
+        public TimeSpan ExpireAfterTimeSpan => ExpireAfter.ParseTimeSpan();
     }
 
     public class ConfigWeighting
