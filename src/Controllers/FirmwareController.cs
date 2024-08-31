@@ -34,6 +34,7 @@ public class FirmwareController : Controller
     }
 
     [Route("ws/firmware/update/{id}")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public async Task Update(string id, [FromQuery] string url)
     {
         if (!HttpContext.WebSockets.IsWebSocketRequest)
