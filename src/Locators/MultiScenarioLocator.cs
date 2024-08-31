@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 
 namespace ESPresense.Locators;
 
-public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator mqtt, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
+public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator mqtt, GlobalEventDispatcher globalEventDispatcher, DeviceHistoryStore deviceHistory) : BackgroundService
 {
     private const int ConfidenceThreshold = 2;
 
@@ -29,13 +29,13 @@ public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator
                     device.BestScenario = bs;
                 else
                     bs = device.BestScenario;
-                var state = bs?.Room?.Name ?? bs?.Floor?.Name ?? "not_home";
+                var newState = bs?.Room?.Name ?? bs?.Floor?.Name ?? "not_home";
 
-                if (state != device.ReportedState)
+                if (newState != device.ReportedState)
                 {
                     moved += 1;
-                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", state);
-                    device.ReportedState = state;
+                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", newState);
+                    device.ReportedState = newState;
                 }
 
                 if (moved > 0)
@@ -73,7 +73,15 @@ public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator
                             }, SerializerSettings.NullIgnore)
                         );
 
-                    await globalEventDispatcher.OnDeviceChanged(device);
+                    globalEventDispatcher.OnDeviceChanged(device);
+                    if (state?.Config?.History?.Enabled ?? false)
+                    {
+                        foreach (var ds in device.Scenarios)
+                        {
+                            if (ds.Confidence == 0) continue;
+                            await deviceHistory.Add(new DeviceHistory { Id = device.Id, When = DateTime.UtcNow, X = ds.Location.X, Y = ds.Location.Y, Z = ds.Location.Z, Confidence = ds.Confidence ?? 0, Fixes = ds.Fixes ?? 0, Scenario = ds.Name, Best = ds == device.BestScenario });
+                        }
+                    }
                 }
             }
         }

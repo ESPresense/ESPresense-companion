@@ -2,7 +2,7 @@
 
 namespace ESPresense.Controllers;
 
-public class GlobalEventDispatcher(DeviceHistoryStore dh)
+public class GlobalEventDispatcher()
 {
     public event EventHandler<NodeStateEventArgs>? NodeStateChanged;
     public event EventHandler<DeviceEventArgs>? DeviceStateChanged;
@@ -13,13 +13,8 @@ public class GlobalEventDispatcher(DeviceHistoryStore dh)
         NodeStateChanged?.Invoke(this, new NodeStateEventArgs(state));
     }
 
-    public async Task OnDeviceChanged(Device device)
+    public void OnDeviceChanged(Device device)
     {
-        foreach (var ds in device.Scenarios)
-        {
-            if (ds.Confidence == 0) continue;
-            await dh.Add(new DeviceHistory { Id = device.Id, When = DateTime.UtcNow, X = ds.Location.X, Y = ds.Location.Y, Z = ds.Location.Z, Confidence = ds.Confidence ?? 0, Fixes = ds.Fixes ?? 0, Scenario = ds.Name, Best = ds == device.BestScenario });
-        }
         DeviceStateChanged?.Invoke(this, new DeviceEventArgs(device));
     }
 

@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using TextExtensions;
 using YamlDotNet.Serialization;
+using ESPresense.Extensions;
 
 namespace ESPresense.Models
 {
@@ -28,6 +29,9 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "devices")] public ConfigDevice[] Devices { get; set; } = Array.Empty<ConfigDevice>();
 
+        [YamlMember(Alias = "history")]
+        public ConfigHistory History { get; set; } = new();
+
         [YamlMember(Alias = "weighting")]
         public ConfigWeighting Weighting { get; set; } = new();
 
@@ -48,6 +52,19 @@ namespace ESPresense.Models
         [YamlIgnore] public double TxRefRssiMax => Limits.TryGetValue("tx_ref_rssi_max", out var val) ? val : -50;
         [YamlIgnore] public double RxAdjRssiMin => Limits.TryGetValue("rx_adj_rssi_min", out var val) ? val : -20;
         [YamlIgnore] public double RxAdjRssiMax => Limits.TryGetValue("rx_adj_rssi_max", out var val) ? val : 20;
+    }
+
+    public class ConfigHistory
+    {
+        [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
+
+        [YamlMember(Alias = "db")]
+        public string Database { get; set; } = "sqlite:///espresense.db";
+
+        [YamlMember(Alias = "expire_after")] public string ExpireAfter { get; set; } = "24h";
+
+        [YamlIgnore]
+        public TimeSpan ExpireAfterTimeSpan => ExpireAfter.TryParseDurationString(out var ts) ? ts : TimeSpan.FromHours(24);
     }
 
     public class ConfigWeighting
