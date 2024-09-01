@@ -41,7 +41,7 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
             if (pos.Length < 3 || floor.Bounds == null)
             {
                 confidence = 1;
-                scenario.Location = guess;
+                scenario.UpdateLocation(guess);
             }
             else
             {
@@ -73,7 +73,7 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
                 var solver = new NelderMeadSimplex(1e-7, 10000);
                 var result = solver.FindMinimum(obj, initialGuess, initialPerturbation);
                 var minimizingPoint = result.MinimizingPoint.PointwiseMinimum(upperBound).PointwiseMaximum(lowerBound);
-                scenario.Location = new Point3D(minimizingPoint[0], minimizingPoint[1], minimizingPoint[2]);
+                scenario.UpdateLocation(new Point3D(minimizingPoint[0], minimizingPoint[1], minimizingPoint[2]));
                 scenario.Scale = minimizingPoint[3];
                 scenario.Fixes = pos.Length;
                 scenario.Error = result.FunctionInfoAtMinimum.Value;
@@ -92,12 +92,12 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
         {
             scenario.ReasonForExit = ExitCondition.ExceedIterations;
             confidence = 1;
-            scenario.Location = guess;
+            scenario.UpdateLocation(guess);
         }
         catch (Exception ex)
         {
             confidence = 0;
-            scenario.Location = new Point3D();
+            scenario.UpdateLocation(new Point3D());
             Log.Error("Error finding location for {0}: {1}", device, ex.Message);
         }
 
