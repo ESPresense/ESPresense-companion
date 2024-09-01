@@ -1,5 +1,4 @@
 ﻿using System.Numerics;
-using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Extensions;
 

@@ -1,4 +1,3 @@
-using ESPresense.Extensions;
 using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Models;

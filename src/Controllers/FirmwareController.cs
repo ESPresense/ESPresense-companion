@@ -1,9 +1,9 @@
 using System.IO.Compression;
 using System.Net.WebSockets;
 using System.Text;
+using ESPresense.Extensions;
 using ESPresense.Network;
 using ESPresense.Services;
-using ESPresense.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ESPresense.Controllers;

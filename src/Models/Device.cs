@@ -1,8 +1,6 @@
-﻿using System.Collections.Concurrent;
-using System.ComponentModel;
+using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using ESPresense.Converters;
-using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Models;
@@ -61,30 +59,27 @@ public class Device
     {
         yield return new KeyValuePair<string, string>("Best Scenario", $"{BestScenario?.Name}");
 
-        var scenarios = Scenarios.OrderByDescending(s => s.Confidence).ToArray();
-        foreach (var s in scenarios.Where(s => s.Room != null))
+        var scenarios = Scenarios.OrderByDescending(s => s.Probability).ToArray();
+        foreach (var s in scenarios)
+        {
+            yield return new KeyValuePair<string, string>($"{s.Name} Probability", $"{s.Probability:F4}");
             yield return new KeyValuePair<string, string>($"{s.Name} Room", $"{s.Room}");
-        foreach (var s in scenarios.Where(a => a.Confidence != null))
             yield return new KeyValuePair<string, string>($"{s.Name} Confidence", $"{s.Confidence}");
-        foreach (var s in scenarios.Where(a => a.Fixes != null))
             yield return new KeyValuePair<string, string>($"{s.Name} Fixes", $"{s.Fixes}");
-        foreach (var s in scenarios.Where(a => a.Error != null))
             yield return new KeyValuePair<string, string>($"{s.Name} Error", $"{s.Error}");
-        foreach (var s in scenarios.Where(a => a.Iterations != null))
             yield return new KeyValuePair<string, string>($"{s.Name} Iterations", $"{s.Iterations}");
-        foreach (var s in scenarios.Where(a => a.Scale != null))
             yield return new KeyValuePair<string, string>($"{s.Name} Scale", $"{s.Scale}");
-        foreach (var s in scenarios.Where(a => a.ReasonForExit != ExitCondition.None))
             yield return new KeyValuePair<string, string>($"{s.Name} ReasonForExit", $"{s.ReasonForExit}");
+        }
+
         var deviceNodes = Nodes.Values.Where(dn => dn.Node != null).OrderBy(dn => dn.Distance).ToList();
         foreach (var dn in deviceNodes)
+        {
             yield return new KeyValuePair<string, string>($"{dn.Node?.Name} Rssi/@1m", $"{dn.Rssi}/{dn.RefRssi}");
-        foreach (var dn in deviceNodes)
             yield return new KeyValuePair<string, string>($"{dn.Node?.Name} Distance", $"{dn.Distance}");
-        foreach (var dn in deviceNodes)
             yield return new KeyValuePair<string, string>($"{dn.Node?.Name} Hits", $"{dn.Hits}");
-        foreach (var dn in deviceNodes)
             yield return new KeyValuePair<string, string>($"{dn.Node?.Name} Last Hit", $"{dn.LastHit?.ToLocalTime():s}");
+        }
 
         foreach (var s in scenarios)
         {

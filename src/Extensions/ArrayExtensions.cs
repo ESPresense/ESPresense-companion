@@ -1,8 +1,4 @@
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-
-namespace ESPresense.Utils;
+namespace ESPresense.Extensions;
 
 public static class ArrayExtensions
 {

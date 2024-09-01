@@ -7,9 +7,11 @@ using Newtonsoft.Json;
 
 namespace ESPresense.Locators;
 
-public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator mqtt, GlobalEventDispatcher globalEventDispatcher, DeviceHistoryStore deviceHistory) : BackgroundService
+public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator mqtt, GlobalEventDispatcher globalEventDispatcher, DeviceHistoryStore deviceHistory)
+    : BackgroundService
 {
-    private const int ConfidenceThreshold = 2;
+    private const double PriorWeight = 0.7; // Weight for the prior probability
+    private const double NewDataWeight = 0.3; // Weight for the new data
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -24,11 +26,13 @@ public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator
             {
                 device.LastCalculated = DateTime.UtcNow;
                 var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
-                var bs = device.Scenarios.Select((scenario, i) => new { scenario, i }).Where(a => a.scenario.Current).OrderByDescending(a => a.scenario.Confidence).ThenBy(a => a.i).FirstOrDefault()?.scenario;
-                if (device.BestScenario == null || bs == null || bs.Confidence - device.BestScenario.Confidence > ConfidenceThreshold)
-                    device.BestScenario = bs;
-                else
-                    bs = device.BestScenario;
+
+                // Update scenario probabilities using Bayesian approach
+                UpdateScenarioProbabilities(device);
+
+                // Select the best scenario based on probabilities
+                var bs = device.BestScenario = SelectBestScenario(device);
+
                 var newState = bs?.Room?.Name ?? bs?.Floor?.Name ?? "not_home";
 
                 if (newState != device.ReportedState)
@@ -75,15 +79,43 @@ public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator
 
                     globalEventDispatcher.OnDeviceChanged(device);
                     if (state?.Config?.History?.Enabled ?? false)
-                    {
                         foreach (var ds in device.Scenarios)
                         {
                             if (ds.Confidence == 0) continue;
                             await deviceHistory.Add(new DeviceHistory { Id = device.Id, When = DateTime.UtcNow, X = ds.Location.X, Y = ds.Location.Y, Z = ds.Location.Z, Confidence = ds.Confidence ?? 0, Fixes = ds.Fixes ?? 0, Scenario = ds.Name, Best = ds == device.BestScenario });
                         }
-                    }
                 }
             }
         }
+    }
+
+    private void UpdateScenarioProbabilities(Device device)
+    {
+        double totalConfidence = device.Scenarios.Sum(s => s.Confidence ?? 0);
+
+        if (totalConfidence > 0)
+        {
+            foreach (var scenario in device.Scenarios)
+            {
+                var newProbability = (scenario.Confidence ?? 0) / totalConfidence;
+                scenario.Probability = PriorWeight * scenario.Probability + NewDataWeight * newProbability;
+            }
+
+            // Normalize probabilities
+            var sum = device.Scenarios.Sum(s => s.Probability);
+            foreach (var scenario in device.Scenarios)
+            {
+                scenario.Probability /= sum;
+            }
+        }
+    }
+
+    private Scenario? SelectBestScenario(Device device)
+    {
+        return device.Scenarios
+            .OrderByDescending(s => s.Probability)
+            .ThenByDescending(s=> s.Confidence)
+            .ThenBy(s => device.Scenarios.IndexOf(s))
+            .FirstOrDefault(s => s.Current);
     }
 }

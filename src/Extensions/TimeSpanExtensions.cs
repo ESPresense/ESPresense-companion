@@ -1,5 +1,3 @@
-using System;
-
 namespace ESPresense.Extensions
 {
     public static class TimeSpanExtensions

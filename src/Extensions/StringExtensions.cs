@@ -1,4 +1,4 @@
-﻿namespace ESPresense.Utils;
+﻿namespace ESPresense.Extensions;
 
 public static class StringExtensions
 {

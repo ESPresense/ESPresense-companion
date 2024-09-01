@@ -1,7 +1,8 @@
+using ESPresense.Extensions;
 using MQTTnet.Diagnostics;
 using Serilog;
 
-namespace ESPresense.Extensions;
+namespace ESPresense.Utils;
 
 public class MqttNetLogger : IMqttNetLogger
 {

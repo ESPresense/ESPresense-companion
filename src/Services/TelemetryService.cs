@@ -1,6 +1,5 @@
 ﻿using ESPresense.Utils;
 using Newtonsoft.Json;
-using Serilog;
 
 namespace ESPresense.Services;
 
