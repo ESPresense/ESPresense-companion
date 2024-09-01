@@ -11,7 +11,7 @@ public class Device
     {
         Id = id;
         Timeout = timeout;
-        HassAutoDiscovery.Add(new AutoDiscovery(this, "device_tracker"));
+        HassAutoDiscovery.Add(new AutoDiscovery(this, "", "device_tracker", "bluetooth"));
     }
 
     public override string ToString()
