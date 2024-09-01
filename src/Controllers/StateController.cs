@@ -5,7 +5,6 @@ using System.Text.Json;
 using ESPresense.Extensions;
 using ESPresense.Models;
 using ESPresense.Services;
-using ESPresense.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
 using JsonSerializer = System.Text.Json.JsonSerializer;

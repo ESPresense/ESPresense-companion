@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.Metrics;
-using ESPresense.Models;
+﻿using ESPresense.Models;
 using ESPresense.Services;
 using Serilog;
 

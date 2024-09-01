@@ -5,8 +5,8 @@ namespace ESPresense.Services;
 
 public class DatabaseFactory(SQLiteAsyncConnection sqliteConnection, ConfigLoader cfg)
 {
-    public async Task<DeviceHistoryStore> GetDeviceHistory()
+    public Task<DeviceHistoryStore> GetDeviceHistory()
     {
-        return new DeviceHistoryStore(sqliteConnection, cfg);
+        return Task.FromResult(new DeviceHistoryStore(sqliteConnection, cfg));
     }
 }

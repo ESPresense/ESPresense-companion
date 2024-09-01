@@ -9,6 +9,7 @@ using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
 using ESPresense.Controllers;
+using ESPresense.Utils;
 using Microsoft.AspNetCore.DataProtection;
 using Flurl.Http.Newtonsoft;
 using Flurl.Http;

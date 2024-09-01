@@ -1,6 +1,5 @@
 ﻿using ESPresense.Services;
 using ESPresense.Utils;
-using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
 using TextExtensions;
 

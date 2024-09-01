@@ -1,6 +1,5 @@
 ﻿using ESPresense.Models;
 using MQTTnet.Client;
-using Serilog;
 
 namespace ESPresense.Extensions;
 
