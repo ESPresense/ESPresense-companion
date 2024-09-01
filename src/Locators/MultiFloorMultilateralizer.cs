@@ -61,7 +61,7 @@ public class MultiFloorMultilateralizer : ILocate
                         scenario.Scale ?? 1.0
                     });
                     var result = solver.FindMinimum(obj, init);
-                    scenario.Location = new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
+                    scenario.UpdateLocation(new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]));
                     scenario.Scale = result.MinimizingPoint[3];
                     scenario.Fixes = pos.Count;
                     scenario.Minimum = nodes.Min(a => (double?) a.Distance);
@@ -73,14 +73,14 @@ public class MultiFloorMultilateralizer : ILocate
                 {
                     confidence = 1;
                     scenario.Scale = 1;
-                    scenario.Location = guess;
+                    scenario.UpdateLocation(guess);
                 }
             }
             catch (Exception ex)
             {
                 confidence = 1;
                 scenario.Scale = 1;
-                scenario.Location = guess;
+                scenario.UpdateLocation(guess);
                 Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
             }
         }

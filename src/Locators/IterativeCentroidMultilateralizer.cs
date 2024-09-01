@@ -49,7 +49,7 @@ public class IterativeCentroidMultilateralizer(Device device, Floor floor) : ILo
                 scenario.Error = CalculateError(centroid, original);
                 scenario.Confidence = 1;
                 scenario.ReasonForExit = ExitCondition.LackOfProgress;
-                scenario.Location = new Point3D(centroid[0], centroid[1], centroid[2]);
+                scenario.UpdateLocation(new Point3D(centroid[0], centroid[1], centroid[2]));
                 scenario.Room = floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
                 return Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) >= 0.1;
             }
@@ -65,7 +65,7 @@ public class IterativeCentroidMultilateralizer(Device device, Floor floor) : ILo
                 var err = CalculateError(centroid, original);
                 scenario.Error = err;
                 scenario.Confidence = Math.Clamp((10000 - (int?)Math.Ceiling(100 * err)) ?? 0, 0, 100);
-                scenario.Location = new Point3D(centroid[0], centroid[1], centroid[2]);
+                scenario.UpdateLocation(new Point3D(centroid[0], centroid[1], centroid[2]));
                 scenario.Room = floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
                 return Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) >= 0.1;
             }

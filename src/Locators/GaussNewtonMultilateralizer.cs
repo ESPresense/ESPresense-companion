@@ -53,7 +53,7 @@ public class GaussNewtonMultilateralizer : ILocate
             if (pos.Length < 3 || _floor.Bounds == null)
             {
                 confidence = 1;
-                scenario.Location = guess;
+                scenario.UpdateLocation(guess);
             }
             else
             {
@@ -67,7 +67,7 @@ public class GaussNewtonMultilateralizer : ILocate
                 var gaussNewton = new GaussNewton(pos, ranges, lowerBound, upperBound);
                 var result = gaussNewton.FindPosition(initialGuess);
 
-                scenario.Location = new Point3D(result.X, result.Y, result.Z);
+                scenario.UpdateLocation(new Point3D(result.X, result.Y, result.Z));
                 scenario.Fixes = pos.Length;
                 scenario.Error = pos.Select((p, i) => Math.Pow(Error(result.ToPoint3D(), p.ToPoint3D(), ranges[i]), 2)).Average();
                 scenario.Iterations = gaussNewton.Iterations;
@@ -81,12 +81,12 @@ public class GaussNewtonMultilateralizer : ILocate
         {
             scenario.ReasonForExit = ExitCondition.ExceedIterations;
             confidence = 1;
-            scenario.Location = guess;
+            scenario.UpdateLocation(guess);
         }
         catch (Exception ex)
         {
             confidence = 0;
-            scenario.Location = new Point3D();
+            scenario.UpdateLocation(new Point3D());
             Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
         }
 

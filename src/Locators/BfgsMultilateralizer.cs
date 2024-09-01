@@ -49,7 +49,7 @@ public class BfgsMultilateralizer : ILocate
             if (pos.Length < 3 || _floor.Bounds == null)
             {
                 confidence = 1;
-                scenario.Location = guess;
+                scenario.UpdateLocation(guess);
             }
             else
             {
@@ -77,7 +77,7 @@ public class BfgsMultilateralizer : ILocate
                 });
                 var solver = new BfgsBMinimizer(0, 0.25, 0.25, 1000);
                 var result = solver.FindMinimum(obj, lowerBound, upperBound, initialGuess);
-                scenario.Location = new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
+                scenario.UpdateLocation(new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]));
                 scenario.Fixes = pos.Length;
                 scenario.Error = result.FunctionInfoAtMinimum.Value;
                 scenario.Iterations = result switch
@@ -94,7 +94,7 @@ public class BfgsMultilateralizer : ILocate
         catch (Exception ex)
         {
             confidence = 1;
-            scenario.Location = guess;
+            scenario.UpdateLocation(guess);
             Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
         }
 
