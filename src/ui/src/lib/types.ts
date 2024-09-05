@@ -40,13 +40,13 @@ export interface Node {
 	name: string;
 	location: { x: number; y: number; z: number };
 	floors: string[];
-	nodes: { [index: string]: { dist: number; var: number; lh: number } };
+	nodes: { [index: string]: { dist: number; var: number; lh: number; rssi: number } };
 }
 
 export interface Device {
 	id: string;
 	name: string;
-	nodes: { [index: string]: { dist: number; var: number; lh: number } };
+	nodes: { [index: string]: { dist: number; var: number; lh: number; rssi: number } };
 	room: { id: string; name: string };
 	floor: { id: string; name: string };
 	location: { x: number; y: number; z: number };

@@ -93,9 +93,9 @@
 {#if radarDist && $r > 0}
 	<text x={$xScale(n.location.x)} y={$yScale(n.location.y) + 15} fill="white" font-size="10px">
 		{#if radarVar !== null && radarVar !== undefined}
-			{radarDist.toFixed(2) ?? 'N/A'} ± {Math.sqrt(radarVar).toFixed(2)}
+			{radarDist.toFixed(2) ?? 'n/a'} ± {Math.sqrt(radarVar).toFixed(2)}
 		{:else}
-			{radarDist.toFixed(2) ?? 'N/A'}
+			{radarDist.toFixed(2) ?? 'n/a'}
 		{/if}
 	</text>
 	<ellipse style="pointer-events: none" cx={$xScale(n.location.x)} cy={$yScale(n.location.y)} fill="none" stroke={colors(n.id)} rx={Math.abs($xScale(0) - $xScale($r))} ry={Math.abs($yScale(0) - $yScale($r))} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />

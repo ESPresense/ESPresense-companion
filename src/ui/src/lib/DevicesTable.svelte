@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DeviceActions from '$lib/DeviceActions.svelte';
 	import { devices } from '$lib/stores';
 	import type { Device } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
@@ -24,6 +25,7 @@
 		{ key: 'scale', title: 'Scale', value: (d) => d.scale?.toFixed(3) ?? 'n/a', sortable: true },
 		{ key: 'confidence', title: 'Confidence', value: (d) => d.confidence ?? 'n/a', sortable: true },
 		{ key: 'lastSeen', title: 'Last Seen', value: (d) => ((d.lastSeen ?? '') == '' ? 'n/a' : (ago(new Date(d.lastSeen)) ?? 'n/a')), sortable: true },
+		{ key: 'actions', title: '', renderComponent: { component: DeviceActions } }
 	];
 
 	function onRowClick(e) {
