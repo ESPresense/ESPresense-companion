@@ -187,6 +187,35 @@ export interface CalibrationResponse {
 	matrix: CalibrationMatrix;
 }
 
+export type NodeSettings = {
+	updating: {
+		autoUpdate: boolean;
+		preRelease: boolean;
+	};
+	scanning: {
+		forgetAfterMs: number | null;
+	};
+	counting: {
+		idPrefixes: string | null;
+		startCountingDistance: number | null;
+		stopCountingDistance: number | null;
+		includeDevicesAge: number | null;
+	};
+	filtering: {
+		includeIds: string | null;
+		excludeIds: string | null;
+		maxReportDistance: number | null;
+		earlyReportDistance: number | null;
+		skipReportAge: number | null;
+	};
+	calibration: {
+		rssiAt1m: number | null;
+		rssiAdjustment: number | null;
+		absorptionFactor: number | null;
+		iBeaconRssiAt1m: number | null;
+	};
+};
+
 export function isNode(d: Device | Node | null): d is Node {
 	return (d as Node)?.telemetry !== undefined;
 }

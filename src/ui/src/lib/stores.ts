@@ -147,3 +147,30 @@ export const calibration = readable<CalibrationResponse>({matrix: {}}, function 
 		clearInterval(interval);
 	};
 });
+
+export const settings = (() => {
+	const { subscribe, set, update } = writable<Settings | null>(null);
+
+	return {
+		subscribe,
+		set,
+		update,
+		load: async () => {
+			const response = await fetch(`${base}/api/settings`);
+			if (!response.ok) throw new Error("Something went wrong loading settings (error="+response.status+" "+response.statusText+")");
+			const data = await response.json();
+			set(data);
+		},
+		save: async (newSettings: Settings) => {
+			const response = await fetch(`${base}/api/settings`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(newSettings),
+			});
+			const data = await response.json();
+			set(data);
+		},
+	};
+})();
