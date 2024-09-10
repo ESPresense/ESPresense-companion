@@ -156,13 +156,13 @@ export const settings = (() => {
 		set,
 		update,
 		load: async () => {
-			const response = await fetch(`${base}/api/settings`);
+			const response = await fetch(`${base}/api/node/*/settings`);
 			if (!response.ok) throw new Error("Something went wrong loading settings (error="+response.status+" "+response.statusText+")");
 			const data = await response.json();
 			set(data);
 		},
 		save: async (newSettings: Settings) => {
-			const response = await fetch(`${base}/api/settings`, {
+			const response = await fetch(`${base}/api/node/*/settings`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

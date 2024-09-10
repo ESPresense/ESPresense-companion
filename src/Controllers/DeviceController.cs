@@ -19,7 +19,7 @@ namespace ESPresense.Controllers
             _state = state;
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{id}/settings")]
         public DeviceSettingsDetails Get(string id)
         {
             var deviceSettings = _deviceSettingsStore.Get(id);
@@ -29,7 +29,7 @@ namespace ESPresense.Controllers
             return new DeviceSettingsDetails(deviceSettings ?? new DeviceSettings { Id = id, OriginalId = id }, details);
         }
 
-        [HttpPut("{id}")]
+        [HttpPut("{id}/settings")]
         public async Task Set(string id, [FromBody] DeviceSettings value)
         {
             await _deviceSettingsStore.Set(id, value);
