@@ -19,14 +19,20 @@ namespace ESPresense.Controllers
             _state = state;
         }
 
-        [HttpGet("{id}/settings")]
-        public DeviceSettingsDetails Get(string id)
+        [HttpGet("{id}/details")]
+        public async Task<IList<KeyValuePair<string, string>>> Details(string id)
         {
-            var deviceSettings = _deviceSettingsStore.Get(id);
-            var details = new List<KeyValuePair<string, string>>();
-            if (deviceSettings?.Id != null && _state.Devices.TryGetValue(deviceSettings.Id, out var device))
-                details.AddRange(device.GetDetails());
-            return new DeviceSettingsDetails(deviceSettings ?? new DeviceSettings { Id = id, OriginalId = id }, details);
+            if (_state.Devices.TryGetValue(id, out var device))
+                return device.GetDetails().ToList();
+            return new List<KeyValuePair<string, string>>();
+        }
+
+        [HttpGet("{id}/settings")]
+        public Task<DeviceSettings?> Get(string id)
+        {
+            var settings = _deviceSettingsStore.Get(id);
+            settings ??= new DeviceSettings { OriginalId = id, Id = id };
+            return Task.FromResult(settings);
         }
 
         [HttpPut("{id}/settings")]
@@ -35,6 +41,4 @@ namespace ESPresense.Controllers
             await _deviceSettingsStore.Set(id, value);
         }
     }
-
-    public readonly record struct DeviceSettingsDetails(DeviceSettings? settings, IList<KeyValuePair<string, string>> details);
 }

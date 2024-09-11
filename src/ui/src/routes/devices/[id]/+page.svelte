@@ -2,22 +2,27 @@
 	import { base } from '$app/paths';
 	import { devices } from '$lib/stores';
 	import { readable } from 'svelte/store';
-	import type { DeviceSetting } from '$lib/types';
+	import type { DeviceSetting, DeviceDetail } from '$lib/types';
 	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
+	import { fetchDeviceDetails } from '$lib/device';
 
 	import Map from '$lib/Map.svelte';
 	import DeviceDetailTabs from '$lib/DeviceDetailTabs.svelte';
 	import DeviceSettings from '$lib/DeviceSettings.svelte';
 
 	export let tab = 'map';
-	export let data: { settings?: DeviceSetting } = {};
-	$: device = $devices.find((d) => d.id === data.settings?.id);
+	export let data: { id: string, settings: DeviceSetting };
+	$: device = $devices.find((d) => d.id === data.id);
 
-	export const deviceDetails = readable([], (set) => {
+	export const deviceDetails = readable<DeviceDetail>([], (set) => {
 		async function fetchAndSet() {
 			try {
-				const response = await fetch(`${base}/api/device/${data.settings?.id}`);
-				const result = await response.json();
+				const id = data.id;
+				if (!id) {
+					console.error('No device id');
+					return;
+				}
+				const result = await fetchDeviceDetails(id);
 				set(result.details);
 			} catch (ex) {
 				console.error(ex);
