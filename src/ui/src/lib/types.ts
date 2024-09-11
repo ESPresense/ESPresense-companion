@@ -187,7 +187,9 @@ export interface CalibrationResponse {
 	matrix: CalibrationMatrix;
 }
 
-export type NodeSettings = {
+export type NodeSetting = {
+	id: string | null;
+	name: string | null;
 	updating: {
 		autoUpdate: boolean;
 		preRelease: boolean;
@@ -211,7 +213,7 @@ export type NodeSettings = {
 	calibration: {
 		rssiAt1m: number | null;
 		rssiAdjustment: number | null;
-		absorptionFactor: number | null;
+		absorption: number | null;
 		iBeaconRssiAt1m: number | null;
 	};
 };

@@ -5,18 +5,18 @@
 	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
 	import { updateMethod, flavor, version, artifact, flavorNames } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
+	import { restartNode, updateNodeSelf } from '$lib/node';
 
 	const modalStore = getModalStore();
 	const toastStore = getToastStore();
 
 	async function onRestart(i: Node) {
 		try {
-			var response = await fetch(`${base}/api/node/${i.id}/restart`, { method: 'POST' });
-			if (response.status != 200) throw new Error(response.statusText);
+			await restartNode(i.id);
 			toastStore.trigger({ message: i.name + ' asked to reboot', background: 'variant-filled-primary' });
 		} catch (e) {
 			console.log(e);
-			toastStore.trigger({ message: e, background: 'variant-filled-error' });
+			toastStore.trigger({ message: e instanceof Error ? e.message : String(e), background: 'variant-filled-error' });
 		}
 	}
 
@@ -44,12 +44,8 @@
 			});
 		} else {
 			if (i) {
-				fetch(`${base}/api/node/${i.id}/update`, {
-					method: 'POST',
-					body: ''
-				})
-					.then((response) => {
-						if (response.status != 200) throw new Error(response.statusText);
+				updateNodeSelf(i.id)
+					.then(() => {
 						const t: ToastSettings = { message: (i.name ?? i.id) + ' asked to update itself', background: 'variant-filled-primary' };
 						toastStore.trigger(t);
 					})

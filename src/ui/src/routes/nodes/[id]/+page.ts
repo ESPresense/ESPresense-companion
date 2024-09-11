@@ -1,7 +1,7 @@
 import { base } from '$app/paths';
 
 export async function load({ fetch, params }) {
-	return await fetch(`${base}/api/node/${params.id}`)
+	return await fetch(`${base}/api/node/${params.id}/settings`)
 		.then((response) => {
 			if (response.status != 200) throw new Error(response.statusText);
 			var data = response.json();

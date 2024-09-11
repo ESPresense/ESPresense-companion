@@ -1,6 +1,8 @@
 import { readable, writable, derived } from 'svelte/store';
 import { base } from '$app/paths';
-import type { Device, Config, Node, CalibrationResponse } from './types';
+import type { Device, Config, Node, NodeSettings, CalibrationResponse } from './types';
+import { loadSettings, saveSettings } from './node';
+import { fetchConfig, fetchCalibrationState, fetchDeviceState, fetchNodeState } from './state';
 
 export const showAll: SvelteStore<boolean> = writable(false);
 export const config = writable<Config>();
@@ -37,8 +39,8 @@ let socket: WebSocket;
 export const history = writable(['/']);
 
 async function getConfig() {
-	const response = await fetch(`${base}/api/state/config`);
-	config.set(await response.json());
+	const data = await fetchConfig();
+	config.set(data);
 }
 
 getConfig();
@@ -112,8 +114,7 @@ export const nodes = readable<Node[]>([], function start(set) {
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
-		fetch(`${base}/api/state/nodes?includeTele=true`)
-			.then((d) => d.json())
+		fetchNodeState()
 			.then((r) => {
 				outstanding = false;
 				errors = 0;
@@ -133,15 +134,12 @@ export const nodes = readable<Node[]>([], function start(set) {
 
 export const calibration = readable<CalibrationResponse>({matrix: {}}, function start(set) {
 	async function fetchAndSet() {
-		const response = await fetch(`${base}/api/state/calibration`);
-		var data = await response.json();
+		const data = await fetchCalibrationState();
 		set(data);
 	}
 
 	fetchAndSet();
-	const interval = setInterval(() => {
-		fetchAndSet();
-	}, 1000);
+	const interval = setInterval(fetchAndSet, 1000);
 
 	return function stop() {
 		clearInterval(interval);
@@ -156,20 +154,11 @@ export const settings = (() => {
 		set,
 		update,
 		load: async () => {
-			const response = await fetch(`${base}/api/node/*/settings`);
-			if (!response.ok) throw new Error("Something went wrong loading settings (error="+response.status+" "+response.statusText+")");
-			const data = await response.json();
+			const data = await loadSettings("*");
 			set(data);
 		},
 		save: async (newSettings: Settings) => {
-			const response = await fetch(`${base}/api/node/*/settings`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(newSettings),
-			});
-			const data = await response.json();
+			const data = await saveSettings(newSettings);
 			set(data);
 		},
 	};
