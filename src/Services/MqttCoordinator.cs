@@ -16,7 +16,7 @@ public class MqttCoordinator
     private readonly ConfigLoader _cfg;
     private readonly ILogger<MqttCoordinator> _logger;
     private readonly IMqttNetLogger _mqttNetLogger;
-    private IManagedMqttClient? _mc;
+    private IManagedMqttClient? _mqttClient;
 
     public MqttCoordinator(ConfigLoader cfg, ILogger<MqttCoordinator> logger, IMqttNetLogger mqttNetLogger)
     {
@@ -61,7 +61,7 @@ public class MqttCoordinator
 
         var mqttFactory = new MqttFactory(_mqttNetLogger);
 
-        var mc = mqttFactory.CreateManagedMqttClient();
+        var mqttClient = mqttFactory.CreateManagedMqttClient();
 
         var mqttClientOptions =
             new MqttClientOptionsBuilder()
@@ -77,37 +77,38 @@ public class MqttCoordinator
             .WithAutoReconnectDelay(TimeSpan.FromSeconds(30))
             .Build();
 
-        await mc.StartAsync(managedMqttClientOptions);
-        mc.Options.ConnectionCheckInterval = TimeSpan.FromSeconds(30);
-        _mc = mc;
+        await mqttClient.StartAsync(managedMqttClientOptions);
+        mqttClient.Options.ConnectionCheckInterval = TimeSpan.FromSeconds(30);
+        _mqttClient = mqttClient;
 
         Log.Logger.Information("Attempting to connect to mqtt server at " + (c.Mqtt.Port != null ? "{@host}:{@port}" : "{@host}") + " as {@username}...", c.Mqtt.Host ?? "localhost", c.Mqtt.Port, c.Mqtt.Username ?? "<anonymous>");
 
-        mc.ConnectedAsync += async s =>
+        mqttClient.ConnectedAsync += async s =>
         {
             Log.Information("MQTT connected!");
-            await mc.EnqueueAsync("espresense/companion/status", "online");
+            if (!ReadOnly)
+            await mqttClient.EnqueueAsync("espresense/companion/status", "online");
 
-            await mc.SubscribeAsync("espresense/devices/+/+");
-            await mc.SubscribeAsync("espresense/settings/+/config");
-            await mc.SubscribeAsync("espresense/rooms/+/+");
+            await mqttClient.SubscribeAsync("espresense/devices/+/+");
+            await mqttClient.SubscribeAsync("espresense/settings/+/config");
+            await mqttClient.SubscribeAsync("espresense/rooms/+/+");
         };
 
-        mc.DisconnectedAsync += s =>
+        mqttClient.DisconnectedAsync += s =>
         {
             Log.Information("MQTT disconnected");
             return Task.CompletedTask;
         };
 
-        mc.ConnectingFailedAsync += s =>
+        mqttClient.ConnectingFailedAsync += s =>
         {
             Log.Error("MQTT connection failed {@error}: {@inner}", new { primary = true }, s.Exception.Message, s.Exception?.InnerException?.Message);
             return Task.CompletedTask;
         };
 
-        mc.ApplicationMessageReceivedAsync += OnMqttMessageReceived;
+        mqttClient.ApplicationMessageReceivedAsync += OnMqttMessageReceived;
 
-        return mc;
+        return mqttClient;
     }
 
     public event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
@@ -193,8 +194,13 @@ public class MqttCoordinator
         }
     }
 
+    private bool ReadOnly => _mqttClient?.Options.ClientOptions.ClientId.ToLower().Contains("read") ?? false;
+
     public async Task EnqueueAsync(string topic, string payload, bool retain = false)
     {
-        await _mc.EnqueueAsync(topic, payload, retain: retain);
+        if (!ReadOnly)
+        {
+            await _mqttClient.EnqueueAsync(topic, payload, retain: retain);
+        }
     }
 }

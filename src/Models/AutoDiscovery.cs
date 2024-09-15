@@ -33,12 +33,12 @@ public class AutoDiscovery(Device dev, string name, string component, string sou
     [JsonProperty("source_type")]
     private string SourceType => sourceType;
 
-    public async Task Send(MqttCoordinator mc)
+    public async Task Send(MqttCoordinator mqtt)
     {
         if (_sent) return;
         _sent = true;
 
-        await mc.EnqueueAsync($"homeassistant/{component}/{dev.Id.ToSnakeCase()}/config", JsonConvert.SerializeObject(this, SerializerSettings.NullIgnore), true);
+        await mqtt.EnqueueAsync($"homeassistant/{component}/{dev.Id.ToSnakeCase()}/config", JsonConvert.SerializeObject(this, SerializerSettings.NullIgnore), true);
     }
 }
 
