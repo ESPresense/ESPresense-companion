@@ -1,0 +1,11 @@
+{
+    "image": "mcr.microsoft.com/devcontainers/dotnet:8.0-bookworm",
+    "forwardPorts": [
+        5279
+    ],
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts"
+        }
+    }
+}
