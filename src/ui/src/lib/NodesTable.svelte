@@ -15,6 +15,7 @@
 		{ key: 'telemetry.version', title: 'Version', value: (d: Node) => d.telemetry?.version ?? 'n/a', sortable: true },
 		{ key: 'cpu.name', title: 'CPU', value: (d: Node) => d.cpu?.name ?? 'n/a', sortable: true },
 		{ key: 'flavor.name', title: 'Flavor', value: (d: Node) => d.flavor?.name ?? 'n/a', sortable: true },
+		{ key: 'telemetry.ip', title: 'IP', value: (d: Node) => d.telemetry?.ip ?? 'n/a', sortable: true },
 		{ key: 'actions', title: '', renderComponent: { component: NodeActions } }
 	];
 
