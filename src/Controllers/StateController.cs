@@ -89,7 +89,6 @@ public class StateController : ControllerBase
             return;
         }
 
-
         AsyncAutoResetEvent newMessage = new AsyncAutoResetEvent();
         ConcurrentQueue<string> changes = new ConcurrentQueue<string>();
         void EnqueueAndSignal<T>(T value)

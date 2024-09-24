@@ -1,4 +1,4 @@
-namespace ESPresense.Locators;
+namespace ESPresense.Weighting;
 
 public interface IWeighting
 {

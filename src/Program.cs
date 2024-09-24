@@ -1,5 +1,4 @@
 using ESPresense.Extensions;
-using ESPresense.Locators;
 using ESPresense.Models;
 using ESPresense.Services;
 using MQTTnet.Diagnostics;
@@ -93,7 +92,7 @@ app.UseWebSockets(new WebSocketOptions
 app.UseSerilogRequestLogging(o =>
 {
     o.EnrichDiagnosticContext = (dc, ctx) => dc.Set("UserAgent", ctx?.Request.Headers.UserAgent);
-    o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Information;
+    o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Verbose;
 });
 
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");

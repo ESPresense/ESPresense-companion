@@ -7,16 +7,19 @@ namespace ESPresense.Models;
 
 public class Device
 {
-    public Device(string id, TimeSpan timeout)
+    public Device(string id, string? discoveryId, TimeSpan timeout)
     {
         Id = id;
         Timeout = timeout;
-        HassAutoDiscovery.Add(new AutoDiscovery(this, "", "device_tracker", "bluetooth"));
+        HassAutoDiscovery.Add(new AutoDiscovery("device_tracker", this, discoveryId, "bluetooth"));
     }
 
     public override string ToString()
     {
-        return $"{nameof(Id)}: {Id}";
+        if (Track)
+            return $"{nameof(Id)}: {Id}";
+        else
+            return $"Untracked {nameof(Id)}: {Id}";
     }
 
     public string Id { get; init; }
