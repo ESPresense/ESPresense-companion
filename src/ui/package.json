@@ -37,7 +37,7 @@
 		"s-ago": "^2.2.0",
 		"svelte": "^4.2.19",
 		"svelte-check": "^4.0.2",
-		"svelte-eslint-parser": "^0.33.1",
+		"svelte-eslint-parser": "^0.41.1",
 		"svelte-table": "^0.6.3",
 		"tslib": "^2.7.0",
 		"typescript": "^5.6.2",
