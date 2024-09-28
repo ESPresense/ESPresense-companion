@@ -13,7 +13,7 @@
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
-		"@floating-ui/dom": "^1.6.3",
+		"@floating-ui/dom": "^1.6.11",
 		"@skeletonlabs/skeleton": "^2.10.2",
 		"@skeletonlabs/tw-plugin": "^0.4.0",
 		"@sveltejs/adapter-static": "^3.0.4",
