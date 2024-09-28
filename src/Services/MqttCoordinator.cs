@@ -1,4 +1,4 @@
-﻿using ESPresense.Events;
+using ESPresense.Events;
 using ESPresense.Extensions;
 using ESPresense.Models;
 using Flurl.Http;
@@ -70,6 +70,7 @@ public class MqttCoordinator
                 .WithWillTopic("espresense/companion/status")
                 .WithWillRetain()
                 .WithWillPayload("offline")
+                .WithCleanSession()
                 .Build();
 
         var managedMqttClientOptions = new ManagedMqttClientOptionsBuilder()
@@ -87,11 +88,12 @@ public class MqttCoordinator
         {
             Log.Information("MQTT connected!");
             if (!ReadOnly)
-            await mqttClient.EnqueueAsync("espresense/companion/status", "online");
+                await mqttClient.EnqueueAsync("espresense/companion/status", "online");
 
             await mqttClient.SubscribeAsync("espresense/devices/+/+");
             await mqttClient.SubscribeAsync("espresense/settings/+/config");
             await mqttClient.SubscribeAsync("espresense/rooms/+/+");
+            await mqttClient.SubscribeAsync("homeassistant/device_tracker/+/config");
         };
 
         mqttClient.DisconnectedAsync += s =>
@@ -118,6 +120,7 @@ public class MqttCoordinator
     public event Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceivedAsync;
     public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
     public event EventHandler? MqttMessageMalformed;
+    public event EventHandler<PreviousDeviceDiscoveredEventArgs>? PreviousDeviceDiscovered;
 
     private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
@@ -139,17 +142,17 @@ public class MqttCoordinator
                     NodeStatusReceivedAsync?.Invoke(new NodeStatusReceivedEventArgs { NodeId = parts[2], Online = online });
                     break;
                 case ["espresense", "rooms", _, _]:
-                {
-                    if (NodeSettingReceivedAsync != null)
-                        await NodeSettingReceivedAsync(new NodeSettingReceivedEventArgs
+                    {
+                        if (NodeSettingReceivedAsync != null)
+                            await NodeSettingReceivedAsync(new NodeSettingReceivedEventArgs
                             {
                                 NodeId = parts[2],
                                 Setting = parts[3],
                                 Payload = arg.ApplicationMessage.ConvertPayloadToString()
                             }
-                        );
-                    break;
-                }
+                            );
+                        break;
+                    }
                 case ["espresense", "devices", _, _]:
                     if (DeviceMessageReceivedAsync != null)
                     {
@@ -180,7 +183,9 @@ public class MqttCoordinator
                             });
                         }
                     }
-
+                    break;
+                case ["homeassistant", "device_tracker", _, "config"]:
+                    HandleDiscoveryMessage(arg.ApplicationMessage.Topic, arg.ApplicationMessage.ConvertPayloadToString());
                     break;
                 default:
                     if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(arg);
@@ -196,11 +201,21 @@ public class MqttCoordinator
 
     private bool ReadOnly => _mqttClient?.Options.ClientOptions.ClientId.ToLower().Contains("read") ?? false;
 
-    public async Task EnqueueAsync(string topic, string payload, bool retain = false)
+    public async Task EnqueueAsync(string topic, string? payload, bool retain = false)
     {
         if (!ReadOnly)
         {
             await _mqttClient.EnqueueAsync(topic, payload, retain: retain);
+        } else {
+            Log.Debug("ReadOnly, would have sent to " + topic + ": " + payload);
         }
     }
+
+    private void HandleDiscoveryMessage(string topic, string payload)
+    {
+        _logger.LogTrace($"Received discovery message on topic: {topic}");
+        if (AutoDiscovery.TryDeserialize(topic, payload, out var msg))
+            PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs { AutoDiscover = msg });
+  }
 }
+

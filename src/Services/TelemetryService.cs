@@ -1,11 +1,12 @@
-﻿using ESPresense.Utils;
+﻿using ESPresense.Models;
+using ESPresense.Utils;
 using Newtonsoft.Json;
 
 namespace ESPresense.Services;
 
 public class TelemetryService(MqttCoordinator mqtt) : BackgroundService
 {
-    private readonly Locators.Telemetry _telemetry = new() { Ip = IpUtils.GetLocalIpAddress() };
+    private readonly Telemetry _telemetry = new() { Ip = IpUtils.GetLocalIpAddress() };
 
     public void IncrementMalformedMessages()
     {

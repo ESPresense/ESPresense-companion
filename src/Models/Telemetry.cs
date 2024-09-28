@@ -1,6 +1,6 @@
 using ConcurrentCollections;
 
-namespace ESPresense.Locators
+namespace ESPresense.Models
 {
     public class Telemetry
     {

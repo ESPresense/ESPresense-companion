@@ -4,6 +4,8 @@ using DotNet.Globbing.Token;
 using ESPresense.Extensions;
 using ESPresense.Locators;
 using ESPresense.Services;
+using ESPresense.Weighting;
+using Serilog;
 
 namespace ESPresense.Models;
 
@@ -112,12 +114,6 @@ public class State
         foreach (var floor in Floors.Values) yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
         //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
         yield return new Scenario(Config, new NearestNode(device), "NearestNode");
-    }
-
-    public IEnumerable<Device> GetIdleDevices()
-    {
-        var now = DateTime.UtcNow;
-        return Devices.Values.Where(a => a is { Track: true, Confidence: > 0 } && now - a.LastCalculated > a.Timeout);
     }
 }
 
