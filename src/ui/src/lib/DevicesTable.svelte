@@ -15,7 +15,7 @@
 
 	let columns = [
 		{ key: 'id', title: 'Id', value: (d) => d.id, sortable: true, defaultSort: true },
-		{ key: 'name', title: 'Name', value: (d) => d.name, sortable: true },
+		{ key: 'name', title: 'Name', value: (d) => d.name ?? '', sortable: true },
 		{ key: 'room', title: 'Room / Floor', value: (d) => d.room?.name ?? d.floor?.name ?? 'n/a', sortable: true },
 		{ key: 'location.x', title: 'X', value: (d) => d.location?.x, sortable: true },
 		{ key: 'location.y', title: 'Y', value: (d) => d.location?.y, sortable: true },
