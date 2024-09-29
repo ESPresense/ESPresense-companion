@@ -83,7 +83,7 @@
                 <tr>
                     <th>Name</th>
                     {#each rxColumns as id}
-                        <th>Rx: {@html id}</th>
+                        <th>Rx: {id}</th>
                     {/each}
                 </tr>
             </thead>
