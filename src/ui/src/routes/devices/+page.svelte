@@ -7,7 +7,7 @@
 	<title>ESPresense Companion: Devices</title>
 </svelte:head>
 
-<div class="text-column">
-	<h1 class="h1">Devices</h1>
+<div class="container mx-auto p-2">
+	<h1 class="text-3xl font-bold my-2 px-2">Devices</h1>
 	<DevicesTable on:selected={(d) => detail(d.detail)} />
 </div>

@@ -1,12 +1,9 @@
 <script lang="ts">
 	import '../app.postcss';
-
-	import { computePosition, autoUpdate, offset, shift, flip, arrow } from '@floating-ui/dom';
 	import { base } from '$app/paths';
+	import { page } from '$app/stores';
 	import { AppShell, AppRail, AppRailAnchor, Drawer, Toast, Modal, initializeStores, storePopup } from '@skeletonlabs/skeleton';
-	import { beforeNavigate } from '$app/navigation';
-	import { updated } from '$app/stores';
-	import { history } from '$lib/stores';
+	import { computePosition, autoUpdate, offset, shift, flip, arrow } from '@floating-ui/dom';
 
 	import logo from '$lib/images/logo.svg';
 	import github from '$lib/images/github.svg';
@@ -14,20 +11,21 @@
 	import nodes from '$lib/images/nodes.svg';
 	import devices from '$lib/images/devices.svg';
 	import calibration from '$lib/images/calibration.svg';
+	import settings from '$lib/images/settings.svg';
 
 	initializeStores();
 
 	storePopup.set({ computePosition, autoUpdate, offset, shift, flip, arrow });
 
-	beforeNavigate(({ willUnload, to }) => {
-		var next = to?.url?.pathname;
-		if (next) $history = [next, ...$history];
-		if ($updated && !willUnload && to?.url) {
-			location.href = to.url.href;
-		}
-	});
 
-	$: current = $history[0];
+	$: current = $page.url.pathname;
+
+	const routes = [
+		{ href: '/', name: 'map', icon: map, alt: 'Map' },
+		{ href: '/devices', name: 'devices', icon: devices, alt: 'Devices' },
+		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
+		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' },
+	];
 </script>
 
 <div class="app h-full">
@@ -42,28 +40,19 @@
 					</AppRailAnchor>
 				</svelte:fragment>
 
-				<AppRailAnchor href="{base}/" name="map" selected={current == `${base}/`}>
-					<img src={map} class="px-6" alt="Map" />
-					<span>Map</span>
-				</AppRailAnchor>
-
-				<AppRailAnchor href="{base}/devices" name="devices" selected={current == `${base}/devices`}>
-					<img src={devices} class="px-6" alt="Devices" />
-					<span>Devices</span>
-				</AppRailAnchor>
-
-				<AppRailAnchor href="{base}/nodes" name="nodes" selected={current == `${base}/nodes`}>
-					<img src={nodes} class="px-6" alt="Nodes" />
-					<span>Nodes</span>
-				</AppRailAnchor>
-
-				<AppRailAnchor href="{base}/calibration" name="calibration" selected={current == `${base}/calibration`}>
-					<img src={calibration} class="px-4" alt="Calibration" />
-					<span>Calibration</span>
-				</AppRailAnchor>
+				{#each routes as route}
+					<AppRailAnchor
+						href="{base}{route.href}"
+						name={route.name}
+						selected={current === `${base}${route.href}`}
+					>
+						<img src={route.icon} class="px-6" alt={route.alt} />
+						<span>{route.alt}</span>
+					</AppRailAnchor>
+				{/each}
 
 				<svelte:fragment slot="trail">
-					<AppRailAnchor regionIcon="w-8" href="https://github.com/ESPresense/ESPresense-companion" target="_blank">
+					<AppRailAnchor href="https://github.com/ESPresense/ESPresense-companion" target="_blank">
 						<img src={github} class="px-4" alt="GitHub" />
 					</AppRailAnchor>
 				</svelte:fragment>
