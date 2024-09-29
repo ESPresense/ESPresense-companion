@@ -39,6 +39,22 @@ history:
   enabled: false # Enable to log history to db (Beta)
   expire_after: 24h # Expire after 24 hours
 
+locators:
+  # Define localization algorithms and their properties
+  - algorithm: nadarayaWatson  # or nealderMead, but not both
+    # Specify floors where this algorithm is applicable
+    floors: ["first", "second", "outside"]
+    props:
+      # Add algorithm-specific properties here
+      bandwidth: 0.5
+      kernel: "gaussian"
+
+  - algorithm: nearestNode
+    props:
+      # Add algorithm-specific properties here
+      maxDistance: 10
+      weightByDistance: true
+
 weighting:
   algorithm: gaussian
   props:
