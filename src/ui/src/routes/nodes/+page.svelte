@@ -6,8 +6,8 @@
 	<title>ESPresense Companion: Nodes</title>
 </svelte:head>
 
-<div class="text-column">
-	<h1 class="h1">Nodes</h1>
+<div class="container mx-auto p-2">
+	<h1 class="text-3xl font-bold my-2 px-2">Nodes</h1>
 
 	<NodesTable />
 </div>

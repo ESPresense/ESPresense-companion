@@ -31,7 +31,7 @@
 	}
 </script>
 
-<div class="table-container p-2">
+<div class="p-2">
 	{#if $devices}
 		<SvelteTable {columns} classNameTable="table table-hover table-compact" rows={$devices} on:clickRow={onRowClick} sortBy="id" />
 	{/if}
