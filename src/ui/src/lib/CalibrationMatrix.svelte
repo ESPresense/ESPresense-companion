@@ -63,7 +63,7 @@
 		{#each rxColumns as id2 (id2)}
 			<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
 				{#if n1[id2]}
-					Expected {@html Number(n1[id2].expected?.toPrecision(3))} - Actual {@html Number(n1[id2]?.actual?.toPrecision(3))} = Error {@html Number(n1[id2]?.err?.toPrecision(3))}
+					Expected {Number(n1[id2].expected?.toPrecision(3))} - Actual {Number(n1[id2]?.actual?.toPrecision(3))} = Error {Number(n1[id2]?.err?.toPrecision(3))}
 				{:else}
 					No beacon Received in last 30 seconds
 				{/if}
@@ -103,7 +103,7 @@
 							<td>Tx: {id1}</td>
 							{#each rxColumns as id2 (id2)}
 								{#if n1[id2]}
-									<td use:popup={{ event: 'hover', target: 'popup-' + id1 + '-' + id2, placement: 'top' }} style={coloring(n1[id2]?.percent)}>{@html value(n1[id2], data_point)}</td>
+									<td use:popup={{ event: 'hover', target: 'popup-' + id1 + '-' + id2, placement: 'top' }} style={coloring(n1[id2]?.percent)}>{value(n1[id2], data_point)}</td>
 								{:else}
 									<td />
 								{/if}

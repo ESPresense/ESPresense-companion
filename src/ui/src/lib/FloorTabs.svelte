@@ -16,7 +16,7 @@
 		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
 			{#if $config?.floors}
 				{#each $config?.floors as { id, name }}
-					<RadioItem bind:group={floorId} {name} value={id}>{@html name}</RadioItem>
+					<RadioItem bind:group={floorId} {name} value={id}>{name}</RadioItem>
 				{/each}
 			{/if}
 		</RadioGroup>
