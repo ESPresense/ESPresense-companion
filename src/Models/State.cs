@@ -6,13 +6,21 @@ using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Weighting;
 using Serilog;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
+using System.IO;
 
 namespace ESPresense.Models;
 
+
+
 public class State
 {
+    private List<LocatorConfig> _locators;
+
     public State(ConfigLoader cl)
     {
+        LoadLocatorConfig();
         IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
         {
             if (floorIds == null) yield break;
@@ -100,7 +108,6 @@ public class State
                     Tx = tx,
                     Rx = rx,
                 });
-
             }
 
         if (OptimizationSnaphots.Count > Config?.Optimization.MaxSnapshots) OptimizationSnaphots.RemoveAt(0);
@@ -111,9 +118,24 @@ public class State
 
     public IEnumerable<Scenario> GetScenarios(Device device)
     {
-        foreach (var floor in Floors.Values) yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this), floor.Name);
-        //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
-        yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+        foreach (var locator in _locators)
+        {
+                foreach (var floor in Floors.Values)
+                {
+                    switch (locator.Algorithm.ToLower())
+                    {
+                        case "nealdermead":
+                            yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+                            break;
+                        case "nadarayawatson":
+                            yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this), floor.Name);
+                            break;
+                        case "nearestnode":
+                            yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+                    }
+                }
+            }
+        }
     }
 
     public bool ShouldTrack(Device device)

@@ -92,6 +92,13 @@ namespace ESPresense.Models
         public TimeSpan ExpireAfterTimeSpan => ExpireAfter.TryParseDurationString(out var ts) ? ts : TimeSpan.FromHours(24);
     }
 
+    public class LocatorConfig
+    {
+        [YamlMember(Alias = "algorithm")] public string? Algorithm { get; set; }
+        [YamlMember(Alias = "floors")] public string[]? Floors { get; set; }
+        [YamlMember(Alias = "props")] public Dictionary<string, double> Props { get; set; } = new();
+    }
+
     public class ConfigWeighting
     {
         [YamlMember(Alias = "algorithm")]

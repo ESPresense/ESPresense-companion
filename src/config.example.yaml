@@ -44,6 +44,15 @@ weighting:
   props:
     sigma: 0.10
 
+locators:
+  - algorithm: nealderMead (or nadaraya)
+    floors: ["first", "second", "outside"]
+    props:
+      key: value
+  - algorithm: nearestNode
+    props:
+      key: value
+
 # Floors w/ the points to draw it in meters
 floors:
   - id: first
