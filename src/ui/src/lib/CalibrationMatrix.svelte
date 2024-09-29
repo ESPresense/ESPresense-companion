@@ -90,7 +90,7 @@
             <tbody>
                 {#each Object.entries($calibration.matrix) as [id1, n1] (id1)}
                     <tr>
-                        <td>Tx: {@html id1}</td>
+                        <td>Tx: {id1}</td>
                         {#each rxColumns as id2 (id2)}
                             {#if n1[id2]}
                                 <td use:popup={{ event: 'hover', target: 'popup-' + id1 + '-' + id2, placement: 'top' }} style={coloring(n1[id2]?.percent)}>{@html value(n1[id2], data_point)}</td>
