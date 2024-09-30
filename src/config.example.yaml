@@ -209,3 +209,7 @@ devices:
   - id: "keys:*"
   - id: "therm:*"
   - id: "iBeacon:*"
+
+# Devices to NOT track
+exclude_devices:
+  - id: "iBeacon:e5ca1ade-f007-ba11-0000-000000000000-*" # These are junk, we alias them to node:*

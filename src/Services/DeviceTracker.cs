@@ -117,30 +117,13 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
         }
     }
 
-    private bool ShouldTrackDevice(Device device)
-    {
-        if (state.ConfigDeviceById.TryGetValue(device.Id, out var cdById))
-        {
-            if (!string.IsNullOrWhiteSpace(cdById.Name))
-                device.Name = cdById.Name;
-            return true;
-        }
-        if (!string.IsNullOrWhiteSpace(device.Name) && state.ConfigDeviceByName.TryGetValue(device.Name, out _))
-            return true;
-        if (!string.IsNullOrWhiteSpace(device.Id) && state.IdsToTrack.Any(a => a.IsMatch(device.Id)))
-            return true;
-        if (!string.IsNullOrWhiteSpace(device.Name) && state.NamesToTrack.Any(a => a.IsMatch(device.Name)))
-            return true;
-        return false;
-    }
-
     private async Task<bool> CheckDeviceAsync(Device device)
     {
         var wasTracked = device.Track;
         if (device.Check)
         {
             Log.Debug("Checking {Device}", device);
-            device.Track = ShouldTrackDevice(device);
+            device.Track = state.ShouldTrack(device);
             device.Check = false;
         }
         if (device.Track != wasTracked)
