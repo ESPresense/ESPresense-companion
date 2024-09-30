@@ -27,7 +27,11 @@ namespace ESPresense.Models
         [YamlMember(Alias = "nodes")]
         public ConfigNode[] Nodes { get; set; } = Array.Empty<ConfigNode>();
 
-        [YamlMember(Alias = "devices")] public ConfigDevice[] Devices { get; set; } = Array.Empty<ConfigDevice>();
+        [YamlMember(Alias = "devices")]
+        public ConfigDevice[] Devices { get; set; } = Array.Empty<ConfigDevice>();
+
+        [YamlMember(Alias = "exclude_devices")]
+        public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
 
         [YamlMember(Alias = "history")]
         public ConfigHistory History { get; set; } = new();

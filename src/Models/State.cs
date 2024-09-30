@@ -115,5 +115,32 @@ public class State
         //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
         yield return new Scenario(Config, new NearestNode(device), "NearestNode");
     }
-}
 
+    public bool ShouldTrack(Device device)
+    {
+        if (IsExcluded(device))
+            return false;
+
+        if (ConfigDeviceById.TryGetValue(device.Id, out var cdById))
+        {
+            if (!string.IsNullOrWhiteSpace(cdById.Name))
+                device.Name = cdById.Name;
+            return true;
+        }
+        if (!string.IsNullOrWhiteSpace(device.Name) && ConfigDeviceByName.TryGetValue(device.Name, out _))
+            return true;
+        if (!string.IsNullOrWhiteSpace(device.Id) && IdsToTrack.Any(a => a.IsMatch(device.Id)))
+            return true;
+        if (!string.IsNullOrWhiteSpace(device.Name) && NamesToTrack.Any(a => a.IsMatch(device.Name)))
+            return true;
+        return false;
+    }
+
+    private bool IsExcluded(Device device)
+    {
+        return Config?.ExcludeDevices.Any(d =>
+            (!string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(device.Id) && Glob.Parse(d.Id).IsMatch(device.Id)) ||
+            (!string.IsNullOrWhiteSpace(d.Name) && !string.IsNullOrWhiteSpace(device.Name) && Glob.Parse(d.Name).IsMatch(device.Name))
+        ) ?? false;
+    }
+}
