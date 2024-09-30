@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 using System.Text.Json.Serialization;
 using ESPresense.Converters;
 using MathNet.Spatial.Euclidean;
@@ -16,10 +17,11 @@ public class Device
 
     public override string ToString()
     {
-        if (Track)
-            return $"{nameof(Id)}: {Id}";
-        else
-            return $"Untracked {nameof(Id)}: {Id}";
+        StringBuilder sb = new();
+        sb.Append($"{nameof(Id)}: {Id}");
+        if (!string.IsNullOrEmpty(Name)) sb.Append($", {nameof(Name)}: {Name}");
+        if (!Track) sb.Append($", {nameof(Track)}: {Track}");
+        return sb.ToString();
     }
 
     public string Id { get; init; }

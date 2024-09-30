@@ -43,54 +43,68 @@ async function getConfig() {
 
 getConfig();
 
-export const devices = readable<Device[]>([], function start(set) {
-	let deviceMap = new Map();
+export const showUntracked = writable<boolean>(false);
 
-	function updateDevicesFromMap() {
-		var a = Array.from(deviceMap.values());
-		set(a);
-	}
+export const devices = derived<[typeof showUntracked], Device[]>(
+	[showUntracked],
+	([$showUntracked], set) => {
+		let deviceMap = new Map();
+		var q = (new URLSearchParams({
+			showUntracked: $showUntracked ? "true" : "false"
+		})).toString();
 
-	function fetchDevices() {
-		fetch(`${base}/api/state/devices`)
-			.then((d) => d.json())
-			.then((r) => {
-				deviceMap = new Map(r.map((device) => [device.id, device]));
-				updateDevicesFromMap();
-			})
-			.catch((ex) => {
-				console.log(ex);
-			});
-	}
+		function updateDevicesFromMap() {
+			const devicesArray = Array.from(deviceMap.values());
+			set(devicesArray);
+		}
 
-	fetchDevices();
+		function fetchDevices() {
 
-	const interval = setInterval(() => {
+			fetch(`${base}/api/state/devices?${q}`)
+				.then((d) => d.json())
+				.then((r) => {
+					deviceMap = new Map(r.map((device: Device) => [device.id, device]));
+					updateDevicesFromMap();
+				})
+				.catch((ex) => {
+					console.error('Error fetching devices:', ex);
+				});
+		}
+
 		fetchDevices();
-	}, 60000);
 
-	function setupWebsocket() {
-		var loc = new URL(`${base}/ws`, window.location.href);
-		var new_uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + loc.pathname;
-		socket = new WebSocket(new_uri);
-		socket.addEventListener('message', async function (event) {
-			var eventData = JSON.parse(event.data);
-			if (eventData.type === 'deviceChanged' && eventData.data?.id) {
-				deviceMap.set(eventData.data.id, eventData.data);
-				updateDevicesFromMap();
-			} else if (eventData.type == 'configChanged') {
-				getConfig();
-			} else if (eventData.type == 'time') relative.set(eventData.data);
-			else console.log(event.data);
-		});
+		const interval = setInterval(fetchDevices, 60000);
+
+		function setupWebsocket() {
+			const loc = new URL(`${base}/ws?${q}`, window.location.href);
+			const new_uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + loc.pathname + loc.search;
+			const socket = new WebSocket(new_uri);
+
+			socket.addEventListener('message', async function (event) {
+				const eventData = JSON.parse(event.data);
+				if (eventData.type === 'deviceChanged' && eventData.data?.id) {
+					deviceMap.set(eventData.data.id, eventData.data);
+					updateDevicesFromMap();
+				} else if (eventData.type === 'configChanged') {
+					getConfig();
+				} else if (eventData.type === 'time') {
+					relative.set(eventData.data);
+				} else {
+					console.log('Unhandled websocket event:', event.data);
+				}
+			});
+
+			return socket;
+		}
+
+		const socket = setupWebsocket();
+
+		return () => {
+			clearInterval(interval);
+			socket.close();
+		};
 	}
-
-	setupWebsocket();
-
-	return function stop() {
-		clearInterval(interval);
-	};
-});
+);
 
 export const nodes = readable<Node[]>([], function start(set) {
 	var errors = 0;
