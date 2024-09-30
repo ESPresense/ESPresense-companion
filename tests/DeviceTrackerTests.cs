@@ -1,4 +1,5 @@
 using System.Reflection;
+using ESPresense.Controllers;
 using ESPresense.Locators;
 using ESPresense.Models;
 using ESPresense.Services;
@@ -29,7 +30,7 @@ public class DeviceTrackerTests
     {
         var configLoader = new ConfigLoader("config");
         var mqtt = new MqttCoordinator(configLoader, null, null);
-        var locator = new DeviceTracker(new State(configLoader), mqtt, new TelemetryService(mqtt));
+        var locator = new DeviceTracker(new State(configLoader), mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher());
         // Use testData to test locator...
         // Assert.That(result, Is.EqualTo(expectedResult));
     }

@@ -67,7 +67,7 @@ public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator
                         }, SerializerSettings.NullIgnore)
                     );
 
-                globalEventDispatcher.OnDeviceChanged(device);
+                globalEventDispatcher.OnDeviceChanged(device, false);
                 if (state?.Config?.History?.Enabled ?? false)
                 {
                     foreach (var ds in device.Scenarios.Where(ds => ds.Confidence != 0))

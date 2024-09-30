@@ -13,9 +13,9 @@ public class GlobalEventDispatcher()
         NodeStateChanged?.Invoke(this, new NodeStateEventArgs(state));
     }
 
-    public void OnDeviceChanged(Device device)
+    public void OnDeviceChanged(Device device, bool trackChanged)
     {
-        DeviceStateChanged?.Invoke(this, new DeviceEventArgs(device));
+        DeviceStateChanged?.Invoke(this, new DeviceEventArgs(device, trackChanged));
     }
 
     public void OnCalibrationChanged(Calibration calibration)
@@ -29,9 +29,10 @@ public class NodeStateEventArgs(NodeState state) : EventArgs
     public NodeState NodeState { get; } = state;
 }
 
-public class DeviceEventArgs(Device device) : EventArgs
+public class DeviceEventArgs(Device device, bool trackChanged) : EventArgs
 {
     public Device Device { get; } = device;
+    public bool TrackChanged { get; } = trackChanged;
 }
 
 public class CalibrationEventArgs(Calibration calibration) : EventArgs

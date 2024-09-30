@@ -40,9 +40,11 @@ public class StateController : ControllerBase
 
     // GET: api/rooms
     [HttpGet("api/state/devices")]
-    public IEnumerable<Device> GetDevices()
+    public IEnumerable<Device> GetDevices([FromQuery] bool showUntracked = false)
     {
-        return _state.Devices.Values.Where(a => a is { Track: true });
+        IEnumerable<Device> d = _state.Devices.Values;
+        if (!showUntracked) d = d.Where(a => a is { Track: true });
+        return d;
     }
 
     // GET: api/config
@@ -81,7 +83,7 @@ public class StateController : ControllerBase
 
     [ApiExplorerSettings(IgnoreApi = true)]
     [Route("/ws")]
-    public async Task Get()
+    public async Task Get([FromQuery] bool showUntracked = false)
     {
         if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
@@ -99,7 +101,11 @@ public class StateController : ControllerBase
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
         void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => EnqueueAndSignal(new { type = "calibrationChanged", data = e.Calibration });
         void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => EnqueueAndSignal(new { type = "nodeStateChanged", data = e.NodeState });
-        void OnDeviceChanged(object? sender, DeviceEventArgs e) => EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
+        void OnDeviceChanged(object? sender, DeviceEventArgs e)
+        {
+            if (showUntracked || (e.Device?.Track ?? false) || e.TrackChanged)
+                EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
+        };
 
         _config.ConfigChanged += OnConfigChanged;
         _eventDispatcher.CalibrationChanged += OnCalibrationChanged;

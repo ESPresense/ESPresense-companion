@@ -1,10 +1,11 @@
 ﻿using System.Threading.Channels;
+using ESPresense.Controllers;
 using ESPresense.Models;
 using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService tele) : BackgroundService
+public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
 {
     private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
     private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
@@ -91,9 +92,11 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
         await foreach (var device in _toProcessChannel.Reader.ReadAllAsync(stoppingToken))
         {
             if (stoppingToken.IsCancellationRequested) break;
-            await CheckDeviceAsync(device);
+            var trackChanged = await CheckDeviceAsync(device);
             if (device.Track)
                 await _toLocateChannel.Writer.WriteAsync(device, stoppingToken);
+            else
+                globalEventDispatcher.OnDeviceChanged(device, trackChanged);
         }
     }
 
@@ -131,7 +134,7 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
         return false;
     }
 
-    private async Task CheckDeviceAsync(Device device)
+    private async Task<bool> CheckDeviceAsync(Device device)
     {
         var wasTracked = device.Track;
         if (device.Check)
@@ -155,7 +158,9 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
                 foreach (var ad in device.HassAutoDiscovery)
                     await ad.Delete(mqtt);
             }
+            return true;
         }
+        return false;
     }
 
     public IAsyncEnumerable<Device> GetConsumingEnumerable(CancellationToken cancellationToken)
