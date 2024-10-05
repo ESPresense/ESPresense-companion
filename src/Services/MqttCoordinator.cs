@@ -172,20 +172,17 @@ public class MqttCoordinator
         }
         catch (JsonSerializationException ex)
         {
-            _logger.LogError(ex, "JSON deserialization error for topic {Topic}. Payload: {Payload}",
-                arg.ApplicationMessage.Topic, payload);
+            _logger.LogError(ex, "JSON deserialization error for topic {Topic}. Payload: {Payload}", arg.ApplicationMessage.Topic, payload);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
         catch (MqttMessageProcessingException ex)
         {
-            _logger.LogError(ex, "Error processing {MessageType} message for topic {Topic}. Payload: {Payload}",
-                ex.MessageType, ex.Topic, ex.Payload);
+            _logger.LogError(ex, "Error processing {MessageType} message for topic {Topic}. Payload: {Payload}", ex.MessageType, ex.Topic, ex.Payload);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error processing message for topic {Topic}. Payload: {Payload}",
-                arg.ApplicationMessage.Topic, payload);
+            _logger.LogError(ex, "Unexpected error processing message for topic {Topic}. Payload: {Payload}", arg.ApplicationMessage.Topic, payload);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
     }
