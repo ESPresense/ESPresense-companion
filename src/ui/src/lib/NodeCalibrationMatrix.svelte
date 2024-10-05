@@ -4,6 +4,8 @@
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
+	import SlideToggle from '$lib/SlideToggle.svelte';
+	import { onMount } from 'svelte';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -80,6 +82,55 @@
 	let data_point: DataPoint = 0;
 
 	const toastStore = getToastStore();
+	let autoOptimization = false;
+	let autoOptimizationLoaded = false;
+	let autoOptimizationBusy = false;
+
+	async function fetchAutoOptimizationState() {
+		try {
+			const response = await fetch(resolve('/api/state/calibration/autoOptimize'));
+			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+			const data = await response.json();
+			autoOptimization = !!data.autoOptimize;
+		} catch (error) {
+			console.error('Error fetching auto-optimization state:', error);
+			toastStore.trigger({
+				message: error instanceof Error ? error.message : 'Failed to load auto-optimization state',
+				background: 'preset-filled-error-500'
+			});
+		} finally {
+			autoOptimizationLoaded = true;
+		}
+	}
+
+	async function toggleAutoOptimization() {
+		if (!autoOptimizationLoaded || autoOptimizationBusy) return;
+		autoOptimizationBusy = true;
+		const desiredState = autoOptimization;
+
+		try {
+			const response = await fetch(resolve('/api/state/calibration/autoOptimize'), {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(desiredState)
+			});
+
+			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+			const data = await response.json();
+			autoOptimization = !!data.autoOptimize;
+		} catch (error) {
+			console.error('Error toggling auto-optimization:', error);
+			autoOptimization = !desiredState;
+			toastStore.trigger({
+				message: error instanceof Error ? error.message : 'Failed to toggle auto-optimization',
+				background: 'preset-filled-error-500'
+			});
+		} finally {
+			autoOptimizationBusy = false;
+		}
+	}
 
 	async function resetCalibration() {
 		const confirmed = await showConfirm({
@@ -108,6 +159,8 @@
 			});
 		}
 	}
+
+	onMount(fetchAutoOptimizationState);
 </script>
 
 <div class="h-full overflow-y-auto">
@@ -156,7 +209,17 @@
 							<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
 							<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
 						</div>
-						<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
+						<div class="flex flex-wrap items-center gap-3">
+							<SlideToggle
+								name="auto-optimization"
+								bind:checked={autoOptimization}
+								disabled={!autoOptimizationLoaded || autoOptimizationBusy}
+								on:click={toggleAutoOptimization}
+							>
+								Auto Optimization
+							</SlideToggle>
+							<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
+						</div>
 					</div>
 				</div>
 				<div class="overflow-x-auto">
@@ -194,4 +257,3 @@
 		{/if}
 	</div>
 </div>
-

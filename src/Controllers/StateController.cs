@@ -389,6 +389,22 @@ public class StateController : ControllerBase
             return StatusCode(500, new { error = "An error occurred while resetting calibration" });
         }
     }
+    
+    [HttpGet("api/state/calibration/autoOptimize")]
+    public IActionResult GetAutoOptimize()
+    {
+        var c = _config.Config;
+        return Ok(new { autoOptimize = c?.Optimization.Enabled ?? false });
+    }
+
+    [HttpPost("api/state/calibration/autoOptimize")]
+    public IActionResult ToggleAutoOptimize([FromBody] bool enable)
+    {
+        var c = _config.Config;
+        if (c != null) c.Optimization.Enabled = enable;
+
+        return Ok(new { autoOptimize = c?.Optimization.Enabled ?? false });
+    }
 }
 
 public class WebSocketCommand
