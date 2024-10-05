@@ -2,6 +2,8 @@
 	import { calibration } from '$lib/stores';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
 	import { popup } from '@skeletonlabs/skeleton';
+	import { SlideToggle } from '@skeletonlabs/skeleton';
+	import { onMount } from 'svelte';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -56,6 +58,40 @@
 	}
 
 	let data_point: DataPoint = 0;
+	let autoOptimization = false;
+
+	async function fetchAutoOptimizationState() {
+		const response = await fetch('/api/state/calibration/autoOptimize');
+		const data = await response.json();
+		autoOptimization = data.autoOptimize;
+	}
+
+	async function toggleAutoOptimization() {
+		try {
+			const newState = !autoOptimization;
+			const response = await fetch('/api/state/calibration/autoOptimize', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(newState),
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				autoOptimization = data.autoOptimize;
+				console.log('Auto-optimization toggled:', autoOptimization);
+			} else {
+				console.error('Failed to toggle auto-optimization');
+			}
+		} catch (error) {
+			console.error('Error toggling auto-optimization:', error);
+		}
+	}
+
+	onMount(() => {
+		fetchAutoOptimizationState();
+	});
 </script>
 
 {#if $calibration?.matrix}
@@ -76,7 +112,7 @@
 <div class="card p-2">
 	{#if $calibration?.matrix}
 		<header>
-			<div class="flex justify-center p-2">
+			<div class="flex justify-between items-center p-2">
 				<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
 					<RadioItem bind:group={data_point} name="justify" value={0}>Error %</RadioItem>
 					<RadioItem bind:group={data_point} name="justify" value={1}>Error (m)</RadioItem>
@@ -85,6 +121,10 @@
 					<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
 					<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
 				</RadioGroup>
+				<div class="flex items-center space-x-2">
+					<span>Auto Optimization</span>
+					<SlideToggle name="auto-optimization" bind:checked={autoOptimization} on:change={toggleAutoOptimization} />
+				</div>
 			</div>
 		</header>
 		<section class="p-4 pt-0">
