@@ -122,6 +122,26 @@ export interface Release {
 	name: string;
 }
 
+export interface CalibrationMatrix {
+	[txName: string]: {
+		[rxName: string]: {
+			tx_ref_rssi?: number;
+			rx_adj_rssi?: number;
+			absorption?: number;
+			expected: number;
+			actual: number;
+			rssi: number;
+			err: number;
+			percent: number;
+			var?: number;
+		};
+	};
+}
+
+export interface CalibrationResponse {
+	matrix: CalibrationMatrix;
+}
+
 export function isNode(d: Device | Node | null): d is Node {
 	return (d as Node)?.telemetry !== undefined;
 }
