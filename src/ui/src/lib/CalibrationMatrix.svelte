@@ -2,6 +2,7 @@
 	import { calibration } from '$lib/stores';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
 	import { popup } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '@skeletonlabs/skeleton';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -56,6 +57,30 @@
 	}
 
 	let data_point: DataPoint = 0;
+
+	const toastStore = getToastStore();
+
+	async function resetCalibration() {
+		try {
+			const response = await fetch('/api/state/calibration/reset', { method: 'POST' });
+			if (response.ok) {
+				toastStore.trigger({
+					message: 'Calibration reset successfully',
+					background: 'variant-filled-success'
+				});
+				// Optionally, you can refresh the calibration data here
+				// For example: await calibration.refresh();
+			} else {
+				throw new Error('Failed to reset calibration');
+			}
+		} catch (error) {
+			console.error('Error resetting calibration:', error);
+			toastStore.trigger({
+				message: 'Failed to reset calibration',
+				background: 'variant-filled-error'
+			});
+		}
+	}
 </script>
 
 {#if $calibration?.matrix}
@@ -76,7 +101,7 @@
 <div class="card p-2">
 	{#if $calibration?.matrix}
 		<header>
-			<div class="flex justify-center p-2">
+			<div class="flex justify-between items-center p-2">
 				<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
 					<RadioItem bind:group={data_point} name="justify" value={0}>Error %</RadioItem>
 					<RadioItem bind:group={data_point} name="justify" value={1}>Error (m)</RadioItem>
@@ -85,6 +110,7 @@
 					<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
 					<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
 				</RadioGroup>
+				<button class="btn variant-filled-warning" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
 		</header>
 		<section class="p-4 pt-0">

@@ -42,7 +42,7 @@ floors:
   - id: first
     name: First Floor
     # Bounds (x,y,z) of map in meters
-    bounds: [[0, 0, 0], [17, 18, 1.5]]
+    bounds: [[0, 0, 0], [17, 18, 3]]
     rooms:
       - name: Powder
         points:
@@ -120,7 +120,7 @@ floors:
           - [0, 7.5]
   - id: second
     name: Second Floor
-    bounds: [[0, 0, 3.1], [17, 18, 4.6]]
+    bounds: [[0, 0, 3], [17, 18, 5.5]]
     rooms:
       - name: Master
         points:
@@ -164,34 +164,43 @@ floors:
 # Locations of espresense nodes in meters
 nodes:
   - name: Master
-    point: [9.4, 13.7, 3.6]
+    point: [3.25, 11, 3.2]
     floors: ["second"]
   - name: Bathroom
-    point: [0.1, 10, 3.9]
+    point: [0.05, 9, 3.9]
     floors: ["second", "outside"]
   - name: Upstairs Hallway
-    point: [12, 10, 3.2]
+    point: [13, 7, 3.33]
     floors: ["second"]
   - name: Garage
     point: [0.75, 16.8, 0.5]
-    floors: ["first", "second", "outside"]
+    floors: ["first", "outside"]
   - name: Office
-    point: [6.75, 15, 3.6]
+    point: [6.75, 15.75, 3.6]
     floors: ["second"]
   - name: Family
     point: [0.25, 0.4, 0.3]
     floors: ["first", "outside"]
   - name: Kitchen
-    point: [9, 9, 0.85]
+    point: [9.5, 9, 1]
+    floors: ["first"]
+  - name: Nook
+    point: [9, 2, 0.33]
     floors: ["first"]
   - name: Dining
     point: [16.25, 3, 1.29]
     floors: ["first", "outside"]
   - name: Basement
     point: [16, 13, -1]
-    floors: ["first", "second", "outside"]
+    floors: ["first", "outside"]
   - name: Laundry
-    point: [4.6, 7.5, 1]
+    point: [5.1, 7.5, 1]
+    floors: ["first"]
+  - name: Back Stairs
+    point: [5.2, 7.5, 3.33]
+    floors: ["first", "second"]
+  - name: Foyer
+    point: [10,10.9,0.33]
     floors: ["first"]
   - name: Mini
     stationary: false
@@ -209,6 +218,10 @@ devices:
   - id: "keys:*"
   - id: "therm:*"
   - id: "iBeacon:*"
+  - id: "car:*"
+  - id: "laptop:*"
+  - id: "itag:f0f010303080"
+    name: "Piper's Backpack"
 
 # Devices to NOT track
 exclude_devices:

@@ -15,11 +15,11 @@ namespace ESPresense.Services
         public async Task Set(string id, NodeSettings ds)
         {
             var old = Get(id);
-            if (ds.Absorption != null && ds.Absorption != old.Absorption)
+            if (ds.Absorption == null || ds.Absorption != old.Absorption)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Absorption:0.00}");
-            if (ds.RxAdjRssi != null && ds.RxAdjRssi != old.RxAdjRssi)
+            if (ds.RxAdjRssi == null || ds.RxAdjRssi != old.RxAdjRssi)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.RxAdjRssi}");
-            if (ds.TxRefRssi != null && ds.TxRefRssi != old.TxRefRssi)
+            if (ds.TxRefRssi == null || ds.TxRefRssi != old.TxRefRssi)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.TxRefRssi}");
         }
 
