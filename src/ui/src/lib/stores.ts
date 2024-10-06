@@ -1,6 +1,6 @@
 import { readable, writable, derived } from 'svelte/store';
 import { base } from '$app/paths';
-import type { Device, Config, Node } from './types';
+import type { Device, Config, Node, CalibrationResponse } from './types';
 
 export const showAll: SvelteStore<boolean> = writable(false);
 export const config = writable<Config>();
@@ -131,7 +131,7 @@ export const nodes = readable<Node[]>([], function start(set) {
 	};
 });
 
-export const calibration = readable({}, function start(set) {
+export const calibration = readable<CalibrationResponse>({matrix: {}}, function start(set) {
 	async function fetchAndSet() {
 		const response = await fetch(`${base}/api/state/calibration`);
 		var data = await response.json();

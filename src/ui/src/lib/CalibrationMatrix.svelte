@@ -2,6 +2,8 @@
 	import { calibration } from '$lib/stores';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
 	import { popup } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '@skeletonlabs/skeleton';
+	import { getModalStore } from '@skeletonlabs/skeleton';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -48,14 +50,51 @@
 
 	let rxColumns: Array<string> = [];
 	$: {
+		const matrix = $calibration?.matrix ?? {};
 		const rxSet = new Set<string>();
-		Object.values($calibration?.matrix ?? {}).forEach((n1) => {
+		Object.keys(matrix).forEach((key) => rxSet.add(key));
+		Object.values(matrix).forEach((n1) => {
 			Object.keys(n1).forEach((key) => rxSet.add(key));
 		});
 		rxColumns = Array.from(rxSet);
 	}
 
 	let data_point: DataPoint = 0;
+
+	const toastStore = getToastStore();
+	const modalStore = getModalStore();
+
+	async function resetCalibration() {
+		const confirmed = await new Promise(resolve => {
+			modalStore.trigger({
+				type: 'confirm',
+				title: 'Reset Calibration',
+				body: 'Are you sure you want to reset the calibration? This will reset rx_adj_rssi, tx_ref_rssi, and absorption for all nodes. This action cannot be undone.',
+				response: (r: boolean) => resolve(r)
+			});
+		});
+
+		if (!confirmed) return;
+
+		try {
+			const response = await fetch('/api/state/calibration/reset', { method: 'POST' });
+			if (response.ok) {
+				toastStore.trigger({
+					message: 'Calibration reset successfully',
+					background: 'variant-filled-success'
+				});
+			} else {
+				const errorText = await response.text();
+				throw new Error(`Server error ${response.status}: ${errorText}`);
+			}
+		} catch (error) {
+			console.error('Error resetting calibration:', error);
+			toastStore.trigger({
+				message: `Failed to reset calibration: ${error.message}`,
+				background: 'variant-filled-error'
+			});
+		}
+	}
 </script>
 
 {#if $calibration?.matrix}
@@ -76,7 +115,7 @@
 <div class="card p-2">
 	{#if $calibration?.matrix}
 		<header>
-			<div class="flex justify-center p-2">
+			<div class="flex justify-between items-center p-2">
 				<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
 					<RadioItem bind:group={data_point} name="justify" value={0}>Error %</RadioItem>
 					<RadioItem bind:group={data_point} name="justify" value={1}>Error (m)</RadioItem>
@@ -85,6 +124,7 @@
 					<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
 					<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
 				</RadioGroup>
+				<button class="btn variant-filled-warning" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
 		</header>
 		<section class="p-4 pt-0">

@@ -135,6 +135,30 @@ public class StateController : ControllerBase
             _eventDispatcher.DeviceStateChanged -= OnDeviceChanged;
         }
     }
+
+    [HttpPost("api/state/calibration/reset")]
+    public async Task<IActionResult> ResetCalibration()
+    {
+        try
+        {
+            // Reset calibration for all nodes
+            foreach (var node in _state.Nodes.Values)
+            {
+                var nodeSettings = _nsd.Get(node.Id);
+                nodeSettings.TxRefRssi = null;
+                nodeSettings.RxAdjRssi = null;
+                nodeSettings.Absorption = null;
+                await _nsd.Set(node.Id, nodeSettings);
+            }
+
+            return Ok(new { message = "Calibration reset successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting calibration");
+            return StatusCode(500, new { error = "An error occurred while resetting calibration" });
+        }
+    }
 }
 
 
