@@ -84,12 +84,13 @@
 					background: 'variant-filled-success'
 				});
 			} else {
-				throw new Error('Failed to reset calibration');
+				const errorText = await response.text();
+				throw new Error(`Server error ${response.status}: ${errorText}`);
 			}
 		} catch (error) {
 			console.error('Error resetting calibration:', error);
 			toastStore.trigger({
-				message: 'Failed to reset calibration',
+				message: `Failed to reset calibration: ${error.message}`,
 				background: 'variant-filled-error'
 			});
 		}
