@@ -15,12 +15,12 @@ namespace ESPresense.Services
         public async Task Set(string id, NodeSettings ds)
         {
             var old = Get(id);
-            if (ds.Absorption == null || ds.Absorption != old.Absorption)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Absorption:0.00}");
-            if (ds.RxAdjRssi == null || ds.RxAdjRssi != old.RxAdjRssi)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.RxAdjRssi}");
-            if (ds.TxRefRssi == null || ds.TxRefRssi != old.TxRefRssi)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.TxRefRssi}");
+            if (ds.Absorption == null || ds.Calibration.Absorption != old.Calibration.Absorption)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Calibration.Absorption:0.00}");
+            if (ds.RxAdjRssi == null || ds.Calibration.RxAdjRssi != old.Calibration.RxAdjRssi)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.Calibration.RxAdjRssi}");
+            if (ds.TxRefRssi == null || ds.Calibration.TxRefRssi != old.Calibration.TxRefRssi)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.Calibration.TxRefRssi}");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
