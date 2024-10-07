@@ -207,7 +207,7 @@ public class MqttCoordinator
         {
             await _mqttClient.EnqueueAsync(topic, payload, retain: retain);
         } else {
-            Log.Debug("ReadOnly, would have sent to " + topic + ": " + payload);
+            Log.Information("ReadOnly, would have sent to " + topic + ": " + payload);
         }
     }
 
