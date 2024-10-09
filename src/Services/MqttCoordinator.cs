@@ -194,7 +194,7 @@ public class MqttCoordinator
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error parsing mqtt message from {topic}", arg.ApplicationMessage.Topic);
+            _logger.LogWarning("Error parsing mqtt message from {topic}: {error}", arg.ApplicationMessage.Topic, ex.Message);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
     }
