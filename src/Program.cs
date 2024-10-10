@@ -23,6 +23,7 @@ FlurlHttp.Clients.UseNewtonsoft();
 
 builder.Host.UseSerilog((context, cfg) => cfg.ReadFrom.Configuration(context.Configuration));
 
+MathNet.Numerics.Control.TryUseNativeMKL();
 Log.Logger.Information(MathNet.Numerics.Control.Describe().Trim('\r','\n'));
 
 var configDir = Environment.GetEnvironmentVariable("CONFIG_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".espresense");
