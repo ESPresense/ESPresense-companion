@@ -74,8 +74,8 @@ internal class OptimizationRunner : BackgroundService
                         Log.Information("Optimizer set {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} Error: {3}", id, result.Absorption, result.RxAdjRssi, result.Error);
                         var a = _nsd.Get(id);
                         if (optimization == null) continue;
-                        if (result.Absorption != null && result.Absorption > optimization.AbsorptionMin && result.Absorption < optimization.AbsorptionMax) a.Absorption = result.Absorption;
-                        if (result.RxAdjRssi != null && result.RxAdjRssi > optimization.RxAdjRssiMin && result.RxAdjRssi < optimization.RxAdjRssiMax) a.RxAdjRssi = result.RxAdjRssi == null ? 0 : (int?)Math.Round(result.RxAdjRssi.Value);
+                        if (result.Absorption != null && result.Absorption > optimization.AbsorptionMin && result.Absorption < optimization.AbsorptionMax) a.Calibration.Absorption = result.Absorption;
+                        if (result.RxAdjRssi != null && result.RxAdjRssi > optimization.RxAdjRssiMin && result.RxAdjRssi < optimization.RxAdjRssiMax) a.Calibration.RxAdjRssi = result.RxAdjRssi == null ? 0 : (int?)Math.Round(result.RxAdjRssi.Value);
                         await _nsd.Set(id, a);
                     }
 

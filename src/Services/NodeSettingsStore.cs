@@ -5,22 +5,23 @@ namespace ESPresense.Services
 {
     public class NodeSettingsStore(MqttCoordinator mqtt, ILogger<NodeSettingsStore> logger) : BackgroundService
     {
-        private readonly ConcurrentDictionary<string, NodeSettings> _storeById = new();
+        private readonly ConcurrentDictionary<string, Models.NodeSettings> _storeById = new();
 
-        public NodeSettings Get(string id)
+        public Models.NodeSettings Get(string id)
         {
-            return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new NodeSettings(id);
+            return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new Models.NodeSettings(id);
         }
 
-        public async Task Set(string id, NodeSettings ds)
+        public async Task Set(string id, Models.NodeSettings ns)
         {
-            var old = Get(id);
-            if (ds.Absorption == null || ds.Absorption != old.Absorption)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Absorption:0.00}");
-            if (ds.RxAdjRssi == null || ds.RxAdjRssi != old.RxAdjRssi)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.RxAdjRssi}");
-            if (ds.TxRefRssi == null || ds.TxRefRssi != old.TxRefRssi)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.TxRefRssi}");
+            var oCs = Get(id).Calibration;
+            var nCs = ns.Calibration;
+            if (nCs.Absorption != null && nCs.Absorption != oCs.Absorption)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{nCs.Absorption:0.00}");
+            if (nCs.RxAdjRssi != null && nCs.RxAdjRssi != oCs.RxAdjRssi)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{nCs.RxAdjRssi}");
+            if (nCs.TxRefRssi != null && nCs.TxRefRssi != oCs.TxRefRssi)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{nCs.TxRefRssi}");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -33,16 +34,16 @@ namespace ESPresense.Services
                     switch (arg.Setting)
                     {
                         case "absorption":
-                            ns.Absorption = double.Parse(arg.Payload);
+                            ns.Calibration.Absorption = double.Parse(arg.Payload);
                             break;
                         case "rx_adj_rssi":
-                            ns.RxAdjRssi = int.Parse(arg.Payload);
+                            ns.Calibration.RxAdjRssi = int.Parse(arg.Payload);
                             break;
                         case "tx_ref_rssi":
-                            ns.TxRefRssi = int.Parse(arg.Payload);
+                            ns.Calibration.TxRefRssi = int.Parse(arg.Payload);
                             break;
                         case "max_distance":
-                            ns.MaxDistance = double.Parse(arg.Payload);
+                            ns.Filtering.MaxDistance = double.Parse(arg.Payload);
                             break;
                         default:
                             return Task.CompletedTask;

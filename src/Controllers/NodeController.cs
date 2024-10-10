@@ -8,18 +8,18 @@ namespace ESPresense.Controllers;
 [ApiController]
 public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : ControllerBase
 {
-    [HttpGet("{id}")]
+    [HttpGet("{id}/settings")]
     public NodeSettingsDetails Get(string id)
     {
         var nodeSettings = nodeSettingsStore.Get(id);
         var details = new List<KeyValuePair<string, string>>();
         if (nodeSettings?.Id != null && state.Nodes.TryGetValue(id, out var node))
             details.AddRange(node.GetDetails());
-        return new NodeSettingsDetails(nodeSettings ?? new NodeSettings(id), details);
+        return new NodeSettingsDetails(nodeSettings ?? new Models.NodeSettings(id), details);
     }
 
-    [HttpPut("{id}")]
-    public Task Set(string id, [FromBody] NodeSettings ds)
+    [HttpPut("{id}/settings")]
+    public Task Set(string id, [FromBody] Models.NodeSettings ds)
     {
         return nodeSettingsStore.Set(id, ds);
     }
@@ -36,5 +36,5 @@ public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : 
         await nodeSettingsStore.Restart(id);
     }
 
-    public readonly record struct NodeSettingsDetails(NodeSettings? settings, IList<KeyValuePair<string, string>> details);
+    public readonly record struct NodeSettingsDetails(Models.NodeSettings? settings, IList<KeyValuePair<string, string>> details);
 }
