@@ -87,7 +87,7 @@
 				const errorText = await response.text();
 				throw new Error(`Server error ${response.status}: ${errorText}`);
 			}
-		} catch (error) {
+		} catch (error: any) {
 			console.error('Error resetting calibration:', error);
 			toastStore.trigger({
 				message: `Failed to reset calibration: ${error.message}`,
