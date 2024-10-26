@@ -39,10 +39,24 @@ history:
   enabled: false # Enable to log history to db (Beta)
   expire_after: 24h # Expire after 24 hours
 
-weighting:
-  algorithm: gaussian
-  props:
-    sigma: 0.10
+locators:
+  nadarayaWatson:
+    enabled: true
+    floors: ["first", "second", "outside"]
+    bandwidth: 0.5
+    kernel: gaussian
+
+  nealderMead:
+    enabled: false
+    floors: ["first", "second", "outside"]
+    weighting:
+      algorithm: gaussian
+      props:
+        sigma: 0.10
+
+  nearestNode:
+    enabled: true
+    maxDistance: 10
 
 # Floors w/ the points to draw it in meters
 floors:

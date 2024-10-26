@@ -11,6 +11,21 @@ using Serilog;
 
 namespace ESPresense.Services;
 
+public class MqttMessageProcessingException : Exception
+{
+    public string Topic { get; }
+    public string? Payload { get; }
+    public string MessageType { get; }
+
+    public MqttMessageProcessingException(string message, string topic, string? payload, string messageType, Exception? innerException = null)
+        : base(message, innerException)
+    {
+        Topic = topic;
+        Payload = payload;
+        MessageType = messageType;
+    }
+}
+
 public class MqttCoordinator
 {
     private readonly ConfigLoader _cfg;
@@ -125,76 +140,52 @@ public class MqttCoordinator
     private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
         var parts = arg.ApplicationMessage.Topic.Split('/');
+        var payload = arg.ApplicationMessage.ConvertPayloadToString();
+
         try
         {
             switch (parts)
             {
                 case ["espresense", "rooms", _, "telemetry"]:
-                    if (NodeTelemetryReceivedAsync != null)
-                    {
-                        var ds = JsonConvert.DeserializeObject<NodeTelemetry>(arg.ApplicationMessage.ConvertPayloadToString());
-                        if (ds != null) await NodeTelemetryReceivedAsync(new NodeTelemetryReceivedEventArgs { NodeId = parts[2], Payload = ds });
-                    }
-
+                    await ProcessTelemetryMessage(parts[2], payload);
                     break;
                 case ["espresense", "rooms", _, "status"]:
-                    var online = arg.ApplicationMessage.ConvertPayloadToString() == "online";
-                    NodeStatusReceivedAsync?.Invoke(new NodeStatusReceivedEventArgs { NodeId = parts[2], Online = online });
+                    await ProcessStatusMessage(parts[2], payload);
                     break;
                 case ["espresense", "rooms", _, _]:
-                    {
-                        if (NodeSettingReceivedAsync != null)
-                            await NodeSettingReceivedAsync(new NodeSettingReceivedEventArgs
-                            {
-                                NodeId = parts[2],
-                                Setting = parts[3],
-                                Payload = arg.ApplicationMessage.ConvertPayloadToString()
-                            }
-                            );
-                        break;
-                    }
+                    await ProcessNodeSettingMessage(parts[2], parts[3], payload);
+                    break;
                 case ["espresense", "devices", _, _]:
-                    if (DeviceMessageReceivedAsync != null)
-                    {
-                        var deviceId = parts[2];
-                        var nodeId = parts[3];
-                        var deserializeObject = JsonConvert.DeserializeObject<DeviceMessage>(arg.ApplicationMessage.ConvertPayloadToString());
-                        if (deserializeObject != null)
-                            await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
-                            {
-                                DeviceId = deviceId,
-                                NodeId = nodeId,
-                                Payload = deserializeObject
-                            });
-                    }
-
+                    await ProcessDeviceMessage(parts[2], parts[3], payload);
                     break;
                 case ["espresense", "settings", _, "config"]:
-                    if (DeviceConfigReceivedAsync != null)
-                    {
-                        var ds = JsonConvert.DeserializeObject<DeviceSettings>(arg.ApplicationMessage.ConvertPayloadToString() ?? "");
-                        if (ds != null)
-                        {
-                            ds.OriginalId = parts[2];
-                            await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs
-                            {
-                                DeviceId = parts[2],
-                                Payload = ds
-                            });
-                        }
-                    }
+                    await ProcessDeviceConfigMessage(parts[2], payload);
                     break;
                 case ["homeassistant", "device_tracker", _, "config"]:
-                    HandleDiscoveryMessage(arg.ApplicationMessage.Topic, arg.ApplicationMessage.ConvertPayloadToString());
+                    await ProcessDiscoveryMessage(arg.ApplicationMessage.Topic, payload);
                     break;
                 default:
-                    if (MqttMessageReceivedAsync != null) await MqttMessageReceivedAsync(arg);
+                    if (MqttMessageReceivedAsync != null)
+                        await MqttMessageReceivedAsync(arg);
                     break;
             }
         }
+        catch (JsonSerializationException ex)
+        {
+            _logger.LogError(ex, "JSON deserialization error for topic {Topic}. Payload: {Payload}",
+                arg.ApplicationMessage.Topic, payload);
+            MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
+        }
+        catch (MqttMessageProcessingException ex)
+        {
+            _logger.LogError(ex, "Error processing {MessageType} message for topic {Topic}. Payload: {Payload}",
+                ex.MessageType, ex.Topic, ex.Payload);
+            MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning("Error parsing mqtt message from {topic}: {error}", arg.ApplicationMessage.Topic, ex.Message);
+            _logger.LogError(ex, "Unexpected error processing message for topic {Topic}. Payload: {Payload}",
+                arg.ApplicationMessage.Topic, payload);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -211,11 +202,131 @@ public class MqttCoordinator
         }
     }
 
-    private void HandleDiscoveryMessage(string topic, string payload)
+    private async Task ProcessTelemetryMessage(string nodeId, string? payload)
     {
-        _logger.LogTrace($"Received discovery message on topic: {topic}");
-        if (AutoDiscovery.TryDeserialize(topic, payload, out var msg))
-            PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs { AutoDiscover = msg });
-  }
-}
+        if (NodeTelemetryReceivedAsync == null) return;
 
+        try
+        {
+            var telemetry = JsonConvert.DeserializeObject<NodeTelemetry>(payload ?? "");
+            if (telemetry == null)
+                throw new MqttMessageProcessingException(
+                    "Telemetry data was null after deserialization",
+                    $"espresense/rooms/{nodeId}/telemetry",
+                    payload,
+                    "Telemetry");
+
+            await NodeTelemetryReceivedAsync(new NodeTelemetryReceivedEventArgs
+            {
+                NodeId = nodeId,
+                Payload = telemetry
+            });
+        }
+        catch (JsonException ex)
+        {
+            throw new MqttMessageProcessingException(
+                "Failed to parse telemetry data",
+                $"espresense/rooms/{nodeId}/telemetry",
+                payload,
+                "Telemetry",
+                ex);
+        }
+    }
+
+    private async Task ProcessStatusMessage(string nodeId, string? payload)
+    {
+        if (NodeStatusReceivedAsync == null) return;
+
+        if (payload == null)
+            throw new MqttMessageProcessingException("Status payload was null", $"espresense/rooms/{nodeId}/status", null, "Status");
+
+        var online = payload == "online";
+        await NodeStatusReceivedAsync(new NodeStatusReceivedEventArgs
+        {
+            NodeId = nodeId,
+            Online = online
+        });
+    }
+
+    private async Task ProcessDeviceMessage(string deviceId, string nodeId, string? payload)
+    {
+        if (DeviceMessageReceivedAsync == null) return;
+
+        try
+        {
+            var deviceMessage = JsonConvert.DeserializeObject<DeviceMessage>(payload ?? "");
+            if (deviceMessage == null)
+                throw new MqttMessageProcessingException("Device message was null after deserialization", $"espresense/devices/{deviceId}/{nodeId}", payload, "DeviceMessage");
+
+            await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
+            {
+                DeviceId = deviceId,
+                NodeId = nodeId,
+                Payload = deviceMessage
+            });
+        }
+        catch (JsonException ex)
+        {
+            throw new MqttMessageProcessingException("Failed to parse device message", $"espresense/devices/{deviceId}/{nodeId}", payload, "DeviceMessage", ex);
+        }
+    }
+
+    private async Task ProcessDeviceConfigMessage(string deviceId, string? payload)
+    {
+        if (DeviceConfigReceivedAsync == null) return;
+
+        try
+        {
+            var deviceSettings = JsonConvert.DeserializeObject<DeviceSettings>(payload ?? "");
+            if (deviceSettings == null)
+                throw new MqttMessageProcessingException("Device settings were null after deserialization", $"espresense/settings/{deviceId}/config", payload, "DeviceConfig");
+
+            deviceSettings.OriginalId = deviceId;
+            await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs
+            {
+                DeviceId = deviceId,
+                Payload = deviceSettings
+            });
+        }
+        catch (JsonException ex)
+        {
+            throw new MqttMessageProcessingException(
+                "Failed to parse device settings",
+                $"espresense/settings/{deviceId}/config",
+                payload,
+                "DeviceConfig",
+                ex);
+        }
+    }
+
+    private async Task ProcessNodeSettingMessage(string nodeId, string setting, string? payload)
+    {
+        if (NodeSettingReceivedAsync == null) return;
+        await NodeSettingReceivedAsync(new NodeSettingReceivedEventArgs
+        {
+            NodeId = nodeId,
+            Setting = setting,
+            Payload = payload
+        });
+    }
+
+    private async Task ProcessDiscoveryMessage(string topic, string? payload)
+    {
+        try
+        {
+            _logger.LogTrace($"Received discovery message on topic: {topic}");
+
+            if (payload == null)
+                throw new MqttMessageProcessingException("Discovery message payload was null", topic, null, "Discovery");
+
+            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg))
+                throw new MqttMessageProcessingException("Failed to deserialize discovery message", topic, payload, "Discovery");
+
+            PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs { AutoDiscover = msg });
+        }
+        catch (Exception ex) when (ex is not MqttMessageProcessingException)
+        {
+            throw new MqttMessageProcessingException("Error processing discovery message", topic, payload, "Discovery", ex);
+        }
+    }
+}
