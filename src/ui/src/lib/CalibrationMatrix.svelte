@@ -4,6 +4,7 @@
 	import { popup } from '@skeletonlabs/skeleton';
 	import { getToastStore } from '@skeletonlabs/skeleton';
 	import { getModalStore } from '@skeletonlabs/skeleton';
+	import { base } from '$app/paths';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -77,7 +78,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch('/api/state/calibration/reset', { method: 'POST' });
+			const response = await fetch(`${base}/api/state/calibration/reset`, { method: 'POST' });
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',
