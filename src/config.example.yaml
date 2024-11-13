@@ -48,6 +48,7 @@ floors:
     name: First Floor
     # Bounds (x,y,z) of map in meters
     bounds: [[0, 0, 0], [17, 18, 3]]
+    wall_thickness: 0.1  # Wall thickness in meters
     rooms:
       - name: Powder
         points:
@@ -126,6 +127,7 @@ floors:
   - id: second
     name: Second Floor
     bounds: [[0, 0, 3], [17, 18, 5.5]]
+    wall_thickness: 0.1  # Wall thickness in meters
     rooms:
       - name: Master
         points:
@@ -165,6 +167,7 @@ floors:
   - id: outside
     name: Outside
     bounds: [[-10, -10, -10], [28, 30, 20]]
+    wall_thickness: 0.1  # Wall thickness in meters
 
 # Locations of espresense nodes in meters
 nodes:

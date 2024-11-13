@@ -6,6 +6,11 @@ export interface LayerCakeContext {
 	colors: ScaleOrdinal<string, string>;
 }
 
+export interface RoomProps {
+	room: Room;
+	wallThickness?: number;
+}
+
 export interface Room {
 	id: string;
 	name: string;
@@ -17,6 +22,7 @@ export interface Floor {
 	name: string;
 	bounds: number[][];
 	rooms: Room[];
+	wallThickness: number;
 }
 
 export interface Node {

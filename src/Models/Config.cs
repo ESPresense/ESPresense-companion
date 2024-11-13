@@ -142,6 +142,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "bounds")]
         public double[][]? Bounds { get; set; }
 
+        [YamlMember(Alias = "wall_thickness")]
+        public double WallThickness { get; set; } = 0.1;  // Default wall thickness in meters
+
         [YamlMember(Alias = "rooms")]
         public ConfigRoom[]? Rooms { get; set; }
 
