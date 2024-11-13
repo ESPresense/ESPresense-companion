@@ -22,6 +22,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "gps")]
         public ConfigGps Gps { get; set; } = new();
 
+        [YamlMember(Alias = "map")]
+        public ConfigMap Map { get; set; } = new();
+
         [YamlMember(Alias = "floors")] public ConfigFloor[]  Floors { get; set; } = Array.Empty<ConfigFloor>();
 
         [YamlMember(Alias = "nodes")]
@@ -40,6 +43,15 @@ namespace ESPresense.Models
         public ConfigWeighting Weighting { get; set; } = new();
 
         [YamlMember(Alias = "optimization")] public ConfigOptimization Optimization { get; set; } = new();
+    }
+
+    public class ConfigMap
+    {
+        [YamlMember(Alias = "flip_x")]
+        public bool FlipX { get; set; } = false;
+
+        [YamlMember(Alias = "flip_y")]
+        public bool FlipY { get; set; } = true;
     }
 
     public class ConfigOptimization

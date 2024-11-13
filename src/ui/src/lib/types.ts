@@ -48,11 +48,17 @@ export interface Device {
 	lastHit: Date;
 }
 
+export interface MapConfig {
+	flipX: boolean;
+	flipY: boolean;
+}
+
 export interface Config {
 	timeout: number;
 	awayTimeout: number;
 	floors: Floor[];
 	devices: Device[];
+	map: MapConfig;
 }
 
 export type NodeSetting = {
