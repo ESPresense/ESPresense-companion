@@ -52,6 +52,15 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "flip_y")]
         public bool FlipY { get; set; } = true;
+
+        [YamlMember(Alias = "wall_thickness")]
+        public double WallThickness { get; set; } = 0.1;  // Default wall thickness in meters
+
+        [YamlMember(Alias = "wall_color")]
+        public string? WallColor { get; set; }  // Optional wall color, defaults to room color if not set
+
+        [YamlMember(Alias = "wall_opacity")]
+        public double? WallOpacity { get; set; }  // Optional wall opacity, defaults to 0.35 if not set
     }
 
     public class ConfigOptimization

@@ -51,6 +51,9 @@ export interface Device {
 export interface MapConfig {
 	flipX: boolean;
 	flipY: boolean;
+	wallThickness: number;
+	wallColor?: string;
+	wallOpacity?: number;
 }
 
 export interface Config {
