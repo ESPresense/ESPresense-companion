@@ -10,7 +10,7 @@
 	const colors = getContext<ScaleOrdinal<string, string>>('colors');
 
 	// Calculate the scaled stroke width based on the wall thickness
-	$: scaledStrokeWidth = Math.abs($xScale(wallThickness) - $xScale(0));
+	$: scaledStrokeWidth = wallThickness == 0 ? 1 : Math.abs($xScale(wallThickness) - $xScale(0));
 	$: centroid = polygonCentroid(room.points);
 	$: scaledRoom = room.points.map((p) => [$xScale(p[0]), $yScale(p[1])]);
 </script>
@@ -22,9 +22,9 @@
 		fill={`url(#${room.id})`}
 		fill-opacity="0.25"
 		stroke={colors(room.id)}
-		stroke-opacity="0.9"
+		stroke-opacity="0.35"
 		stroke-width={scaledStrokeWidth}
-		stroke-linejoin="round"
+		stroke-linejoin="miter-clip"
 	/>
 
 	<!-- Room gradient definition -->
