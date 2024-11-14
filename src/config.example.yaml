@@ -12,6 +12,11 @@ gps:
   longitude: -77.036560
   elevation: 146
 
+# Map coordinate system configuration
+map:
+  flip_x: false  # Set to true to flip X coordinates (default: false)
+  flip_y: true   # Set to true to use bottom-left origin, false for top-left origin (default: true)
+
 # How long before device considered stale
 timeout: 30
 # How long before device is considered away
