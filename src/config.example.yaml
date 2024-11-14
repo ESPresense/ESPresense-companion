@@ -12,10 +12,12 @@ gps:
   longitude: -77.036560
   elevation: 146
 
-# Map coordinate system configuration
 map:
-  flip_x: false  # Set to true to flip X coordinates (default: false)
-  flip_y: true   # Set to true to use bottom-left origin, false for top-left origin (default: true)
+  flip_x: false        # Set to true to flip X coordinates (default: false)
+  flip_y: true         # Set to true to use bottom-left origin, false for top-left origin (default: true)
+  wall_thickness: 0.1  # Wall thickness in meters
+  wall_color: "#ddd"   # Optional wall color, if not set uses room color
+  wall_opacity: 0.35   # Optional wall opacity, if not set defaults to 0.35
 
 # How long before device considered stale
 timeout: 30
@@ -48,7 +50,6 @@ floors:
     name: First Floor
     # Bounds (x,y,z) of map in meters
     bounds: [[0, 0, 0], [17, 18, 3]]
-    wall_thickness: 0.1  # Wall thickness in meters
     rooms:
       - name: Powder
         points:
@@ -127,7 +128,6 @@ floors:
   - id: second
     name: Second Floor
     bounds: [[0, 0, 3], [17, 18, 5.5]]
-    wall_thickness: 0.1  # Wall thickness in meters
     rooms:
       - name: Master
         points:
@@ -167,7 +167,6 @@ floors:
   - id: outside
     name: Outside
     bounds: [[-10, -10, -10], [28, 30, 20]]
-    wall_thickness: 0.1  # Wall thickness in meters
 
 # Locations of espresense nodes in meters
 nodes:
