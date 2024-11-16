@@ -12,15 +12,12 @@ using System.IO;
 
 namespace ESPresense.Models;
 
-
-
 public class State
 {
     private List<LocatorConfig> _locators;
 
     public State(ConfigLoader cl)
     {
-        LoadLocatorConfig();
         IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
         {
             if (floorIds == null) yield break;
@@ -120,19 +117,19 @@ public class State
     {
         foreach (var locator in _locators)
         {
-                foreach (var floor in Floors.Values)
+            foreach (var floor in Floors.Values)
+            {
+                switch (locator.Algorithm.ToLower())
                 {
-                    switch (locator.Algorithm.ToLower())
-                    {
-                        case "nealdermead":
-                            yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
-                            break;
-                        case "nadarayawatson":
-                            yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this), floor.Name);
-                            break;
-                        case "nearestnode":
-                            yield return new Scenario(Config, new NearestNode(device), "NearestNode");
-                    }
+                    case "nealdermead":
+                        yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+                        break;
+                    case "nadarayawatson":
+                        yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this), floor.Name);
+                        break;
+                    case "nearestnode":
+                        yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+                        break;
                 }
             }
         }
