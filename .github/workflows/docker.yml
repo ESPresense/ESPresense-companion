@@ -42,7 +42,5 @@ jobs:
           docker buildx build \
             --platform linux/arm,linux/arm64,linux/amd64 \
             --output "type=image,push=true" \
-            --no-cache \
             --file ./Dockerfile . \
-            --compress \
             --tag "espresense/espresense-companion:${{ steps.version.outputs.version }}"
