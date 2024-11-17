@@ -12,6 +12,7 @@
 	import Nodes from './Nodes.svelte';
 	import AxisX from './AxisX.svelte';
 	import AxisY from './AxisY.svelte';
+	import MapCoordinates from './MapCoordinates.svelte';
 
 	let svg: Element;
 	let transform = zoomIdentity;
@@ -74,6 +75,7 @@
 			<Rooms {transform} {floorId} />
 			<Nodes {transform} {floorId} {deviceId} {nodeId} on:selected on:hovered={hoveredNode} />
 			<Devices {transform} {floorId} {deviceId} {exclusive} on:selected on:hovered={hoveredDevice} />
+			<MapCoordinates {transform} />
 		</Svg>
 	</LayerCake>
 {:else}
