@@ -14,14 +14,11 @@
 
 		const svgElement = event.currentTarget as SVGElement;
 		const rect = svgElement.getBoundingClientRect();
-		const x = event.clientX - rect.left - 16;
-		const y = event.clientY - rect.top - 16;
+		const x = event.clientX - rect.left;
+		const y = event.clientY - rect.top;
 
-		const transformedX = (x - transform.x) / transform.k;
-		const transformedY = (y - transform.y) / transform.k;
-
-		cursorX = $xScale.invert(transformedX);
-		cursorY = $yScale.invert(transformedY);
+		cursorX = $xScale.invert((x - transform.x) / transform.k);
+		cursorY = $yScale.invert((y - transform.y) / transform.k);
 	}
 </script>
 
