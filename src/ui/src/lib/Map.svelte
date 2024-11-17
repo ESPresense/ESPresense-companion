@@ -25,7 +25,7 @@
 	$: bounds = floor?.bounds;
 
 	const handler = zoom()
-		.scaleExtent([1, 40])
+		.scaleExtent([0.5, 40])
 		.on('zoom', (e) => {
 			transform = e.transform;
 		});
