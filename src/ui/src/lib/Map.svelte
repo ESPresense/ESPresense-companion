@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LayerCake, Svg, Html, Canvas } from 'layercake';
-	import { config, devices } from '$lib/stores';
+	import { config } from '$lib/stores';
 	import { scaleOrdinal, schemeCategory10 } from 'd3';
 	import { select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
@@ -54,6 +54,50 @@
 		nodeId = e.detail?.id;
 	}
 
+	function handleKeyboard(event: KeyboardEvent) {
+
+		const zoomFactor = event.shiftKey ? 1.005 : 1.1;
+		const translateAmount = event.shiftKey ? 1 : 50;
+		let newTransform = transform;
+
+		switch(event.key) {
+			case '0':
+				event.preventDefault();
+				newTransform = zoomIdentity.scale(1);
+				break;
+			case '=':
+			case '+':
+				event.preventDefault();
+				newTransform = zoomIdentity.scale(Math.min(transform.k * zoomFactor, 40));
+				break;
+			case '-':
+			case '_':
+				event.preventDefault();
+				newTransform = zoomIdentity.scale(Math.max(transform.k / zoomFactor, 0.5));
+				break;
+			case 'ArrowLeft':
+				event.preventDefault();
+				newTransform = transform.translate(-translateAmount / transform.k, 0);
+				break;
+			case 'ArrowRight':
+				event.preventDefault();
+				newTransform = transform.translate(translateAmount / transform.k, 0);
+				break;
+			case 'ArrowUp':
+				event.preventDefault();
+				newTransform = transform.translate(0, -translateAmount / transform.k);
+				break;
+			case 'ArrowDown':
+				event.preventDefault();
+				newTransform = transform.translate(0, translateAmount / transform.k);
+				break;
+		}
+
+		if (newTransform !== transform) {
+			select(svg).call(handler.transform, newTransform);
+		}
+	}
+
 	setContext('colors', scaleOrdinal(schemeCategory10));
 
 	$: {
@@ -72,6 +116,8 @@
 		return $config?.map?.flipY ? [max, min] : [min, max];
 	}
 </script>
+
+<svelte:window on:keydown={handleKeyboard} />
 
 {#if bounds}
 	<LayerCake
