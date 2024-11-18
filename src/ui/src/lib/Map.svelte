@@ -60,17 +60,17 @@
 		switch(event.key) {
 			case '0':
 				event.preventDefault();
-				newTransform = zoomIdentity.scale(1);
+				newTransform = zoomIdentity.translate(transform.x, transform.y);
 				break;
 			case '=':
 			case '+':
 				event.preventDefault();
-				newTransform = zoomIdentity.scale(Math.min(transform.k * zoomFactor, 40));
+				newTransform = transform.scale(zoomFactor);
 				break;
 			case '-':
 			case '_':
 				event.preventDefault();
-				newTransform = zoomIdentity.scale(Math.max(transform.k / zoomFactor, 0.5));
+				newTransform = transform.scale(1 / zoomFactor);
 				break;
 			case 'ArrowLeft':
 				event.preventDefault();
