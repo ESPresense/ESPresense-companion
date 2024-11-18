@@ -36,10 +36,7 @@
 
 	const handler = zoom()
 		.scaleExtent([0.5, 40])
-		.wheelDelta((event) => {
-			const factor = event.altKey ? 0.25 : 1.0;
-			return -event.deltaY * factor * 0.002;
-		})
+		.wheelDelta((event) => { return -(event.deltaY + event.deltaX * 0.25) * 0.002; })
 		.on('zoom', (e) => {
 			transform = e.transform;
 		});
