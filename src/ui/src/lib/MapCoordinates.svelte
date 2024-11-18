@@ -2,10 +2,15 @@
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
 	import type { LayerCakeContext } from '$lib/types';
+	import { getToastStore } from '@skeletonlabs/skeleton';
 
+	const toastStore = getToastStore();
 	export let transform = zoomIdentity;
 	$: cursorX = 0;
 	$: cursorY = 0;
+
+	let copiedCoords: string[] = [];
+	let hasFocus = false;
 
 	const { xScale, yScale, width, height, padding } = getContext<any>('LayerCake');
 
@@ -31,9 +36,39 @@
 		cursorX = $xScale.invert(transformedX);
 		cursorY = $yScale.invert(transformedY);
 	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		// Check for Ctrl/Cmd + C
+		if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+			event.preventDefault();
+			hasFocus = true;
+			const coords = `          - [${cursorX.toFixed(2)},${cursorY.toFixed(2)}]`;
+			copiedCoords = [...copiedCoords, coords];
+			navigator.clipboard.writeText(copiedCoords.join('\n'));
+			toastStore.trigger({
+				message: `Copied ${copiedCoords.length} coordinate${copiedCoords.length > 1 ? 's' : ''} to clipboard!`,
+				background: 'variant-filled-success'
+			});
+		}
+	}
+
+	function handleFocusOut() {
+		if (hasFocus) {
+			hasFocus = false;
+			copiedCoords = [];
+			toastStore.trigger({
+				message: 'Coordinate collection reset',
+				background: 'variant-filled-primary'
+			});
+		}
+	}
 </script>
 
-<svelte:window on:mousemove={updateCoordinates} />
+<svelte:window
+	on:mousemove={updateCoordinates}
+	on:keydown={handleKeydown}
+	on:blur={handleFocusOut}
+/>
 
 <g transform="translate({$width - 120}, {$height - 40})">
 	<rect
