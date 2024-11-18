@@ -18,7 +18,7 @@
 		if (!$xScale || !$yScale) return;
 
 		const target = event.target as SVGElement;
-		const svg = target.ownerSVGElement || target as SVGSVGElement;
+		const svg = target.ownerSVGElement || (target as SVGSVGElement);
 		const point = svg.createSVGPoint();
 		point.x = event.clientX;
 		point.y = event.clientY;
@@ -42,13 +42,22 @@
 		if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
 			event.preventDefault();
 			hasFocus = true;
-			const coords = `          - [${cursorX.toFixed(2)},${cursorY.toFixed(2)}]`;
+			const coords = `      - [${cursorX.toFixed(2)},${cursorY.toFixed(2)}]`;
 			copiedCoords = [...copiedCoords, coords];
-			navigator.clipboard.writeText(copiedCoords.join('\n'));
-			toastStore.trigger({
-				message: `Copied ${copiedCoords.length} coordinate${copiedCoords.length > 1 ? 's' : ''} to clipboard!`,
-				background: 'variant-filled-success'
-			});
+			navigator.clipboard
+				.writeText(copiedCoords.join('\n'))
+				.then(() => {
+					toastStore.trigger({
+						message: `Copied ${copiedCoords.length} coordinate${copiedCoords.length > 1 ? 's' : ''} to clipboard!`,
+						background: 'variant-filled-success'
+					});
+				})
+				.catch((error) => {
+					toastStore.trigger({
+						message: `Failed to copy to clipboard: ${error}`,
+						background: 'variant-filled-error'
+					});
+				});
 		}
 	}
 
@@ -64,27 +73,11 @@
 	}
 </script>
 
-<svelte:window
-	on:mousemove={updateCoordinates}
-	on:keydown={handleKeydown}
-	on:blur={handleFocusOut}
-/>
+<svelte:window on:mousemove={updateCoordinates} on:keydown={handleKeydown} on:blur={handleFocusOut} />
 
 <g transform="translate({$width - 120}, {$height - 40})">
-	<rect
-		width="110"
-		height="30"
-		rx="4"
-		fill="#2563eb"
-		class="shadow-lg"
-	/>
-	<text
-		x="55"
-		y="19"
-		text-anchor="middle"
-		fill="white"
-		font-size="12"
-	>
+	<rect width="110" height="30" rx="4" fill="#2563eb" class="shadow-lg" />
+	<text x="55" y="19" text-anchor="middle" fill="white" font-size="12">
 		X: {cursorX.toFixed(2)}, Y: {cursorY.toFixed(2)}
 	</text>
 </g>
