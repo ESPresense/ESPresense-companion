@@ -7,29 +7,33 @@
 	$: cursorX = 0;
 	$: cursorY = 0;
 
-	const { xScale, yScale, width, height } = getContext<LayerCakeContext>('LayerCake');
+	const { xScale, yScale, width, height, padding } = getContext<any>('LayerCake');
 
-	function updateCoordinates(event: PointerEvent) {
+	function updateCoordinates(event: MouseEvent) {
 		if (!$xScale || !$yScale) return;
 
-		const svgElement = event.currentTarget as SVGElement;
-		const rect = svgElement.getBoundingClientRect();
-		const x = event.clientX - rect.left;
-		const y = event.clientY - rect.top;
+		const target = event.target as SVGElement;
+		const svg = target.ownerSVGElement || target as SVGSVGElement;
+		const point = svg.createSVGPoint();
+		point.x = event.clientX;
+		point.y = event.clientY;
 
-		cursorX = $xScale.invert((x - transform.x) / transform.k);
-		cursorY = $yScale.invert((y - transform.y) / transform.k);
+		// Convert screen coordinates to SVG coordinates
+		const svgPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
+
+		// Adjust for padding from context
+		const adjustedX = svgPoint.x - $padding.left;
+		const adjustedY = svgPoint.y - $padding.top;
+
+		const transformedX = (adjustedX - transform.x) / transform.k;
+		const transformedY = (adjustedY - transform.y) / transform.k;
+
+		cursorX = $xScale.invert(transformedX);
+		cursorY = $yScale.invert(transformedY);
 	}
 </script>
 
-<rect
-	x="0"
-	y="0"
-	width={$width}
-	height={$height}
-	fill="transparent"
-	on:pointermove={updateCoordinates}
-/>
+<svelte:window on:mousemove={updateCoordinates} />
 
 <g transform="translate({$width - 120}, {$height - 40})">
 	<rect

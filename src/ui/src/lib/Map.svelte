@@ -126,12 +126,12 @@
 		padding={{ top: 16, left: 16, bottom: 16, right: 16 }}
 	>
 		<Svg bind:element={svg}>
+			<MapCoordinates {transform} />
 			<AxisX {transform} />
 			<AxisY {transform} />
 			<Rooms {transform} {floorId} />
 			<Nodes {transform} {floorId} {deviceId} {nodeId} on:selected on:hovered={hoveredNode} />
 			<Devices {transform} {floorId} {deviceId} {exclusive} on:selected on:hovered={hoveredDevice} />
-			<MapCoordinates {transform} />
 		</Svg>
 	</LayerCake>
 {:else}
