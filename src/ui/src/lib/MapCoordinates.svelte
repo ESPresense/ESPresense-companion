@@ -42,14 +42,17 @@
 		if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
 			event.preventDefault();
 			hasFocus = true;
-			const coords = `      - [${cursorX.toFixed(2)},${cursorY.toFixed(2)}]`;
+			const roundedX = Math.round(cursorX * 10) / 10;
+			const roundedY = Math.round(cursorY * 10) / 10;
+			const coords = `          - [${roundedX},${roundedY}]`;
 			copiedCoords = [...copiedCoords, coords];
 			navigator.clipboard
 				.writeText(copiedCoords.join('\n'))
 				.then(() => {
 					toastStore.trigger({
 						message: `Copied ${copiedCoords.length} coordinate${copiedCoords.length > 1 ? 's' : ''} to clipboard!`,
-						background: 'variant-filled-success'
+						background: 'variant-filled-success',
+						timeout: 1000
 					});
 				})
 				.catch((error) => {
@@ -67,7 +70,8 @@
 			copiedCoords = [];
 			toastStore.trigger({
 				message: 'Coordinate collection reset',
-				background: 'variant-filled-primary'
+				background: 'variant-filled-primary',
+				timeout: 1000
 			});
 		}
 	}
@@ -78,6 +82,6 @@
 <g transform="translate({$width - 120}, {$height - 40})">
 	<rect width="110" height="30" rx="4" fill="#2563eb" class="shadow-lg" />
 	<text x="55" y="19" text-anchor="middle" fill="white" font-size="12">
-		X: {cursorX.toFixed(2)}, Y: {cursorY.toFixed(2)}
+		X: {Math.round(cursorX * 10) / 10}, Y: {Math.round(cursorY * 10) / 10}
 	</text>
 </g>
