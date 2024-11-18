@@ -24,6 +24,15 @@
 
 	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
+	$: squareBounds = bounds ? makeSquareBounds(bounds) : undefined;
+
+	function makeSquareBounds(bounds: number[][]): number[][] {
+		const maxDim = Math.max(bounds[1][0], bounds[1][1]);
+		return [
+			[bounds[0][0], bounds[0][1], bounds[0][2]],
+			[maxDim, maxDim, bounds[1][2]]
+		];
+	}
 
 	const handler = zoom()
 		.scaleExtent([0.5, 40])
@@ -66,7 +75,7 @@
 		y="1"
 		xRange={getXRange}
 		yRange={getYRange}
-		flatData={bounds}
+		flatData={squareBounds}
 		padding={{ top: 16, left: 16, bottom: 16, right: 16 }}
 	>
 		<Svg bind:element={svg}>
