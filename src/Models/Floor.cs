@@ -17,14 +17,21 @@ public class Floor
 
     public void Update(Config c, ConfigFloor cf)
     {
+        Point3D Point3DConvert(double[] b)
+        {
+            var x = b.Length > 0 ? b[0] : 0;
+            var y = b.Length > 1 ? b[1] : 0;
+            var z = b.Length > 2 ? b[2] : 0;
+            return new Point3D(x, y, z);
+        }
+
         Config = c;
         Name = cf.Name;
         Id = cf.GetId();
-        Bounds = cf.Bounds?.Select(b => new Point3D(b[0], b[1], b[2])).ToArray();
+        Bounds = cf.Bounds?.Select(Point3DConvert).ToArray();
 
         foreach (var room in cf.Rooms ?? Enumerable.Empty<ConfigRoom>()) Rooms.GetOrAdd(room.GetId(), a => new Room()).Update(c, this, room);
     }
-
 
     public override string ToString()
     {
@@ -34,7 +41,7 @@ public class Floor
     public bool Contained(double? z)
     {
         if (z == null) return false;
-        if (Bounds == null) return false;
+        if (Bounds == null || Bounds.Length < 2) return false;
         return z >= Bounds[0].Z && z <= Bounds[1].Z;
     }
 }
