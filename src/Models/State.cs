@@ -13,14 +13,6 @@ public class State
 {
     public State(ConfigLoader cl)
     {
-        IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
-        {
-            if (floorIds == null) yield break;
-            foreach (var floorId in floorIds)
-                if (Floors.TryGetValue(floorId, out var floor))
-                    yield return floor;
-        }
-
         void LoadConfig(Config c)
         {
             Config = c;
@@ -56,12 +48,13 @@ public class State
             NamesToTrack = namesToTrack;
             ConfigDeviceByName = configDeviceByName;
 
-            Weighting = c.Weighting?.Algorithm switch
+            var w = c?.Locators?.NealderMead?.Weighting;
+            Weighting = w?.Algorithm switch
             {
                 "equal" => new EqualWeighting(),
-                "gaussian" => new GaussianWeighting(c.Weighting?.Props),
-                "exponential" => new ExponentialWeighting(c.Weighting?.Props),
-                _ => new GaussianWeighting(c.Weighting?.Props),
+                "gaussian" => new GaussianWeighting(w?.Props),
+                "exponential" => new ExponentialWeighting(w?.Props),
+                _ => new GaussianWeighting(w?.Props),
             };
             foreach (var device in Devices.Values) device.Check = true;
         }
@@ -100,7 +93,6 @@ public class State
                     Tx = tx,
                     Rx = rx,
                 });
-
             }
 
         if (OptimizationSnaphots.Count > Config?.Optimization.MaxSnapshots) OptimizationSnaphots.RemoveAt(0);
@@ -109,11 +101,44 @@ public class State
         return os;
     }
 
+    IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
+    {
+        if (floorIds == null)
+        {
+            foreach (var floor in Floors.Values)
+                yield return floor;
+        }
+        else
+            foreach (var floorId in floorIds)
+                if (Floors.TryGetValue(floorId, out var floor))
+                    yield return floor;
+    }
+
     public IEnumerable<Scenario> GetScenarios(Device device)
     {
-        foreach (var floor in Floors.Values) yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
-        //yield return new Scenario(_state.Config, new MultiFloorMultilateralizer(device, _state), "Multifloor");
-        yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+        var nealderMead = Config?.Locators?.NealderMead;
+        var nadarayaWatson = Config?.Locators?.NadarayaWatson;
+        var nearestNode = Config?.Locators?.NearestNode;
+
+        if ((nealderMead?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        {
+            if (nealderMead?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(nealderMead?.Floors))
+                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+
+            if (nadarayaWatson?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
+                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this), floor.Name);
+
+            if (nearestNode?.Enabled ?? false)
+                yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+        }
+        else
+        {
+            Log.Warning("No locators enabled, using default NelderMead");
+            foreach (var floor in Floors.Values)
+                yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+        }
     }
 
     public bool ShouldTrack(Device device)

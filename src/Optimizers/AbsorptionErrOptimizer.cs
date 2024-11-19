@@ -40,7 +40,6 @@ public class AbsorptionErrOptimizer : IOptimizer
                         var error = rxNodes
                             .Select((dn, i) => new { err = pos[i] - Distance(x, dn), weight = 1 })
                             .Average(a => a.weight * Math.Pow(a.err, 2));
-                        //Console.WriteLine("{0,-20}> Absorption: {1:#0.000, 10} Err: {2:##0.0000000000000000}", node.Id, x[0], error);
                         return error;
                     });
 

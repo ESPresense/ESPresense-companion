@@ -25,7 +25,8 @@ namespace ESPresense.Models
         [YamlMember(Alias = "map")]
         public ConfigMap Map { get; set; } = new();
 
-        [YamlMember(Alias = "floors")] public ConfigFloor[]  Floors { get; set; } = Array.Empty<ConfigFloor>();
+        [YamlMember(Alias = "floors")]
+        public ConfigFloor[] Floors { get; set; } = Array.Empty<ConfigFloor>();
 
         [YamlMember(Alias = "nodes")]
         public ConfigNode[] Nodes { get; set; } = Array.Empty<ConfigNode>();
@@ -39,10 +40,59 @@ namespace ESPresense.Models
         [YamlMember(Alias = "history")]
         public ConfigHistory History { get; set; } = new();
 
+        [YamlMember(Alias = "locators")]
+        public ConfigLocators Locators { get; set; } = new();
+
+        [YamlMember(Alias = "optimization")]
+        public ConfigOptimization Optimization { get; set; } = new();
+    }
+
+    public class ConfigLocators
+    {
+        [YamlMember(Alias = "nadaraya_watson")]
+        public NadarayaWatsonConfig NadarayaWatson { get; set; } = new();
+
+        [YamlMember(Alias = "nealder_mead")]
+        public NealderMeadConfig NealderMead { get; set; } = new();
+
+        [YamlMember(Alias = "nearest_node")]
+        public NearestNodeConfig NearestNode { get; set; } = new();
+    }
+
+    public class NadarayaWatsonConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
+
+        [YamlMember(Alias = "bandwidth")]
+        public double Bandwidth { get; set; } = 0.5;
+
+        [YamlMember(Alias = "kernel")]
+        public string Kernel { get; set; } = "gaussian";
+    }
+
+    public class NealderMeadConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
+
         [YamlMember(Alias = "weighting")]
         public ConfigWeighting Weighting { get; set; } = new();
+    }
 
-        [YamlMember(Alias = "optimization")] public ConfigOptimization Optimization { get; set; } = new();
+    public class NearestNodeConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "max_distance")]
+        public double? MaxDistance { get; set; }
     }
 
     public class ConfigMap
