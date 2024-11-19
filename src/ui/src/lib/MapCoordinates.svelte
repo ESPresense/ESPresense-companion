@@ -12,29 +12,39 @@
 	let copiedCoords: string[] = [];
 	let hasFocus = false;
 
-	const { xScale, yScale, width, height, padding } = getContext<any>('LayerCake');
+	const { xScale, yScale, width, height, padding } = getContext<LayerCakeContext>('LayerCake');
 
 	function updateCoordinates(event: MouseEvent) {
 		if (!$xScale || !$yScale) return;
 
 		const target = event.target as SVGElement;
 		const svg = target.ownerSVGElement || (target as SVGSVGElement);
-		const point = svg.createSVGPoint();
-		point.x = event.clientX;
-		point.y = event.clientY;
 
-		// Convert screen coordinates to SVG coordinates
-		const svgPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
+		if (!(svg instanceof SVGSVGElement)) return;
 
-		// Adjust for padding from context
-		const adjustedX = svgPoint.x - $padding.left;
-		const adjustedY = svgPoint.y - $padding.top;
+		try {
+			const point = svg.createSVGPoint();
+			point.x = event.clientX;
+			point.y = event.clientY;
 
-		const transformedX = (adjustedX - transform.x) / transform.k;
-		const transformedY = (adjustedY - transform.y) / transform.k;
+			const screenCTM = svg.getScreenCTM();
+			if (!screenCTM) return;
 
-		cursorX = $xScale.invert(transformedX);
-		cursorY = $yScale.invert(transformedY);
+			// Convert screen coordinates to SVG coordinates
+			const svgPoint = point.matrixTransform(screenCTM.inverse());
+
+			// Adjust for padding from context
+			const adjustedX = svgPoint.x - ($padding?.left ?? 0);
+			const adjustedY = svgPoint.y - ($padding?.top ?? 0);
+
+			const transformedX = (adjustedX - transform.x) / transform.k;
+			const transformedY = (adjustedY - transform.y) / transform.k;
+
+			cursorX = $xScale.invert(transformedX);
+			cursorY = $yScale.invert(transformedY);
+		} catch (error) {
+			console.error('Error updating coordinates:', error);
+		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {

@@ -1,8 +1,17 @@
 import type { ScaleOrdinal, ScaleLinear } from 'd3';
+import type { Writable } from 'svelte/store';
 
 export interface LayerCakeContext {
-	xScale: SvelteStore<ScaleLinear<number, number, never>>;
-	yScale: SvelteStore<ScaleLinear<number, number, never>>;
+	xScale: Writable<ScaleLinear<number, number, never>>;
+	yScale: Writable<ScaleLinear<number, number, never>>;
+	width: Writable<number>;
+	height: Writable<number>;
+	padding: Writable<{
+		top: number;
+		right: number;
+		bottom: number;
+		left: number;
+	}>;
 	colors: ScaleOrdinal<string, string>;
 }
 
