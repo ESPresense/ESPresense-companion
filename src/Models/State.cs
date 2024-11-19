@@ -5,6 +5,7 @@ using ESPresense.Extensions;
 using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Weighting;
+using Serilog;
 
 namespace ESPresense.Models;
 
@@ -119,7 +120,6 @@ public class State
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
 
-        Console.WriteLine($"NealderMead: {nealderMead?.Enabled}, NadarayaWatson: {nadarayaWatson?.Enabled}, NearestNode: {nearestNode?.Enabled}");
         if ((nealderMead?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
         {
             if (nealderMead?.Enabled ?? false)
@@ -135,7 +135,7 @@ public class State
         }
         else
         {
-            Console.WriteLine("No locators enabled, using default NelderMead");
+            Log.Warning("No locators enabled, using default NelderMead");
             foreach (var floor in Floors.Values)
                 yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
         }

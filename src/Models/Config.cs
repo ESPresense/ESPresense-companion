@@ -49,13 +49,13 @@ namespace ESPresense.Models
 
     public class ConfigLocators
     {
-        [YamlMember(Alias = "nadarayaWatson")]
+        [YamlMember(Alias = "nadaraya_watson")]
         public NadarayaWatsonConfig NadarayaWatson { get; set; } = new();
 
-        [YamlMember(Alias = "nealderMead")]
+        [YamlMember(Alias = "nealder_mead")]
         public NealderMeadConfig NealderMead { get; set; } = new();
 
-        [YamlMember(Alias = "nearestNode")]
+        [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
     }
 
@@ -91,7 +91,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }
 
-        [YamlMember(Alias = "maxDistance")]
+        [YamlMember(Alias = "max_distance")]
         public double? MaxDistance { get; set; }
     }
 

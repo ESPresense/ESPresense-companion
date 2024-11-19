@@ -12,17 +12,17 @@ public class ConfigTests
     {
         string yaml = @"
         locators:
-          nadarayaWatson:
+          nadaraya_watson:
             enabled: true
             floors: [""floor1"", ""floor2""]
             bandwidth: 0.5
             kernel: ""gaussian""
-          nealderMead:
+          nealder_mead:
             enabled: false
             floors: [""floor3""]
-          nearestNode:
+          nearest_node:
             enabled: true
-            maxDistance: 10.0
+            max_distance: 10.0
         ";
 
         var deserializer = new DeserializerBuilder().Build();
