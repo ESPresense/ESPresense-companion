@@ -33,10 +33,8 @@ ENV ASPNETCORE_URLS="http://+:8267" \
 
 RUN if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
       apt-get update && apt-get install -y apt-transport-https gnupg software-properties-common wget && \
-      wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB && \
-      apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB && \
-      rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB && \
-      echo "deb https://apt.repos.intel.com/mkl all main" > /etc/apt/sources.list.d/intel-mkl.list && \
+      wget -qO - https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor -o /usr/share/keyrings/intel-software.gpg && \
+      echo "deb [signed-by=/usr/share/keyrings/intel-software.gpg] https://apt.repos.intel.com/mkl all main" > /etc/apt/sources.list.d/intel-mkl.list && \
       apt-get update && apt-get install -y intel-mkl-64bit-2020.0-088; \
     fi
 
