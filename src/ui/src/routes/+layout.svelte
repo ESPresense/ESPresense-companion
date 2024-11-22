@@ -25,6 +25,7 @@
 		{ href: '/devices', name: 'devices', icon: devices, alt: 'Devices' },
 		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
 		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' },
+		{ href: '/settings', name: 'settings', icon: settings, alt: 'Settings' }
 	];
 </script>
 
