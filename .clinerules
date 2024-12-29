@@ -1,0 +1,3 @@
+Test via `dotnet watch --project src`
+Don't fix warnings and typescript issues unless it relates to your task
+src/ui is svelete 5 please don't use old syntax
