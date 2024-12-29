@@ -36,7 +36,9 @@
 
 	const handler = zoom()
 		.scaleExtent([0.5, 40])
-		.wheelDelta((event) => { return -(event.deltaY + event.deltaX * 0.25) * 0.002; })
+		.wheelDelta((event) => {
+			return -(event.deltaY + event.deltaX * 0.25) * 0.002;
+		})
 		.on('zoom', (e) => {
 			transform = e.transform;
 		});
@@ -52,12 +54,11 @@
 	}
 
 	function handleKeyboard(event: KeyboardEvent) {
-
 		const zoomFactor = event.shiftKey ? 1.005 : 1.1;
 		const translateAmount = event.shiftKey ? 1 : 50;
 		let newTransform = transform;
 
-		switch(event.key) {
+		switch (event.key) {
 			case '0':
 				event.preventDefault();
 				newTransform = zoomIdentity.translate(transform.x, transform.y);
@@ -117,14 +118,7 @@
 <svelte:window on:keydown={handleKeyboard} />
 
 {#if bounds}
-	<LayerCake
-		x="0"
-		y="1"
-		xRange={getXRange}
-		yRange={getYRange}
-		flatData={squareBounds}
-		padding={{ top: 16, left: 16, bottom: 16, right: 16 }}
-	>
+	<LayerCake x="0" y="1" xRange={getXRange} yRange={getYRange} flatData={squareBounds} padding={{ top: 16, left: 16, bottom: 16, right: 16 }}>
 		<Svg bind:element={svg}>
 			<MapCoordinates {transform} />
 			<AxisX {transform} />

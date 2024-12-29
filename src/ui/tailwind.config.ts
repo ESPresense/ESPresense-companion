@@ -8,13 +8,10 @@ const config = {
 	content: [
 		'./src/**/*.{html,js,svelte,ts}',
 		// 3. Append the path to the Skeleton package
-		join(require.resolve(
-			'@skeletonlabs/skeleton'),
-			'../**/*.{html,js,svelte,ts}'
-		)
+		join(require.resolve('@skeletonlabs/skeleton'), '../**/*.{html,js,svelte,ts}')
 	],
 	theme: {
-		extend: {},
+		extend: {}
 	},
 	plugins: [
 		forms,
@@ -23,16 +20,16 @@ const config = {
 				preset: [
 					{
 						name: 'skeleton',
-						enhancements: true,
+						enhancements: true
 					},
 					{
 						name: 'crimson',
-						enhancements: true,
-					},
-				],
-			},
-		}),
-	],
+						enhancements: true
+					}
+				]
+			}
+		})
+	]
 } satisfies Config;
 
 export default config;

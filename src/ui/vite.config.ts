@@ -16,8 +16,8 @@ export default defineConfig({
 			'/ws': {
 				target: 'ws://localhost:5279',
 				ws: true
-			},
+			}
 		},
 		host: true
-	},
+	}
 });

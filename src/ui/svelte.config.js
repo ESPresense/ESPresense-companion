@@ -4,29 +4,29 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-  extensions: ['.svelte'],
+	extensions: ['.svelte'],
 
-  preprocess: [vitePreprocess()],
+	preprocess: [vitePreprocess()],
 
-  relative: true,
+	relative: true,
 
 	vitePlugin: {
-		inspector: true,
-  },
+		inspector: true
+	},
 
-  kit: {
-    embedded: true,
-    inlineStyleThreshold: 4096,
+	kit: {
+		embedded: true,
+		inlineStyleThreshold: 4096,
 		prerender: {
 			crawl: false
-    },
+		},
 		adapter: adapter({
 			strict: false
-    }),
-    version: {
-      name: child_process.execSync('git rev-parse HEAD').toString().trim(),
-      pollInterval: 5000
-    },
+		}),
+		version: {
+			name: child_process.execSync('git rev-parse HEAD').toString().trim(),
+			pollInterval: 5000
+		}
 	}
 };
 
