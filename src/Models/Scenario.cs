@@ -55,15 +55,18 @@ public class Scenario(Config? config, ILocate locator, string? name)
         UpdateStateTransitionMatrix(dt);
 
         // Predict
-        _kalmanStateEstimate = _F! * _kalmanStateEstimate!;
-        _kalmanErrorCovariance = _F * _kalmanErrorCovariance! * _F.Transpose() + _Q!;
+        if (_F == null || _kalmanStateEstimate == null || _kalmanErrorCovariance == null || _H == null || _Q == null || _R == null)
+            return;
+
+        _kalmanStateEstimate = _F * _kalmanStateEstimate;
+        _kalmanErrorCovariance = _F * _kalmanErrorCovariance * _F.Transpose() + _Q;
 
         // Update
         var y = Matrix<double>.Build.DenseOfArray(new double[,] {
             { newLocation.X }, { newLocation.Y }, { newLocation.Z }
-        }) - _H! * _kalmanStateEstimate;
+        }) - _H * _kalmanStateEstimate;
 
-        var S = _H * _kalmanErrorCovariance * _H.Transpose() + _R!;
+        var S = _H * _kalmanErrorCovariance * _H.Transpose() + _R;
         var K = _kalmanErrorCovariance * _H.Transpose() * S.Inverse();
 
         _kalmanStateEstimate += K * y;

@@ -128,7 +128,7 @@ public class State
 
             if (nadarayaWatson?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
-                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor), floor.Name);
 
             if (nearestNode?.Enabled ?? false)
                 yield return new Scenario(Config, new NearestNode(device), "NearestNode");

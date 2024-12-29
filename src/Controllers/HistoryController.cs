@@ -1,4 +1,4 @@
-﻿using ESPresense.Models;
+﻿﻿using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,7 +25,7 @@ namespace ESPresense.Controllers
         public async Task<DeviceHistoryResponse> Get(string id)
         {
             var dh = await _databaseFactory.GetDeviceHistory();
-            var history = await dh.List(id);
+            var history = await dh.List(id) ?? new List<DeviceHistory>();
             return new DeviceHistoryResponse(history);
         }
     }

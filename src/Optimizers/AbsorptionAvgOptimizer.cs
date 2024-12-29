@@ -1,4 +1,4 @@
-﻿using ESPresense.Models;
+﻿﻿using ESPresense.Models;
 
 namespace ESPresense.Optimizers;
 
@@ -32,8 +32,9 @@ public class AbsorptionAvgOptimizer : IOptimizer
             if (pathLossExponents.Count > 0)
             {
                 var absorption = pathLossExponents.Average();
-                if (absorption < _state.Config?.Optimization.AbsorptionMin) continue;
-                if (absorption > _state.Config?.Optimization.AbsorptionMax) continue;
+                var optimization = _state.Config?.Optimization;
+                if (absorption < (optimization?.AbsorptionMin ?? 2.0)) continue;
+                if (absorption > (optimization?.AbsorptionMax ?? 4.0)) continue;
                 results.RxNodes.Add(g.Key.Id, new ProposedValues { Absorption = absorption });
             }
         }

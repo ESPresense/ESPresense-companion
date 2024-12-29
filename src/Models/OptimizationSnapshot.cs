@@ -25,7 +25,7 @@ public class OptimizationSnapshot
 
 public class OptNode
 {
-    public string Id { get; set; }
+    public string? Id { get; set; }
     public string? Name { get; set; }
     public Point3D Location { get; set; }
 }
@@ -33,8 +33,8 @@ public class OptNode
 public class Measure
 {
     public bool Current { get; set; }
-    public OptNode Rx { get; set; }
-    public OptNode Tx { get; set; }
+    public OptNode Rx { get; set; } = new();
+    public OptNode Tx { get; set; } = new();
     public double RefRssi { get; set; }
     public double Rssi { get; set; }
     public double Distance { get; set; }
