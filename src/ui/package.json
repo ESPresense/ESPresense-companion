@@ -15,7 +15,7 @@
 	"devDependencies": {
 		"@eslint/js": "^9.17.0",
 		"@floating-ui/dom": "^1.6.12",
-		"@skeletonlabs/skeleton": "^2.10.3",
+		"@skeletonlabs/skeleton": "^2.10.4",
 		"@skeletonlabs/tw-plugin": "^0.4.0",
 		"@sveltejs/adapter-static": "^3.0.6",
 		"@sveltejs/kit": "^2.15.1",
