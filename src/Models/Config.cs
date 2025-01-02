@@ -40,11 +40,23 @@ namespace ESPresense.Models
         [YamlMember(Alias = "history")]
         public ConfigHistory History { get; set; } = new();
 
+        [YamlMember(Alias = "weighting")]
+        public ConfigWeighting Weighting { get; set; } = new();
+
         [YamlMember(Alias = "locators")]
         public ConfigLocators Locators { get; set; } = new();
 
         [YamlMember(Alias = "optimization")]
         public ConfigOptimization Optimization { get; set; } = new();
+    }
+
+    public class ConfigWeighting
+    {
+        [YamlMember(Alias = "algorithm")]
+        public string Algorithm { get; set; } = "gaussian";
+
+        [YamlMember(Alias = "props")]
+        public Dictionary<string, double> Props { get; set; } = new();
     }
 
     public class ConfigLocators
@@ -69,9 +81,6 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "bandwidth")]
         public double Bandwidth { get; set; } = 1e-6;
-
-        [YamlMember(Alias = "kernel")]
-        public string Kernel { get; set; } = "gaussian";
     }
 
     public class NealderMeadConfig
@@ -82,8 +91,6 @@ namespace ESPresense.Models
         [YamlMember(Alias = "floors")]
         public string[]? Floors { get; set; }
 
-        [YamlMember(Alias = "weighting")]
-        public ConfigWeighting Weighting { get; set; } = new();
     }
 
     public class NearestNodeConfig
@@ -142,13 +149,6 @@ namespace ESPresense.Models
         public TimeSpan ExpireAfterTimeSpan => ExpireAfter.TryParseDurationString(out var ts) ? ts : TimeSpan.FromHours(24);
     }
 
-    public class ConfigWeighting
-    {
-        [YamlMember(Alias = "algorithm")]
-        public string Algorithm { get; set; } = "gaussian";
-
-        [YamlMember(Alias = "props")] public Dictionary<string, double> Props { get; set; } = new();
-    }
 
     public class ConfigGps
     {

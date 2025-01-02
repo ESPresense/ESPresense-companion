@@ -48,7 +48,7 @@ public class State
             NamesToTrack = namesToTrack;
             ConfigDeviceByName = configDeviceByName;
 
-            var w = c?.Locators?.NealderMead?.Weighting;
+            var w = c?.Weighting;
             Weighting = w?.Algorithm switch
             {
                 "equal" => new EqualWeighting(),
