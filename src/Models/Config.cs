@@ -68,7 +68,7 @@ namespace ESPresense.Models
         public string[]? Floors { get; set; }
 
         [YamlMember(Alias = "bandwidth")]
-        public double Bandwidth { get; set; } = 0.5;
+        public double Bandwidth { get; set; } = 1e-6;
 
         [YamlMember(Alias = "kernel")]
         public string Kernel { get; set; } = "gaussian";

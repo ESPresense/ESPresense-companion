@@ -47,11 +47,11 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             else
             {
                 // Nadaraya-Watson estimator implementation
-                double epsilon = 1e-6;
+                var bandwidth = state.Config?.Locators?.NadarayaWatson?.Bandwidth ?? 0.5;
 
                 var weights = nodes.Select(dn =>
                 {
-                    return 1.0 / (Math.Pow(dn.Distance, 2) + epsilon);
+                    return 1.0 / (Math.Pow(dn.Distance, 2) + bandwidth);
                 }).ToArray();
 
                 var totalWeight = weights.Sum();

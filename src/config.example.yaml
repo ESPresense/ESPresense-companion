@@ -43,7 +43,7 @@ locators:
   nadaraya_watson:
     enabled: true
     floors: ["first", "second", "outside"]
-    bandwidth: 0.5
+    bandwidth: 1e-6
     kernel: gaussian
 
   nealder_mead:
