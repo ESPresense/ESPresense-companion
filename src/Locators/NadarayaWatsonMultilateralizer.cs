@@ -1,20 +1,42 @@
 using System;
 using System.Linq;
-using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Services;
+using ESPresense.Utils;
+using ESPresense.Weighting;
 using MathNet.Spatial.Euclidean;
 using Serilog;
-using ESPresense.Services;
 
 namespace ESPresense.Locators;
 
-public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, NodeTelemetryStore nts) : ILocate
+public class NadarayaWatsonMultilateralizer : ILocate
 {
+    private readonly Device _device;
+    private readonly Floor _floor;
+    private readonly State _state;
+    private readonly NodeTelemetryStore _nts;
+    private readonly IKernel _kernel;
+
+    public NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, NodeTelemetryStore nts, ConfigKernel? kernelConfig = null)
+    {
+        _device = device;
+        _floor = floor;
+        _state = state;
+        _nts = nts;
+
+        _kernel = kernelConfig?.Algorithm?.ToLowerInvariant() switch
+        {
+            "epanechnikov" => new EpanechnikovKernel(kernelConfig?.Props),
+            "gaussian" => new GaussianKernel(kernelConfig?.Props),
+            _ => new InverseSquareKernel(kernelConfig?.Props)
+        };
+    }
+
     public bool Locate(Scenario scenario)
     {
-        var heard = device.Nodes.Values
-            .Where(n => n.Current && (n.Node?.Floors?.Contains(floor) ?? false))
+        var heard = _device.Nodes.Values
+            .Where(n => n.Current && (n.Node?.Floors?.Contains(_floor) ?? false))
             .OrderBy(n => n.Distance)
             .ToArray();
 
@@ -29,14 +51,13 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         scenario.Minimum = heard.Min(n => (double?)n.Distance);
         scenario.LastHit = heard.Max(n => n.LastHit);
         scenario.Fixes = heard.Length;
-        scenario.Floor = floor;
+        scenario.Floor = _floor;
 
         Point3D est;
-        double weightedError = 0;
 
         try
         {
-            if (heard.Length < 3 || floor.Bounds == null)
+            if (heard.Length < 3 || _floor.Bounds == null)
             {
                 est = Point3D.MidPoint(heard[0].Node!.Location, heard[1].Node!.Location);
                 scenario.Error = null;
@@ -44,23 +65,31 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             }
             else
             {
-                const double EPS = 1e-6;
-                var weights = heard.Select(n => 1.0 / (Math.Pow(n.Distance, 2) + EPS)).ToArray();
+                var weights = heard.Select(n => _kernel.Evaluate(n.Distance)).ToArray();
                 var wSum = weights.Sum();
 
-                est = new Point3D(
-                    heard.Zip(weights, (n, w) => n.Node!.Location.X * w).Sum() / wSum,
-                    heard.Zip(weights, (n, w) => n.Node!.Location.Y * w).Sum() / wSum,
-                    heard.Zip(weights, (n, w) => n.Node!.Location.Z * w).Sum() / wSum
-                );
-
-                weightedError = heard.Zip(weights, (n, w) =>
+                if (wSum <= 0)
                 {
-                    double diff = est.DistanceTo(n.Node!.Location) - n.Distance;
-                    return w * diff * diff;
-                }).Sum() / wSum;
+                    est = Point3D.MidPoint(heard[0].Node!.Location, heard[1].Node!.Location);
+                    scenario.Error = null;
+                    scenario.PearsonCorrelation = null;
+                }
+                else
+                {
+                    est = new Point3D(
+                        heard.Zip(weights, (n, w) => n.Node!.Location.X * w).Sum() / wSum,
+                        heard.Zip(weights, (n, w) => n.Node!.Location.Y * w).Sum() / wSum,
+                        heard.Zip(weights, (n, w) => n.Node!.Location.Z * w).Sum() / wSum
+                    );
 
-                scenario.Error = weightedError;
+                    var weightedError = heard.Zip(weights, (n, w) =>
+                    {
+                        double diff = est.DistanceTo(n.Node!.Location) - n.Distance;
+                        return w * diff * diff;
+                    }).Sum() / wSum;
+
+                    scenario.Error = weightedError;
+                }
             }
 
             scenario.UpdateLocation(est);
@@ -69,13 +98,9 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             var calculated = heard.Select(n => est.DistanceTo(n.Node!.Location)).ToList();
             scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measured, calculated);
 
-            // Get count of possible online nodes for this floor
-            int nodesPossibleOnline = state.Nodes.Values
-                .Count(n =>
-                    (n.Floors?.Contains(floor) ?? false) &&
-                    (nts.Online(n.Id)));
+            int nodesPossibleOnline = _state.Nodes.Values
+                .Count(n => (n.Floors?.Contains(_floor) ?? false) && _nts.Online(n.Id));
 
-            // Use the centralized confidence calculation
             scenario.Confidence = MathUtils.CalculateConfidence(
                 scenario.Error,
                 scenario.PearsonCorrelation,
@@ -88,13 +113,13 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             scenario.UpdateLocation(scenario.Location); // revert to last good
             scenario.Confidence = 0;
             scenario.Error = null;
-            Log.Error("Locator error for {Device}: {Message}", device, ex.Message);
+            Log.Error("Locator error for {Device}: {Message}", _device, ex.Message);
         }
 
         if (scenario.Confidence <= 0) return false;
         if (scenario.Location.DistanceTo(scenario.LastLocation) < 0.1) return false;
 
-        scenario.Room = floor.Rooms.Values.FirstOrDefault(r =>
+        scenario.Room = _floor.Rooms.Values.FirstOrDefault(r =>
             r.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
 
         return true;
