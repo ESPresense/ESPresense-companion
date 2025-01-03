@@ -1,18 +1,38 @@
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Weighting;
 using MathNet.Spatial.Euclidean;
 using Serilog;
 
 namespace ESPresense.Locators;
 
-public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state) : ILocate
+public class NadarayaWatsonMultilateralizer : ILocate
 {
+    private readonly Device _device;
+    private readonly Floor _floor;
+    private readonly State _state;
+    private readonly IKernel _kernel;
+
+    public NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, ConfigKernel? kernelConfig = null)
+    {
+        _device = device;
+        _floor = floor;
+        _state = state;
+
+        _kernel = kernelConfig?.Algorithm?.ToLower() switch
+        {
+            "epanechnikov" => new EpanechnikovKernel(kernelConfig?.Props),
+            "gaussian" => new GaussianKernel(kernelConfig?.Props),
+            _ => new InverseSquareKernel(kernelConfig?.Props)
+        };
+    }
+
     public bool Locate(Scenario scenario)
     {
         var confidence = scenario.Confidence;
 
-        var nodes = device.Nodes.Values
-            .Where(a => a.Current && (a.Node?.Floors?.Contains(floor) ?? false))
+        var nodes = _device.Nodes.Values
+            .Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false))
             .OrderBy(a => a.Distance)
             .ToArray();
 
@@ -31,7 +51,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             return false;
         }
 
-        scenario.Floor = floor;
+        scenario.Floor = _floor;
 
         var guess = confidence < 5
             ? Point3D.MidPoint(positions[0], positions[1])
@@ -39,21 +59,15 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
 
         try
         {
-            if (positions.Length < 3 || floor.Bounds == null)
+            if (positions.Length < 3 || _floor.Bounds == null)
             {
                 confidence = 1;
                 scenario.UpdateLocation(guess);
             }
             else
             {
-                // Nadaraya-Watson estimator implementation
-                double epsilon = 1e-6;
 
-                var weights = nodes.Select(dn =>
-                {
-                    return 1.0 / (Math.Pow(dn.Distance, 2) + epsilon);
-                }).ToArray();
-
+                var weights = nodes.Select(dn => _kernel.Evaluate(dn.Distance)).ToArray();
                 var totalWeight = weights.Sum();
 
                 var weightedX = nodes.Zip(weights, (dn, w) => dn.Node!.Location.X * w).Sum();
@@ -87,7 +101,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         {
             confidence = 0;
             scenario.UpdateLocation(new Point3D());
-            Log.Error("Error finding location for {0}: {1}", device, ex.Message);
+            Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
         }
 
         scenario.Confidence = confidence;
@@ -95,7 +109,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
 
-        scenario.Room = floor.Rooms.Values.FirstOrDefault(a =>
+        scenario.Room = _floor.Rooms.Values.FirstOrDefault(a =>
             a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
 
         return true;

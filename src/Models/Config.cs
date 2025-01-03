@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿﻿using Newtonsoft.Json;
 using TextExtensions;
 using YamlDotNet.Serialization;
 using ESPresense.Extensions;
@@ -57,6 +57,24 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
+
+        [YamlMember(Alias = "iterative_nadaraya_watson")]
+        public IterativeNadarayaWatsonConfig IterativeNadarayaWatson { get; set; } = new();
+    }
+
+    public class IterativeNadarayaWatsonConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
+
+        [YamlMember(Alias = "kernel")]
+        public ConfigKernel Kernel { get; set; } = new();
+
+        [YamlMember(Alias = "max_iterations")]
+        public int MaxIterations { get; set; } = 2;
     }
 
     public class NadarayaWatsonConfig
@@ -67,11 +85,17 @@ namespace ESPresense.Models
         [YamlMember(Alias = "floors")]
         public string[]? Floors { get; set; }
 
-        [YamlMember(Alias = "bandwidth")]
-        public double Bandwidth { get; set; } = 0.5;
-
         [YamlMember(Alias = "kernel")]
-        public string Kernel { get; set; } = "gaussian";
+        public ConfigKernel Kernel { get; set; } = new();
+    }
+
+    public class ConfigKernel
+    {
+        [YamlMember(Alias = "algorithm")]
+        public string Algorithm { get; set; } = "gaussian";
+
+        [YamlMember(Alias = "props")]
+        public Dictionary<string, double> Props { get; set; } = new();
     }
 
     public class NealderMeadConfig

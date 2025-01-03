@@ -43,8 +43,10 @@ locators:
   nadaraya_watson:
     enabled: true
     floors: ["first", "second", "outside"]
-    bandwidth: 0.5
-    kernel: gaussian
+    kernel:
+      algorithm: inverse_square
+      props:
+        epsilon: 1e-6
 
   nealder_mead:
     enabled: false

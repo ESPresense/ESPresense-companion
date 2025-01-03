@@ -120,7 +120,10 @@ public class State
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
 
-        if ((nealderMead?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        var iterativeNadarayaWatson = Config?.Locators?.IterativeNadarayaWatson;
+
+        if ((nealderMead?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) ||
+            (nearestNode?.Enabled ?? false) || (iterativeNadarayaWatson?.Enabled ?? false))
         {
             if (nealderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nealderMead?.Floors))
@@ -132,6 +135,20 @@ public class State
 
             if (nearestNode?.Enabled ?? false)
                 yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+
+            if (iterativeNadarayaWatson?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(iterativeNadarayaWatson?.Floors))
+                    yield return new Scenario(
+                        Config,
+                        new IterativeNadarayaWatsonMultilateralizer(
+                            device,
+                            floor,
+                            this,
+                            iterativeNadarayaWatson.Kernel,
+                            iterativeNadarayaWatson.MaxIterations
+                        ),
+                        floor.Name
+                    );
         }
         else
         {

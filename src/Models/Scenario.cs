@@ -4,106 +4,57 @@ using MathNet.Spatial.Euclidean;
 using Newtonsoft.Json;
 using MathNet.Numerics.LinearAlgebra;
 
-namespace ESPresense.Models;
-
-public class Scenario(Config? config, ILocate locator, string? name)
+namespace ESPresense.Models
 {
-    private Config? Config { get; } = config;
-    private ILocate Locator { get; } = locator;
-
-    public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
-    public int? Confidence { get; set; }
-    public double? Minimum { get; set; }
-    [JsonIgnore] public Point3D LastLocation { get; set; }
-    public Point3D Location { private set; get; }
-    public double? Scale { get; set; }
-    public int? Fixes { get; set; }
-    public string? Name { get; } = name;
-    public Room? Room { get; set; }
-    public double? Error { get; set; }
-    public int? Iterations { get; set; }
-    public ExitCondition ReasonForExit { get; set; }
-    public Floor? Floor { get; set; }
-    public DateTime? LastHit { get; set; }
-    public double Probability { get; set; } = 1.0;
-
-    // Kalman filter properties
-    private Matrix<double>? _kalmanStateEstimate;
-    private Matrix<double>? _kalmanErrorCovariance;
-    private const double ProcessNoise = 0.01;
-    private const double MeasurementNoise = 0.1;
-    private Matrix<double>? _F; // State transition matrix
-    private Matrix<double>? _H; // Measurement matrix
-    private Matrix<double>? _Q; // Process noise covariance
-    private Matrix<double>? _R; // Measurement noise covariance
-
-    public bool Locate()
+    public class Scenario(Config? config, ILocate locator, string? name)
     {
-        return Locator.Locate(this);
-    }
+        const bool DisableFiltering = false;
+        private Config? Config { get; } = config;
+        private ILocate Locator { get; } = locator;
 
-    public void UpdateLocation(Point3D newLocation)
-    {
-        if (_kalmanStateEstimate == null || _kalmanErrorCovariance == null)
+        public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
+        public int? Confidence { get; set; }
+        public double? Minimum { get; set; }
+        [JsonIgnore] public Point3D LastLocation { get; set; }
+        public Point3D Location { private set; get; }
+        public double? Scale { get; set; }
+        public int? Fixes { get; set; }
+        public string? Name { get; } = name;
+        public Room? Room { get; set; }
+        public double? Error { get; set; }
+        public int? Iterations { get; set; }
+        public ExitCondition ReasonForExit { get; set; }
+        public Floor? Floor { get; set; }
+        public DateTime? LastHit { get; set; }
+        public double Probability { get; set; } = 1.0;
+
+        // 1€ filter for 3D
+        // Tune minCutoff, beta, and dCutoff for your application:
+        private OneEuroFilter3D _oneEuroFilter = new OneEuroFilter3D(minCutoff: 1.0, beta: 0.005, dCutoff: 1.0);
+
+        public bool Locate()
         {
-            InitializeKalmanFilter(newLocation);
+            return Locator.Locate(this);
         }
 
-        var dt = (DateTime.UtcNow - (LastHit ?? DateTime.UtcNow)).TotalSeconds;
-        LastHit = DateTime.UtcNow;
+        public void UpdateLocation(Point3D newLocation)
+        {
+            // If we haven’t gotten any location yet, just set it
+            if (Location == default || DisableFiltering)
+            {
+                Location = newLocation;
+                LastHit = DateTime.UtcNow;
+                return;
+            }
 
-        UpdateStateTransitionMatrix(dt);
+            var now = DateTime.UtcNow;
+            LastHit = now;
 
-        // Predict
-        _kalmanStateEstimate = _F! * _kalmanStateEstimate!;
-        _kalmanErrorCovariance = _F * _kalmanErrorCovariance! * _F.Transpose() + _Q!;
+            // Smooth the new reading using the 3D 1€ filter
+            var smoothedPoint = _oneEuroFilter.Filter(newLocation, now);
 
-        // Update
-        var y = Matrix<double>.Build.DenseOfArray(new double[,] {
-            { newLocation.X }, { newLocation.Y }, { newLocation.Z }
-        }) - _H! * _kalmanStateEstimate;
-
-        var S = _H * _kalmanErrorCovariance * _H.Transpose() + _R!;
-        var K = _kalmanErrorCovariance * _H.Transpose() * S.Inverse();
-
-        _kalmanStateEstimate += K * y;
-        _kalmanErrorCovariance = (Matrix<double>.Build.DenseIdentity(6) - K * _H) * _kalmanErrorCovariance;
-
-        // Update Location
-        Location = new Point3D(
-            _kalmanStateEstimate[0, 0],
-            _kalmanStateEstimate[1, 0],
-            _kalmanStateEstimate[2, 0]
-        );
-    }
-
-    private void InitializeKalmanFilter(Point3D initialLocation)
-    {
-        _kalmanStateEstimate = Matrix<double>.Build.DenseOfArray(new double[,] {
-            { initialLocation.X }, { initialLocation.Y }, { initialLocation.Z },
-            { 0 }, { 0 }, { 0 }
-        });
-        _kalmanErrorCovariance = Matrix<double>.Build.DenseDiagonal(6, 6, 1);
-
-        _H = Matrix<double>.Build.DenseOfArray(new double[,] {
-            { 1, 0, 0, 0, 0, 0 },
-            { 0, 1, 0, 0, 0, 0 },
-            { 0, 0, 1, 0, 0, 0 }
-        });
-
-        _Q = Matrix<double>.Build.DenseDiagonal(6, 6, ProcessNoise);
-        _R = Matrix<double>.Build.DenseDiagonal(3, 3, MeasurementNoise);
-    }
-
-    private void UpdateStateTransitionMatrix(double dt)
-    {
-        _F = Matrix<double>.Build.DenseOfArray(new double[,] {
-            { 1, 0, 0, dt, 0, 0 },
-            { 0, 1, 0, 0, dt, 0 },
-            { 0, 0, 1, 0, 0, dt },
-            { 0, 0, 0, 1, 0, 0 },
-            { 0, 0, 0, 0, 1, 0 },
-            { 0, 0, 0, 0, 0, 1 }
-        });
+            // Store it
+            Location = smoothedPoint;
+        }
     }
 }
