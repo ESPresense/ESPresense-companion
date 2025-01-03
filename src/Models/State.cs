@@ -206,8 +206,15 @@ public class State
         var multiFloor = Config?.Locators?.MultiFloor;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
+        var iterativeNadarayaWatson = Config?.Locators?.IterativeNadarayaWatson;
 
-        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (multiFloor?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        if ((nelderMead?.Enabled ?? false) ||
+            (bfgs?.Enabled ?? false) ||
+            (mle?.Enabled ?? false) ||
+            (multiFloor?.Enabled ?? false) ||
+            (nadarayaWatson?.Enabled ?? false) ||
+            (nearestNode?.Enabled ?? false) ||
+            (iterativeNadarayaWatson?.Enabled ?? false))
         {
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
@@ -226,10 +233,28 @@ public class State
 
             if (nadarayaWatson?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
-                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this, _nts), floor.Name);
+                    yield return new Scenario(
+                        Config,
+                        new NadarayaWatsonMultilateralizer(device, floor, this, _nts, nadarayaWatson.Kernel),
+                        floor.Name
+                    );
 
             if (nearestNode?.Enabled ?? false)
                 yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
+
+            if (iterativeNadarayaWatson?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(iterativeNadarayaWatson?.Floors))
+                    yield return new Scenario(
+                        Config,
+                        new IterativeNadarayaWatsonMultilateralizer(
+                            device,
+                            floor,
+                            this,
+                            iterativeNadarayaWatson.Kernel,
+                            iterativeNadarayaWatson.MaxIterations
+                        ),
+                        floor.Name
+                    );
         }
         else
         {
