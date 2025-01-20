@@ -25,7 +25,7 @@
 		"@types/node": "^22.9.1",
 		"@types/three": "^0.171.0",
 		"@typescript-eslint/eslint-plugin": "^8.15.0",
-		"@typescript-eslint/parser": "^8.15.0",
+		"@typescript-eslint/parser": "^8.21.0",
 		"autoprefixer": "^10.4.20",
 		"d3": "^7.9.0",
 		"d3-zoom": "^3.0.0",
