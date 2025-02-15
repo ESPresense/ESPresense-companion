@@ -21,12 +21,12 @@ namespace ESPresense.Services
         }
         private readonly ConcurrentDictionary<string, NodeSettings> _storeById = new();
 
-        public NodeSettings Get(string id)
+        public Models.NodeSettings Get(string id)
         {
-            return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new NodeSettings(id);
+            return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new Models.NodeSettings(id);
         }
 
-        public async Task Set(string id, NodeSettings ds)
+        public async Task Set(string id, Models.NodeSettings ns)
         {
             var retain = id == "*";
             var old = Get(id);

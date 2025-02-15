@@ -1,31 +1,22 @@
 <script lang="ts">
-	import { base } from '$app/paths';
 	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
 	import { getToastStore } from '@skeletonlabs/skeleton';
-
 	import type { ToastSettings } from '@skeletonlabs/skeleton';
 	import type { NodeSetting } from './types';
+	import { saveNodeSettings } from '$lib/node';
 
 	export let settings: NodeSetting | null = null;
 	const toastStore = getToastStore();
 
-	function save() {
-		if (settings) {
-			fetch(`${base}/api/node/${settings.id}`, {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(settings)
-			})
-				.then((response) => {
-					if (response.status != 200) throw new Error(response.statusText);
-				})
-				.catch((e) => {
-					console.log(e);
-					const t: ToastSettings = { message: e, background: 'variant-filled-error' };
-					toastStore.trigger(t);
-				});
+	async function save() {
+		if (settings && settings.id) {
+			try {
+				await saveNodeSettings(settings.id, settings);
+			} catch (e) {
+				console.log(e);
+				const t: ToastSettings = { message: e instanceof Error ? e.message : String(e), background: 'variant-filled-error' };
+				toastStore.trigger(t);
+			}
 		}
 	}
 </script>
@@ -62,7 +53,7 @@
 						<span>Max Distance</span>
 						<input class="input" type="text" placeholder="" bind:value={settings.max_distance} />
 					</label>
-					<button class="btn bg-success-700 text-black" on:click={(e) => save()}>Save</button>
+					<button class="btn bg-success-700 text-black" on:click|preventDefault={save}>Save</button>
 				</form>
 			</svelte:fragment>
 		</AccordionItem>
