@@ -20,9 +20,9 @@ public class OptimizationResults
                 var rx = nss.Get(m.Rx.Id);
 
                 RxNodes.TryGetValue(m.Rx.Id, out var pv);
-                double rxAdjRssi = pv?.RxAdjRssi ?? rx.RxAdjRssi ?? 0;
-                double txPower = tx.TxRefRssi ?? -59;
-                double pathLossExponent = pv?.Absorption ?? rx.Absorption ?? 3;
+                double rxAdjRssi = pv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
+                double txPower = tx.Calibration.TxRefRssi ?? -59;
+                double pathLossExponent = pv?.Absorption ?? rx.Calibration.Absorption ?? 3;
                 double distance = m.Rx.Location.DistanceTo(m.Tx.Location);
                 double predictedRssi = txPower + rxAdjRssi - 10 * pathLossExponent * Math.Log10(distance);
 

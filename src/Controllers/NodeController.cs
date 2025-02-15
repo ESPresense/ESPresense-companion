@@ -1,6 +1,7 @@
 ﻿using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
+using Serilog;
 
 namespace ESPresense.Controllers;
 
@@ -21,6 +22,7 @@ public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : 
     [HttpPut("{id}")]
     public Task Set(string id, [FromBody] NodeSettings ds)
     {
+        Log.Information("Set {id} {@ds}", id, ds);
         return nodeSettingsStore.Set(id, ds);
     }
 

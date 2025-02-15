@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+﻿﻿using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -66,9 +66,9 @@ public class StateController : ControllerBase
             {
                 var rxNs = _nsd.Get(rxId);
                 var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
-                if (txNs.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.TxRefRssi.Value;
-                if (rxNs.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.RxAdjRssi.Value;
-                if (rxNs.Absorption is not null) rxM["absorption"] = rxNs.Absorption.Value;
+                if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
+                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
+                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
                 rxM["expected"] = rx.Expected;
                 rxM["actual"] = rx.Distance;
                 rxM["rssi"] = rx.Rssi;
@@ -145,9 +145,9 @@ public class StateController : ControllerBase
             foreach (var node in _state.Nodes.Values)
             {
                 var nodeSettings = _nsd.Get(node.Id);
-                nodeSettings.TxRefRssi = null;
-                nodeSettings.RxAdjRssi = null;
-                nodeSettings.Absorption = null;
+                nodeSettings.Calibration.TxRefRssi = null;
+                nodeSettings.Calibration.RxAdjRssi = null;
+                nodeSettings.Calibration.Absorption = null;
                 await _nsd.Set(node.Id, nodeSettings);
             }
 
