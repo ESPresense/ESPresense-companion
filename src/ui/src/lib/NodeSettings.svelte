@@ -46,22 +46,71 @@
 						<span>Name</span>
 						<input class="input" type="text" bind:value={settings.name} />
 					</label>
-					<label>
-						<span>Absorption</span>
-						<input class="input" type="text" placeholder="" bind:value={settings.absorption} />
-					</label>
-					<label>
-						<span>Rx Adj Rssi</span>
-						<input class="input" type="text" placeholder="" bind:value={settings.rx_adj_rssi} />
-					</label>
-					<label>
-						<span>Tx Ref Rssi</span>
-						<input class="input" type="text" placeholder="" bind:value={settings.tx_ref_rssi} />
-					</label>
-					<label>
-						<span>Max Distance</span>
-						<input class="input" type="text" placeholder="" bind:value={settings.max_distance} />
-					</label>
+
+					<section class="space-y-4">
+						<h4 class="text-xl font-semibold">Updating</h4>
+						<label class="label">
+							<span>Auto Update</span>
+							<input type="checkbox" class="checkbox" bind:checked={settings.updating.autoUpdate} />
+						</label>
+						<label class="label">
+							<span>Include Pre-releases</span>
+							<input type="checkbox" class="checkbox" bind:checked={settings.updating.preRelease} />
+						</label>
+					</section>
+
+					<section class="space-y-4">
+						<h4 class="text-xl font-semibold">Counting</h4>
+						<label class="label">
+							<span>ID Prefixes</span>
+							<input type="text" class="input" bind:value={settings.counting.idPrefixes} />
+						</label>
+						<label class="label">
+							<span>Start Counting Distance (m)</span>
+							<input type="number" class="input" step="0.01" min="0" bind:value={settings.counting.startCountingDistance} />
+						</label>
+						<label class="label">
+							<span>Stop Counting Distance (m)</span>
+							<input type="number" class="input" step="0.01" min="0" bind:value={settings.counting.stopCountingDistance} />
+						</label>
+					</section>
+
+					<section class="space-y-4">
+						<h4 class="text-xl font-semibold">Filtering</h4>
+						<label class="label">
+							<span>Include IDs</span>
+							<input type="text" class="input" bind:value={settings.filtering.includeIds} />
+						</label>
+						<label class="label">
+							<span>Exclude IDs</span>
+							<input type="text" class="input" bind:value={settings.filtering.excludeIds} />
+						</label>
+						<label class="label">
+							<span>Max Distance (m)</span>
+							<input type="number" class="input" step="0.01" min="0" bind:value={settings.filtering.maxDistance} />
+						</label>
+					</section>
+
+					<section class="space-y-4">
+						<h4 class="text-xl font-semibold">Calibration</h4>
+						<label class="label">
+							<span>RSSI at 1m</span>
+							<input type="number" class="input" bind:value={settings.calibration.rssiAt1m} />
+						</label>
+						<label class="label">
+							<span>Rx Adj RSSI</span>
+							<input type="number" class="input" bind:value={settings.calibration.rxAdjRssi} />
+						</label>
+						<label class="label">
+							<span>Absorption</span>
+							<input type="number" class="input" step="0.01" bind:value={settings.calibration.absorption} />
+						</label>
+						<label class="label">
+							<span>Tx Ref RSSI</span>
+							<input type="number" class="input" bind:value={settings.calibration.txRefRssi} />
+						</label>
+					</section>
+
 					<button class="btn bg-success-700 text-black" on:click={(e) => save()}>Save</button>
 				</form>
 			</svelte:fragment>
