@@ -38,8 +38,9 @@ public class AbsorptionLineFitOptimizer : IOptimizer
             var linearModel = Fit.Line(distances.ToArray(), rssiDiffs.ToArray());
 
             double absorption = linearModel.Item2 / 10;
-            if (absorption < _state.Config?.Optimization.AbsorptionMin) continue;
-            if (absorption > _state.Config?.Optimization.AbsorptionMax) continue;
+            var optimization = _state.Config?.Optimization;
+            if (absorption < (optimization?.AbsorptionMin ?? 2.0)) continue;
+            if (absorption > (optimization?.AbsorptionMax ?? 4.0)) continue;
             or.RxNodes.Add(g.Key.Id, new ProposedValues { Absorption = absorption });
         }
 
