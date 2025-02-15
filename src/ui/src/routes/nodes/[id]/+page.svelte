@@ -2,7 +2,7 @@
 	import { base } from '$app/paths';
 	import { nodes } from '$lib/stores';
 	import { readable } from 'svelte/store';
-	import type { NodeSetting } from '$lib/types';
+	import type { NodeSettingDetails } from '$lib/types';
 	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
 
 	import Map from '$lib/Map.svelte';
@@ -10,7 +10,7 @@
 	import NodeSettings from '$lib/NodeSettings.svelte';
 
 	export let floorId: string | null = null;
-	export let data: { settings?: NodeSetting } = {};
+	export let data: NodeSettingDetails = {};
 	$: node = $nodes.find((d) => d.id === data.settings?.id);
 
 	export const nodeDetails = readable([], (set) => {

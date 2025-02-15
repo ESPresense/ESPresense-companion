@@ -108,6 +108,9 @@ public class MqttCoordinator
             await mqttClient.SubscribeAsync("espresense/devices/+/+");
             await mqttClient.SubscribeAsync("espresense/settings/+/config");
             await mqttClient.SubscribeAsync("espresense/rooms/+/+");
+            await mqttClient.SubscribeAsync("espresense/rooms/+/+");
+            await mqttClient.SubscribeAsync("espresense/rooms/*/+/set");
+
             await mqttClient.SubscribeAsync("homeassistant/device_tracker/+/config");
         };
 
@@ -151,6 +154,9 @@ public class MqttCoordinator
                     break;
                 case ["espresense", "rooms", _, "status"]:
                     await ProcessStatusMessage(parts[2], payload);
+                    break;
+                case ["espresense", "rooms", "*", _, "set"]:
+                    await ProcessNodeSettingMessage(parts[2], parts[3], payload);
                     break;
                 case ["espresense", "rooms", _, _]:
                     await ProcessNodeSettingMessage(parts[2], parts[3], payload);
@@ -197,7 +203,9 @@ public class MqttCoordinator
         if (!ReadOnly)
         {
             await _mqttClient.EnqueueAsync(topic, payload, retain: retain);
-        } else {
+        }
+        else
+        {
             Log.Information("ReadOnly, would have sent to " + topic + ": " + payload);
         }
     }
