@@ -16,6 +16,21 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
 
         mqtt.PreviousDeviceDiscovered += (s, arg) =>
         {
+            if (arg.AutoDiscover == null)
+            {
+                // Handle null AutoDiscover (message deletion)
+                var deleteDeviceId = arg.AutoDiscover?.Message?.StateTopic?.Split('/').Last();
+                if (deleteDeviceId != null && state.Devices.TryRemove(deleteDeviceId, out var removedDevice))
+                {
+                    Log.Debug("[-] Removed device: {Device} (disc)", removedDevice);
+                }
+                else
+                {
+                    Log.Debug("Device not found for deletion: {DeviceId}", deleteDeviceId);
+                }
+                return;
+            }
+
             if (arg.AutoDiscover.Component != "device_tracker")
             {
                 Log.Debug("Ignoring, component isn't device_tracker (" + arg.AutoDiscover.Component + ")");
