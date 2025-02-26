@@ -37,7 +37,12 @@
 	const handler = zoom()
 		.scaleExtent([0.5, 40])
 		.wheelDelta((event) => {
-			return -(event.deltaY + event.deltaX * 0.25) * 0.002;
+			// Only zoom if shift key is pressed
+			if (event.shiftKey) {
+				return -(event.deltaY + event.deltaX * 0.25) * 0.002;
+			}
+			// Return 0 to prevent zooming when shift key is not pressed
+			return 0;
 		})
 		.on('zoom', (e) => {
 			transform = e.transform;
