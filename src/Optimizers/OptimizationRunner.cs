@@ -16,7 +16,7 @@ internal class OptimizationRunner : BackgroundService
         _state = state;
         _nsd = nsd;
         _logger = logger;
-        _optimizers = new List<IOptimizer> { new RxAdjRssiOptimizer(_state), new AbsorptionAvgOptimizer(_state), new AbsorptionErrOptimizer(_state) };
+        _optimizers = new List<IOptimizer> { new CombinedOptimizer(_state) };
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
