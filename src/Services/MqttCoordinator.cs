@@ -110,8 +110,8 @@ public class MqttCoordinator
             await mqttClient.SubscribeAsync("espresense/rooms/+/+");
             await mqttClient.SubscribeAsync("espresense/rooms/+/+");
             await mqttClient.SubscribeAsync("espresense/rooms/*/+/set");
-
             await mqttClient.SubscribeAsync("homeassistant/device_tracker/+/config");
+            await mqttClient.SubscribeAsync("espresense/companion/+/attributes");
         };
 
         mqttClient.DisconnectedAsync += s =>
@@ -139,6 +139,7 @@ public class MqttCoordinator
     public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
     public event EventHandler? MqttMessageMalformed;
     public event EventHandler<PreviousDeviceDiscoveredEventArgs>? PreviousDeviceDiscovered;
+    public event Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceivedAsync;
 
     private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
@@ -169,6 +170,9 @@ public class MqttCoordinator
                     break;
                 case ["homeassistant", "device_tracker", _, "config"]:
                     await ProcessDiscoveryMessage(arg.ApplicationMessage.Topic, payload);
+                    break;
+                case ["espresense", "companion", _, "attributes"]:
+                    await ProcessDeviceAttributesMessage(parts[2], payload);
                     break;
                 default:
                     if (MqttMessageReceivedAsync != null)
@@ -339,6 +343,39 @@ public class MqttCoordinator
         catch (Exception ex) when (ex is not MqttMessageProcessingException)
         {
             throw new MqttMessageProcessingException("Error processing discovery message", topic, payload, "Discovery", ex);
+        }
+    }
+
+    private async Task ProcessDeviceAttributesMessage(string deviceId, string? payload)
+    {
+        if (DeviceAttributesReceivedAsync == null) return;
+
+        try
+        {
+            if (string.IsNullOrEmpty(payload))
+                return;
+
+            var attributes = JsonConvert.DeserializeObject<Dictionary<string, object>>(payload);
+            if (attributes == null)
+                throw new MqttMessageProcessingException(
+                    "Device attributes were null after deserialization",
+                    $"espresense/companion/{deviceId}/attributes",
+                    payload,
+                    "DeviceAttributes");
+
+            await DeviceAttributesReceivedAsync(new DeviceAttributesEventArgs
+            {
+                DeviceId = deviceId,
+                Attributes = attributes
+            });
+        }
+        catch (JsonException ex)
+        {
+            throw new MqttMessageProcessingException(
+                "Failed to parse device attributes",
+                $"espresense/companion/{deviceId}/attributes",
+                payload,
+                "DeviceAttributes", ex);
         }
     }
 }

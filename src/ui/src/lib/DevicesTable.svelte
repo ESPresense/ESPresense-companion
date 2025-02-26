@@ -23,7 +23,7 @@
 		{ key: 'fixes', title: 'Fixes', value: (d) => d.fixes ?? 'n/a', sortable: true },
 		{ key: 'scale', title: 'Scale', value: (d) => d.scale?.toFixed(3) ?? 'n/a', sortable: true },
 		{ key: 'confidence', title: 'Confidence', value: (d) => d.confidence ?? 'n/a', sortable: true },
-		{ key: 'lastHit', title: 'LastHit', value: (d) => ((d.lastHit ?? '') == '' ? 'n/a' : (ago(new Date(d.lastHit)) ?? 'n/a')), sortable: true }
+		{ key: 'lastSeen', title: 'Last Seen', value: (d) => ((d.lastSeen ?? '') == '' ? 'n/a' : (ago(new Date(d.lastSeen)) ?? 'n/a')), sortable: true },
 	];
 
 	function onRowClick(e) {
