@@ -42,13 +42,13 @@ history:
 locators:
   nadaraya_watson:
     enabled: true
-    floors: ["first", "second", "outside"]
+    floors: ["first", "second"]
     bandwidth: 0.5
     kernel: gaussian
 
   nealder_mead:
     enabled: false
-    floors: ["first", "second", "outside"]
+    floors: ["first", "second"]
     weighting:
       algorithm: gaussian
       props:
@@ -67,166 +67,165 @@ floors:
     rooms:
       - name: Powder
         points:
-          - [6, 12]
-          - [8.6, 12]
-          - [8.6, 10]
-          - [8, 9]
-          - [6, 9]
-          - [6, 12]
+          - [6.3, 10.2]
+          - [8.4, 10.2]
+          - [8.4, 9]
+          - [7.1, 7.6]
+          - [6.3, 7.6]
+          - [6.3, 10.2]
       - name: Den
         points:
-          - [6, 16.2]
-          - [9.6, 16.2]
-          - [9.6, 13.5]
-          - [8.6, 12]
-          - [6, 12]
-          - [6, 14.5]
+          - [6.3,14]
+          - [9.9,14]
+          - [9.9,12.7]
+          - [9.8,12.7]
+          - [9.8,11.5]
+          - [8.4,10.2]
+          - [6.3,10.2]
       - name: Family
         points:
-          - [0, 0.5]
-          - [0, 5.5]
-          - [5, 5.5]
+          - [0.0, 0.7]
+          - [0.0, 5.4]
+          - [5.0, 5.4]
           - [6, 4.5]
-          - [6, 0.5]
-          - [5.5, 0]
-          - [0.5, 0]
-          - [0, 0.5]
+          - [6, 0.75]
+          - [5.25, 0.0]
+          - [0.7, 0.0]
+          - [0.0, 0.7]
       - name: Kitchen
         points:
-          - [6, 2]
-          - [6, 9]
-          - [8, 9]
-          - [8.6, 10]
-          - [12.5, 10]
-          - [12.5, 2]
-          - [6, 2]
+          - [6, 0.8]
+          - [6, 4.5]
+          - [7.3, 6.3]
+          - [8.4, 7.4]
+          - [12.4, 7.4]
+          - [12.4, 1.75]
+          - [8.9, 1.75]
+          - [8.9, 0.50]
+          - [6.3, 0.50]
+          - [6.0, 0.7]
       - name: Garage
         points:
-          - [0, 17]
-          - [1.5, 17]
-          - [1.5, 17.5]
-          - [6, 17.5]
-          - [6, 7.5]
-          - [0, 7.5]
-          - [0, 17]
+          - [0, 17.375]
+          - [2.3, 17.375]
+          - [2.3, 17.7]
+          - [6.3, 17.7]
+          - [6.3, 7.6]
+          - [0, 7.6]
+          - [0, 17.375]
       - name: Living
         points:
-          - [16.5, 13.25]
-          - [16.5, 7.75]
-          - [12.5, 7.75]
-          - [12.5, 13.25]
-          - [16.5, 13.25]
+          - [16.45,11.8]
+          - [16.45, 7.1]
+          - [12.4, 7.1]
+          - [12.4, 11.8]
+          - [16.45, 11.8]
       - name: Dining
         points:
-          - [16.5, 2.75]
-          - [16.5, 7.75]
-          - [12.5, 7.75]
-          - [12.5, 2.75]
-          - [16.5, 2.75]
+          - [16.45, 2.75]
+          - [16.45, 7.1]
+          - [12.4, 7.1]
+          - [12.4, 2.4]
+          - [16.45, 2.4]
       - name: Foyer
         points:
-          - [9.6, 13.5]
-          - [9.6, 15]
-          - [12.5, 15]
-          - [12.5, 10]
-          - [11.6, 10]
-          - [8.6, 10]
-          - [8.6, 12]
+          - [9.8,12.7]
+          - [12.4,12.7]
+          - [12.4,8.5]
+          - [10.9,7.4]
+          - [8.4,7.4]
+          - [8.4,8.6]
+          - [8.4,10.2]
+          - [9.8,11.5]
+          - [9.8,12.5]
       - name: Laundry
         points:
-          - [0, 7.5]
-          - [3.6, 7.5]
-          - [3.6, 5.5]
-          - [0, 5.5]
-          - [0, 7.5]
+          - [0, 5.4]
+          - [0, 7.6]
+          - [3.5, 7.6]
+          - [3.5, 5.4]
+          - [0, 5.4]
   - id: second
     name: Second Floor
     bounds: [[0, 0, 3], [17, 18, 5.5]]
     rooms:
       - name: Master
         points:
-          - [3.2, 13.5]
-          - [6, 13.5]
-          - [6, 12]
-          - [8.6, 12.0]
-          - [8.6, 10.5]
-          - [8.6, 8.5]
-          - [8, 7.5]
-          - [3.2, 7.5]
-          - [3.2, 13.5]
+          - [3.2,7.6]
+          - [3.2,12.3]
+          - [6.3,12.3]
+          - [6.3,10.2]
+          - [8.4,10.2]
+          - [8.4,9]
+          - [6.9,7.6]
+          - [3.7,7.6]
       - name: Office
         points:
-          - [6, 16.2]
-          - [9.6, 16.2]
-          - [9.6, 13.5]
-          - [8.6, 12]
-          - [6, 12]
-          - [6, 14.5]
+          - [6.3,14]
+          - [9.9,14]
+          - [9.9,12.7]
+          - [9.8,12.7]
+          - [9.8,11.5]
+          - [8.4,10.2]
+          - [6.3,10.2]
       - name: Master Bathroom
         points:
-          - [0, 13.5]
-          - [3.2, 13.5]
-          - [3.2, 7.5]
-          - [0, 7.5]
-          - [0, 13.5]
+          - [0, 7.6]
+          - [0, 12.3]
+          - [3.2, 12.3]
+          - [3.2, 7.6]
       - name: Master Closet
         points:
-          - [0, 16.5]
-          - [1.5, 16.5]
-          - [1.5, 17.0]
-          - [6, 17.0]
-          - [6, 13.5]
-          - [0, 13.5]
-          - [0, 16.5]
-  - id: outside
-    name: Outside
-    bounds: [[-10, -10, -10], [28, 30, 20]]
+          - [1.3,12.3]
+          - [5,12.3]
+          - [5,17.1]
+          - [1.3,17.1]
 
 # Locations of espresense nodes in meters
 nodes:
   - name: Master
-    point: [3.25, 11, 3.2]
+    point: [3.4, 10.4, 3.4]
     floors: ["second"]
   - name: Bathroom
-    point: [0.05, 9, 3.9]
-    floors: ["second", "outside"]
+    point: [0.15, 8.6, 4]
+    floors: ["second"]
   - name: Upstairs Hallway
-    point: [13, 7, 3.33]
+    point: [10.4, 6.4, 3.4]
     floors: ["second"]
   - name: Garage
-    point: [0.75, 16.8, 0.5]
-    floors: ["first", "outside"]
+    point: [1, 17.3, 0.5]
+    floors: ["first"]
   - name: Office
-    point: [6.75, 15.75, 3.6]
+    point: [6.8, 13.5, 3.6]
     floors: ["second"]
   - name: Family
-    point: [0.25, 0.4, 0.3]
-    floors: ["first", "outside"]
+    point: [0.25, 0.4, 0.4]
+    floors: ["first"]
   - name: Kitchen
-    point: [9.5, 9, 1]
+    point: [8, 6.5, 1]
     floors: ["first"]
   - name: Nook
-    point: [9, 2, 0.33]
+    point: [7, 0.55, 0.4]
     floors: ["first"]
   - name: Dining
-    point: [16.25, 3, 1.29]
-    floors: ["first", "outside"]
+    point: [16.3, 2.6, 1.29]
+    floors: ["first", "second"]
   - name: Basement
-    point: [16, 13, -1]
-    floors: ["first", "outside"]
+    point: [15.8, 11.5, -0.5]
+    floors: ["first"]
   - name: Laundry
-    point: [5.1, 7.5, 1]
+    point: [4.3, 7.6, 1]
     floors: ["first"]
   - name: Back Stairs
-    point: [5.2, 7.5, 3.33]
+    point: [4.5, 7.5, 3.4]
     floors: ["first", "second"]
   - name: Foyer
-    point: [10,10.9,0.33]
-    floors: ["first"]
-  - name: Mini
+    point: [9.9, 8.3, 0.4]
+    floors: ["first", "second"]
+  - name: VW EOS
     stationary: false
     point: [-2, 15, 0.5]
-    floors: ["outside"]
+    floors: ["first"]
 
 # Devices to track
 devices:
