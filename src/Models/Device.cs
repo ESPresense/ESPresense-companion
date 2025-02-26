@@ -8,6 +8,8 @@ namespace ESPresense.Models;
 
 public class Device
 {
+    private DateTime? _lastSeen;
+
     public Device(string id, string? discoveryId, TimeSpan timeout)
     {
         Id = id;
@@ -42,7 +44,19 @@ public class Device
 
     public int? Fixes => BestScenario?.Fixes;
 
-    public DateTime? LastHit => BestScenario?.LastHit ?? Nodes.Values.Max(a => a.LastHit);
+    public DateTime? LastSeen
+    {
+        get
+        {
+            var lastSeen =  BestScenario?.LastHit ?? Nodes.Values.Max(a => a.LastHit);
+            if (_lastSeen == null || lastSeen > _lastSeen) _lastSeen = lastSeen;
+            return _lastSeen;
+        }
+        set
+        {
+            _lastSeen = value;
+        }
+    }
 
     [JsonIgnore] public bool Check { get; set; }
     [JsonIgnore] public bool Track { get; set; }

@@ -54,7 +54,7 @@ export interface Device {
 	scale: number;
 	fixes: number;
 	timeout: number;
-	lastHit: Date;
+	lastSeen: Date;
 }
 
 export interface MapConfig {

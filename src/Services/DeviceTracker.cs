@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+﻿﻿using System.Threading.Channels;
 using ESPresense.Controllers;
 using ESPresense.Models;
 using Serilog;
@@ -14,6 +14,7 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
     {
         mqtt.MqttMessageMalformed += (s, e) => { tele.IncrementMalformedMessages(); };
 
+        // Handle device discovery
         mqtt.PreviousDeviceDiscovered += (s, arg) =>
         {
             if (arg.AutoDiscover == null)
@@ -49,6 +50,7 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
             });
         };
 
+        // Handle device messages
         mqtt.DeviceMessageReceivedAsync += async arg =>
         {
             bool isNode = arg.DeviceId.StartsWith("node:");
@@ -91,6 +93,42 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
                 else
                 {
                     tele.IncrementSkipped();
+                }
+            }
+        };
+
+        // Handle device attributes to restore LastSeen values
+        mqtt.DeviceAttributesReceivedAsync += async arg =>
+        {
+            if (state.Devices.TryGetValue(arg.DeviceId, out var device))
+            {
+                // Check if the attributes contain last_seen
+                if (arg.Attributes.TryGetValue("last_seen", out var lastSeenObj) && lastSeenObj != null)
+                {
+                    try
+                    {
+                        DateTime? lastSeen = null;
+
+                        // Handle different formats of last_seen
+                        if (lastSeenObj is DateTime dateTime)
+                        {
+                            lastSeen = dateTime;
+                        }
+                        else if (lastSeenObj is string lastSeenStr && !string.IsNullOrEmpty(lastSeenStr))
+                        {
+                            if (DateTime.TryParse(lastSeenStr, out var parsedDate))
+                            {
+                                lastSeen = parsedDate;
+                            }
+                        }
+
+                        if (device.LastSeen == null)
+                        {
+                            device.LastSeen = lastSeen;
+                            Log.Information("Restored Last Seen for device {DeviceId} to {LastSeen}", arg.DeviceId, lastSeen);
+                        }
+                    }
+                    catch (Exception ex) { Log.Warning(ex, "Failed to parse last_seen for device {DeviceId}", arg.DeviceId); }
                 }
             }
         };

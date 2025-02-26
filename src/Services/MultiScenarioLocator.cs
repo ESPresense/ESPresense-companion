@@ -37,35 +37,21 @@ public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator
 
                 var gps = state?.Config?.Gps;
                 var (latitude, longitude) = GpsUtil.Add(bs?.Location.X, bs?.Location.Y, gps?.Latitude, gps?.Longitude);
-
-                if (latitude == null || longitude == null)
-                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
-                        JsonConvert.SerializeObject(new
-                        {
-                            x = bs?.Location.X,
-                            y = bs?.Location.Y,
-                            z = bs?.Location.Z,
-                            confidence = bs?.Confidence,
-                            fixes = bs?.Fixes,
-                            best_scenario = bs?.Name
-                        }, SerializerSettings.NullIgnore)
-                    );
-                else
-                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes",
-                        JsonConvert.SerializeObject(new
-                        {
-                            source_type = "espresense",
-                            latitude,
-                            longitude,
-                            elevation = bs?.Location.Z + gps?.Elevation,
-                            x = bs?.Location.X,
-                            y = bs?.Location.Y,
-                            z = bs?.Location.Z,
-                            confidence = bs?.Confidence,
-                            fixes = bs?.Fixes,
-                            best_scenario = bs?.Name
-                        }, SerializerSettings.NullIgnore)
-                    );
+                var payload = JsonConvert.SerializeObject(new
+                {
+                    source_type = "espresense",
+                    latitude,
+                    longitude,
+                    elevation = bs?.Location.Z + gps?.Elevation,
+                    x = bs?.Location.X,
+                    y = bs?.Location.Y,
+                    z = bs?.Location.Z,
+                    confidence = bs?.Confidence,
+                    fixes = bs?.Fixes,
+                    best_scenario = bs?.Name,
+                    last_seen = device.LastSeen
+                }, SerializerSettings.NullIgnore);
+                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
 
                 globalEventDispatcher.OnDeviceChanged(device, false);
                 if (state?.Config?.History?.Enabled ?? false)
