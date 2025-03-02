@@ -10,11 +10,16 @@ namespace ESPresense.Services
         private readonly ConcurrentDictionary<string, DeviceSettings> _storeById = new();
         private readonly ConcurrentDictionary<string, DeviceSettings> _storeByAlias = new();
 
-        public DeviceSettings? Get(string id)
+        public IEnumerable<DeviceSettings> GetAll()
+        {
+            return _storeById.Values;
+        }
+
+        public DeviceSettings? Get(string id, bool byAlias)
         {
             _storeById.TryGetValue(id, out var dsId);
             _storeByAlias.TryGetValue(id, out var dsAlias);
-            return dsId ?? dsAlias;
+            return byAlias ? dsAlias : (dsId ?? dsAlias);
         }
 
         public async Task Set(string id, DeviceSettings ds)

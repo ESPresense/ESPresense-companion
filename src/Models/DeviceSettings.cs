@@ -21,8 +21,8 @@ public class DeviceSettings
     [StringLength(128)]
     public string? Name { get; set; }
 
-    [JsonPropertyName("refRssi")]
-    [JsonProperty("refRssi")]
+    [JsonPropertyName("rssi@1m")]
+    [JsonProperty("rssi@1m")]
     [Range(-127, 128)]
     public int? RefRssi { get; set; }
 }

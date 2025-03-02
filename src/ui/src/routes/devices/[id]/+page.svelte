@@ -11,7 +11,7 @@
 
 	export let tab = 'map';
 	export let data: { settings?: DeviceSetting } = {};
-	$: device = $devices.find((d) => d.id === data.settings?.id);
+	$: device = $devices?.find((d) => d.id === data.settings?.id);
 
 	export const deviceDetails = readable([], (set) => {
 		async function fetchAndSet() {

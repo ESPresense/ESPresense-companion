@@ -113,7 +113,16 @@ export type DeviceSetting = {
 	originalId: string;
 	id: string | null;
 	name: string | null;
-	refRssi: number | null;
+	'rssi@1m': number | null;
+	error?: string;
+};
+
+export interface DeviceMessage {
+	distance: number;
+	rssi: number;
+	"rssi@1m": number;
+	name?: string;
+	var?: number;
 };
 
 export type Firmware = {

@@ -7,7 +7,7 @@
 
   // Add a function to handle the "Calibrate" button click
   function handleCalibrate() {
-    calibrateById(row.id)
+    calibrateById(row.originalId ?? row.id)
   }
 
 

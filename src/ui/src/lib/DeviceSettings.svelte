@@ -11,8 +11,8 @@
 
 	function save() {
 		if (settings) {
-			const rssiRef = parseInt(settings['refRssi'] + '');
-			settings['refRssi'] = isNaN(rssiRef) ? null : rssiRef;
+			const rssiRef = parseInt(settings['rssi@1m'] + '');
+			settings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
 			fetch(`${base}/api/device/${settings.originalId}`, {
 				method: 'PUT',
@@ -55,7 +55,7 @@
 					</label>
 					<label>
 						<span>RSSI@1m</span>
-						<input class="input" type="text" placeholder="" bind:value={settings.refRssi} />
+						<input class="input" type="text" placeholder="" bind:value={settings['rssi@1m']} />
 					</label>
 					<button class="btn bg-success-700 text-black" on:click={(e) => save()}>Save</button>
 				</form>
