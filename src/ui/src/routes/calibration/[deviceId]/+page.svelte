@@ -2,9 +2,11 @@
 	import { page } from '$app/stores';
 	import { devices, nodes, config } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
-	import CalibrationSpot from '$lib/CalibrationSpot.svelte';
 	import { onMount } from 'svelte';
-	// Using Skeleton UI v2 classes
+	import type { ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '@skeletonlabs/skeleton';
+
+	const toastStore = getToastStore();
 
 	let deviceId = $page.params.deviceId;
 	let selectedFloorId: string | null = null;
@@ -48,14 +50,14 @@
 			// Fetch the device data
 			const response = await fetch(`/api/device/${deviceId}`);
 			if (!response.ok) {
-				console.error('Failed to fetch device settings');
-				return;
+				throw new Error('Failed to fetch device settings');
 			}
-
 			deviceSettings = await response.json();
 			currentRssiAt1m = deviceSettings.rssiAt1m;
-		} catch (error) {
-			console.error('Error fetching device settings:', error);
+		} catch (e) {
+			console.error('Error fetching device settings:', e);
+			const t: ToastSettings = { message: e, background: 'variant-filled-error' };
+			toastStore.trigger(t);
 		}
 	});
 
