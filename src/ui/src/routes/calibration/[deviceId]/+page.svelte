@@ -50,13 +50,13 @@
 			// Fetch the device data
 			const response = await fetch(`/api/device/${deviceId}`);
 			if (!response.ok) {
-				throw new Error('Failed to fetch device settings');
+				throw new Error('Error fetching device settings ({response.status})');
 			}
 			deviceSettings = await response.json();
 			currentRefRssi = deviceSettings.refRssi;
-		} catch (e) {
-			console.error('Error fetching device settings:', e);
-			const t: ToastSettings = { message: e, background: 'variant-filled-error' };
+		} catch (e: unknown) {
+			const error = e as Error;
+			const t: ToastSettings = { message: error.message, background: 'variant-filled-error' };
 			toastStore.trigger(t);
 		}
 	});
@@ -317,13 +317,14 @@
 			if (response.ok) {
 				currentRefRssi = calculatedRefRssi;
 				showResults = false;
-				alert('Calibration saved successfully!');
+				toastStore.trigger({ message: 'Calibration saved successfully!' });
 			} else {
-				alert('Failed to save calibration. Please try again.');
+				throw new Error('Error saving calibration. Please try again.');
 			}
-		} catch (error) {
-			console.error('Error saving calibration:', error);
-			alert('Error saving calibration. Please try again.');
+		} catch (e: unknown) {
+			const error = e as Error;
+			const t: ToastSettings = { message: error.message, background: 'variant-filled-error' };
+			toastStore.trigger(t);
 		}
 	}
 
