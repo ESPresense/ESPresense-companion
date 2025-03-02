@@ -8,7 +8,7 @@
 	export let deviceId: string | null = null;
 	export let tab = 'map';
 
-	$: device = $devices.find((d) => d.id === deviceId);
+	$: device = $devices?.find((d) => d.id === deviceId);
 	$: floor = $config?.floors.find((f) => f.id === floorId);
 	let previousPage: string | undefined = undefined;
 

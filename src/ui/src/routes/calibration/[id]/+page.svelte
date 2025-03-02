@@ -10,7 +10,7 @@
 	export let data: { settings?: DeviceSetting } = {};
 
 	// Device state
-	let deviceId: string = data.settings?.originalId ?? '';
+	let deviceId: string = data.settings?.id ?? '';
 	let selectedFloorId: string | null = null;
 	let calibrationSpot: { x: number; y: number; z?: number } | null = null;
 	let calibrationSpotHeight = 1.0; // Default height in meters
@@ -40,7 +40,7 @@
 
 	// Initialize from device data when available
 	$: if ($devices && deviceId && !calibrationSpot) {
-		const device = $devices.find((d: any) => d.id === deviceId);
+		const device = $devices?.find((d: any) => d.id === deviceId);
 		if (device) {
 			if (device.floor !== null) {
 				selectedFloorId = device.floor.id;
@@ -82,7 +82,7 @@
 
 	// Update RSSI values when devices or nodeDistances change
 	$: if ($devices && nodeDistances.length > 0) {
-		const device = $devices.find((d: any) => d.id === deviceId);
+		const device = $devices?.find((d: any) => d.id === deviceId);
 		if (device && device.nodes) {
 			nodeDistances.forEach((node) => {
 				const nodeData = device.nodes[node.id];
@@ -104,9 +104,9 @@
 
 		collectedData = [...collectedData, newReading];
 
-		// Limit the number of readings we keep
-		if (collectedData.length > 30) {
-			collectedData = collectedData.slice(-30);
+		 // Increase sample retention to 100 samples (instead of 30)
+		if (collectedData.length > 100) {
+			collectedData = collectedData.slice(-100);
 		}
 	}
 
@@ -244,18 +244,14 @@
 			return null;
 		}
 
-		// Use the most recent readings
-		const usableData = collectedData.slice(-20);
+		// Use all collected samples instead of just the most recent 20
+		const usableData = collectedData;
 
-		// Group by node
-		const nodeData: {
-			[nodeId: string]: Array<{ rssi: number; distance: number }>;
-		} = {};
-
+		// Group readings by node
+		const nodeData: { [nodeId: string]: Array<{ rssi: number; distance: number }> } = {};
 		usableData.forEach((reading) => {
 			reading.forEach((nodeReading) => {
 				if (nodeReading.rssi === null) return;
-
 				if (!nodeData[nodeReading.nodeId]) {
 					nodeData[nodeReading.nodeId] = [];
 				}
@@ -266,42 +262,33 @@
 			});
 		});
 
-		// Calculate median RSSI for each node
+		 // For each node, calculate the average of (rssi + 20 * log10(distance))
 		const refRssiEstimates: Array<{ refRssi: number; weight: number }> = [];
-
 		Object.entries(nodeData).forEach(([nodeId, readings]) => {
 			if (!includedNodes[nodeId] || readings.length < 5) return;
 
-			// Sort by RSSI and take median
-			const sorted = [...readings].sort((a, b) => a.rssi - b.rssi);
-			const median = sorted[Math.floor(sorted.length / 2)];
+			// Sum the transformed RSSI values across all samples for this node
+			const sumEstimates = readings.reduce(
+				(acc, cur) => acc + (cur.rssi + 20 * Math.log10(cur.distance)),
+				0
+			);
+			const avgRefRssi = sumEstimates / readings.length;
 
-			// Calculate refRssi
-			const distance = median.distance;
-			if (distance < 0.1) return; // Skip very close distances
+			// Compute the average distance to use as the weighting factor
+			const avgDistance = readings.reduce((acc, cur) => acc + cur.distance, 0) / readings.length;
+			if (avgDistance < 0.1) return; // Skip very close distances
 
-			const refRssi = median.rssi + 20 * Math.log10(distance);
-			const weight = 1 / Math.max(1, distance);
-
-			refRssiEstimates.push({ refRssi, weight });
+			const weight = 1 / Math.max(1, avgDistance);
+			refRssiEstimates.push({ refRssi: avgRefRssi, weight });
 		});
 
 		if (refRssiEstimates.length === 0) return null;
 
-		// Calculate weighted average
+		// Compute the weighted average across all node estimates
 		const totalWeight = refRssiEstimates.reduce((sum, est) => sum + est.weight, 0);
 		const rawValue = refRssiEstimates.reduce((sum, est) => sum + est.refRssi * est.weight, 0) / totalWeight;
 		return Math.round(rawValue);
 	}
-
-	// We no longer need these since we're showing results directly
-	// function showCalibrationResults() {
-	// 	showResults = true;
-	// }
-
-	// function hideResults() {
-	// 	showResults = false;
-	// }
 
 	function toggleNodeInclusion(nodeId: string) {
 		includedNodes[nodeId] = !includedNodes[nodeId];
@@ -496,13 +483,13 @@
 						<div class="card p-4 variant-soft">
 							<header class="font-semibold mb-2">Current Values</header>
 							<p class="text-xl font-bold">
-								refRssi: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
+								RSSI@1m: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
 							</p>
 						</div>
 						<div class="card p-4 variant-filled-primary">
 							<header class="font-semibold mb-2">New Values</header>
 							<p class="text-xl font-bold">
-								refRssi: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
+								RSSI@1m: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
 							</p>
 						</div>
 					</div>
