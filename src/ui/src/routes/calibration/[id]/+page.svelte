@@ -1,103 +1,158 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import { devices, nodes, config } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
-	import { onMount } from 'svelte';
 	import type { ToastSettings } from '@skeletonlabs/skeleton';
 	import { getToastStore } from '@skeletonlabs/skeleton';
+	import type { DeviceSetting } from '$lib/types';
 
 	const toastStore = getToastStore();
 
-	let deviceId = $page.params.deviceId;
+	export let data: { settings?: DeviceSetting } = {};
+
+	// Device state
+	let deviceId: string = data.settings?.originalId ?? '';
 	let selectedFloorId: string | null = null;
 	let calibrationSpot: { x: number; y: number; z?: number } | null = null;
+	let calibrationSpotHeight = 1.0; // Default height in meters
+	let deviceSettings: any = data.settings;
+	let currentRefRssi: number | null | undefined = data.settings?.refRssi;
+
+	// Calibration metrics
 	let nodeDistances: { id: string; name: string; distance: number; nodeZ?: number }[] = [];
 	let rssiValues: { [key: string]: number | null } = {};
 	let includedNodes: { [key: string]: boolean } = {};
-	let currentRefRssi: number | null = null;
 	let calculatedRefRssi: number | null = null;
-	let deviceSettings: any = null;
-	let collectedData: any[][] = [];
 	let stabilityScore: number = 0;
-	let showResults = false;
-	let calibrationSpotHeight = 1.0; // Default height in meters
 
-	$: device = $devices?.find((d) => d.id === deviceId);
-	$: floor = $config?.floors.find((f) => f.id === selectedFloorId);
+	// Collection state
+	let collectedData: { nodeId: string; rssi: number | null; distance: number; timestamp: number; spotX: number; spotY: number }[][] = [];
+
+	// Error handling from initial load
+	$: if (data.settings?.error) {
+		const t: ToastSettings = { message: data.settings.error, background: 'variant-filled-error' };
+		toastStore.trigger(t);
+	}
+
+	// Reactive device and floor lookup
+	$: device = $devices?.find((d: any) => d.id === deviceId);
+	$: floor = $config?.floors.find((f: any) => f.id === selectedFloorId);
 	$: bounds = floor?.bounds;
 
-	// Handle floor changes
-	$: if (selectedFloorId) {
-		// Only reset data on floor change, not on calibration spot movement
-		if (calibrationSpot) {
-			rssiValues = {};
-			collectedData = [];
-			calculatedRefRssi = null;
-			stabilityScore = 0;
-
-			// Recalculate distances when floor changes
-			calculateDistances();
-		}
-	}
-
-	// Track calibrationSpot x,y,z values explicitly to force reactivity
-	$: if (calibrationSpot) {
-		calculateDistances();
-	}
-
-	onMount(async () => {
-		try {
-			// Fetch the device data
-			const response = await fetch(`/api/device/${deviceId}`);
-			if (!response.ok) {
-				throw new Error('Error fetching device settings ({response.status})');
-			}
-			deviceSettings = await response.json();
-			currentRefRssi = deviceSettings.refRssi;
-		} catch (e: unknown) {
-			const error = e as Error;
-			const t: ToastSettings = { message: error.message, background: 'variant-filled-error' };
-			toastStore.trigger(t);
-		}
-	});
-
-	// Use reactive statement to initialize from device store once it's available
+	// Initialize from device data when available
 	$: if ($devices && deviceId && !calibrationSpot) {
-		const device = $devices.find((d) => d.id === deviceId);
+		const device = $devices.find((d: any) => d.id === deviceId);
 		if (device) {
 			if (device.floor !== null) {
 				selectedFloorId = device.floor.id;
 			}
 			if (device.location?.x !== null && device.location?.y !== null) {
 				calibrationSpot = { x: device.location.x, y: device.location.y };
-				calculateDistances();
 			}
 		}
 	}
 
-	function calculateDistances() {
-		if (!$nodes || !calibrationSpot || !selectedFloorId) {
-			nodeDistances = [];
-			includedNodes = {};
-			return;
+	// Reset data on floor change
+	$: if (selectedFloorId && calibrationSpot) {
+		// This will ensure we recalculate when the floor changes
+		const floorChanged = true;
+	}
+
+	// Handle floor change - reset data
+	$: if (selectedFloorId && calibrationSpot) {
+		rssiValues = {};
+		collectedData = [];
+		calculatedRefRssi = null;
+		stabilityScore = 0;
+	}
+
+	// Update Z coordinate when height changes
+	$: if (calibrationSpot && calibrationSpotHeight) {
+		calibrationSpot.z = calibrationSpotHeight;
+	}
+
+	// Calculate distances whenever calibration spot or floor changes
+	$: nodeDistances = calculateNodeDistances(calibrationSpot, selectedFloorId, $nodes, bounds, calibrationSpotHeight);
+
+	// Calculate included nodes whenever nodeDistances changes
+	$: nodeDistances.forEach((node) => {
+		if (includedNodes[node.id] === undefined) {
+			includedNodes[node.id] = true;
+		}
+	});
+
+	// Update RSSI values when devices or nodeDistances change
+	$: if ($devices && nodeDistances.length > 0) {
+		const device = $devices.find((d: any) => d.id === deviceId);
+		if (device && device.nodes) {
+			nodeDistances.forEach((node) => {
+				const nodeData = device.nodes[node.id];
+				rssiValues[node.id] = nodeData?.rssi ?? null;
+			});
+		}
+	}
+
+	// Collect data and update calculations
+	$: if ($devices && nodeDistances.length > 0 && calibrationSpot) {
+		const newReading = nodeDistances.map((node) => ({
+			nodeId: node.id,
+			rssi: rssiValues[node.id],
+			distance: node.distance,
+			timestamp: Date.now(),
+			spotX: calibrationSpot.x,
+			spotY: calibrationSpot.y
+		}));
+
+		collectedData = [...collectedData, newReading];
+
+		// Limit the number of readings we keep
+		if (collectedData.length > 30) {
+			collectedData = collectedData.slice(-30);
+		}
+	}
+
+	// Update stability score when collectedData changes
+	$: if (collectedData.length > 0) {
+		stabilityScore = calculateStabilityScore(collectedData);
+	}
+
+	// Calculate final RSSI when enough data is collected
+	$: if (collectedData.length >= 5) {
+		calculatedRefRssi = calculateFinalRssi(collectedData, nodeDistances, includedNodes);
+	}
+
+	// Update calculations when rssiValues or includedNodes change
+	$: if (Object.keys(rssiValues).length > 0 || Object.keys(includedNodes).length > 0) {
+		calculatedRefRssi = updateCalculation(nodeDistances, rssiValues, includedNodes);
+	}
+
+	// Pure function to calculate distances (no state modification)
+	function calculateNodeDistances(
+		calibrationSpot: { x: number; y: number; z?: number } | null,
+		selectedFloorId: string | null,
+		nodes: any[] | undefined,
+		bounds: any,
+		calibrationSpotHeight: number
+	) {
+		if (!nodes || !calibrationSpot || !selectedFloorId) {
+			return [];
 		}
 
 		// Get all nodes on the selected floor
-		const newNodeDistances = $nodes
-			.filter((node) => {
+		return nodes
+			.filter((node: any) => {
 				const isOnFloor = node.floors.includes(selectedFloorId || '');
 				return isOnFloor && node.location.x != null && node.location.y != null;
 			})
-			.map((node) => {
+			.map((node: any) => {
 				const nodeZ = node.location.z || 0;
-				const spotZ = calibrationSpot!.z || calibrationSpotHeight;
+				const spotZ = calibrationSpot.z || calibrationSpotHeight;
 
 				// Calculate height from floor by subtracting the floor's lower z-bound
 				const floorLowerZ = bounds ? bounds[0][2] : 0;
 				const nodeHeightFromFloor = nodeZ - floorLowerZ;
 
 				// Calculate 3D distance (x,y,z)
-				const distance = Math.sqrt(Math.pow(node.location.x - calibrationSpot!.x, 2) + Math.pow(node.location.y - calibrationSpot!.y, 2) + Math.pow(nodeZ - spotZ, 2));
+				const distance = Math.sqrt(Math.pow(node.location.x - calibrationSpot.x, 2) + Math.pow(node.location.y - calibrationSpot.y, 2) + Math.pow(nodeZ - spotZ, 2));
 
 				return {
 					id: node.id,
@@ -106,35 +161,13 @@
 					nodeZ: nodeHeightFromFloor
 				};
 			});
-
-		// Update nodeDistances with the new values
-		nodeDistances = newNodeDistances;
-
-		// Initialize includedNodes for the first time or maintain existing state
-		nodeDistances.forEach((node) => {
-			if (includedNodes[node.id] === undefined) {
-				includedNodes[node.id] = true;
-			}
-		});
 	}
 
-	// Reactive RSSI values fetching - moved from function to reactive statement
-	$: if ($devices && nodeDistances && nodeDistances.length > 0) {
-		const device = $devices.find((d) => d.id === deviceId);
-		if (device && device.nodes) {
-			nodeDistances.forEach((node) => {
-				const nodeData = device.nodes[node.id];
-				rssiValues[node.id] = nodeData?.rssi ?? null;
-			});
-			updateCalculation();
-		}
-	}
-
-	function updateCalculation() {
+	// Function to update calculation
+	function updateCalculation(nodeDistances: any[], rssiValues: any, includedNodes: any) {
 		const includedNodeData = nodeDistances.filter((node) => includedNodes[node.id] && rssiValues[node.id] !== null);
 		if (includedNodeData.length === 0) {
-			calculatedRefRssi = null;
-			return;
+			return null;
 		}
 
 		// Calculate refRssi using the standard formula: RSSI@d = refRssi - 10n * log10(d)
@@ -152,27 +185,22 @@
 
 				return { refRssi, weight };
 			})
-			.filter((estimate) => estimate !== null);
+			.filter((estimate) => estimate !== null) as { refRssi: number; weight: number }[];
 
 		if (rssiEstimates.length === 0) {
-			calculatedRefRssi = null;
-			return;
+			return null;
 		}
 
 		// Calculate weighted average
 		const totalWeight = rssiEstimates.reduce((sum, est) => sum + est.weight, 0);
 		const rawValue = rssiEstimates.reduce((sum, est) => sum + est.refRssi * est.weight, 0) / totalWeight;
-		calculatedRefRssi = Math.round(rawValue);
+		return Math.round(rawValue);
 	}
 
-	function showCalibrationResults() {
-		showResults = true;
-	}
-
-	function updateStabilityScore() {
+	// Function to calculate stability score
+	function calculateStabilityScore(collectedData: any[]) {
 		if (collectedData.length < 3) {
-			stabilityScore = Math.min(20, collectedData.length * 6);
-			return;
+			return Math.min(20, collectedData.length * 6);
 		}
 
 		// Get the last few sets of readings
@@ -188,7 +216,7 @@
 					const nodeData = reading.find((r) => r.nodeId === node.id);
 					return nodeData?.rssi;
 				})
-				.filter((rssi) => rssi !== null && rssi !== undefined);
+				.filter((rssi) => rssi !== null && rssi !== undefined) as number[];
 
 			if (nodeReadings.length < 3) return;
 
@@ -201,18 +229,19 @@
 
 		// Average all variances
 		const variances: number[] = Object.values(nodeVariances);
-		if (variances.length === 0) return;
+		if (variances.length === 0) return Math.min(20, collectedData.length * 6);
 
 		const avgVariance = variances.reduce((sum, val) => sum + val, 0) / variances.length;
 
 		// Convert to a 0-100 score (lower variance = higher score)
 		// RSSI variance is typically 0-10, so scale accordingly
-		stabilityScore = Math.max(20, Math.min(100, 100 - avgVariance * 8));
+		return Math.max(20, Math.min(100, 100 - avgVariance * 8));
 	}
 
-	function calculateFinalRssi() {
+	// Function to calculate final RSSI
+	function calculateFinalRssi(collectedData: any[], nodeDistances: any[], includedNodes: any) {
 		if (collectedData.length < 5) {
-			return;
+			return null;
 		}
 
 		// Use the most recent readings
@@ -257,46 +286,26 @@
 			refRssiEstimates.push({ refRssi, weight });
 		});
 
-		if (refRssiEstimates.length === 0) return;
+		if (refRssiEstimates.length === 0) return null;
 
 		// Calculate weighted average
 		const totalWeight = refRssiEstimates.reduce((sum, est) => sum + est.weight, 0);
 		const rawValue = refRssiEstimates.reduce((sum, est) => sum + est.refRssi * est.weight, 0) / totalWeight;
-		calculatedRefRssi = Math.round(rawValue);
+		return Math.round(rawValue);
 	}
 
-	// Also make nodeDistances reactive
-	$: nodeDistancesUpdate = nodeDistances.length > 0 ? JSON.stringify(nodeDistances.map((n) => [n.id, n.distance.toFixed(2)])) : '';
+	// We no longer need these since we're showing results directly
+	// function showCalibrationResults() {
+	// 	showResults = true;
+	// }
 
-	// Continuously collect data and update calculations whenever devices or nodeDistances change
-	$: if ($devices && nodeDistances.length > 0) {
-		// Add current RSSI readings to collected data
-		if (calibrationSpot) {
-			const newReading = nodeDistances.map((node) => ({
-				nodeId: node.id,
-				rssi: rssiValues[node.id],
-				distance: node.distance,
-				timestamp: Date.now(),
-				spotX: calibrationSpot.x,
-				spotY: calibrationSpot.y
-			}));
+	// function hideResults() {
+	// 	showResults = false;
+	// }
 
-			collectedData.push(newReading);
-
-			// Limit the number of readings we keep to prevent memory issues
-			if (collectedData.length > 30) {
-				collectedData = collectedData.slice(-30);
-			}
-
-			updateStabilityScore();
-			calculateFinalRssi();
-		}
-	}
-
-	// Clean up not needed as we're not using intervals
-
-	function hideResults() {
-		showResults = false;
+	function toggleNodeInclusion(nodeId: string) {
+		includedNodes[nodeId] = !includedNodes[nodeId];
+		includedNodes = { ...includedNodes }; // Trigger reactivity
 	}
 
 	async function saveCalibration() {
@@ -316,7 +325,6 @@
 
 			if (response.ok) {
 				currentRefRssi = calculatedRefRssi;
-				showResults = false;
 				toastStore.trigger({ message: 'Calibration saved successfully!' });
 			} else {
 				throw new Error('Error saving calibration. Please try again.');
@@ -328,12 +336,7 @@
 		}
 	}
 
-	function toggleNodeInclusion(nodeId: string) {
-		includedNodes[nodeId] = !includedNodes[nodeId];
-		updateCalculation();
-		calculateFinalRssi();
-	}
-
+	// Helper functions for display
 	function getStabilityLabel(score: number): string {
 		if (score < 30) return 'Poor';
 		if (score < 60) return 'Fair';
@@ -387,18 +390,11 @@
 							max="5"
 							step="0.1"
 							bind:value={calibrationSpotHeight}
-							on:input={() => {
-								if (calibrationSpot) calibrationSpot.z = calibrationSpotHeight;
-								calculateDistances();
-							}}
 							class="input"
 						/>
 						<button
 							class="variant-filled-primary"
-							on:click={() => {
-								if (calibrationSpot) calibrationSpot.z = calibrationSpotHeight;
-								calculateDistances();
-							}}>Set</button
+							on:click={() => calibrationSpotHeight = calibrationSpotHeight}>Set</button
 						>
 					</div>
 				</div>
@@ -494,37 +490,8 @@
 
 				<div class="card p-4 variant-soft">
 					<header class="font-semibold mb-4">Calibration Results</header>
-					<div class="space-y-4">
-						<div>
-							<div class="text-sm text-surface-700">Current RSSI@1m:</div>
-							<div class="text-xl font-semibold">
-								{currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
-							</div>
-						</div>
-						<div>
-							<div class="text-sm text-surface-700">Calculated RSSI@1m:</div>
-							<div class="text-xl font-semibold text-primary-500">
-								{calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
-							</div>
-						</div>
 
-						<div class="flex gap-2">
-							<button class="btn btn-lg variant-filled-primary flex-1 mt-4" on:click={saveCalibration} disabled={calculatedRefRssi == null}> Save Calibration </button>
-
-							<button class="btn btn-lg variant-filled-secondary flex-1 mt-4" on:click={showCalibrationResults} disabled={calculatedRefRssi == null}> Review </button>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	{/if}
-
-	{#if showResults}
-		<div class="modal-backdrop" class:backdrop-blur={showResults}>
-			<div class="modal-container">
-				<div class="modal-content w-modal card p-6 shadow-xl">
-					<header class="text-xl font-bold mb-4">Calibration Results</header>
-
+					<!-- Side-by-side comparison of current vs new values -->
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 						<div class="card p-4 variant-soft">
 							<header class="font-semibold mb-2">Current Values</header>
@@ -540,21 +507,23 @@
 						</div>
 					</div>
 
-					<div class="card p-4 variant-ghost-warning mb-6">
-						{#if currentRefRssi != null && calculatedRefRssi != null}
+					{#if currentRefRssi != null && calculatedRefRssi != null}
+						<div class="card p-4 variant-ghost-warning mb-4">
 							<p>
 								This is a <span class="font-semibold">{Math.abs(calculatedRefRssi - Math.round(currentRefRssi))} dBm</span>
 								{calculatedRefRssi > currentRefRssi ? 'increase' : 'decrease'}.
 							</p>
-						{/if}
-						<p>This change will affect how distances are calculated for this device.</p>
-					</div>
+							<p>This change will affect how distances are calculated for this device.</p>
+						</div>
+					{/if}
 
-					<footer class="flex flex-wrap justify-end gap-2">
-						<button class="btn variant-filled-primary" on:click={saveCalibration}> Accept New Calibration </button>
-						<button class="btn variant-filled-secondary" on:click={hideResults}> Continue Collecting Data </button>
-						<button class="btn variant-filled-surface" on:click={() => (showResults = false)}> Cancel </button>
-					</footer>
+					<button
+						class="btn btn-lg variant-filled-primary w-full"
+						on:click={saveCalibration}
+						disabled={calculatedRefRssi == null || (currentRefRssi === calculatedRefRssi)}
+					>
+						Accept New Calibration
+					</button>
 				</div>
 			</div>
 		</div>
