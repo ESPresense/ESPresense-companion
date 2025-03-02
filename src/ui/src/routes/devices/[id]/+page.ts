@@ -8,6 +8,6 @@ export async function load({ fetch, params }) {
 			return data;
 		})
 		.catch((e) => {
-			return { settings: { originalId: params.id, id: null, name: null, 'rssi@1m': null, error: e } };
+			return { settings: { originalId: params.id, id: null, name: null, 'refRssi': null, error: e } };
 		});
 }

@@ -14,8 +14,8 @@
 	let nodeDistances: { id: string; name: string; distance: number; nodeZ?: number }[] = [];
 	let rssiValues: { [key: string]: number | null } = {};
 	let includedNodes: { [key: string]: boolean } = {};
-	let currentRssiAt1m: number | null = null;
-	let calculatedRssiAt1m: number | null = null;
+	let currentRefRssi: number | null = null;
+	let calculatedRefRssi: number | null = null;
 	let deviceSettings: any = null;
 	let collectedData: any[][] = [];
 	let stabilityScore: number = 0;
@@ -32,7 +32,7 @@
 		if (calibrationSpot) {
 			rssiValues = {};
 			collectedData = [];
-			calculatedRssiAt1m = null;
+			calculatedRefRssi = null;
 			stabilityScore = 0;
 
 			// Recalculate distances when floor changes
@@ -53,7 +53,7 @@
 				throw new Error('Failed to fetch device settings');
 			}
 			deviceSettings = await response.json();
-			currentRssiAt1m = deviceSettings.rssiAt1m;
+			currentRefRssi = deviceSettings.refRssi;
 		} catch (e) {
 			console.error('Error fetching device settings:', e);
 			const t: ToastSettings = { message: e, background: 'variant-filled-error' };
@@ -133,12 +133,12 @@
 	function updateCalculation() {
 		const includedNodeData = nodeDistances.filter((node) => includedNodes[node.id] && rssiValues[node.id] !== null);
 		if (includedNodeData.length === 0) {
-			calculatedRssiAt1m = null;
+			calculatedRefRssi = null;
 			return;
 		}
 
-		// Calculate RSSI@1m using the standard formula: RSSI@d = RSSI@1m - 10n * log10(d)
-		// Rearranged to: RSSI@1m = RSSI@d + 10n * log10(d)
+		// Calculate refRssi using the standard formula: RSSI@d = refRssi - 10n * log10(d)
+		// Rearranged to: refRssi = RSSI@d + 10n * log10(d)
 		// Using n = 2 (typical path loss exponent)
 		const rssiEstimates = includedNodeData
 			.map((node) => {
@@ -146,23 +146,23 @@
 				// Skip very close distances to avoid log10 issues
 				if (node.distance < 0.1) return null;
 
-				// Calculate RSSI@1m and weight by distance (closer nodes are more reliable)
-				const rssiAt1m = rssi !== null ? rssi + 20 * Math.log10(node.distance) : null;
+				// Calculate refRssi and weight by distance (closer nodes are more reliable)
+				const refRssi = rssi !== null ? rssi + 20 * Math.log10(node.distance) : null;
 				const weight = 1 / Math.max(1, node.distance);
 
-				return { rssiAt1m, weight };
+				return { refRssi, weight };
 			})
 			.filter((estimate) => estimate !== null);
 
 		if (rssiEstimates.length === 0) {
-			calculatedRssiAt1m = null;
+			calculatedRefRssi = null;
 			return;
 		}
 
 		// Calculate weighted average
 		const totalWeight = rssiEstimates.reduce((sum, est) => sum + est.weight, 0);
-		const rawValue = rssiEstimates.reduce((sum, est) => sum + est.rssiAt1m * est.weight, 0) / totalWeight;
-		calculatedRssiAt1m = Math.round(rawValue);
+		const rawValue = rssiEstimates.reduce((sum, est) => sum + est.refRssi * est.weight, 0) / totalWeight;
+		calculatedRefRssi = Math.round(rawValue);
 	}
 
 	function showCalibrationResults() {
@@ -238,7 +238,7 @@
 		});
 
 		// Calculate median RSSI for each node
-		const rssiAt1mEstimates: Array<{ rssiAt1m: number; weight: number }> = [];
+		const refRssiEstimates: Array<{ refRssi: number; weight: number }> = [];
 
 		Object.entries(nodeData).forEach(([nodeId, readings]) => {
 			if (!includedNodes[nodeId] || readings.length < 5) return;
@@ -247,22 +247,22 @@
 			const sorted = [...readings].sort((a, b) => a.rssi - b.rssi);
 			const median = sorted[Math.floor(sorted.length / 2)];
 
-			// Calculate RSSI@1m
+			// Calculate refRssi
 			const distance = median.distance;
 			if (distance < 0.1) return; // Skip very close distances
 
-			const rssiAt1m = median.rssi + 20 * Math.log10(distance);
+			const refRssi = median.rssi + 20 * Math.log10(distance);
 			const weight = 1 / Math.max(1, distance);
 
-			rssiAt1mEstimates.push({ rssiAt1m, weight });
+			refRssiEstimates.push({ refRssi, weight });
 		});
 
-		if (rssiAt1mEstimates.length === 0) return;
+		if (refRssiEstimates.length === 0) return;
 
 		// Calculate weighted average
-		const totalWeight = rssiAt1mEstimates.reduce((sum, est) => sum + est.weight, 0);
-		const rawValue = rssiAt1mEstimates.reduce((sum, est) => sum + est.rssiAt1m * est.weight, 0) / totalWeight;
-		calculatedRssiAt1m = Math.round(rawValue);
+		const totalWeight = refRssiEstimates.reduce((sum, est) => sum + est.weight, 0);
+		const rawValue = refRssiEstimates.reduce((sum, est) => sum + est.refRssi * est.weight, 0) / totalWeight;
+		calculatedRefRssi = Math.round(rawValue);
 	}
 
 	// Also make nodeDistances reactive
@@ -300,7 +300,7 @@
 	}
 
 	async function saveCalibration() {
-		if (!calculatedRssiAt1m) return;
+		if (!calculatedRefRssi) return;
 
 		try {
 			const response = await fetch(`/api/device/${deviceId}`, {
@@ -310,12 +310,12 @@
 				},
 				body: JSON.stringify({
 					...deviceSettings,
-					rssiAt1m: calculatedRssiAt1m
+					refRssi: calculatedRefRssi
 				})
 			});
 
 			if (response.ok) {
-				currentRssiAt1m = calculatedRssiAt1m;
+				currentRefRssi = calculatedRefRssi;
 				showResults = false;
 				alert('Calibration saved successfully!');
 			} else {
@@ -441,8 +441,8 @@
 									<td>{node.distance?.toFixed(2) || 'n/a'}</td>
 									<td>{rssiValues[node.id] != null ? rssiValues[node.id].toFixed(1) : 'n/a'}</td>
 									<td>
-										{#if rssiValues[node.id] != null && currentRssiAt1m !== null}
-											{Math.pow(10, (currentRssiAt1m - rssiValues[node.id]) / 20).toFixed(2)}
+										{#if rssiValues[node.id] != null && currentRefRssi !== null}
+											{Math.pow(10, (currentRefRssi - rssiValues[node.id]) / 20).toFixed(2)}
 										{:else}
 											n/a
 										{/if}
@@ -497,20 +497,20 @@
 						<div>
 							<div class="text-sm text-surface-700">Current RSSI@1m:</div>
 							<div class="text-xl font-semibold">
-								{currentRssiAt1m != null ? Math.round(currentRssiAt1m) : 'n/a'} dBm
+								{currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
 							</div>
 						</div>
 						<div>
 							<div class="text-sm text-surface-700">Calculated RSSI@1m:</div>
 							<div class="text-xl font-semibold text-primary-500">
-								{calculatedRssiAt1m != null ? calculatedRssiAt1m : 'n/a'} dBm
+								{calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
 							</div>
 						</div>
 
 						<div class="flex gap-2">
-							<button class="btn btn-lg variant-filled-primary flex-1 mt-4" on:click={saveCalibration} disabled={calculatedRssiAt1m == null}> Save Calibration </button>
+							<button class="btn btn-lg variant-filled-primary flex-1 mt-4" on:click={saveCalibration} disabled={calculatedRefRssi == null}> Save Calibration </button>
 
-							<button class="btn btn-lg variant-filled-secondary flex-1 mt-4" on:click={showCalibrationResults} disabled={calculatedRssiAt1m == null}> Review </button>
+							<button class="btn btn-lg variant-filled-secondary flex-1 mt-4" on:click={showCalibrationResults} disabled={calculatedRefRssi == null}> Review </button>
 						</div>
 					</div>
 				</div>
@@ -528,22 +528,22 @@
 						<div class="card p-4 variant-soft">
 							<header class="font-semibold mb-2">Current Values</header>
 							<p class="text-xl font-bold">
-								RSSI@1m: {currentRssiAt1m != null ? Math.round(currentRssiAt1m) : 'n/a'} dBm
+								refRssi: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
 							</p>
 						</div>
 						<div class="card p-4 variant-filled-primary">
 							<header class="font-semibold mb-2">New Values</header>
 							<p class="text-xl font-bold">
-								RSSI@1m: {calculatedRssiAt1m != null ? calculatedRssiAt1m : 'n/a'} dBm
+								refRssi: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
 							</p>
 						</div>
 					</div>
 
 					<div class="card p-4 variant-ghost-warning mb-6">
-						{#if currentRssiAt1m != null && calculatedRssiAt1m != null}
+						{#if currentRefRssi != null && calculatedRefRssi != null}
 							<p>
-								This is a <span class="font-semibold">{Math.abs(calculatedRssiAt1m - Math.round(currentRssiAt1m))} dBm</span>
-								{calculatedRssiAt1m > currentRssiAt1m ? 'increase' : 'decrease'}.
+								This is a <span class="font-semibold">{Math.abs(calculatedRefRssi - Math.round(currentRefRssi))} dBm</span>
+								{calculatedRefRssi > currentRefRssi ? 'increase' : 'decrease'}.
 							</p>
 						{/if}
 						<p>This change will affect how distances are calculated for this device.</p>
