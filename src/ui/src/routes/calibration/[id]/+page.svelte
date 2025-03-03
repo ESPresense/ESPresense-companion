@@ -366,8 +366,12 @@
 	}
 </script>
 
+<svelte:head>
+	<title>ESPresense Companion: Device Calibration</title>
+</svelte:head>
+
 <div class="container mx-auto p-4 max-w-7xl">
-	<h1 class="h1 mb-4">Calibration for Device {data.settings?.id}</h1>
+	<h2 class="h2 mb-4">Device Calibration: {data.settings?.id}</h2>
 
 	<div class="card p-4 mb-6 variant-soft">
 		<header class="font-semibold mb-2">Instructions</header>

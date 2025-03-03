@@ -518,6 +518,10 @@
     });
 </script>
 
+<svelte:head>
+	<title>ESPresense Companion: 3D Map</title>
+</svelte:head>
+
 <div class="w-full h-full" bind:this={container}></div>
 
 <style>
