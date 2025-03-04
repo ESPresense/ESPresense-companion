@@ -1,5 +1,5 @@
 # Build stage
-FROM mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim-amd64 AS build-env
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
@@ -16,8 +16,9 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
 WORKDIR /App
 COPY . ./
 
-RUN echo "Building on ${BUILDPLATFORM} for ${TARGETPLATFORM}"
-
+RUN echo "Building on ${BUILDPLATFORM} for ${TARGETPLATFORM}" && \
+    echo "TARGETPLATFORM=${TARGETPLATFORM}" && \
+    echo "BUILDPLATFORM=${BUILDPLATFORM}"
 RUN dotnet restore
 RUN dotnet publish -c Release -o out
 

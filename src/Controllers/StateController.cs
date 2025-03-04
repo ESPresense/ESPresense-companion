@@ -1,5 +1,6 @@
 ﻿﻿using System.Collections.Concurrent;
 using System.Net.WebSockets;
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using ESPresense.Extensions;
@@ -7,6 +8,7 @@ using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
+using ESPresense.Events;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace ESPresense.Controllers;
@@ -19,15 +21,17 @@ public class StateController : ControllerBase
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
     private readonly MappingService _ms;
+    private readonly MqttCoordinator _mqtt;
     private readonly GlobalEventDispatcher _eventDispatcher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, MappingService ms, GlobalEventDispatcher eventDispatcher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, MappingService ms, MqttCoordinator mqtt, GlobalEventDispatcher eventDispatcher)
     {
         _logger = logger;
         _state = state;
         _config = config;
         _nsd = nsd;
         _ms = ms;
+        _mqtt = mqtt;
         _eventDispatcher = eventDispatcher;
     }
 
@@ -93,6 +97,9 @@ public class StateController : ControllerBase
 
         AsyncAutoResetEvent newMessage = new AsyncAutoResetEvent();
         ConcurrentQueue<string> changes = new ConcurrentQueue<string>();
+
+        // Dictionary to track device message subscriptions
+        Dictionary<string, bool> deviceSubscriptions = new Dictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
             changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions (JsonSerializerDefaults.Web)));
@@ -107,13 +114,101 @@ public class StateController : ControllerBase
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
         };
 
+        // New handler for device messages
+        async Task OnDeviceMessageReceived(DeviceMessageEventArgs args)
+        {
+            // Check if client is subscribed to this device
+            if (deviceSubscriptions.TryGetValue(args.DeviceId, out var isSubscribed) && isSubscribed)
+            {
+                EnqueueAndSignal(new
+                {
+                    type = "deviceMessage",
+                    deviceId = args.DeviceId,
+                    nodeId = args.NodeId,
+                    data = args.Payload
+                });
+            }
+        }
+
         _config.ConfigChanged += OnConfigChanged;
         _eventDispatcher.CalibrationChanged += OnCalibrationChanged;
         _eventDispatcher.NodeStateChanged += OnNodeStateChanged;
         _eventDispatcher.DeviceStateChanged += OnDeviceChanged;
+
         try
         {
             using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+
+            // Set up buffer for receiving messages
+            var buffer = new byte[1024 * 4];
+
+            var receiveTask = Task.Run(async () =>
+            {
+                while (webSocket.State == WebSocketState.Open)
+                {
+                    WebSocketReceiveResult result;
+                    using var ms = new MemoryStream();
+                    do
+                    {
+                        result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                        if (result.MessageType == WebSocketMessageType.Close)
+                            break;
+
+                        ms.Write(buffer, 0, result.Count);
+                    } while (!result.EndOfMessage);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                        break;
+
+                    ms.Seek(0, SeekOrigin.Begin);
+
+                    // Process the command
+                    try
+                    {
+                        using var reader = new StreamReader(ms, Encoding.UTF8);
+                        var message = await reader.ReadToEndAsync();
+                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                        if (command != null)
+                        {
+                            switch (command.Command?.ToLower())
+                            {
+                                case "subscribe":
+                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.DeviceId))
+                                    {
+                                        // Subscribe to device messages
+                                        deviceSubscriptions[command.DeviceId] = true;
+
+                                        // Register handler if this is the first subscription
+                                        if (deviceSubscriptions.Count == 1)
+                                            _mqtt.DeviceMessageReceivedAsync += OnDeviceMessageReceived;
+
+                                        _logger.LogDebug("Client subscribed to device messages for {DeviceId}", command.DeviceId);
+                                    }
+                                    break;
+
+                                case "unsubscribe":
+                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.DeviceId))
+                                    {
+                                        // Unsubscribe from device messages
+                                        deviceSubscriptions.Remove(command.DeviceId);
+
+                                        // Unregister handler if no more subscriptions
+                                        if (deviceSubscriptions.Count == 0)
+                                            _mqtt.DeviceMessageReceivedAsync -= OnDeviceMessageReceived;
+
+                                        _logger.LogDebug("Client unsubscribed from device messages for {DeviceId}", command.DeviceId);
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing WebSocket command");
+                    }
+                }
+            });
 
             EnqueueAndSignal(new { type = "time", data = DateTime.UtcNow.RelativeMilliseconds() });
 
@@ -133,6 +228,10 @@ public class StateController : ControllerBase
             _eventDispatcher.CalibrationChanged -= OnCalibrationChanged;
             _eventDispatcher.NodeStateChanged -= OnNodeStateChanged;
             _eventDispatcher.DeviceStateChanged -= OnDeviceChanged;
+
+            // Unregister device message handler if needed
+            if (deviceSubscriptions.Count > 0)
+                _mqtt.DeviceMessageReceivedAsync -= OnDeviceMessageReceived;
         }
     }
 
@@ -161,4 +260,10 @@ public class StateController : ControllerBase
     }
 }
 
+public class WebSocketCommand
+{
+    public string? Command { get; set; }
+    public string? Type { get; set; }
+    public string? DeviceId { get; set; }
+}
 

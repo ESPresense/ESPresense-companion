@@ -11,7 +11,7 @@
 
 	export let tab = 'map';
 	export let data: { settings?: DeviceSetting } = {};
-	$: device = $devices.find((d) => d.id === data.settings?.id);
+	$: device = $devices?.find((d) => d.id === data.settings?.id);
 
 	export const deviceDetails = readable([], (set) => {
 		async function fetchAndSet() {
@@ -36,7 +36,7 @@
 </script>
 
 <svelte:head>
-	<title>ESPresense Companion: Map</title>
+	<title>ESPresense Companion: Device Detail</title>
 </svelte:head>
 
 <DeviceDetailTabs deviceId={data.settings?.id} floorId={device?.floor?.id} bind:tab />

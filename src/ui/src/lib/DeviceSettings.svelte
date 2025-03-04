@@ -54,7 +54,7 @@
 						<input class="input" type="text" bind:value={settings.name} />
 					</label>
 					<label>
-						<span>Rssi@1m</span>
+						<span>RSSI@1m</span>
 						<input class="input" type="text" placeholder="" bind:value={settings['rssi@1m']} />
 					</label>
 					<button class="btn bg-success-700 text-black" on:click={(e) => save()}>Save</button>

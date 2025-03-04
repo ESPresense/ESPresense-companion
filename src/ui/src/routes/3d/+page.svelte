@@ -197,7 +197,7 @@
     }
 
     function setupRooms() {
-        $: if ($config?.floors && groupPivot) {
+        if ($config?.floors && groupPivot) {
             cleanupRooms();
             const newRoomGroup = new THREE.Group();
             newRoomGroup.name = 'RoomGroup';
@@ -249,17 +249,17 @@
     }
 
     function setupNodes() {
-        $: if ($nodes && groupPivot && showNodes) {
+        if ($nodes && groupPivot && showNodes) {
             updateNodes($nodes);
         }
 
-        $: if (!showNodes) {
+        if (!showNodes) {
             cleanupNodeGroup();
         }
     }
 
     function setupDevices() {
-        $: if ($devices && groupPivot) {
+        if ($devices && groupPivot) {
             updateDevices($devices);
         }
     }
@@ -517,6 +517,10 @@
         };
     });
 </script>
+
+<svelte:head>
+	<title>ESPresense Companion: 3D Map</title>
+</svelte:head>
 
 <div class="w-full h-full" bind:this={container}></div>
 

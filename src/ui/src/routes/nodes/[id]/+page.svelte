@@ -36,7 +36,7 @@
 </script>
 
 <svelte:head>
-	<title>ESPresense Companion: Map</title>
+	<title>ESPresense Companion: Node Detail</title>
 </svelte:head>
 
 <NodeDetailTabs nodeId={data.settings?.id} bind:floorId />
