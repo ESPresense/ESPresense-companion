@@ -70,9 +70,6 @@
 	let calculatedRefRssi: number | null = null;
 	let stabilityScore: number = 0;
 
-	// Collection state for calibration data
-	let collectedData: { nodeId: string; rssi: number | null; distance: number; timestamp: number; spotX: number; spotY: number }[][] = [];
-
 	// Error handling from initial load
 	$: if (data.settings?.error) {
 		const t: ToastSettings = { message: data.settings.error, background: 'variant-filled-error' };
@@ -100,7 +97,6 @@
 	// Reset data on floor change
 	$: if (selectedFloorId && calibrationSpot) {
 		rssiValues = {};
-		collectedData = [];
 		calculatedRefRssi = null;
 		stabilityScore = 0;
 	}
@@ -159,10 +155,6 @@
 			spotX: calibrationSpot?.x || 0,
 			spotY: calibrationSpot?.y || 0
 		}));
-		collectedData = [...collectedData, newReading];
-		if (collectedData.length > 100) {
-			collectedData = collectedData.slice(-100);
-		}
 	}
 
 	// Update stability score based on all device messages
@@ -299,8 +291,9 @@
 		includedNodes = { ...includedNodes }; // Trigger reactivity
 	}
 
+	$: messageStats = calculateMessageStats(deviceMessages);
 	// Get message statistics for display
-	function getMessageStats() {
+	function calculateMessageStats(deviceMessages: Record<string, DeviceMessage[]>) {
 		const stats: Record<string, { count: number, avgRssi: number | null, minRssi: number | null, maxRssi: number | null, stdDev: number | null }> = {};
 
 		Object.entries(deviceMessages).forEach(([nodeId, messages]) => {
@@ -492,15 +485,15 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each Object.entries(getMessageStats()) as [nodeId, stats]}
+							{#each Object.entries(messageStats) as [nodeId, stats]}
 								{@const node = nodeDistances.find(n => n.id === nodeId)}
 								<tr>
 									<td>{node?.name || nodeId}</td>
 									<td>{stats.count}</td>
-									<td>{stats.avgRssi !== null ? stats.avgRssi.toFixed(1) : 'n/a'}</td>
-									<td>{stats.minRssi !== null ? stats.minRssi.toFixed(1) : 'n/a'}</td>
-									<td>{stats.maxRssi !== null ? stats.maxRssi.toFixed(1) : 'n/a'}</td>
-									<td>{stats.stdDev !== null ? stats.stdDev.toFixed(2) : 'n/a'}</td>
+									<td>{stats.avgRssi != null ? stats.avgRssi.toFixed(1) : 'n/a'}</td>
+									<td>{stats.minRssi != null ? stats.minRssi.toFixed(1) : 'n/a'}</td>
+									<td>{stats.maxRssi != null ? stats.maxRssi.toFixed(1) : 'n/a'}</td>
+									<td>{stats.stdDev != null ? stats.stdDev.toFixed(2) : 'n/a'}</td>
 								</tr>
 							{/each}
 						</tbody>
