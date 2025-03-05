@@ -13,6 +13,7 @@
 	import AxisX from './AxisX.svelte';
 	import AxisY from './AxisY.svelte';
 	import MapCoordinates from './MapCoordinates.svelte';
+	import CalibrationSpot from './CalibrationSpot.svelte';
 
 	let svg: Element;
 	let transform = zoomIdentity;
@@ -21,6 +22,8 @@
 	export let deviceId: string | null = null;
 	export let nodeId: string | null = null;
 	export let exclusive: boolean = false;
+	export let calibrate: boolean = false;
+	export let calibrationSpot: { x: number, y: number } | null = null;
 
 	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
@@ -131,6 +134,9 @@
 			<Rooms {transform} {floorId} />
 			<Nodes {transform} {floorId} {deviceId} {nodeId} on:selected on:hovered={hoveredNode} />
 			<Devices {transform} {floorId} {deviceId} {exclusive} on:selected on:hovered={hoveredDevice} />
+			{#if (calibrate && calibrationSpot)}
+				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} />
+			{/if}
 		</Svg>
 	</LayerCake>
 {:else}

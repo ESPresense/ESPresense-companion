@@ -66,7 +66,7 @@ The primary WebSocket endpoint is at `/ws` and is implemented in `StateControlle
 
 ```csharp
 [Route("/ws")]
-public async Task Get([FromQuery] bool showUntracked = false)
+public async Task Get([FromQuery] bool showAll = false)
 {
     // Check if it's a WebSocket request
     if (!HttpContext.WebSockets.IsWebSocketRequest)
@@ -78,40 +78,40 @@ public async Task Get([FromQuery] bool showUntracked = false)
     // Set up event handlers
     AsyncAutoResetEvent newMessage = new AsyncAutoResetEvent();
     ConcurrentQueue<string> changes = new ConcurrentQueue<string>();
-    
+
     // Define event handlers
-    void OnConfigChanged(object? sender, Config e) => 
+    void OnConfigChanged(object? sender, Config e) =>
         EnqueueAndSignal(new { type = "configChanged" });
     void OnDeviceChanged(object? sender, DeviceEventArgs e) =>
         EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
-    
+
     // Subscribe to events
     _config.ConfigChanged += OnConfigChanged;
     _eventDispatcher.DeviceStateChanged += OnDeviceChanged;
-    
+
     try
     {
         // Accept WebSocket connection
         using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-        
+
         // Send initial time sync
         EnqueueAndSignal(new { type = "time", data = DateTime.UtcNow.RelativeMilliseconds() });
-        
+
         // Main message loop
         while (!webSocket.CloseStatus.HasValue)
         {
             // Send any queued messages
             while (changes.TryDequeue(out var jsonEvent))
                 await webSocket.SendAsync(
-                    new ArraySegment<byte>(Encoding.UTF8.GetBytes(jsonEvent)), 
-                    WebSocketMessageType.Text, 
-                    true, 
+                    new ArraySegment<byte>(Encoding.UTF8.GetBytes(jsonEvent)),
+                    WebSocketMessageType.Text,
+                    true,
                     CancellationToken.None);
-            
+
             // Wait for new messages
             await newMessage.WaitAsync();
         }
-        
+
         // Close WebSocket properly
         await webSocket.CloseAsync(
             webSocket.CloseStatus.Value,
@@ -153,7 +153,7 @@ Key aspects:
    - `devices`: Device data
    - `nodes`: Node data
    - `config`: System configuration
-   - UI state stores (showAll, showUntracked, etc.)
+   - UI state stores (showAll, showAll, etc.)
 
 ### Store Implementation
 
@@ -164,12 +164,12 @@ The store system is the central part of frontend state management, implemented i
 export const config = writable<Config>();
 
 // Derived store with API fetching and WebSocket
-export const devices = derived<[typeof showUntracked], Device[]>(
-    [showUntracked],
-    ([$showUntracked], set) => {
+export const devices = derived<[typeof showAll], Device[]>(
+    [showAll],
+    ([$showAll], set) => {
         let deviceMap = new Map();
         var q = (new URLSearchParams({
-            showUntracked: $showUntracked ? "true" : "false"
+            showAll: $showAll ? "true" : "false"
         })).toString();
 
         // Update function
@@ -193,7 +193,7 @@ export const devices = derived<[typeof showUntracked], Device[]>(
         // Set up WebSocket for real-time updates
         function setupWebsocket() {
             const loc = new URL(`${base}/ws?${q}`, window.location.href);
-            const new_uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + 
+            const new_uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') +
                 '//' + loc.host + loc.pathname + loc.search;
             const socket = new WebSocket(new_uri);
 
@@ -234,7 +234,7 @@ Key aspects:
 ```typescript
 function setupWebsocket() {
     const loc = new URL(`${base}/ws?${q}`, window.location.href);
-    const new_uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + 
+    const new_uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') +
         '//' + loc.host + loc.pathname + loc.search;
     const socket = new WebSocket(new_uri);
     // Set up event handlers
@@ -320,7 +320,7 @@ To create a new UI component that integrates with the system:
 ```svelte
 <script>
   import { devices, nodes, config } from '$lib/stores';
-  
+
   // Reactive declarations using store values
   $: relevantDevices = $devices.filter(d => d.track);
   $: nodeMap = new Map($nodes.map(n => [n.id, n]));
@@ -338,11 +338,11 @@ async function updateDevice(id, data) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  
+
   if (!response.ok) {
     throw new Error('Failed to update device');
   }
-  
+
   // No need to update local store - WebSocket will handle it
 }
 ```

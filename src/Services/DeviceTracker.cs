@@ -12,6 +12,12 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        mqtt.DeviceMessageReceivedAsync += (e) =>
+        {
+            globalEventDispatcher.OnDeviceMessageReceived(e);
+            return Task.CompletedTask;
+        };
+
         mqtt.MqttMessageMalformed += (s, e) => { tele.IncrementMalformedMessages(); };
 
         // Handle device discovery

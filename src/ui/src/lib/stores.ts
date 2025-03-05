@@ -1,9 +1,11 @@
-import { readable, writable, derived } from 'svelte/store';
+import { readable, writable, derived, get } from 'svelte/store';
 import { base } from '$app/paths';
-import type { Device, Config, Node, CalibrationResponse } from './types';
+import type { Device, Config, Node, CalibrationResponse, DeviceSetting } from './types';
+import { WSManager } from './wsManager';
 
-export const showAll: SvelteStore<boolean> = writable(false);
 export const config = writable<Config>();
+export const showAll = writable<boolean>(false);
+export const showAllFloors = writable<boolean>(false);
 
 export const relativeTimer = function () {
 	let interval: NodeJS.Timeout | undefined;
@@ -32,83 +34,120 @@ export const relativeTimer = function () {
 
 export const relative = relativeTimer();
 
-let socket: WebSocket;
+// Create a singleton WSManager instance
+export const wsManager = new WSManager();
 
-export const history = writable(['/']);
+// Device message events and subscriptions
+export const history = writable<string[]>(['/']);
 
+// Load config initially
 async function getConfig() {
 	const response = await fetch(`${base}/api/state/config`);
 	config.set(await response.json());
 }
-
 getConfig();
 
-export const showUntracked = writable<boolean>(false);
 
-export const devices = derived<[typeof showUntracked], Device[]>(
-	[showUntracked],
-	([$showUntracked], set) => {
-		let deviceMap = new Map();
-		var q = (new URLSearchParams({
-			showUntracked: $showUntracked ? "true" : "false"
-		})).toString();
-
-		function updateDevicesFromMap() {
-			const devicesArray = Array.from(deviceMap.values());
-			set(devicesArray);
-		}
-
-		function fetchDevices() {
-
-			fetch(`${base}/api/state/devices?${q}`)
-				.then((d) => d.json())
-				.then((r) => {
-					deviceMap = new Map(r.map((device: Device) => [device.id, device]));
-					updateDevicesFromMap();
-				})
-				.catch((ex) => {
-					console.error('Error fetching devices:', ex);
-				});
-		}
-
-		fetchDevices();
-
-		const interval = setInterval(fetchDevices, 60000);
-
-		function setupWebsocket() {
-			const loc = new URL(`${base}/ws?${q}`, window.location.href);
-			const new_uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + loc.pathname + loc.search;
-			const socket = new WebSocket(new_uri);
-
-			socket.addEventListener('message', async function (event) {
-				const eventData = JSON.parse(event.data);
-				if (eventData.type === 'deviceChanged' && eventData.data?.id) {
-					deviceMap.set(eventData.data.id, eventData.data);
-					updateDevicesFromMap();
-				} else if (eventData.type === 'configChanged') {
-					getConfig();
-				} else if (eventData.type === 'time') {
-					relative.set(eventData.data);
-				} else {
-					console.log('Unhandled websocket event:', event.data);
-				}
+export const deviceSettings = writable<DeviceSetting[] | null>([], function start(set) {
+	let settings: DeviceSetting[] = [];
+	let outstanding = false;
+	const interval = setInterval(() => {
+		if (outstanding) return;
+		outstanding = true;
+		fetch(`${base}/api/devices`)
+			.then((d) => d.json())
+			.then((r: DeviceSetting[]) => {
+				outstanding = false;
+				settings = r;
+				set(settings);
+			})
+			.catch((ex) => {
+				outstanding = false;
+				console.error(ex);
 			});
+	}, 60000);
 
-			return socket;
-		}
+	return () => {
+		clearInterval(interval);
+	};
+});
 
-		const socket = setupWebsocket();
+export const devices = readable<Device[]>([], function start(set) {
+	let deviceMap = new Map<string, Device>();
+	let pollTimer: NodeJS.Timeout;
+	let isPolling = false;
 
-		return () => {
-			clearInterval(interval);
-			socket.close();
-		};
+	function updateDevicesFromMap() {
+		set(Array.from(deviceMap.values()));
 	}
-);
 
+	async function fetchDevices() {
+		if (isPolling) return;
+
+		isPolling = true;
+		try {
+			const response = await fetch(`${base}/api/state/devices?showAll=${get(showAll)}`);
+			if (!response.ok) {
+				throw new Error(`HTTP error! Status: ${response.status}`);
+			}
+			const devices: Device[] = await response.json();
+
+			// Replace the entire map instead of accumulating devices
+			deviceMap = new Map(devices.map((device: Device) => [device.id, device]));
+			updateDevicesFromMap();
+		} catch (error) {
+			console.error('Error fetching devices:', error);
+		} finally {
+			isPolling = false;
+		}
+	}
+
+	fetchDevices();
+	pollTimer = setInterval(fetchDevices, 60000);
+
+	const deviceChangedCallback = (data: Device) => {
+		if (data?.id) {
+			deviceMap.set(data.id, data);
+			updateDevicesFromMap();
+		}
+	};
+	wsManager.subscribeToEvent('deviceChanged', deviceChangedCallback);
+
+	const configChangedCallback = (data: Config) => {
+		getConfig();
+	};
+	wsManager.subscribeToEvent('configChanged', configChangedCallback);
+
+	const timeCallback = (data: number) => {
+		relative.set(data);
+	};
+	wsManager.subscribeToEvent('time', timeCallback);
+
+	// Subscribe to showAll changes and trigger immediate poll when it changes
+	const unsubscribeShowUntracked = showAll.subscribe((value) => {
+		wsManager.sendMessage({
+			command: 'changeFilter',
+			type: 'showAll',
+			value: ''+value
+		});
+
+		// Force an immediate poll when showAll changes
+		fetchDevices();
+	});
+
+	return () => {
+		clearInterval(pollTimer);
+		wsManager.unsubscribeFromEvent('deviceChanged', deviceChangedCallback);
+		wsManager.unsubscribeFromEvent('configChanged', configChangedCallback);
+		wsManager.unsubscribeFromEvent('time', timeCallback);
+		unsubscribeShowUntracked();
+	};
+});
+
+// Nodes store (polling)
 export const nodes = readable<Node[]>([], function start(set) {
-	var errors = 0;
-	var outstanding = false;
+	let errors = 0;
+	let outstanding = false;
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
@@ -121,29 +160,25 @@ export const nodes = readable<Node[]>([], function start(set) {
 			})
 			.catch((ex) => {
 				outstanding = false;
+				errors++;
 				if (errors > 5) set([]);
-				console.log(ex);
+				console.error(ex);
 			});
 	}, 1000);
 
-	return function stop() {
+	return () => {
 		clearInterval(interval);
 	};
 });
 
-export const calibration = readable<CalibrationResponse>({matrix: {}}, function start(set) {
+// Calibration polling store
+export const calibration = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
 	async function fetchAndSet() {
 		const response = await fetch(`${base}/api/state/calibration`);
-		var data = await response.json();
+		const data = await response.json();
 		set(data);
 	}
-
 	fetchAndSet();
-	const interval = setInterval(() => {
-		fetchAndSet();
-	}, 1000);
-
-	return function stop() {
-		clearInterval(interval);
-	};
+	const interval = setInterval(fetchAndSet, 1000);
+	return () => clearInterval(interval);
 });

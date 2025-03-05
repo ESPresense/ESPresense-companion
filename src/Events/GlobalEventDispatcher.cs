@@ -1,9 +1,11 @@
-﻿using ESPresense.Models;
+﻿using ESPresense.Events;
+using ESPresense.Models;
 
 namespace ESPresense.Controllers;
 
 public class GlobalEventDispatcher()
 {
+    public event EventHandler<DeviceMessageEventArgs> DeviceMessageReceived;
     public event EventHandler<NodeStateEventArgs>? NodeStateChanged;
     public event EventHandler<DeviceEventArgs>? DeviceStateChanged;
     public event EventHandler<CalibrationEventArgs>? CalibrationChanged;
@@ -21,6 +23,11 @@ public class GlobalEventDispatcher()
     public void OnCalibrationChanged(Calibration calibration)
     {
         CalibrationChanged?.Invoke(this, new CalibrationEventArgs(calibration));
+    }
+
+    public void OnDeviceMessageReceived(DeviceMessageEventArgs e)
+    {
+        DeviceMessageReceived?.Invoke(this, e);
     }
 }
 
