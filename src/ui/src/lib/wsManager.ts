@@ -40,7 +40,7 @@ export class WSManager {
         this.socket!.send(JSON.stringify({
           command: 'subscribe',
           type: 'deviceMessage',
-          deviceId
+          value: deviceId
         }));
       });
       this.pendingSubscriptions.clear();
@@ -106,7 +106,7 @@ export class WSManager {
       this.socket.send(JSON.stringify({
         command: 'subscribe',
         type: 'deviceMessage',
-        deviceId
+        value: deviceId
       }));
     } else {
       this.pendingSubscriptions.add(deviceId);

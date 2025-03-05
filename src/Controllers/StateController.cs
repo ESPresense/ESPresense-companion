@@ -21,7 +21,6 @@ public class StateController : ControllerBase
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
     private readonly MappingService _ms;
-    private readonly MqttCoordinator _mqtt;
     private readonly GlobalEventDispatcher _eventDispatcher;
 
     public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, MappingService ms, MqttCoordinator mqtt, GlobalEventDispatcher eventDispatcher)
@@ -31,7 +30,6 @@ public class StateController : ControllerBase
         _config = config;
         _nsd = nsd;
         _ms = ms;
-        _mqtt = mqtt;
         _eventDispatcher = eventDispatcher;
     }
 
@@ -44,10 +42,10 @@ public class StateController : ControllerBase
 
     // GET: api/rooms
     [HttpGet("api/state/devices")]
-    public IEnumerable<Device> GetDevices([FromQuery] bool showUntracked = false)
+    public IEnumerable<Device> GetDevices([FromQuery] bool showAll = false)
     {
         IEnumerable<Device> d = _state.Devices.Values;
-        if (!showUntracked) d = d.Where(a => a is { Track: true });
+        if (!showAll) d = d.Where(a => a is { Track: true });
         return d;
     }
 
@@ -87,7 +85,7 @@ public class StateController : ControllerBase
 
     [ApiExplorerSettings(IgnoreApi = true)]
     [Route("/ws")]
-    public async Task Get([FromQuery] bool showUntracked = false)
+    public async Task Get([FromQuery] bool showAll = false)
     {
         if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
@@ -98,8 +96,7 @@ public class StateController : ControllerBase
         AsyncAutoResetEvent newMessage = new AsyncAutoResetEvent();
         ConcurrentQueue<string> changes = new ConcurrentQueue<string>();
 
-        // Dictionary to track device message subscriptions
-        Dictionary<string, bool> deviceSubscriptions = new Dictionary<string, bool>();
+        ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
             changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions (JsonSerializerDefaults.Web)));
@@ -110,14 +107,12 @@ public class StateController : ControllerBase
         void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => EnqueueAndSignal(new { type = "nodeStateChanged", data = e.NodeState });
         void OnDeviceChanged(object? sender, DeviceEventArgs e)
         {
-            if (showUntracked || (e.Device?.Track ?? false) || e.TrackChanged)
+            if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
         };
 
-        // New handler for device messages
-        async Task OnDeviceMessageReceived(DeviceMessageEventArgs args)
+        void OnDeviceMessageReceived(object? sender, DeviceMessageEventArgs args)
         {
-            // Check if client is subscribed to this device
             if (deviceSubscriptions.TryGetValue(args.DeviceId, out var isSubscribed) && isSubscribed)
             {
                 EnqueueAndSignal(new
@@ -134,6 +129,7 @@ public class StateController : ControllerBase
         _eventDispatcher.CalibrationChanged += OnCalibrationChanged;
         _eventDispatcher.NodeStateChanged += OnNodeStateChanged;
         _eventDispatcher.DeviceStateChanged += OnDeviceChanged;
+        _eventDispatcher.DeviceMessageReceived += OnDeviceMessageReceived;
 
         try
         {
@@ -173,31 +169,23 @@ public class StateController : ControllerBase
                         {
                             switch (command.Command?.ToLower())
                             {
+                                case "changeFilter":
+                                    if (command.Type == "showAll")
+                                        showAll = command.Value == "true";
+                                    break;
                                 case "subscribe":
-                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.DeviceId))
+                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.Value))
                                     {
-                                        // Subscribe to device messages
-                                        deviceSubscriptions[command.DeviceId] = true;
-
-                                        // Register handler if this is the first subscription
-                                        if (deviceSubscriptions.Count == 1)
-                                            _mqtt.DeviceMessageReceivedAsync += OnDeviceMessageReceived;
-
-                                        _logger.LogDebug("Client subscribed to device messages for {DeviceId}", command.DeviceId);
+                                        deviceSubscriptions.AddOrUpdate(command.Value, true, (_, __) => true);
+                                        _logger.LogDebug("Client subscribed to device messages for {DeviceId}", command.Value);
                                     }
                                     break;
 
                                 case "unsubscribe":
-                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.DeviceId))
+                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.Value))
                                     {
-                                        // Unsubscribe from device messages
-                                        deviceSubscriptions.Remove(command.DeviceId);
-
-                                        // Unregister handler if no more subscriptions
-                                        if (deviceSubscriptions.Count == 0)
-                                            _mqtt.DeviceMessageReceivedAsync -= OnDeviceMessageReceived;
-
-                                        _logger.LogDebug("Client unsubscribed from device messages for {DeviceId}", command.DeviceId);
+                                        deviceSubscriptions.TryRemove(command.Value, out _);
+                                        _logger.LogDebug("Client unsubscribed from device messages for {DeviceId}", command.Value);
                                     }
                                     break;
                             }
@@ -228,10 +216,7 @@ public class StateController : ControllerBase
             _eventDispatcher.CalibrationChanged -= OnCalibrationChanged;
             _eventDispatcher.NodeStateChanged -= OnNodeStateChanged;
             _eventDispatcher.DeviceStateChanged -= OnDeviceChanged;
-
-            // Unregister device message handler if needed
-            if (deviceSubscriptions.Count > 0)
-                _mqtt.DeviceMessageReceivedAsync -= OnDeviceMessageReceived;
+            _eventDispatcher.DeviceMessageReceived -= OnDeviceMessageReceived;
         }
     }
 
@@ -264,6 +249,6 @@ public class WebSocketCommand
 {
     public string? Command { get; set; }
     public string? Type { get; set; }
-    public string? DeviceId { get; set; }
+    public string? Value { get; set; }
 }
 

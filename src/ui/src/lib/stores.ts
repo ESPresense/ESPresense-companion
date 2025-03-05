@@ -3,8 +3,8 @@ import { base } from '$app/paths';
 import type { Device, Config, Node, CalibrationResponse, DeviceSetting } from './types';
 import { WSManager } from './wsManager';
 
-export const showAll = writable<boolean>(false);
 export const config = writable<Config>();
+export const showAll = writable<boolean>(false);
 
 export const relativeTimer = function () {
 	let interval: NodeJS.Timeout | undefined;
@@ -46,8 +46,6 @@ async function getConfig() {
 }
 getConfig();
 
-// Instead of using a query parameter for filtering "untracked", we send a WS filter command.
-export const showUntracked = writable<boolean>(false);
 
 export const deviceSettings = writable<DeviceSetting[] | null>([], function start(set) {
 	let settings: DeviceSetting[] = [];
@@ -73,31 +71,39 @@ export const deviceSettings = writable<DeviceSetting[] | null>([], function star
 	};
 });
 
-// Devices store: initial polling load then WS updates
 export const devices = readable<Device[]>([], function start(set) {
 	let deviceMap = new Map<string, Device>();
+	let pollTimer: NodeJS.Timeout;
+	let isPolling = false;
 
-	// Update our store based on the device map
 	function updateDevicesFromMap() {
 		set(Array.from(deviceMap.values()));
 	}
 
-	// Initial polling load (note: no filter in URL)
-	function fetchDevices() {
-		fetch(`${base}/api/state/devices`)
-			.then((d) => d.json())
-			.then((r: Device[]) => {
-				deviceMap = new Map(r.map((device: Device) => [device.id, device]));
-				updateDevicesFromMap();
-			})
-			.catch((ex) => {
-				console.error('Error fetching devices:', ex);
-			});
-	}
-	fetchDevices();
-	const pollingInterval = setInterval(fetchDevices, 60000);
+	async function fetchDevices() {
+		if (isPolling) return;
 
-	// WS event subscriptions
+		isPolling = true;
+		try {
+			const response = await fetch(`${base}/api/state/devices?showAll=${get(showAll)}`);
+			if (!response.ok) {
+				throw new Error(`HTTP error! Status: ${response.status}`);
+			}
+			const devices: Device[] = await response.json();
+
+			// Replace the entire map instead of accumulating devices
+			deviceMap = new Map(devices.map((device: Device) => [device.id, device]));
+			updateDevicesFromMap();
+		} catch (error) {
+			console.error('Error fetching devices:', error);
+		} finally {
+			isPolling = false;
+		}
+	}
+
+	fetchDevices();
+	pollTimer = setInterval(fetchDevices, 60000);
+
 	const deviceChangedCallback = (data: Device) => {
 		if (data?.id) {
 			deviceMap.set(data.id, data);
@@ -116,17 +122,20 @@ export const devices = readable<Device[]>([], function start(set) {
 	};
 	wsManager.subscribeToEvent('time', timeCallback);
 
-	// When showUntracked changes, send a WS message to update the filter
-	const unsubscribeShowUntracked = showUntracked.subscribe((value) => {
+	// Subscribe to showAll changes and trigger immediate poll when it changes
+	const unsubscribeShowUntracked = showAll.subscribe((value) => {
 		wsManager.sendMessage({
 			command: 'changeFilter',
-			type: 'untracked',
-			value: value
+			type: 'showAll',
+			value: ''+value
 		});
+
+		// Force an immediate poll when showAll changes
+		fetchDevices();
 	});
 
 	return () => {
-		clearInterval(pollingInterval);
+		clearInterval(pollTimer);
 		wsManager.unsubscribeFromEvent('deviceChanged', deviceChangedCallback);
 		wsManager.unsubscribeFromEvent('configChanged', configChangedCallback);
 		wsManager.unsubscribeFromEvent('time', timeCallback);

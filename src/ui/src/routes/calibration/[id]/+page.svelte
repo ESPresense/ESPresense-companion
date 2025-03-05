@@ -146,18 +146,6 @@
 		}
 	}
 
-	// Collect data and update calculations periodically
-	$: if ($devices && nodeDistances.length > 0 && calibrationSpot) {
-		const newReading = nodeDistances.map((node) => ({
-			nodeId: node.id,
-			rssi: rssiValues[node.id],
-			distance: node.distance,
-			timestamp: Date.now(),
-			spotX: calibrationSpot?.x || 0,
-			spotY: calibrationSpot?.y || 0
-		}));
-	}
-
 	// Update stability score based on all device messages
 	$: stabilityScore = calculateStabilityScore();
 
