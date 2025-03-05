@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { devices, showAll } from '$lib/stores';
+	import { devices, showAllFloors } from '$lib/stores';
 	import { zoomIdentity } from 'd3-zoom';
 
 	import DeviceMarker from './DeviceMarker.svelte';
@@ -13,7 +13,7 @@
 	function visible(d: Device) {
 		if (exclusive) return d.id === deviceId;
 		if (d.confidence <= 1 || !d.location) return false;
-		if ($showAll) return true;
+		if ($showAllFloors) return true;
 		return d.floor?.id === floorId;
 	}
 </script>

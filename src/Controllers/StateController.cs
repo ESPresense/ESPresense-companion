@@ -23,7 +23,7 @@ public class StateController : ControllerBase
     private readonly MappingService _ms;
     private readonly GlobalEventDispatcher _eventDispatcher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, MappingService ms, MqttCoordinator mqtt, GlobalEventDispatcher eventDispatcher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, MappingService ms, GlobalEventDispatcher eventDispatcher)
     {
         _logger = logger;
         _state = state;

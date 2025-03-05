@@ -5,6 +5,7 @@ import { WSManager } from './wsManager';
 
 export const config = writable<Config>();
 export const showAll = writable<boolean>(false);
+export const showAllFloors = writable<boolean>(false);
 
 export const relativeTimer = function () {
 	let interval: NodeJS.Timeout | undefined;
