@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
 	import type { ToastSettings } from '@skeletonlabs/skeleton';
@@ -317,7 +318,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(`/api/device/${deviceSettings.originalId}`, {
+			const response = await fetch(`${base}/api/device/${deviceSettings.originalId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })

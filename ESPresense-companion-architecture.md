@@ -293,7 +293,7 @@ Common message types:
    - User fills out device form
    - Form data is submitted via `fetch`:
    ```javascript
-   const response = await fetch(`/api/device/${id}`, {
+   const response = await fetch(`${base}/api/device/${id}`, {
      method: 'PUT',
      headers: { 'Content-Type': 'application/json' },
      body: JSON.stringify(deviceData)
@@ -333,7 +333,7 @@ The component will automatically receive updates via the store subscriptions. No
 3. **Update data**:
 ```javascript
 async function updateDevice(id, data) {
-  const response = await fetch(`/api/device/${id}`, {
+  const response = await fetch(`${base}/api/device/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
