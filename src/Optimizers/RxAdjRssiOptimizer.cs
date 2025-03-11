@@ -1,4 +1,4 @@
-﻿using ESPresense.Models;
+﻿﻿using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using Serilog;
@@ -22,7 +22,7 @@ public class RxAdjRssiOptimizer : IOptimizer
         OptimizationResults or = new();
         var optimization = _state.Config?.Optimization;
 
-        var absorption = ((optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2d) + optimization?.AbsorptionMin ?? 3d;
+        var absorption = ((optimization?.AbsorptionMax ?? 4.0) - (optimization?.AbsorptionMin ?? 2.0)) / 2d + (optimization?.AbsorptionMin ?? 2.0);
 
         foreach (var g in os.ByRx())
         {

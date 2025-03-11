@@ -43,7 +43,9 @@ public class AbsorptionErrOptimizer : IOptimizer
                         return error;
                     });
 
-                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { (optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d });
+                var initialGuess = Vector<double>.Build.DenseOfArray(new[] {
+                    ((optimization?.AbsorptionMax ?? 4.0) - (optimization?.AbsorptionMin ?? 2.0)) / 2 + (optimization?.AbsorptionMin ?? 2.0)
+                });
 
                 var solver = new NelderMeadSimplex(1e-4, 10000);
                 var result = solver.FindMinimum(obj, initialGuess);

@@ -5,7 +5,7 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state) : ILocate
+public class NadarayaWatsonMultilateralizer(Device device, Floor floor) : ILocate
 {
     public bool Locate(Scenario scenario)
     {

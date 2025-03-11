@@ -114,16 +114,16 @@ public class MqttCoordinator
             await mqttClient.SubscribeAsync("espresense/companion/+/attributes");
         };
 
-        mqttClient.DisconnectedAsync += s =>
+        mqttClient.DisconnectedAsync += async s =>
         {
             Log.Information("MQTT disconnected");
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         };
 
-        mqttClient.ConnectingFailedAsync += s =>
+        mqttClient.ConnectingFailedAsync += async s =>
         {
             Log.Error("MQTT connection failed {@error}: {@inner}", new { primary = true }, s.Exception.Message, s.Exception?.InnerException?.Message);
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         };
 
         mqttClient.ApplicationMessageReceivedAsync += OnMqttMessageReceived;
@@ -143,6 +143,8 @@ public class MqttCoordinator
 
     private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
+        if (arg.ApplicationMessage?.Topic == null) return;
+
         var parts = arg.ApplicationMessage.Topic.Split('/');
         var payload = arg.ApplicationMessage.ConvertPayloadToString();
 

@@ -43,8 +43,8 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
                 Log.Debug("Ignoring, component isn't device_tracker (" + arg.AutoDiscover.Component + ")");
                 return;
             }
-            var deviceId = arg.AutoDiscover.Message.StateTopic.Split("/").Last();
-            bool isNode = deviceId.StartsWith("node:");
+            var deviceId = arg.AutoDiscover.Message?.StateTopic?.Split("/").Last() ?? string.Empty;
+            bool isNode = deviceId?.StartsWith("node:") ?? false;
             if (isNode) return;
 
             var device = state.Devices.GetOrAdd(deviceId, id =>
@@ -59,9 +59,9 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
         // Handle device messages
         mqtt.DeviceMessageReceivedAsync += async arg =>
         {
-            bool isNode = arg.DeviceId.StartsWith("node:");
+            bool isNode = !string.IsNullOrEmpty(arg.DeviceId) && arg.DeviceId.StartsWith("node:");
 
-            if (!state.Nodes.TryGetValue(arg.NodeId, out var rx))
+            if (string.IsNullOrEmpty(arg.NodeId) || !state.Nodes.TryGetValue(arg.NodeId, out var rx))
             {
                 state.Nodes[arg.NodeId] = rx = new Node(arg.NodeId);
                 if (tele.AddUnknownNode(arg.NodeId))
