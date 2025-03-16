@@ -39,7 +39,7 @@ public class CombinedOptimizer : IOptimizer
             // Process and store results
             foreach (var deviceId in uniqueDeviceIds)
             {
-                if (rxAdjRssiDict.TryGetValue(deviceId, out var rxAdjRssi) && 
+                if (rxAdjRssiDict.TryGetValue(deviceId, out var rxAdjRssi) &&
                     nodeAbsorptions.TryGetValue(deviceId, out var absorption))
                 {
                     results.RxNodes[deviceId] = new ProposedValues
@@ -59,7 +59,7 @@ public class CombinedOptimizer : IOptimizer
         return results;
     }
 
-    private (Dictionary<string, double> RxAdjRssi, Dictionary<(string, string), double> PathAbsorption, double Error) 
+    private (Dictionary<string, double> RxAdjRssi, Dictionary<(string, string), double> PathAbsorption, double Error)
         OptimizeRxAdjRssiAndPathAbsorption(List<Measure> allNodes, List<string> uniqueDeviceIds, ConfigOptimization optimization)
     {
         var pathPairs = new HashSet<(string, string)>(allNodes.Select(n => (Min(n.Rx.Id, n.Tx.Id), Max(n.Rx.Id, n.Tx.Id))));
@@ -119,31 +119,48 @@ public class CombinedOptimizer : IOptimizer
         return (rxAdjRssiDict, pathAbsorptionDict, result.FunctionInfoAtMinimum.Value);
     }
 
-    private Dictionary<string, double> OptimizeNodeAbsorptions(List<Measure> allNodes, List<string> uniqueDeviceIds, 
+    private Dictionary<string, double> OptimizeNodeAbsorptions(List<Measure> allNodes, List<string> uniqueDeviceIds,
         Dictionary<string, double> rxAdjRssiDict, Dictionary<(string, string), double> pathAbsorptionDict, ConfigOptimization optimization)
     {
-        var obj = ObjectiveFunction.ValueAndGradient(x =>
-        {
-            // Objective function (error calculation) remains the same
-            var value = CalculateError(allNodes, rxAdjRssiDict, pathAbsorptionDict: absorptionDict);
-            
-            // Numerically approximate the gradient
-            var gradient = new double[x.Count];
-            double epsilon = 1e-5;
-            
-            for (int i = 0; i < x.Count; i++)
-            {
-                var xPlusEps = x.Clone();
-                xPlusEps[i] += epsilon;
+        // Fix: Use ObjectiveFunction.Gradient() instead of ValueAndGradient
+        var obj = ObjectiveFunction.Gradient(
+            x => {
+                var nodeAbsorptionDict = new Dictionary<string, double>();
+                for (int i = 0; i < uniqueDeviceIds.Count; i++)
+                {
+                    var absorption = x[i];
+                    if (absorption < optimization?.AbsorptionMin || absorption > optimization?.AbsorptionMax)
+                        return double.PositiveInfinity;
+                    nodeAbsorptionDict[uniqueDeviceIds[i]] = absorption;
+                }
                 
-                var errorPlusEps = CalculateError(allNodes, rxAdjRssiDict, pathAbsorptionDict: absorptionDict);
-                gradient[i] = (errorPlusEps - value) / epsilon;
-            }
+                return CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: nodeAbsorptionDict);
+            },
+            x => {
+                var nodeAbsorptionDict = new Dictionary<string, double>();
+                for (int i = 0; i < uniqueDeviceIds.Count; i++)
+                {
+                    nodeAbsorptionDict[uniqueDeviceIds[i]] = x[i];
+                }
+                
+                // Numerically approximate the gradient
+                var gradient = Vector<double>.Build.Dense(x.Count);
+                double epsilon = 1e-5;
+                double baseError = CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: nodeAbsorptionDict);
 
-            return (value, Vector<double>.Build.Dense(gradient));
-        });
+                for (int i = 0; i < x.Count; i++)
+                {
+                    var tempDict = new Dictionary<string, double>(nodeAbsorptionDict);
+                    tempDict[uniqueDeviceIds[i]] += epsilon;
+                    
+                    var errorPlusEps = CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: tempDict);
+                    gradient[i] = (errorPlusEps - baseError) / epsilon;
+                }
 
-        var initialGuess = Vector<double>.Build.Dense(uniqueDeviceIds.Count, 
+                return gradient;
+            });
+
+        var initialGuess = Vector<double>.Build.Dense(uniqueDeviceIds.Count,
             (optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d);
 
         var solver = new BfgsMinimizer(1e-7, 1e-7, 1e-7);
@@ -158,7 +175,7 @@ public class CombinedOptimizer : IOptimizer
         return nodeAbsorptions;
     }
 
-    private double CalculateError(List<Measure> nodes, Dictionary<string, double> rxAdjRssiDict, 
+    private double CalculateError(List<Measure> nodes, Dictionary<string, double> rxAdjRssiDict,
         Dictionary<string, double> nodeAbsorptionDict = null, Dictionary<(string, string), double> pathAbsorptionDict = null)
     {
         return nodes.Select(n =>
