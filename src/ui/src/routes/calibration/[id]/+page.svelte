@@ -12,7 +12,6 @@
 
 	export let data: { settings?: DeviceSetting } = {};
 
-	// Node settings cache
 	let nodeSettings: Record<string, NodeSetting | null> = {};
 
 	// Device state
