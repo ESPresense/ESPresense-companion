@@ -105,7 +105,7 @@ namespace ESPresense.Services
             }
             catch (FlurlHttpException ex) when (ex.Call.Response.StatusCode == 400)
             {
-                _logger.LogWarning("Hass supervisor says the mqtt add-on is not installed");
+                _logger.LogWarning("Supervisor says the mqtt add-on is not installed/running");
                 return null;
             }
             catch (Exception ex)
