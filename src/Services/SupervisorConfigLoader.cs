@@ -25,7 +25,7 @@ namespace ESPresense.Services
             [property: JsonPropertyName("password")] string Password,
             [property: JsonPropertyName("protocol")] string Protocol
         );
-        
+
         private readonly ILogger<SupervisorConfigLoader> _logger;
         private ConfigMqtt? _cachedConfig;
         private readonly SemaphoreSlim _cacheLock = new SemaphoreSlim(1, 1);
@@ -102,6 +102,11 @@ namespace ESPresense.Services
                 _logger.LogInformation("Successfully retrieved MQTT configuration from Supervisor");
 
                 return config;
+            }
+            catch (FlurlHttpException ex) when (ex.Call.Response.StatusCode == 400)
+            {
+                _logger.LogWarning("Supervisor says the mqtt add-on is not installed/running");
+                return null;
             }
             catch (Exception ex)
             {

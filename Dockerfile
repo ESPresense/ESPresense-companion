@@ -27,7 +27,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /App
 EXPOSE 8267 8268
 
-ENV ASPNETCORE_URLS="http://+:8267" \
+ENV HTTP_PORTS=8267 \
     OTA_UPDATE_PORT=8268 \
     CONFIG_DIR="/config/espresense"
 
