@@ -4,13 +4,16 @@
 	import Map from '$lib/Map.svelte';
 	import type { ToastSettings } from '@skeletonlabs/skeleton';
 	import { getToastStore } from '@skeletonlabs/skeleton';
-	import type { DeviceSetting } from '$lib/types';
+	import type { DeviceSetting, NodeSetting } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';
 
 	const toastStore = getToastStore();
 
 	export let data: { settings?: DeviceSetting } = {};
+
+	// Node settings cache
+	let nodeSettings: Record<string, NodeSetting | null> = {};
 
 	// Device state
 	let deviceSettings: any = data.settings;
@@ -22,6 +25,21 @@
 
 	// Local storage for all device messages (keyed by nodeId)
 	let deviceMessages: Record<string, DeviceMessage[]> = {};
+
+	// Function to fetch node settings
+	async function fetchNodeSettings(nodeId: string) {
+		try {
+			const response = await fetch(`${base}/api/node/${nodeId}`);
+			if (response.ok) {
+				const data = await response.json();
+				nodeSettings[nodeId] = data.settings;
+				// Force reactivity by creating a new object reference
+				nodeSettings = { ...nodeSettings };
+			}
+		} catch (error) {
+			console.error(`Error fetching settings for node ${nodeId}:`, error);
+		}
+	}
 
 	// Update the message handler to store all messages in an array
 	function handleDeviceMessage(eventData: { deviceId: string; nodeId: string; data: DeviceMessage }) {
@@ -112,11 +130,20 @@
 	$: nodeDistances = calculateNodeDistances(calibrationSpot, selectedFloorId, $nodes, bounds, calibrationSpotHeight);
 
 	// Set default inclusion for nodes
-	$: nodeDistances.forEach((node) => {
+	$: {
+		// Fetch settings for each node
+		nodeDistances.forEach((node) => {
+			// Set default inclusion
 		if (includedNodes[node.id] === undefined) {
 			includedNodes[node.id] = true;
 		}
-	});
+
+			// Fetch node settings if not already fetched
+			if (!nodeSettings[node.id]) {
+				fetchNodeSettings(node.id);
+			}
+		});
+	}
 
 	// Update RSSI values using all available messages for each node
 	$: if (nodeDistances.length > 0) {
@@ -225,8 +252,12 @@
 			// Calculate average RSSI
 			const avgRssi = validRssiValues.reduce((sum, val) => sum + val, 0) / validRssiValues.length;
 
-			// Calculate refRssi using the formula RSSI@1m = RSSI + 20*log10(distance)
-			const refRssi = avgRssi + 20 * Math.log10(node.distance);
+			// Get the node's absorption value or use default of 2 if not available
+			const absorption = nodeSettings[nodeId]?.calibration?.absorption ?? 2;
+
+			// Use the node's absorption value (multiplied by 10 to match the scale)
+			// The formula is RSSI@1m = RSSI + 10*n*log10(distance) where n is the path loss exponent
+			const refRssi = avgRssi + 10 * absorption * Math.log10(node.distance);
 
 			// Weight by inverse distance (closer nodes get higher weight)
 			const weight = 1 / Math.max(1, node.distance);
@@ -335,19 +366,6 @@
 		}
 	}
 
-	function getStabilityLabel(score: number): string {
-		if (score < 30) return 'Poor';
-		if (score < 60) return 'Fair';
-		if (score < 80) return 'Good';
-		return 'Excellent';
-	}
-
-	function getColorFromStability(score: number): string {
-		if (score < 30) return '#f44336';
-		if (score < 60) return '#ff9800';
-		if (score < 80) return '#ffeb3b';
-		return '#4caf50';
-	}
 </script>
 
 <svelte:head>
@@ -425,8 +443,8 @@
 								<th>Node</th>
 								<th>Height from Floor (m)</th>
 								<th>Map Distance (m)</th>
-								<th>RSSI (dBm)</th>
 								<th>Est. Distance (m)</th>
+								<th>RSSI (dBm)</th>
 								<th>Est. RSSI@1m</th>
 								<th>Include</th>
 							</tr>
@@ -437,17 +455,21 @@
 									<td>{node.name}</td>
 									<td>{node.nodeZ?.toFixed(2) || 'n/a'}</td>
 									<td>{node.distance?.toFixed(2) || 'n/a'}</td>
-									<td>{rssiValues[node.id] != null ? rssiValues[node.id]?.toFixed(1) : 'n/a'}</td>
 									<td>
 										{#if rssiValues[node.id] != null && currentRefRssi != null}
-											{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / 20).toFixed(2)}
+											{#if nodeSettings[node.id]?.calibration?.absorption != null}
+												{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / (10 * (nodeSettings[node.id]?.calibration?.absorption || 2))).toFixed(2)}
+											{:else}
+												{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / 20).toFixed(2)}
+											{/if}
 										{:else}
 											n/a
 										{/if}
 									</td>
+									<td>{rssiValues[node.id] != null ? rssiValues[node.id]?.toFixed(1) : 'n/a'}</td>
 									<td>
 										{#if rssiValues[node.id] != null && node.distance != null && node.distance > 0.1}
-											{Math.round((rssiValues[node.id] || 0) + 20 * Math.log10(node.distance))}
+											{Math.round((rssiValues[node.id] || 0) + 10 * (nodeSettings[node.id]?.calibration?.absorption || 2) * Math.log10(node.distance))}
 										{:else}
 											n/a
 										{/if}
@@ -496,13 +518,6 @@
 				<div class="card p-4 variant-soft">
 					<header class="font-semibold mb-2">Data Collection Status</header>
 					<div class="mt-4">
-						<div class="flex justify-between mb-1">
-							<span>Stability:</span>
-							<span class="font-medium">{getStabilityLabel(stabilityScore)}</span>
-						</div>
-						<div class="progress h-2">
-							<div class="progress-bar" style="width: {stabilityScore}%; background-color: {getColorFromStability(stabilityScore)}"></div>
-						</div>
 					</div>
 					<div class="mt-4">
 						<div class="flex justify-between mb-1">
