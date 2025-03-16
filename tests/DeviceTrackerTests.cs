@@ -29,7 +29,7 @@ public class DeviceTrackerTests
     public void TestMultiScenarioLocator()
     {
         var configLoader = new ConfigLoader("config");
-        var mqtt = new MqttCoordinator(configLoader, null, null);
+        var mqtt = new MqttCoordinator(configLoader, null, null, null);
         var locator = new DeviceTracker(new State(configLoader), mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher());
         // Use testData to test locator...
         // Assert.That(result, Is.EqualTo(expectedResult));

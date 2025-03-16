@@ -5,7 +5,7 @@ using ESPresense.Extensions;
 
 namespace ESPresense.Models
 {
-    public class Config
+    public partial class Config
     {
         [YamlMember(Alias = "mqtt")]
         public ConfigMqtt? Mqtt { get; set; }
@@ -47,7 +47,7 @@ namespace ESPresense.Models
         public ConfigOptimization Optimization { get; set; } = new();
     }
 
-    public class ConfigLocators
+    public partial class ConfigLocators
     {
         [YamlMember(Alias = "nadaraya_watson")]
         public NadarayaWatsonConfig NadarayaWatson { get; set; } = new();
@@ -59,7 +59,7 @@ namespace ESPresense.Models
         public NearestNodeConfig NearestNode { get; set; } = new();
     }
 
-    public class NadarayaWatsonConfig
+    public partial class NadarayaWatsonConfig
     {
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }
@@ -74,7 +74,7 @@ namespace ESPresense.Models
         public string Kernel { get; set; } = "gaussian";
     }
 
-    public class NealderMeadConfig
+    public partial class NealderMeadConfig
     {
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }
@@ -86,7 +86,7 @@ namespace ESPresense.Models
         public ConfigWeighting Weighting { get; set; } = new();
     }
 
-    public class NearestNodeConfig
+    public partial class NearestNodeConfig
     {
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }
@@ -95,7 +95,7 @@ namespace ESPresense.Models
         public double? MaxDistance { get; set; }
     }
 
-    public class ConfigMap
+    public partial class ConfigMap
     {
         [YamlMember(Alias = "flip_x")]
         public bool FlipX { get; set; } = false;
@@ -113,7 +113,7 @@ namespace ESPresense.Models
         public double? WallOpacity { get; set; }  // Optional wall opacity, defaults to 0.35 if not set
     }
 
-    public class ConfigOptimization
+    public partial class ConfigOptimization
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
         [YamlMember(Alias = "interval_secs")] public int IntervalSecs { get; set; } = 60;
@@ -129,7 +129,7 @@ namespace ESPresense.Models
         [YamlIgnore] public double RxAdjRssiMax => Limits.TryGetValue("rx_adj_rssi_max", out var val) ? val : 25;
     }
 
-    public class ConfigHistory
+    public partial class ConfigHistory
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
 
@@ -142,7 +142,7 @@ namespace ESPresense.Models
         public TimeSpan ExpireAfterTimeSpan => ExpireAfter.TryParseDurationString(out var ts) ? ts : TimeSpan.FromHours(24);
     }
 
-    public class ConfigWeighting
+    public partial class ConfigWeighting
     {
         [YamlMember(Alias = "algorithm")]
         public string Algorithm { get; set; } = "gaussian";
@@ -150,7 +150,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "props")] public Dictionary<string, double> Props { get; set; } = new();
     }
 
-    public class ConfigGps
+    public partial class ConfigGps
     {
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
@@ -179,7 +179,7 @@ namespace ESPresense.Models
         public string ClientId { get; set; } = "espresense-companion";
     }
 
-    public class ConfigDevice
+    public partial class ConfigDevice
     {
         [YamlMember(Alias = "name")]
         public string? Name { get; set; }
@@ -190,7 +190,7 @@ namespace ESPresense.Models
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
-    public class ConfigFloor
+    public partial class ConfigFloor
     {
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
@@ -207,7 +207,7 @@ namespace ESPresense.Models
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
-    public class ConfigRoom
+    public partial class ConfigRoom
     {
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
@@ -221,7 +221,7 @@ namespace ESPresense.Models
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
-    public class ConfigNode
+    public partial class ConfigNode
     {
         [YamlMember(Alias = "name")]
         public string? Name { get; set; }
