@@ -1,13 +1,11 @@
 using ESPresense.Events;
 using ESPresense.Extensions;
 using ESPresense.Models;
-using Flurl.Http;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Diagnostics;
 using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
-using Serilog;
 
 namespace ESPresense.Services;
 
@@ -31,48 +29,101 @@ public class MqttCoordinator
     private readonly ConfigLoader _cfg;
     private readonly ILogger<MqttCoordinator> _logger;
     private readonly IMqttNetLogger _mqttNetLogger;
+    private readonly SupervisorConfigLoader _supervisorConfigLoader;
     private IManagedMqttClient? _mqttClient;
+    private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
+    private Task<IManagedMqttClient>? _initTask;
+    private ConfigMqtt? _lastConfig;
+    private bool _reconnectRequired;
 
-    public MqttCoordinator(ConfigLoader cfg, ILogger<MqttCoordinator> logger, IMqttNetLogger mqttNetLogger)
+    public MqttCoordinator(
+        ConfigLoader cfg,
+        ILogger<MqttCoordinator> logger,
+        IMqttNetLogger mqttNetLogger,
+        SupervisorConfigLoader supervisorConfigLoader)
     {
         _cfg = cfg;
         _logger = logger;
         _mqttNetLogger = mqttNetLogger;
-        Task.Run(GetClient);
+        _supervisorConfigLoader = supervisorConfigLoader;
+        _cfg.ConfigChanged += (s, c) =>
+        {
+            var configChanged = ConfigChanged(c.Mqtt);
+            if (configChanged) _logger.LogInformation("MQTT configuration changed");
+            _reconnectRequired |= configChanged;
+        };
     }
 
-    private async Task<IManagedMqttClient> GetClient()
+    private bool ConfigChanged(ConfigMqtt? config)
+    {
+        if (config == null) return _lastConfig != null;
+        return _lastConfig != null &&
+             (!string.Equals(_lastConfig.Host, config.Host, StringComparison.OrdinalIgnoreCase) ||
+              _lastConfig.Port != config.Port ||
+              !string.Equals(_lastConfig.Username, config.Username) ||
+              !string.Equals(_lastConfig.Password, config.Password) ||
+              _lastConfig.Ssl != config.Ssl);
+    }
+
+    private async Task<ConfigMqtt?> GetUserConfig()
     {
         var c = await _cfg.ConfigAsync();
 
         c.Mqtt ??= new ConfigMqtt();
 
-        var supervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN");
-        if (string.IsNullOrEmpty(c.Mqtt.Host) && !string.IsNullOrEmpty(supervisorToken))
-            try
+        return string.IsNullOrEmpty(c.Mqtt.Host) ? null : c.Mqtt;
+    }
+
+    private async Task<IManagedMqttClient> GetClient()
+    {
+        // Return existing client if available and no reconnect needed
+        if (_mqttClient != null && !_reconnectRequired)
+            return _mqttClient;
+
+        await _initLock.WaitAsync();
+        try
+        {
+            // Double-check after acquiring lock
+            if (_mqttClient != null && !_reconnectRequired)
+                return _mqttClient;
+
+            // Clean up if reconnecting
+            if (_reconnectRequired && _mqttClient != null)
             {
                 try
                 {
-                    var (_, _, data) = await "http://supervisor/services/mqtt"
-                        .WithOAuthBearerToken(supervisorToken)
-                        .GetJsonAsync<HassIoResult>();
-
-                    c.Mqtt.Host = string.IsNullOrEmpty(data.Host) ? "localhost" : data.Host;
-                    c.Mqtt.Port = int.TryParse(data.Port, out var i) ? i : null;
-                    if (!string.IsNullOrEmpty(data.Username)) c.Mqtt.Username = data.Username;
-                    if (!string.IsNullOrEmpty(data.Password)) c.Mqtt.Password = data.Password;
-                    c.Mqtt.Ssl = data.Ssl;
+                    await _mqttClient.StopAsync();
+                    _mqttClient.Dispose();
+                    _mqttClient = null;
                 }
-                catch (FlurlHttpException ex)
+                catch (Exception ex)
                 {
-                    var error = await ex.GetResponseJsonAsync<HassIoResult>();
-                    Log.Warning($"Failed to get MQTT config from Hass Supervisor: {error.Message}");
+                    _logger.LogWarning(ex, "Error disconnecting MQTT client during reconnection");
                 }
+                _initTask = null;
+                _reconnectRequired = false;
             }
-            catch (Exception e)
-            {
-                Log.Error(e, "Failed to get MQTT config from Hass Supervisor");
-            }
+
+            // Use cached task if initializing
+            if (_initTask != null)
+                return await _initTask;
+
+            // Start initialization
+            _initTask = InitializeClientAsync();
+            return await _initTask;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+
+    private async Task<IManagedMqttClient> InitializeClientAsync()
+    {
+        // Get config (try user config first, then supervisor)
+        var config = await GetUserConfig() ?? await _supervisorConfigLoader.GetSupervisorConfig();
+        if (config == null)
+            throw new InvalidOperationException("No MQTT server setup, fix your config.yaml");
 
         var mqttFactory = new MqttFactory(_mqttNetLogger);
 
@@ -80,8 +131,8 @@ public class MqttCoordinator
 
         var mqttClientOptions =
             new MqttClientOptionsBuilder()
-                .WithConfig(c.Mqtt)
-                .WithClientId(c.Mqtt.ClientId)
+                .WithConfig(config)
+                .WithClientId(config.ClientId)
                 .WithWillTopic("espresense/companion/status")
                 .WithWillRetain()
                 .WithWillPayload("offline")
@@ -93,21 +144,14 @@ public class MqttCoordinator
             .WithAutoReconnectDelay(TimeSpan.FromSeconds(30))
             .Build();
 
-        await mqttClient.StartAsync(managedMqttClientOptions);
-        mqttClient.Options.ConnectionCheckInterval = TimeSpan.FromSeconds(30);
-        _mqttClient = mqttClient;
-
-        Log.Logger.Information("Attempting to connect to mqtt server at " + (c.Mqtt.Port != null ? "{@host}:{@port}" : "{@host}") + " as {@username}...", c.Mqtt.Host ?? "localhost", c.Mqtt.Port, c.Mqtt.Username ?? "<anonymous>");
-
         mqttClient.ConnectedAsync += async s =>
         {
-            Log.Information("MQTT connected!");
+            _logger.LogInformation("MQTT connected!");
             if (!ReadOnly)
                 await mqttClient.EnqueueAsync("espresense/companion/status", "online");
 
             await mqttClient.SubscribeAsync("espresense/devices/+/+");
             await mqttClient.SubscribeAsync("espresense/settings/+/config");
-            await mqttClient.SubscribeAsync("espresense/rooms/+/+");
             await mqttClient.SubscribeAsync("espresense/rooms/+/+");
             await mqttClient.SubscribeAsync("espresense/rooms/*/+/set");
             await mqttClient.SubscribeAsync("homeassistant/device_tracker/+/config");
@@ -116,18 +160,30 @@ public class MqttCoordinator
 
         mqttClient.DisconnectedAsync += s =>
         {
-            Log.Information("MQTT disconnected");
+            _logger.LogInformation("MQTT disconnected");
             return Task.CompletedTask;
         };
 
         mqttClient.ConnectingFailedAsync += s =>
         {
-            Log.Error("MQTT connection failed {@error}: {@inner}", new { primary = true }, s.Exception.Message, s.Exception?.InnerException?.Message);
+            _logger.LogError("MQTT connection failed: {Error}",
+                s.Exception?.Message + (s.Exception?.InnerException != null ? " - " + s.Exception.InnerException.Message : ""));
             return Task.CompletedTask;
         };
 
         mqttClient.ApplicationMessageReceivedAsync += OnMqttMessageReceived;
 
+        // Connect
+        _logger.LogInformation("Connecting to MQTT at {Host}{Port} as {User}",
+            config.Host,
+            config.Port.HasValue ? ":" + config.Port : "",
+            string.IsNullOrEmpty(config.Username) ? "<anonymous>" : config.Username);
+
+        await mqttClient.StartAsync(managedMqttClientOptions);
+        mqttClient.Options.ConnectionCheckInterval = TimeSpan.FromSeconds(30);
+
+        _lastConfig = config.Clone();
+        _mqttClient = mqttClient;
         return mqttClient;
     }
 
@@ -204,13 +260,25 @@ public class MqttCoordinator
 
     public async Task EnqueueAsync(string topic, string? payload, bool retain = false)
     {
+        var client = await GetClient();
+
         if (!ReadOnly)
         {
-            await _mqttClient.EnqueueAsync(topic, payload, retain: retain);
+            try
+            {
+                await client.EnqueueAsync(topic, payload, retain: retain);
+            }
+            catch (Exception ex)
+            {
+                var sanitizedTopic = topic.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+                _logger.LogError(ex, "Failed to enqueue MQTT message to {Topic}", sanitizedTopic);
+                throw;
+            }
         }
         else
         {
-            Log.Information("ReadOnly, would have sent to " + topic + ": " + payload);
+            var sanitizedTopic = topic.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+            _logger.LogInformation("ReadOnly, would have sent to {Topic}: {Payload}", sanitizedTopic, payload);
         }
     }
 

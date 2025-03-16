@@ -66,6 +66,7 @@ builder.Services.AddSingleton<FirmwareTypeStore>();
 builder.Services.AddSingleton<MappingService>();
 builder.Services.AddSingleton<GlobalEventDispatcher>();
 builder.Services.AddSingleton<DeviceTracker>();
+builder.Services.AddSingleton<SupervisorConfigLoader>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
