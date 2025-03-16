@@ -23,14 +23,8 @@ internal class OptimizationRunner : BackgroundService
     {
         double best;
 
-        var reEvaluate = Task.Run(async () =>
-        {
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
-                best = new OptimizationResults().Evaluate(_state.OptimizationSnaphots, _nsd);
-            }
-        }, stoppingToken);
+        // Removed the reEvaluate task since we're now recalculating the baseline
+        // at each optimization cycle with the current snapshots
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -52,13 +46,14 @@ internal class OptimizationRunner : BackgroundService
                 await Task.Delay(TimeSpan.FromSeconds(optimization?.IntervalSecs ?? 60), stoppingToken);
             }
 
-            best = new OptimizationResults().Evaluate(_state.OptimizationSnaphots, _nsd);
-
             run = 0;
             while (optimization is { Enabled: true })
             {
                 if (run++ == 0) Log.Information("Optimization started");
                 var os = _state.TakeOptimizationSnapshot();
+
+                best = new OptimizationResults().Evaluate(_state.OptimizationSnaphots, _nsd);
+
                 foreach (var optimizer in _optimizers)
                 {
                     var results = optimizer.Optimize(os);
@@ -83,10 +78,8 @@ internal class OptimizationRunner : BackgroundService
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(optimization?.IntervalSecs ?? 60), stoppingToken);
-
             }
         }
 
-        await reEvaluate;
     }
 }

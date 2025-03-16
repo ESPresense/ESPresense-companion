@@ -1,4 +1,5 @@
 using ESPresense.Services;
+using Serilog;
 
 namespace ESPresense.Models;
 
@@ -22,7 +23,7 @@ public class OptimizationResults
                 RxNodes.TryGetValue(m.Rx.Id, out var pv);
                 double rxAdjRssi = pv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
                 double txPower = tx.Calibration.TxRefRssi ?? -59;
-                double pathLossExponent = pv?.Absorption ?? rx.Calibration.Absorption ?? 3;
+                double pathLossExponent = pv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
                 double distance = m.Rx.Location.DistanceTo(m.Tx.Location);
                 double predictedRssi = txPower + rxAdjRssi - 10 * pathLossExponent * Math.Log10(distance);
 
