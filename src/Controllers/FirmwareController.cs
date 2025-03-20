@@ -37,6 +37,12 @@ public class FirmwareController : Controller
     [Route("api/firmware/download")]
     public async Task<IActionResult> DownloadFirmware([FromQuery] string url)
     {
+        if (!url.StartsWith("https://github.com/ESPresense/") &&
+            !url.StartsWith("https://nightly.link/ESPresense/"))
+        {
+            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", url);
+            return StatusCode(StatusCodes.Status400BadRequest, "Only ESPresense GitHub URLs are allowed");
+        }
         try
         {
             var firmwareStream = await GetFirmware(url);
