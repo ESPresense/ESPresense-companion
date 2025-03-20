@@ -33,6 +33,8 @@ optimization:
     absorption_max: 3.5
     rx_adj_rssi_min: -5
     rx_adj_rssi_max: 25
+    tx_ref_rssi_min: -80
+    tx_ref_rssi_max: -40
 
 history:
   enabled: false # Enable to log history to db (Beta)

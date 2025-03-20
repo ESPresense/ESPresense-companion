@@ -76,7 +76,7 @@ public class StateController : ControllerBase
                 rxM["rssi"] = rx.Rssi;
                 rxM["diff"] = rx.Distance - rx.MapDistance;
                 rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
-                if (rx.Variance is not null) rxM["var"] = rx.Variance.Value;
+                if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
             }
         }
 

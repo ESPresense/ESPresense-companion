@@ -26,12 +26,13 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
         var absorptionMin = optimization.AbsorptionMin;
         var absorptionMax = optimization.AbsorptionMax;
         var absorptionMiddle = optimization.AbsorptionMin + (optimization.AbsorptionMax - optimization.AbsorptionMin) / 2;
+        var txRefRssi = -59;
 
         Log.Information("Bounds: RxAdj [{0}, {1}], Absorption [{2}, {3}]", rxAdjMin, rxAdjMax, absorptionMin, absorptionMax);
 
         foreach (var g in os.ByRx())
         {
-            var rxNodes = g.Where(b => b.Current).ToArray();
+            var rxNodes = g.ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
             if (rxNodes.Length < 3) continue;
@@ -53,7 +54,7 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                         double error = 0;
                         for (int i = 0; i < nodesToUse.Length; i++)
                         {
-                            double dist = Math.Pow(10, (-59 + x[0] - nodesToUse[i].Node.Rssi) / (10.0 * fixedAbsorption));
+                            double dist = Math.Pow(10, (txRefRssi + x[0] - nodesToUse[i].Node.Rssi) / (10.0 * fixedAbsorption));
                             double distError = posToUse[i] - dist;
                             error += distError * distError;
                         }
@@ -77,9 +78,9 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                         {
                             double d = pos[i];
                             double wAbs = Math.Min(2.0, 2.0 * Math.Pow(d / 3.0, 2) / (1 + Math.Pow(d / 3.0, 2)));
-                            double dist = Math.Pow(10, (-59 + rxAdjRssi - rxNodes[i].Rssi) / (10.0 * x[0]));
+                            double dist = Math.Pow(10, (txRefRssi + rxAdjRssi - rxNodes[i].Rssi) / (10.0 * x[0]));
                             double distError = pos[i] - dist;
-                            double predictedRssi = -59 + rxAdjRssi - 10 * x[0] * Math.Log10(pos[i]);
+                            double predictedRssi = txRefRssi + rxAdjRssi - 10 * x[0] * Math.Log10(pos[i]);
                             Log.Debug("Node {0}: d={1:0.00}, wAbs={2:0.00}, distErr={3:0.00}, PredRssi={4:0.00}, MeasRssi={5}",
                                 g.Key.Id, d, wAbs, distError, predictedRssi, rxNodes[i].Rssi);
                             error += wAbs * distError * distError;
@@ -95,7 +96,7 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                 Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}",
                     g.Key.Id, rxAdjRssi, absorption, resultAbs.FunctionInfoAtMinimum.Value);
 
-                or.RxNodes.Add(g.Key.Id, new ProposedValues
+                or.Nodes.Add(g.Key.Id, new ProposedValues
                 {
                     RxAdjRssi = rxAdjRssi,
                     Absorption = absorption,
