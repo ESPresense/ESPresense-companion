@@ -45,12 +45,12 @@ public class FirmwareController : Controller
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Error downloading firmware from {url}", url);
+            _logger.LogError(ex, "Error downloading firmware from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
             return StatusCode(StatusCodes.Status502BadGateway, $"Failed to download firmware: {ex.Message}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing firmware download from {url}", url);
+            _logger.LogError(ex, "Error processing firmware download from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
             return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing firmware: {ex.Message}");
         }
     }
