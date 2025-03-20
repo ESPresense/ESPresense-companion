@@ -33,6 +33,34 @@ public class FirmwareController : Controller
         return _firmwareTypeStore.Get();
     }
 
+    [HttpGet]
+    [Route("api/firmware/download")]
+    public async Task<IActionResult> DownloadFirmware([FromQuery] string url)
+    {
+        if (!url.StartsWith("https://github.com/ESPresense/") &&
+            !url.StartsWith("https://nightly.link/ESPresense/"))
+        {
+            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            return StatusCode(StatusCodes.Status400BadRequest, "Only ESPresense GitHub URLs are allowed");
+        }
+        try
+        {
+            var firmwareStream = await GetFirmware(url);
+            firmwareStream.Position = 0;
+            return File(firmwareStream, "application/octet-stream", "firmware.bin");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error downloading firmware from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            return StatusCode(StatusCodes.Status502BadGateway, $"Failed to download firmware: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing firmware download from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing firmware: {ex.Message}");
+        }
+    }
+
     [Route("ws/firmware/update/{id}")]
     [ApiExplorerSettings(IgnoreApi = true)]
     public async Task Update(string id, [FromQuery] string url)

@@ -4,7 +4,7 @@
 	import type { Node } from '$lib/types';
 	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
 
-	export let updateMethod: string;
+	export let firmwareSource: string;
 	export let node: Node;
 	export let flavor: string;
 	export let cpu: string;
@@ -32,7 +32,7 @@
 	let url: string;
 	let log: string[] = [];
 	let lastNonNumericLog: string | null = null;
-	$: url = getFirmwareUrl(updateMethod, version, artifact, firmware);
+	$: url = getFirmwareUrl(firmwareSource, version, artifact, firmware) ?? '#ERR';
 
 	async function onFormSubmit(): Promise<void> {
 		log = [];
