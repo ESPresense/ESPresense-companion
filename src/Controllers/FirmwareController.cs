@@ -40,7 +40,7 @@ public class FirmwareController : Controller
         if (!url.StartsWith("https://github.com/ESPresense/") &&
             !url.StartsWith("https://nightly.link/ESPresense/"))
         {
-            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", url);
+            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
             return StatusCode(StatusCodes.Status400BadRequest, "Only ESPresense GitHub URLs are allowed");
         }
         try
