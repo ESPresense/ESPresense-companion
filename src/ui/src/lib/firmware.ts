@@ -3,6 +3,7 @@ import { base } from '$app/paths';
 import type { FirmwareManifest, Release, WorkflowRun } from '$lib/types';
 
 export const updateMethod: SvelteStore<string> = writable('self');
+export const firmwareSource: SvelteStore<string> = writable('release');
 export const flavor: SvelteStore<string> = writable();
 export const version: SvelteStore<string> = writable();
 export const artifact: SvelteStore<string> = writable();
@@ -111,16 +112,28 @@ export const releases = readable<Map<string, Release[]>>(new Map(), function sta
 	};
 });
 
-export function getFirmwareUrl(updateMethod: string, version: string, artifact: string, firmware: string): string {
+export function getFirmwareUrl(firmwareSource: string, version: string, artifact: string, firmware: string): string | null {
 	if (firmware)
-		switch (updateMethod) {
+		switch (firmwareSource) {
 			case 'artifact':
 				if (artifact) return `https://nightly.link/ESPresense/ESPresense/actions/runs/${artifact}/${firmware}.zip`;
 			case 'release':
 				if (version) return `https://github.com/ESPresense/ESPresense/releases/download/${version}/${firmware}`;
-			default:
 		}
-	return '#ERR';
+	return null;
+}
+
+export function getLocalFirmwareUrl(firmwareSource: string, version: string, artifact: string, firmware: string): string | null {
+    const url = getFirmwareUrl(firmwareSource, version, artifact, firmware);
+    if (!url) return null;
+
+    const loc = new URL(`${base}/api/firmware/download`, window.location.href);
+
+    const params = new URLSearchParams();
+    params.append('url', url);
+    loc.search = params.toString();
+
+    return loc.toString();
 }
 
 type Callback = (percentComplete: number, message: string) => void;

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Node } from '$lib/types';
 	export let row: Node;
+	export let col: string;
 </script>
 
 <div class="flex justify-center">

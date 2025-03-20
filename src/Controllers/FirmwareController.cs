@@ -33,6 +33,28 @@ public class FirmwareController : Controller
         return _firmwareTypeStore.Get();
     }
 
+    [HttpGet]
+    [Route("api/firmware/download")]
+    public async Task<IActionResult> DownloadFirmware([FromQuery] string url)
+    {
+        try
+        {
+            var firmwareStream = await GetFirmware(url);
+            firmwareStream.Position = 0;
+            return File(firmwareStream, "application/octet-stream", "firmware.bin");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Error downloading firmware from {url}", url);
+            return StatusCode(StatusCodes.Status502BadGateway, $"Failed to download firmware: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing firmware download from {url}", url);
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing firmware: {ex.Message}");
+        }
+    }
+
     [Route("ws/firmware/update/{id}")]
     [ApiExplorerSettings(IgnoreApi = true)]
     public async Task Update(string id, [FromQuery] string url)

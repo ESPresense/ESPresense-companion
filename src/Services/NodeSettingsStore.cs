@@ -149,9 +149,9 @@ namespace ESPresense.Services
             await Task.Delay(-1, stoppingToken);
         }
 
-        public async Task Update(string id)
+        public async Task Update(string id, string? url)
         {
-            await mqtt.EnqueueAsync($"espresense/rooms/{id}/update/set", "PRESS");
+            await mqtt.EnqueueAsync($"espresense/rooms/{id}/update/set", url ?? "PRESS");
         }
 
         public async Task Arduino(string id, bool on)
