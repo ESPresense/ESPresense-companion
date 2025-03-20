@@ -18,18 +18,18 @@ public class RxAdjRssiOptimizer : IOptimizer
 
     public OptimizationResults Optimize(OptimizationSnapshot os)
     {
-
         OptimizationResults or = new();
         var optimization = _state.Config?.Optimization;
 
         var absorption = ((optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2d) + optimization?.AbsorptionMin ?? 3d;
+        var txRefRssi = -59;
 
         foreach (var g in os.ByRx())
         {
-            var rxNodes = g.Where(b => b.Current).ToArray();
+            var rxNodes = g.ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
-            double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (-59 + x[0] - dn.Rssi ) / (10.0d * absorption));
+            double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (txRefRssi + x[0] - dn.Rssi) / (10.0d * absorption));
 
             if (rxNodes.Length < 3) continue;
 
@@ -53,7 +53,7 @@ public class RxAdjRssiOptimizer : IOptimizer
                 var rxAdjRssi = result.MinimizingPoint[0];
                 if (rxAdjRssi < optimization?.RxAdjRssiMin) rxAdjRssi = optimization.RxAdjRssiMin;
                 if (rxAdjRssi > optimization?.RxAdjRssiMax) rxAdjRssi = optimization.RxAdjRssiMax;
-                or.RxNodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = rxAdjRssi, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
+                or.Nodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = rxAdjRssi, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
             }
             catch (Exception ex)
             {

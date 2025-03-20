@@ -24,11 +24,12 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
         var rxAdjMax = optimization?.RxAdjRssiMax ?? 25;
         var absorptionMin = optimization?.AbsorptionMin ?? 2.5;
         var absorptionMax = optimization?.AbsorptionMax ?? 3.5;
+        var txRefRssi = -59;  //TODO: Don't hardcode
         Log.Information("Bounds: RxAdj [{0}, {1}], Absorption [{2}, {3}]", rxAdjMin, rxAdjMax, absorptionMin, absorptionMax);
 
         foreach (var g in os.ByRx())
         {
-            var rxNodes = g.Where(b => b.Current).ToArray();
+            var rxNodes = g.ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
             Log.Debug("Node {0}: {1} measurements", g.Key.Id, rxNodes.Length);
@@ -37,7 +38,7 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
 
             double Distance(Vector<double> x, Measure dn)
             {
-                double exponent = (-59 + x[0] - dn.Rssi) / (10.0d * x[1]);
+                double exponent = (txRefRssi + x[0] - dn.Rssi) / (10.0d * x[1]);
                 return (x[1] > 0 && !double.IsInfinity(exponent)) ? Math.Pow(10, exponent) : double.MaxValue;
             }
 
@@ -80,7 +81,7 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
                 Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}",
                     g.Key.Id, rxAdjRssi, absorption, result.FunctionInfoAtMinimum.Value);
 
-                or.RxNodes.Add(g.Key.Id, new ProposedValues
+                or.Nodes.Add(g.Key.Id, new ProposedValues
                 {
                     RxAdjRssi = rxAdjRssi,
                     Absorption = absorption,
