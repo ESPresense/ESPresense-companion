@@ -6,7 +6,7 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
 	extensions: ['.svelte'],
 
-	preprocess: [vitePreprocess()],
+	preprocess: [vitePreprocess({ script: true })],
 
 	relative: true,
 
