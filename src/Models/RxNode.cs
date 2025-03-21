@@ -13,7 +13,7 @@ public class RxNode
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
 
-    public double Expected => Tx?.Location.DistanceTo(Rx!.Location) ?? -1;
+    public double MapDistance => Tx?.Location.DistanceTo(Rx!.Location) ?? -1;
 
     public double LastDistance { get; set; }
 

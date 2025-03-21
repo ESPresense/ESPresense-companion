@@ -182,10 +182,10 @@ export interface CalibrationMatrix {
 			tx_ref_rssi?: number;
 			rx_adj_rssi?: number;
 			absorption?: number;
-			expected: number;
-			actual: number;
+			mapDistance: number;
+			distance: number;
 			rssi: number;
-			err: number;
+			diff: number;
 			percent: number;
 			var?: number;
 		};
