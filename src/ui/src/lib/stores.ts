@@ -47,7 +47,6 @@ async function getConfig() {
 }
 getConfig();
 
-
 export const deviceSettings = writable<DeviceSetting[] | null>([], function start(set) {
 	let settings: DeviceSetting[] = [];
 	let outstanding = false;
@@ -128,7 +127,7 @@ export const devices = readable<Device[]>([], function start(set) {
 		wsManager.sendMessage({
 			command: 'changeFilter',
 			type: 'showAll',
-			value: ''+value
+			value: '' + value
 		});
 
 		// Force an immediate poll when showAll changes

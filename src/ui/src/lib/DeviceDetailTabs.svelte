@@ -2,7 +2,7 @@
 	import { config, devices } from './stores';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
 
 	export let floorId: string | null = null;
 	export let deviceId: string | null = null;
@@ -36,7 +36,7 @@
 				<h4 class="h4">{device?.name || device?.id} on {floor?.name ?? 'Unknown'}</h4>
 			</div>
 		{/if}
-		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
+		<RadioGroup active="preset-filled-primary-500" hover="hover:preset-tonal-primary">
 			<RadioItem bind:group={tab} name="Map" value="map">Map</RadioItem>
 			<RadioItem bind:group={tab} name="Calibration" value="calibration">Calibration</RadioItem>
 		</RadioGroup>

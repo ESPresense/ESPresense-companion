@@ -2,8 +2,7 @@
 	import { base } from '$app/paths';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
-	import type { ToastSettings } from '@skeletonlabs/skeleton';
-	import { getToastStore } from '@skeletonlabs/skeleton';
+	import type { ToastSettings } from '@skeletonlabs/skeleton-svelte';
 	import type { DeviceSetting, NodeSetting } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';
@@ -34,11 +33,11 @@
 				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
 			} else {
 				const errorData = await response.text();
-				toastStore.trigger({ message: `Error fetching device settings: ${errorData || response.statusText}`, background: 'variant-filled-error' });
+				toastStore.trigger({ message: `Error fetching device settings: ${errorData || response.statusText}`, background: 'preset-filled-error-500' });
 			}
 		} catch (error) {
 			console.error(`Error fetching settings for device ${deviceId}:`, error);
-			toastStore.trigger({ message: 'Error fetching device settings.', background: 'variant-filled-error' });
+			toastStore.trigger({ message: 'Error fetching device settings.', background: 'preset-filled-error-500' });
 		}
 	}
 
@@ -107,7 +106,7 @@
 
 	// Error handling adjusted for fetched settings
 	$: if (deviceSettings?.error) {
-		const t: ToastSettings = { message: deviceSettings.error, background: 'variant-filled-error' };
+		const t: ToastSettings = { message: deviceSettings.error, background: 'preset-filled-error-500' };
 		toastStore.trigger(t);
 	}
 
@@ -345,7 +344,7 @@
 			}
 		} catch (e: unknown) {
 			const error = e as Error;
-			toastStore.trigger({ message: error.message, background: 'variant-filled-error' });
+			toastStore.trigger({ message: error.message, background: 'preset-filled-error-500' });
 		}
 	}
 </script>
@@ -357,7 +356,7 @@
 <div class="container mx-auto p-4 max-w-7xl">
 	<h2 class="h2 mb-4">Device Calibration: {deviceId}</h2> <!-- Changed from data.settings?.id -->
 
-	<div class="card p-4 mb-6 variant-soft">
+	<div class="card p-4 mb-6 preset-tonal">
 		<header class="font-semibold mb-2">Instructions</header>
 		<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
 		<ol class="list-decimal pl-6 mb-2">
@@ -395,7 +394,7 @@
 							class="input"
 						/>
 						<button
-							class="variant-filled-primary"
+							class="preset-filled-primary-500"
 							on:click={() => (calibrationSpotHeight = calibrationSpotHeight)}
 						>
 							Set
@@ -414,7 +413,7 @@
 
 	{#if calibrationSpot}
 		<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-			<div class="card p-4 col-span-1 lg:col-span-8 variant-soft">
+			<div class="card p-4 col-span-1 lg:col-span-8 preset-tonal">
 				<header class="text-xl font-semibold mb-2">Node Distances and RSSI Values</header>
 				<p class="text-sm mb-3">
 					<span class="font-semibold">Map Distance:</span> Calculated from node and calibration spot positions in 3D space (X, Y, and Z).<br />
@@ -422,7 +421,7 @@
 					<span class="font-semibold">Height from Floor:</span> The Z-coordinate (height) of the node from the floor.
 				</p>
 				<div class="table-container">
-					<table class="table table-hover table-compact">
+					<table class="table  table-compact">
 						<thead>
 							<tr>
 								<th>Node</th>
@@ -476,7 +475,7 @@
 				<!-- Device Message Statistics Table -->
 				<header class="text-xl font-semibold mb-2 mt-6">Device Message Statistics</header>
 				<div class="table-container">
-					<table class="table table-hover table-compact">
+					<table class="table  table-compact">
 						<thead>
 							<tr>
 								<th>Node</th>
@@ -505,7 +504,7 @@
 			</div>
 
 			<div class="col-span-1 lg:col-span-4 space-y-6">
-				<div class="card p-4 variant-soft">
+				<div class="card p-4 preset-tonal">
 					<header class="font-semibold mb-2">Data Collection Status</header>
 					<div class="mt-4"></div>
 					<div class="mt-4">
@@ -522,16 +521,16 @@
 					</div>
 					<p class="mt-4 text-sm">Keep the device stationary for best results.</p>
 				</div>
-				<div class="card p-4 variant-soft">
+				<div class="card p-4 preset-tonal">
 					<header class="font-semibold mb-4">Calibration Results</header>
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-						<div class="card p-4 variant-soft">
+						<div class="card p-4 preset-tonal">
 							<header class="font-semibold mb-2">Current Values</header>
 							<p class="text-xl font-bold">
 								RSSI@1m: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
 							</p>
 						</div>
-						<div class="card p-4 variant-filled-primary">
+						<div class="card p-4 preset-filled-primary-500">
 							<header class="font-semibold mb-2">New Values</header>
 							<p class="text-xl font-bold">
 								RSSI@1m: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
@@ -539,7 +538,7 @@
 						</div>
 					</div>
 					{#if currentRefRssi != null && calculatedRefRssi != null}
-						<div class="card p-4 variant-ghost-warning mb-4">
+						<div class="card p-4 preset-tonal-warning border border-warning-500 mb-4">
 							<p>
 								This is a <span class="font-semibold">{Math.abs(calculatedRefRssi - Math.round(currentRefRssi))} dBm</span>
 								{calculatedRefRssi > currentRefRssi ? 'increase' : 'decrease'}.
@@ -548,7 +547,7 @@
 						</div>
 					{/if}
 					<button
-						class="btn btn-lg variant-filled-primary w-full"
+						class="btn btn-lg preset-filled-primary-500 w-full"
 						on:click={saveCalibration}
 						disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}
 					>

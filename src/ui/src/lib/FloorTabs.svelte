@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { config } from '$lib/stores';
 
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
 	import Filter from './Filter.svelte';
 
 	export let floorId: string | null = null;
@@ -13,13 +13,13 @@
 		<path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
 	</svg>
 	<nav class="h-50 text-black">
-		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
+		<Segment active="preset-filled-primary-500" hover="hover:preset-tonal-primary">
 			{#if $config?.floors}
 				{#each $config?.floors as { id, name }}
-					<RadioItem bind:group={floorId} {name} value={id}>{name}</RadioItem>
+					<Segment.Item bind:group={floorId} {name} value={id}>{name}</Segment.Item>
 				{/each}
 			{/if}
-		</RadioGroup>
+		</Segment>
 		<div class="pl-4 pt-2">
 			<Filter />
 		</div>
