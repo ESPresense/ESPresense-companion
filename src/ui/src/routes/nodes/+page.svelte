@@ -1,7 +1,7 @@
 <script lang="ts">
 	import NodesTable from '$lib/NodesTable.svelte';
-	import { getToastStore, SlideToggle } from '@skeletonlabs/skeleton';
-	import type { ToastSettings } from '@skeletonlabs/skeleton';
+	import { Switch } from '@skeletonlabs/skeleton-svelte';
+	import type { ToastSettings } from '@skeletonlabs/skeleton-svelte';
 	import { base } from '$app/paths';
 	import type { NodeSettingDetails } from '$lib/types';
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
@@ -31,7 +31,7 @@
 			})
 			.catch((e) => {
 				console.log(e);
-				const t: ToastSettings = { message: e, background: 'variant-filled-error' };
+				const t: ToastSettings = { message: e, background: 'preset-filled-error-500' };
 				toastStore.trigger(t);
 			});
 	}
@@ -45,7 +45,7 @@
 		})
 		.catch((e) => {
 			console.log(e);
-			const t: ToastSettings = { message: e, background: 'variant-filled-error' };
+			const t: ToastSettings = { message: e, background: 'preset-filled-error-500' };
 			toastStore.trigger(t);
 		});
 </script>

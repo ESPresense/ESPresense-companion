@@ -2,7 +2,7 @@
 	import { base } from '$app/paths';
 	import link from '$lib/images/link.svg';
 	import type { Node } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { type ToastSettings } from '@skeletonlabs/skeleton-svelte';
 	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 
@@ -16,13 +16,13 @@
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to reboot`,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Failed to restart node',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -86,13 +86,13 @@
 			const message = `${node.name || node.id} asked to update ${updateDescription}`;
 			toastStore.trigger({
 				message,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Update failed',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -129,15 +129,15 @@
 
 {#if row.online}
 	{#if row.telemetry?.version}
-		<button on:click={() => onUpdate(row)} disabled={!($updateMethod == 'self' || ($firmwareSource == 'release' && $version) || ($firmwareSource == 'artifact' && $artifact))} class="btn btn-sm variant-filled">Update</button>
+		<button on:click={() => onUpdate(row)} disabled={!($updateMethod == 'self' || ($firmwareSource == 'release' && $version) || ($firmwareSource == 'artifact' && $artifact))} class="btn btn-sm preset-filled">Update</button>
 	{/if}
 
 	{#if row.telemetry}
-		<button on:click={() => onRestart(row)} class="btn btn-sm variant-filled">Restart</button>
+		<button on:click={() => onRestart(row)} class="btn btn-sm preset-filled">Restart</button>
 	{/if}
 
 	{#if row.telemetry?.ip}
-		<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled">
+		<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm preset-filled">
 			<span>Visit</span>
 			<span><img class="w-4" src={link} alt="External Link" /></span>
 		</a>

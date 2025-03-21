@@ -1,8 +1,8 @@
 <script lang="ts">
-	import '../app.postcss';
+	import '../app.css';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
-	import { AppShell, AppRail, AppRailAnchor, Drawer, Toast, Modal, initializeStores, storePopup } from '@skeletonlabs/skeleton';
+	import { Navigation, ToastProvider } from '@skeletonlabs/skeleton-svelte';
 	import { computePosition, autoUpdate, offset, shift, flip, arrow } from '@floating-ui/dom';
 
 	import logo from '$lib/images/logo.svg';
@@ -31,10 +31,10 @@
 
 <div class="app h-full">
 	<Modal />
-	<Toast />
+	<ToastProvider />
 	<AppShell>
 		<svelte:fragment slot="sidebarLeft">
-			<AppRail>
+			<Navigation>
 				<svelte:fragment slot="lead">
 					<AppRailAnchor href="https://espresense.com/companion" target="_blank" group="main">
 						<img src={logo} class="px-6" alt="ESPresense Companion" />
@@ -57,7 +57,7 @@
 						<img src={github} class="px-4" alt="GitHub" />
 					</AppRailAnchor>
 				</svelte:fragment>
-			</AppRail>
+			</Navigation>
 		</svelte:fragment>
 		<slot />
 		<Drawer width="400px" />

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { ProgressBar } from '@skeletonlabs/skeleton';
+	import { Progress } from '@skeletonlabs/skeleton-svelte';
 	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
 	import type { Node } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { type ToastSettings } from '@skeletonlabs/skeleton-svelte';
 
 	export let firmwareSource: string;
 	export let node: Node;
@@ -53,7 +53,7 @@
 		} catch (e) {
 			if (e instanceof Error) {
 				console.log(e);
-				const t: ToastSettings = { message: e.message, background: 'variant-filled-error' };
+				const t: ToastSettings = { message: e.message, background: 'preset-filled-error-500' };
 				toastStore.trigger(t);
 			}
 		} finally {
@@ -67,7 +67,7 @@
 	// Base Classes
 	const cBase = 'card p-4 w-modal shadow-xl space-y-4';
 	const cHeader = 'text-2xl font-bold';
-	const cForm = 'border border-surface-500 p-4 space-y-4 rounded-container-token';
+	const cForm = 'border border-surface-500 p-4 space-y-4 rounded-container';
 </script>
 
 {#if $modalStore[0]}
@@ -77,7 +77,7 @@
 			{#each log as item}
 				<p>{item}</p>
 			{/each}
-			<ProgressBar bind:value={percentComplete} max={100} />
+			<Progress bind:value={percentComplete} max={100} />
 			{#if state > State.Updating}
 				<footer class="modal-footer {parent.regionFooter}">
 					{#if state == State.Success}
