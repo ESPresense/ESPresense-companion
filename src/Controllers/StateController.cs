@@ -71,11 +71,11 @@ public class StateController : ControllerBase
                 if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
                 if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
                 if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
-                rxM["expected"] = rx.Expected;
-                rxM["actual"] = rx.Distance;
+                rxM["mapDistance"] = rx.MapDistance;
+                rxM["distance"] = rx.Distance;
                 rxM["rssi"] = rx.Rssi;
-                rxM["err"] = rx.Expected - rx.Distance;
-                rxM["percent"] = rx.Distance / rx.Expected;
+                rxM["diff"] = rx.Distance - rx.MapDistance;
+                rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
                 if (rx.Variance is not null) rxM["var"] = rx.Variance.Value;
             }
         }

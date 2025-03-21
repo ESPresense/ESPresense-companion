@@ -15,12 +15,19 @@
 		VarianceMeters = 5
 	}
 
-	function coloring(percent: number) {
+	function coloring(percent: number | null): string {
 		if (percent == null) {
 			return '';
 		}
-		percent = Math.max(0, Math.min(percent, 2)); // Clamp percent between 0 and 2
-		return 'background-color: hsl(' + (240 - Math.min(Math.max(percent * 120, 0), 240)) + ', 50%, 50%)';
+		// Clamp percent between -2 and +2
+		percent = Math.max(-2, Math.min(percent, 2));
+
+		// Clamp the color mapping between -1 and +1 for hue purposes
+		const colorPercent = Math.max(-1, Math.min(percent, 1));
+
+		// Map colorPercent (-1 to +1) to hue (240° blue -> 120° green -> 0° red)
+		const hue = 240 - (colorPercent + 1) * (240 / 2); // Shift from 240° to 0°
+		return `background-color: hsl(${hue}, 50%, 50%)`;
 	}
 
 	function value(n1: any, data_point: number) {
@@ -30,7 +37,7 @@
 			let num;
 			switch (data_point) {
 				case DataPoint.ErrorMeters:
-					num = n1?.err;
+					num = n1?.diff;
 					break;
 				case DataPoint.Absorption:
 					num = n1?.absorption;
@@ -103,7 +110,7 @@
 		{#each rxColumns as id2 (id2)}
 			<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
 				{#if n1[id2]}
-					Expected {Number(n1[id2].expected?.toPrecision(3))} - Actual {Number(n1[id2]?.actual?.toPrecision(3))} = Error {Number(n1[id2]?.err?.toPrecision(3))}
+					Map Distance {Number(n1[id2].mapDistance?.toPrecision(3))} - Measured {Number(n1[id2]?.distance?.toPrecision(3))} = Error {Number(n1[id2]?.diff?.toPrecision(3))}
 				{:else}
 					No beacon Received in last 30 seconds
 				{/if}
