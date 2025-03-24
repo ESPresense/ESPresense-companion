@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
-	import { getToastStore } from '@skeletonlabs/skeleton';
-
-	import type { ToastSettings } from '@skeletonlabs/skeleton';
+	import { Accordion } from '@skeletonlabs/skeleton-svelte';
+	import type { ToastSettings } from '@skeletonlabs/skeleton-svelte';
 	import type { DeviceSetting } from './types';
 
 	export let settings: DeviceSetting | null = null;
@@ -26,7 +24,7 @@
 				})
 				.catch((e) => {
 					console.log(e);
-					const t: ToastSettings = { message: e, background: 'variant-filled-error' };
+					const t: ToastSettings = { message: e, background: 'preset-filled-error-500' };
 					toastStore.trigger(t);
 				});
 		}
@@ -35,7 +33,7 @@
 
 {#if settings}
 	<Accordion>
-		<AccordionItem spacing="space-y-4" open>
+		<Accordion.Item spacing="space-y-4" open>
 			<svelte:fragment slot="summary">
 				<h3 class="h3">Settings</h3>
 			</svelte:fragment>
@@ -60,7 +58,7 @@
 					<button class="btn bg-success-700 text-black" on:click={(e) => save()}>Save</button>
 				</form>
 			</svelte:fragment>
-		</AccordionItem>
+		</Accordion.Item>
 	</Accordion>
 {:else}
 	<div class="text-center">Loading...</div>

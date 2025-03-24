@@ -2,7 +2,7 @@
 	import { config, nodes } from './stores';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
 
 	export let floorId: string | null = null;
 	export let nodeId: string | null = null;
@@ -35,14 +35,14 @@
 				<h4 class="h4">Node: {node?.name || node?.id}</h4>
 			</div>
 		{/if}
-		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
+		<Segment active="preset-filled-primary-500" hover="hover:preset-tonal-primary">
 			{#if $config?.floors}
 				{#each $config?.floors as { id, name }}
-					<RadioItem bind:group={floorId} {name} value={id}>{name}</RadioItem>
+					<Segment.Item bind:group={floorId} {name} value={id}>{name}</Segment.Item>
 				{/each}
 			{/if}
-			<RadioItem bind:group={floorId} name="Settings" value="settings">Settings</RadioItem>
-		</RadioGroup>
+			<Segment.Item bind:group={floorId} name="Settings" value="settings">Settings</Segment.Item>
+		</Segment>
 	</nav>
 	<svg viewBox="0 0 2 3" aria-hidden="true">
 		<path d="M0,0 L0,3 C0.5,3 0.5,3 1,2 L2,0 Z" />

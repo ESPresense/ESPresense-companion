@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-	import { popup } from '@skeletonlabs/skeleton';
-	import { getToastStore } from '@skeletonlabs/skeleton';
-	import { getModalStore } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
 	import { base } from '$app/paths';
 
 	enum DataPoint {
@@ -89,7 +86,7 @@
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',
-					background: 'variant-filled-success'
+					background: 'preset-filled-success-500'
 				});
 			} else {
 				const errorText = await response.text();
@@ -99,7 +96,7 @@
 			console.error('Error resetting calibration:', error);
 			toastStore.trigger({
 				message: `Failed to reset calibration: ${error.message}`,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -108,13 +105,13 @@
 {#if $calibration?.matrix}
 	{#each Object.entries($calibration?.matrix) as [id1, n1] (id1)}
 		{#each rxColumns as id2 (id2)}
-			<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
+			<div class="card preset-filled-secondary-500 p-4" data-popup={'popup-' + id1 + '-' + id2}>
 				{#if n1[id2]}
 					Map Distance {Number(n1[id2].mapDistance?.toPrecision(3))} - Measured {Number(n1[id2]?.distance?.toPrecision(3))} = Error {Number(n1[id2]?.diff?.toPrecision(3))}
 				{:else}
 					No beacon Received in last 30 seconds
 				{/if}
-				<div class="arrow variant-filled-secondary" />
+				<div class="arrow preset-filled-secondary-500" />
 			</div>
 		{/each}
 	{/each}
@@ -124,19 +121,19 @@
 	{#if $calibration?.matrix}
 		<header>
 			<div class="flex justify-between items-center p-2">
-				<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
-					<RadioItem bind:group={data_point} name="justify" value={0}>Error %</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={1}>Error (m)</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={2}>Absorption</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
-				</RadioGroup>
-				<button class="btn variant-filled-warning" on:click={resetCalibration}> Reset Calibration </button>
+				<Segment active="preset-filled-primary-500" hover="hover:preset-tonal-primary">
+					<Segment.Item bind:group={data_point} name="justify" value={0}>Error %</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={1}>Error (m)</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={2}>Absorption</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={5}>Variance (m)</Segment.Item>
+				</Segment>
+				<button class="btn preset-filled-warning-500" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
 		</header>
 		<section class="p-4 pt-0">
-			<table class="table table-hover">
+			<table class="table ">
 				<thead>
 					<tr>
 						<th>Name</th>
