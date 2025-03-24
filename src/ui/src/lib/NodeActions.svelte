@@ -125,6 +125,7 @@
 
 	export let row: Node;
 	export let col: string;
+	$: _ = col
 </script>
 
 {#if row.online}

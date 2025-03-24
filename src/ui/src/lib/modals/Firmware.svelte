@@ -12,7 +12,7 @@
 	export let artifact: string;
 	export let parent: any;
 
-	enum State {
+	enum Progress {
 		Form,
 		Updating,
 		Failed,
@@ -26,7 +26,7 @@
 		return str.replace(/\d+/g, '');
 	}
 
-	let state: State = State.Form;
+	let progress: Progress = Progress.Form;
 	let percentComplete: number = 0;
 	let firmware: string;
 	let url: string;
@@ -36,11 +36,11 @@
 
 	async function onFormSubmit(): Promise<void> {
 		log = [];
-		state = State.Updating;
+		progress = Progress.Updating;
 		try {
 			await firmwareUpdate(node.id, url, (p: number, l: string) => {
 				const currentNonNumericLog = extractNonNumeric(l);
-				if (p == -1) state = State.Failed;
+				if (p == -1) progress = Progress.Failed;
 				else percentComplete = p;
 				if (lastNonNumericLog === currentNonNumericLog) {
 					log[log.length - 1] = l;
@@ -57,7 +57,7 @@
 				toastStore.trigger(t);
 			}
 		} finally {
-			if (state == State.Updating) state = State.Success;
+			if (progress == Progress.Updating) progress = Progress.Success;
 		}
 	}
 
@@ -71,16 +71,16 @@
 </script>
 
 {#if $modalStore[0]}
-	{#if state > State.Form}
+	{#if progress > Progress.Form}
 		<div class={cBase}>
 			<header class={cHeader}>{$modalStore[0]?.title ?? '(title missing)'}: {percentComplete ?? 0}%...</header>
 			{#each log as item}
 				<p>{item}</p>
 			{/each}
 			<ProgressBar bind:value={percentComplete} max={100} />
-			{#if state > State.Updating}
+			{#if progress > Progress.Updating}
 				<footer class="modal-footer {parent.regionFooter}">
-					{#if state == State.Success}
+					{#if progress == Progress.Success}
 						<button class="btn {parent.buttonPositive}" on:click={parent.onClose}>Close</button>
 					{:else}
 						<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
