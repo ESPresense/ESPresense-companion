@@ -42,7 +42,7 @@ public class Device
 
     public double? Scale => BestScenario?.Scale;
 
-    public int? Fixes => BestScenario?.Fixes;
+    public int? Fixes => Nodes.Values.Count(dn => dn.Current);
 
     public DateTime? LastSeen
     {
