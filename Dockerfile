@@ -28,6 +28,7 @@ WORKDIR /App
 EXPOSE 8267 8268
 
 ENV HTTP_PORTS=8267 \
+    HTTPS_PORTS="" \
     OTA_UPDATE_PORT=8268 \
     CONFIG_DIR="/config/espresense"
 
