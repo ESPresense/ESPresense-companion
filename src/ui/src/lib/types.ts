@@ -176,7 +176,7 @@ export interface Release {
 	name: string;
 }
 
-export interface CalibrationMatrix {
+export interface NodeCalibrationMatrix {
 	[txName: string]: {
 		[rxName: string]: {
 			tx_ref_rssi?: number;
@@ -193,7 +193,7 @@ export interface CalibrationMatrix {
 }
 
 export interface CalibrationResponse {
-	matrix: CalibrationMatrix;
+	matrix: NodeCalibrationMatrix;
 }
 
 export function isNode(d: Device | Node | null): d is Node {
