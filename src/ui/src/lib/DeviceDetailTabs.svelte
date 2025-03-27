@@ -38,7 +38,7 @@
 		{/if}
 		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
 			<RadioItem bind:group={tab} name="Map" value="map">Map</RadioItem>
-			<RadioItem bind:group={tab} name="Settings" value="settings">Settings</RadioItem>
+			<RadioItem bind:group={tab} name="Calibration" value="calibration">Calibration</RadioItem>
 		</RadioGroup>
 	</nav>
 	<svg viewBox="0 0 2 3" aria-hidden="true">

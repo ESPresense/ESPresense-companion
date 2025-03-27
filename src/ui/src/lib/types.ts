@@ -126,6 +126,11 @@ export type DeviceSetting = {
 	error?: string;
 };
 
+export type DeviceSettingsDetails = {
+	settings: DeviceSetting | null;
+	details: Array<{ key: string; value: string }>;
+};
+
 export interface DeviceMessage {
 	distance: number;
 	rssi: number;
