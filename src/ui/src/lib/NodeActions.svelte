@@ -8,9 +8,13 @@
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from './NodeSettingsModal.svelte';
 
+	export let row: Node; // Node data for this row
+	export let col: string; // Column identifier from parent table
+	$: _ = col; // Suppress unused variable warning while preserving the prop
+
 	const modalStore = getModalStore();
 	const toastStore = getToastStore();
-	let loadingEdit = false; // Loading state for edit button
+	let loadingEdit = false;
 
 	async function onRestart(node: Node) {
 		try {
@@ -32,12 +36,10 @@
 
 	function getUpdateDescription(flavorId: string | undefined): string {
 		const selectedFlavorId = $flavor === '-' ? flavorId : $flavor;
-		// Ensure selectedFlavorId is defined before using it as a map key
 		const flavorName = selectedFlavorId ? $flavorNames?.get(selectedFlavorId) : undefined;
 
 		let description = '';
 
-		// Determine base description based on update method and source
 		if ($updateMethod === 'self') {
 			description = 'with latest firmware';
 		} else if (['manual', 'recovery'].includes($updateMethod)) {
@@ -48,7 +50,6 @@
 			}
 		}
 
-		// Add flavor name if available and not default
 		if (flavorName && $flavor !== '-') {
 			description = `${description} ${flavorName}`;
 		}
@@ -64,15 +65,21 @@
 		let url: string | null = null;
 
 		try {
-			if ($updateMethod != 'self') {
+			if ($updateMethod !== 'self') {
 				const matchingFirmware = $firmwareTypes?.firmware?.filter((d) => d.cpu === cpuId && d.flavor === selectedFlavorId);
 				const firmwareId = matchingFirmware?.length === 1 ? matchingFirmware[0].name : null;
-				if (!firmwareId) throw new Error(`No firmware found for selected CPU (${cpuId}) and flavor (${selectedFlavorId})`);
-				url = $artifact
-					? getLocalFirmwareUrl($firmwareSource, $version, $artifact, firmwareId)
-					: getFirmwareUrl($firmwareSource, $version, $artifact, firmwareId);
-				if (!url) throw new Error(`No firmware URL found for ${$firmwareSource}, ${$version || $artifact}, ${cpuId}, ${selectedFlavorId}`);
+
+				if (!firmwareId) {
+					throw new Error(`No firmware found for selected CPU (${cpuId}) and flavor (${selectedFlavorId})`);
+				}
+
+				url = $artifact ? getLocalFirmwareUrl($firmwareSource, $version, $artifact, firmwareId) : getFirmwareUrl($firmwareSource, $version, $artifact, firmwareId);
+
+				if (!url) {
+					throw new Error(`No firmware URL found for ${$firmwareSource}, ${$version || $artifact}, ${cpuId}, ${selectedFlavorId}`);
+				}
 			}
+
 			const response = await fetch(`${base}/api/node/${node.id}/update`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -87,9 +94,8 @@
 
 			if (!response.ok) throw new Error(response.statusText || 'Update failed');
 
-			const message = `${node.name || node.id} asked to update ${updateDescription}`;
 			toastStore.trigger({
-				message,
+				message: `${node.name || node.id} asked to update ${updateDescription}`,
 				background: 'variant-filled-primary'
 			});
 		} catch (error) {
@@ -127,30 +133,23 @@
 		}
 	}
 
-	// Function to handle map navigation using detail
-	function handleMap() {
-		detail(row);
-		// Note: The original navigation went to /map?nodeId=...
-		// The detail function navigates to /nodes/{id}. This aligns with the user's provided detail function logic.
-	}
-
-	// Added handleEdit function, similar to DeviceActions
 	async function handleEdit() {
 		if (!row) return;
 		loadingEdit = true;
+
 		try {
 			const response = await fetch(`${base}/api/node/${row.id}`);
 			if (!response.ok) {
 				throw new Error(`Failed to fetch node settings details: ${response.statusText}`);
 			}
+
 			const nodeSettingsDetails: NodeSettingDetails = await response.json();
 
-			// Check if the settings object exists within the details
 			if (!nodeSettingsDetails.settings) {
-				// Attempt to create a default settings object if null
+				// Create default settings if none exist
 				const defaultSettings: NodeSetting = {
-					id: row.id, // Use the row ID as the default ID
-					name: row.name || null, // Use row name or null
+					id: row.id,
+					name: row.name || null,
 					updating: { autoUpdate: null, prerelease: null },
 					scanning: { forgetAfterMs: null },
 					counting: { idPrefixes: null, minDistance: null, maxDistance: null, minMs: null },
@@ -158,63 +157,55 @@
 					calibration: { rxRefRssi: null, rxAdjRssi: null, absorption: null, txRefRssi: null }
 				};
 				nodeSettingsDetails.settings = defaultSettings;
-				// Log a warning or info that default settings are being used
 				console.warn(`Node settings for ${row.id} not found in API response, using defaults.`);
-				// Optionally, you could throw an error here if default settings are not acceptable:
-				// throw new Error('Node settings not found in API response.');
 			}
 
-			const nodeSetting: NodeSetting = nodeSettingsDetails.settings; // Extract the settings
+			const nodeSetting: NodeSetting = nodeSettingsDetails.settings;
 
 			modalStore.trigger({
 				type: 'component',
-				// Pass the extracted nodeSetting to the modal
-				component: { ref: NodeSettingsModal, props: { nodeSetting: nodeSetting } },
-				title: `Edit Settings for ${nodeSetting.name || nodeSetting.id}` // Use extracted settings for title
+				component: { ref: NodeSettingsModal, props: { nodeSetting } },
+				title: `Edit Settings for ${nodeSetting.name || nodeSetting.id}`
 			});
 		} catch (ex) {
 			console.error('Error fetching node settings for modal:', ex);
-			let errorMessage = 'An unknown error occurred while loading node settings.';
-			if (ex instanceof Error) {
-				errorMessage = `Error loading node settings: ${ex.message}`;
-			}
-			const t: ToastSettings = { message: errorMessage, background: 'variant-filled-error' };
-			toastStore.trigger(t);
+			const errorMessage = ex instanceof Error ? `Error loading node settings: ${ex.message}` : 'An unknown error occurred while loading node settings.';
+
+			toastStore.trigger({
+				message: errorMessage,
+				background: 'variant-filled-error'
+			});
 		} finally {
 			loadingEdit = false;
 		}
 	}
-
-	export let row: Node;
-	export let col: string;
-	$: _ = col;
 </script>
 
-{#if row.online}
-	<!-- Edit button (Primary) -->
-	<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit}>
-		{#if loadingEdit}
-			<span class="loading loading-spinner loading-xs"></span>
-		{:else}
-			Edit
+<div class="flex gap-1">
+	{#if row.online}
+		<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
+			{#if loadingEdit}
+				<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+			{:else}
+				Edit
+			{/if}
+		</button>
+
+		<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
+
+		{#if row.telemetry?.version}
+			<button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
 		{/if}
-	</button>
 
-	<!-- Map button (Secondary) -->
-	<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={handleMap}>Map</button>
+		{#if row.telemetry}
+			<button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
+		{/if}
 
-	{#if row.telemetry?.version}
-		<button on:click={() => onUpdate(row)} disabled={!($updateMethod == 'self' || ($firmwareSource == 'release' && $version) || ($firmwareSource == 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary">Update</button>
+		{#if row.telemetry?.ip}
+			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
+				<span>Visit</span>
+				<span><img class="w-4" src={link} alt="External Link" /></span>
+			</a>
+		{/if}
 	{/if}
-
-	{#if row.telemetry}
-		<button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning">Restart</button>
-	{/if}
-
-	{#if row.telemetry?.ip}
-		<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled">
-			<span>Visit</span>
-			<span><img class="w-4" src={link} alt="External Link" /></span>
-		</a>
-	{/if}
-{/if}
+</div>

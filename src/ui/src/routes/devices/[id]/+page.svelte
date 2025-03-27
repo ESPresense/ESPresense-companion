@@ -3,7 +3,7 @@
 	import { devices } from '$lib/stores';
 	import { readable, derived } from 'svelte/store';
 	import { page } from '$app/stores';
-import type { DeviceSetting } from '$lib/types';
+	import type { DeviceSetting } from '$lib/types';
 	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
 
 	import Map from '$lib/Map.svelte';
@@ -11,33 +11,35 @@ import type { DeviceSetting } from '$lib/types';
 	import DeviceCalibration from '$lib/DeviceCalibration.svelte';
 	import DeviceSettings from '$lib/DeviceSettings.svelte';
 
-	// Get tab from URL query parameter or default to 'map'
-	$: tab = $page.url.searchParams.get('tab') || 'map';
-	export let data: { settings?: DeviceSetting } = {};
-	$: device = $devices?.find((d) => d.id === data.settings?.id);
-
 	// Define type for the details array items
 	type DeviceDetailItem = { key: string; value: string };
 
+	export let data: { settings?: DeviceSetting } = {};
+
+	// Get tab from URL query parameter or default to 'map'
+	$: tab = $page.url.searchParams.get('tab') || 'map';
+	$: device = $devices?.find((d) => d.id === data.settings?.id);
+
 	export const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
+		const deviceId = data.settings?.id;
+		if (!deviceId) return () => {};
+
 		async function fetchAndSet() {
 			try {
-				const response = await fetch(`${base}/api/device/${data.settings?.id}`);
+				const response = await fetch(`${base}/api/device/${deviceId}`);
+				if (!response.ok) throw new Error(`HTTP error ${response.status}`);
 				const result = await response.json();
-				set(result.details);
+				set(result.details || []);
 			} catch (ex) {
-				console.error(ex);
+				console.error(`Error fetching device details: ${ex instanceof Error ? ex.message : String(ex)}`);
+				set([]);
 			}
 		}
 
 		fetchAndSet();
-		const interval = setInterval(() => {
-			fetchAndSet();
-		}, 1000);
+		const interval = setInterval(fetchAndSet, 1000);
 
-		return function stop() {
-			clearInterval(interval);
-		};
+		return () => clearInterval(interval);
 	});
 </script>
 
@@ -51,8 +53,7 @@ import type { DeviceSetting } from '$lib/types';
 	<div class="flex-grow h-full overflow-clip">
 		{#if tab === 'map'}
 			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
-		{/if}
-		{#if tab === 'calibration'}
+		{:else if tab === 'calibration'}
 			{#if data.settings?.id}
 				<DeviceCalibration deviceId={data.settings.id} />
 			{:else}
@@ -67,13 +68,17 @@ import type { DeviceSetting } from '$lib/types';
 					<h3 class="h3">Details</h3>
 				</svelte:fragment>
 				<svelte:fragment slot="content">
-					{#if $deviceDetails}
+					{#if $deviceDetails && $deviceDetails.length > 0}
 						{#each $deviceDetails as d}
-							<label>
+							<label class="flex flex-col gap-1">
 								<span>{d.key}</span>
-								<input class="input" type="text" disabled bind:value={d.value} />
+								<input class="input" type="text" disabled value={d.value} />
 							</label>
+						{:else}
+							<p class="text-sm italic">No details available</p>
 						{/each}
+					{:else}
+						<p class="text-sm italic">Loading details...</p>
 					{/if}
 				</svelte:fragment>
 			</AccordionItem>
