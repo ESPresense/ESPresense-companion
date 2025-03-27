@@ -6,7 +6,7 @@ namespace ESPresense.Services
 {
     public class NodeSettingsStore(MqttCoordinator mqtt, ILogger<NodeSettingsStore> logger) : BackgroundService
     {
-        private static bool ParseBool(string value)
+        private static bool ParseBool(string? value)
         {
             if (string.IsNullOrEmpty(value))
                 return false;
@@ -31,46 +31,49 @@ namespace ESPresense.Services
             var retain = id == "*";
             var old = Get(id);
 
+            if (ds.Name != null && ds.Name != old.Name)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/name/set", ds.Name, retain);
+
             // Updating settings
-            if (ds.Updating.AutoUpdate == null || ds.Updating.AutoUpdate != old.Updating.AutoUpdate)
+            if (ds.Updating.AutoUpdate != null && ds.Updating.AutoUpdate != old.Updating.AutoUpdate)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/auto_update/set", ds.Updating.AutoUpdate == true ? "ON" : "OFF", retain);
-            if (ds.Updating.Prerelease == null || ds.Updating.Prerelease != old.Updating.Prerelease)
+            if (ds.Updating.Prerelease != null && ds.Updating.Prerelease != old.Updating.Prerelease)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/prerelease/set", ds.Updating.Prerelease == true ? "ON" : "OFF", retain);
 
             // Scanning settings
-            if (ds.Scanning.ForgetAfterMs == null || ds.Scanning.ForgetAfterMs != old.Scanning.ForgetAfterMs)
+            if (ds.Scanning.ForgetAfterMs != null && ds.Scanning.ForgetAfterMs != old.Scanning.ForgetAfterMs)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/forget_after_ms/set", $"{ds.Scanning.ForgetAfterMs}", retain);
 
             // Counting settings
-            if (ds.Counting.IdPrefixes == null || ds.Counting.IdPrefixes != old.Counting.IdPrefixes)
+            if (ds.Counting.IdPrefixes != null && ds.Counting.IdPrefixes != old.Counting.IdPrefixes)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_ids/set", $"{ds.Counting.IdPrefixes}", retain);
-            if (ds.Counting.MinDistance == null || ds.Counting.MinDistance != old.Counting.MinDistance)
+            if (ds.Counting.MinDistance != null && ds.Counting.MinDistance != old.Counting.MinDistance)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_min_dist/set", $"{ds.Counting.MinDistance:0.00}", retain);
-            if (ds.Counting.MaxDistance == null || ds.Counting.MaxDistance != old.Counting.MaxDistance)
+            if (ds.Counting.MaxDistance != null && ds.Counting.MaxDistance != old.Counting.MaxDistance)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_max_dist/set", $"{ds.Counting.MaxDistance:0.00}", retain);
-            if (ds.Counting.MinMs == null || ds.Counting.MinMs != old.Counting.MinMs)
+            if (ds.Counting.MinMs != null && ds.Counting.MinMs != old.Counting.MinMs)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_ms/set", $"{ds.Counting.MinMs}", retain);
 
             // Filtering settings
-            if (ds.Filtering.IncludeIds == null || ds.Filtering.IncludeIds != old.Filtering.IncludeIds)
+            if (ds.Filtering.IncludeIds != null && ds.Filtering.IncludeIds != old.Filtering.IncludeIds)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/include/set", $"{ds.Filtering.IncludeIds}", retain);
-            if (ds.Filtering.ExcludeIds == null || ds.Filtering.ExcludeIds != old.Filtering.ExcludeIds)
+            if (ds.Filtering.ExcludeIds != null && ds.Filtering.ExcludeIds != old.Filtering.ExcludeIds)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/exclude/set", $"{ds.Filtering.ExcludeIds}", retain);
-            if (ds.Filtering.MaxDistance == null || ds.Filtering.MaxDistance != old.Filtering.MaxDistance)
+            if (ds.Filtering.MaxDistance != null && ds.Filtering.MaxDistance != old.Filtering.MaxDistance)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/max_distance/set", $"{ds.Filtering.MaxDistance:0.00}", retain);
-            if (ds.Filtering.SkipDistance == null || ds.Filtering.SkipDistance != old.Filtering.SkipDistance)
+            if (ds.Filtering.SkipDistance != null && ds.Filtering.SkipDistance != old.Filtering.SkipDistance)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/skip_distance/set", $"{ds.Filtering.SkipDistance:0.00}", retain);
-            if (ds.Filtering.SkipMs == null || ds.Filtering.SkipMs != old.Filtering.SkipMs)
+            if (ds.Filtering.SkipMs != null && ds.Filtering.SkipMs != old.Filtering.SkipMs)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/skip_ms/set", $"{ds.Filtering.SkipMs}", retain);
 
             // Calibration settings
-            if (ds.Calibration.Absorption == null || ds.Calibration.Absorption != old.Calibration.Absorption)
+            if (ds.Calibration.Absorption != null && ds.Calibration.Absorption != old.Calibration.Absorption)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Calibration.Absorption:0.00}", retain);
-            if (ds.Calibration.RxAdjRssi == null || ds.Calibration.RxAdjRssi != old.Calibration.RxAdjRssi)
+            if (ds.Calibration.RxAdjRssi != null && ds.Calibration.RxAdjRssi != old.Calibration.RxAdjRssi)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.Calibration.RxAdjRssi}", retain);
-            if (ds.Calibration.TxRefRssi == null || ds.Calibration.TxRefRssi != old.Calibration.TxRefRssi)
+            if (ds.Calibration.TxRefRssi != null && ds.Calibration.TxRefRssi != old.Calibration.TxRefRssi)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.Calibration.TxRefRssi}", retain);
-            if (ds.Calibration.RxRefRssi == null || ds.Calibration.RxRefRssi != old.Calibration.RxRefRssi)
+            if (ds.Calibration.RxRefRssi != null && ds.Calibration.RxRefRssi != old.Calibration.RxRefRssi)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/ref_rssi/set", $"{ds.Calibration.RxRefRssi}", retain);
         }
 
@@ -78,11 +81,16 @@ namespace ESPresense.Services
         {
             mqtt.NodeSettingReceivedAsync += arg =>
             {
+                Log.Debug("Received {0} for {1}: {2}", arg.Setting, arg.NodeId, arg.Payload);
                 try
                 {
                     var ns = Get(arg.NodeId);
                     switch (arg.Setting)
                     {
+                        case "name":
+                            ns.Name = arg.Payload;
+                            break;
+
                         // Updating settings
                         case "auto_update":
                             ns.Updating.AutoUpdate = ParseBool(arg.Payload);

@@ -4,12 +4,21 @@ using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
-public class NodeSettings(string id)
+public class NodeSettings(string id, string? name = null)
 {
     [JsonPropertyName("id")]
     [JsonProperty("id")]
     [StringLength(64)]
-    public string? Id { get; set; } = id;
+    public string Id => id;
+
+    [JsonPropertyName("name")]
+    [JsonProperty("name")]
+    [StringLength(64)]
+    public string? Name
+    {
+        get => name;
+        set => name = value;
+    }
 
     [JsonPropertyName("updating")]
     [JsonProperty("updating")]
@@ -33,7 +42,7 @@ public class NodeSettings(string id)
 
     public NodeSettings Clone()
     {
-        return new NodeSettings(id)
+        return new NodeSettings(id, name)
         {
             Updating = Updating.Clone(),
             Scanning = Scanning.Clone(),
