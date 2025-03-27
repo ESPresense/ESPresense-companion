@@ -114,8 +114,8 @@ export type NodeSetting = {
 };
 
 export type NodeSettingDetails = {
-	settings: NodeSetting;
-	details: {};
+	settings: NodeSetting | null; // Match C# nullability
+	details: Array<{ key: string; value: string }>; // Corresponds to IList<KeyValuePair<string, string>>
 };
 
 export type DeviceSetting = {
