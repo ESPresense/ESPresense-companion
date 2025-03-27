@@ -55,7 +55,7 @@ namespace ESPresense.Services
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_ms/set", $"{ds.Counting.MinMs}", retain);
 
             // Filtering settings
-            if (ds.Filtering.IncludeIds != null || ds.Filtering.IncludeIds != old.Filtering.IncludeIds)
+            if (ds.Filtering.IncludeIds != null && ds.Filtering.IncludeIds != old.Filtering.IncludeIds)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/include/set", $"{ds.Filtering.IncludeIds}", retain);
             if (ds.Filtering.ExcludeIds != null && ds.Filtering.ExcludeIds != old.Filtering.ExcludeIds)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/exclude/set", $"{ds.Filtering.ExcludeIds}", retain);
