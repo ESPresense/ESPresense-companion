@@ -7,10 +7,7 @@ export function detail(d: Device | Node | null) {
 	else goto(`${base}/devices/${d?.id}`);
 }
 
-export function calibrate(d: Device | null) {
-	goto(`${base}/calibration/${d?.id}`);
-}
-
-export function calibrateById(id: string) {
-	goto(`${base}/calibration/${id}`);
+export function calibrateDevice(d: Device | null) {
+	// Navigate to the device detail page with the calibration tab selected
+	goto(`${base}/devices/${d?.id}?tab=calibration`);
 }
