@@ -23,7 +23,7 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
 
         foreach (var g in os.ByRx())
         {
-            var rxNodes = g.Where(b => b.Current).ToArray();
+            var rxNodes = g.ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
             var absorptionMiddle = optimization.AbsorptionMin + (optimization.AbsorptionMax - optimization.AbsorptionMin) / 2;
 
@@ -70,7 +70,7 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
                 Log.Information("Optimized {0,-20}     : RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}",
                     g.Key.Id, rxAdjRssi, absorption, result.FunctionInfoAtMinimum.Value);
 
-                or.RxNodes.Add(g.Key.Id, new ProposedValues
+                or.Nodes.Add(g.Key.Id, new ProposedValues
                 {
                     RxAdjRssi = rxAdjRssi,
                     Absorption = absorption,

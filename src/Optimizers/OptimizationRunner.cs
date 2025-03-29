@@ -16,7 +16,7 @@ internal class OptimizationRunner : BackgroundService
         _state = state;
         _nsd = nsd;
         _logger = logger;
-        _optimizers = new List<IOptimizer> { new RxAdjRssiOptimizer(_state), new AbsorptionAvgOptimizer(_state), new AbsorptionErrOptimizer(_state) };
+        _optimizers = new List<IOptimizer> { new GlobalAbsorptionRxTxOptimizer(_state) };
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,16 +61,19 @@ internal class OptimizationRunner : BackgroundService
                     if (d >= best || double.IsNaN(d) || double.IsInfinity(d))
                     {
                         Log.Information("Optimizer {0,-24} found worse  results, rms {1:0.000}>{2:0.000}", optimizer.Name, d, best);
+                        foreach (var (id, result) in results.Nodes)
+                            Log.Debug("Optimizer wanted {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} TxAdj: {3:00} Error: {4}", id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
                         continue;
                     }
                     Log.Information("Optimizer {0,-24} found better results, rms {1:0.000}<{2:0.000}", optimizer.Name, d, best);
-                    foreach (var (id, result) in results.RxNodes)
+                    foreach (var (id, result) in results.Nodes)
                     {
-                        Log.Information("Optimizer set {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} Error: {3}", id, result.Absorption, result.RxAdjRssi, result.Error);
+                        Log.Information("Optimizer set {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} TxAdj: {3:00} Error: {4}", id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
                         var a = _nsd.Get(id);
                         if (optimization == null) continue;
-                        if (result.Absorption != null && result.Absorption > optimization.AbsorptionMin && result.Absorption < optimization.AbsorptionMax) a.Calibration.Absorption = result.Absorption;
-                        if (result.RxAdjRssi != null && result.RxAdjRssi > optimization.RxAdjRssiMin && result.RxAdjRssi < optimization.RxAdjRssiMax) a.Calibration.RxAdjRssi = result.RxAdjRssi == null ? 0 : (int?)Math.Round(result.RxAdjRssi.Value);
+                        if (result.Absorption != null) a.Calibration.Absorption = result.Absorption;
+                        if (result.RxAdjRssi != null) a.Calibration.RxAdjRssi = result.RxAdjRssi == null ? 0 : (int?)Math.Round(result.RxAdjRssi.Value);
+                        if (result.TxRefRssi != null) a.Calibration.TxRefRssi = result.TxRefRssi == null ? 0 : (int?)Math.Round(result.TxRefRssi.Value);
                         await _nsd.Set(id, a);
                     }
 
@@ -80,6 +83,5 @@ internal class OptimizationRunner : BackgroundService
                 await Task.Delay(TimeSpan.FromSeconds(optimization?.IntervalSecs ?? 60), stoppingToken);
             }
         }
-
     }
 }
