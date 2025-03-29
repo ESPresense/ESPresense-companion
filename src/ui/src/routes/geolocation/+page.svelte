@@ -79,8 +79,9 @@
 			layers: [
 				new TileLayer({ // Use ESRI World Imagery
 					source: new XYZ({
-						url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-						maxZoom: 19 // Optional: Set max zoom level supported by the source
+						url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', // Consider externalizing this URL
+						maxZoom: 19, // Optional: Set max zoom level supported by the source
+						attributions: 'Sources: Esri, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community'
 					})
 				}),
 				new VectorLayer({
