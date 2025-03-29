@@ -17,6 +17,7 @@
     let groupPivot: THREE.Group;
     let isAnimating = false;
     let startTime: number;
+    let guiInstance: GUI | null = null; // To hold the GUI instance
 
     // Position adjustments
     const X_POS_ADJ = 1.5;
@@ -470,19 +471,21 @@
     }
 
     function doGuiSetup() {
-        const gui = new GUI({ title: 'Settings' });
+        // Ensure previous GUI is destroyed if setup is called again (unlikely here, but good practice)
+        guiInstance?.destroy();
+        guiInstance = new GUI({ title: 'Settings' });
 
-        gui.add(effectController, 'zRotationSpeed', 0, 1, 0.01)
+        guiInstance.add(effectController, 'zRotationSpeed', 0, 1, 0.01)
             .onChange((value: number) => {
                 zRotationSpeed = value;
             });
 
-        gui.close();
+        guiInstance.close();
     }
 
     onMount(() => {
         if (container) {
-            initScene();
+            initScene(); // This now calls doGuiSetup which assigns guiInstance
             isAnimating = true;
             requestAnimationFrame(animate);
         }
@@ -512,8 +515,9 @@
             window.removeEventListener('resize', handleResize);
             if (renderer) {
                 renderer.dispose();
-                renderer.forceContextLoss();
+                renderer.forceContextLoss(); // Attempt to release WebGL context
             }
+            guiInstance?.destroy(); // Destroy the GUI instance
         };
     });
 </script>
