@@ -12,6 +12,7 @@
 	import devices from '$lib/images/devices.svg';
 	import calibration from '$lib/images/calibration.svg';
 	import cube from '$lib/images/cube.svg';
+	import settings from '$lib/images/settings.svg';
 
 	initializeStores();
 
@@ -26,6 +27,7 @@
 		{ href: '/devices', name: 'devices', icon: devices, alt: 'Devices' },
 		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
 		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' },
+		{ href: '/settings', name: 'settings', icon: settings, alt: 'Settings' }
 	];
 </script>
 
