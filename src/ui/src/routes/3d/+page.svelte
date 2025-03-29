@@ -17,7 +17,7 @@
 	let rotationPivot: THREE.Group;
 	let contentGroup: THREE.Group;
 	let isAnimating = false;
-	let startTime: number;
+	let startTime: number | null = null;
 	let guiInstance: GUI | null = null;
 	let planCenter = new THREE.Vector3(0, 0, 0);
 
