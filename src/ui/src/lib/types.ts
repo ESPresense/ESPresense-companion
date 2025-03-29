@@ -65,11 +65,20 @@ export interface MapConfig {
 	wallOpacity?: number;
 }
 
+export interface ConfigGps {
+	latitude?: number | null;
+	longitude?: number | null;
+	elevation?: number | null;
+	rotation?: number | null; // Degrees clockwise from North
+}
+
+
 export interface Config {
 	timeout: number;
 	awayTimeout: number;
 	floors: Floor[];
 	devices: Device[];
+	gps?: ConfigGps | null;
 	map: MapConfig;
 }
 

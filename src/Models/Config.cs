@@ -152,9 +152,14 @@ namespace ESPresense.Models
 
     public partial class ConfigGps
     {
+        [YamlMember(Alias = "latitude")]
         public double? Latitude { get; set; }
+        [YamlMember(Alias = "longitude")]
         public double? Longitude { get; set; }
+        [YamlMember(Alias = "elevation")]
         public double? Elevation { get; set; }
+        [YamlMember(Alias = "rotation")]
+        public double? Rotation { get; set; } // Degrees clockwise from North
     }
 
     public partial class ConfigMqtt

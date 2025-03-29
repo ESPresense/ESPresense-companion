@@ -36,7 +36,7 @@ public class MultiScenarioLocator(DeviceTracker dl, State state, MqttCoordinator
                 device.ReportedLocation = bs?.Location ?? new Point3D();
 
                 var gps = state?.Config?.Gps;
-                var (latitude, longitude) = GpsUtil.Add(bs?.Location.X, bs?.Location.Y, gps?.Latitude, gps?.Longitude);
+                var (latitude, longitude) = GpsUtil.Add(bs?.Location.X, bs?.Location.Y, gps);
                 var payload = JsonConvert.SerializeObject(new
                 {
                     source_type = "espresense",
