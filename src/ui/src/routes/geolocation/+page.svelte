@@ -10,6 +10,7 @@
 	import TileLayer from 'ol/layer/Tile';
 	import VectorLayer from 'ol/layer/Vector';
 	import OSM from 'ol/source/OSM';
+	import XYZ from 'ol/source/XYZ';
 	import VectorSource from 'ol/source/Vector';
 	import Feature from 'ol/Feature';
 	import Point from 'ol/geom/Point';
@@ -76,8 +77,12 @@
 		map = new Map({
 			target: mapElement,
 			layers: [
-				new TileLayer({
-					source: new OSM() // Base map
+				new TileLayer({ // Use ESRI World Imagery
+					source: new XYZ({
+						url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', // Consider externalizing this URL
+						maxZoom: 19, // Optional: Set max zoom level supported by the source
+						attributions: 'Sources: Esri, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community'
+					})
 				}),
 				new VectorLayer({
 					source: floorplanSource,
@@ -246,7 +251,6 @@
 
 <svelte:head>
 	<title>ESPresense Companion: Geolocation</title>
-	<!-- Include OpenLayers CSS -->
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v9.1.0/ol.css" />
 </svelte:head>
 
