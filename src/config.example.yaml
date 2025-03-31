@@ -11,6 +11,7 @@ gps:
   latitude: 38.897957
   longitude: -77.036560
   elevation: 146
+  rotation: 10 # Rotation in degrees from north (0 degrees)
 
 map:
   flip_x: false        # Set to true to flip X coordinates (default: false)
