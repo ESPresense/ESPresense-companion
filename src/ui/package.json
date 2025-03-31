@@ -34,7 +34,7 @@
 		"eslint-plugin-svelte": "^3.3.3",
 		"globals": "^16.0.0",
 		"layercake": "^8.4.3",
-		"ol": "^10.4.0",
+		"ol": "^10.5.0",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.3.3",
 		"s-ago": "^2.2.0",
