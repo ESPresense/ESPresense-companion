@@ -17,7 +17,7 @@
 
   function save() {
     // Ensure rssi@1m is a number or null
-    const rssiRef = parseInt(localSettings['rssi@1m'] + '');
+    const rssiRef = parseFloat(localSettings['rssi@1m'] + '');
     localSettings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
     fetch(`${base}/api/device/${deviceSetting.id}`, { // Use original deviceSetting.id for the PUT request URL
