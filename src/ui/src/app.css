@@ -1,0 +1,14 @@
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton/optional/presets';
+@import '@skeletonlabs/skeleton/themes/legacy';
+@source "../node_modules/@skeletonlabs/skeleton-svelte/dist";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@tailwind variants;
+
+/*place global styles here */
+html,
+body {
+	@apply h-full overflow-hidden;
+}

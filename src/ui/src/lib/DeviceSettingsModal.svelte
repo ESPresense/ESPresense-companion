@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import type { DeviceSetting } from '$lib/types';
-  import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+  import { type ToastSettings } from '@skeletonlabs/skeleton-svelte';
   import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
 
   // Props
@@ -29,7 +29,7 @@
     })
       .then((response) => {
         if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
-        const t: ToastSettings = { message: 'Settings saved successfully!', background: 'variant-filled-success' };
+        const t: ToastSettings = { message: 'Settings saved successfully!', background: 'preset-filled-success-500' };
         toastStore.trigger(t);
         // Optionally, update the parent component or state if needed
         if (parent && parent.onSettingsSaved) {
@@ -43,7 +43,7 @@
         if (e instanceof Error) {
           errorMessage = `Error saving: ${e.message}`;
         }
-        const t: ToastSettings = { message: errorMessage, background: 'variant-filled-error' };
+        const t: ToastSettings = { message: errorMessage, background: 'preset-filled-error-500' };
         toastStore.trigger(t);
       });
   }
@@ -63,6 +63,6 @@
   <!-- Modal Actions -->
   <footer class="modal-footer flex justify-end space-x-2 pt-4">
     <button class="btn" on:click={handleCancel}>Cancel</button>
-    <button class="btn variant-filled-primary" on:click={save}>Save</button>
+    <button class="btn preset-filled-primary-500" on:click={save}>Save</button>
   </footer>
 </div>

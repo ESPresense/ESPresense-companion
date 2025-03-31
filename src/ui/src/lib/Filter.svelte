@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { showAllFloors } from '$lib/stores';
-	import { SlideToggle } from '@skeletonlabs/skeleton';
+	import { Switch } from '@skeletonlabs/skeleton-svelte';
 </script>
 
-<SlideToggle active="variant-filled-primary" hover="hover:variant-soft-primary" name="slider-label" bind:checked={$showAllFloors}>Show All Floors</SlideToggle>
+<Switch active="preset-filled-primary-500" hover="hover:preset-tonal-primary" name="slider-label" bind:checked={$showAllFloors}>Show All Floors</Switch>

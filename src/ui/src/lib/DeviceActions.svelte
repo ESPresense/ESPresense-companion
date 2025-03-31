@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { detail, calibrateDevice } from '$lib/urls';
-	import { getModalStore, getToastStore, type ModalStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { type ModalStore, type ToastSettings } from '@skeletonlabs/skeleton-svelte';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
 	import DeviceSettingsModal from './DeviceSettingsModal.svelte';
 
@@ -39,7 +39,7 @@
 
 			toastStore.trigger({
 				message: errorMessage,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			loadingEdit = false;
@@ -48,13 +48,13 @@
 </script>
 
 <div class="flex gap-1">
-	<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
+	<button class="btn btn-sm preset-filled-primary-500" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
 		{#if loadingEdit}
 			<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 		{:else}
 			Edit
 		{/if}
 	</button>
-	<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
-	<button class="btn btn-sm variant-filled-tertiary" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
+	<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
+	<button class="btn btn-sm preset-filled-tertiary-500" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
 </div>
