@@ -87,9 +87,8 @@ export const devices = readable<Device[]>([], function start(set) {
 		isPolling = true;
 		try {
 			const response = await fetch(`${base}/api/state/devices?showAll=${get(showAll)}`);
-			if (!response.ok) {
-				throw new Error(`HTTP error! Status: ${response.status}`);
-			}
+			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
 			const devices: Device[] = await response.json();
 
 			// Replace the entire map instead of accumulating devices

@@ -22,6 +22,7 @@ public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : 
     [HttpPut("{id}")]
     public Task Set(string id, [FromBody] NodeSettings ds)
     {
+        ds.Id = id;
         Log.Information("Set {id} {@ds}", id, ds);
         return nodeSettingsStore.Set(id, ds);
     }

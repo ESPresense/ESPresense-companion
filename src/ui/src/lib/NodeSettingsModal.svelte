@@ -27,9 +27,7 @@
         body: JSON.stringify(localSettings) // Send the local copy
       });
 
-      if (!response.ok) {
-        throw new Error(`Save failed: ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
       const t: ToastSettings = { message: 'Node settings saved successfully!', background: 'variant-filled-success' };
       toastStore.trigger(t);
