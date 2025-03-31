@@ -114,8 +114,8 @@ export type NodeSetting = {
 };
 
 export type NodeSettingDetails = {
-	settings: NodeSetting;
-	details: {};
+	settings: NodeSetting | null; // Match C# nullability
+	details: Array<{ key: string; value: string }>; // Corresponds to IList<KeyValuePair<string, string>>
 };
 
 export type DeviceSetting = {
@@ -124,6 +124,11 @@ export type DeviceSetting = {
 	name: string | null;
 	'rssi@1m': number | null;
 	error?: string;
+};
+
+export type DeviceSettingsDetails = {
+	settings: DeviceSetting | null;
+	details: Array<{ key: string; value: string }>;
 };
 
 export interface DeviceMessage {

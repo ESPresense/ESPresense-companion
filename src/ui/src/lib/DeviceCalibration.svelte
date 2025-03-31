@@ -10,20 +10,37 @@
 
 	const toastStore = getToastStore();
 
-	export let data: { settings?: DeviceSetting } = {};
+	// Changed from 'export let data' to 'export let deviceId'
+	export let deviceId: string;
 
 	let nodeSettings: Record<string, NodeSetting | null> = {};
 
-	// Device state
-	let deviceSettings: any = data.settings;
-	let deviceId: string | null = deviceSettings?.id || null;
+	// Device state - adjusted to fetch based on deviceId
+	let deviceSettings: DeviceSetting | null = null; // Will fetch in onMount
 	let selectedFloorId: string | null = null;
 	let calibrationSpot: { x: number; y: number; z?: number } | null = null;
 	let calibrationSpotHeight = 1.0; // Default height in meters
-	let currentRefRssi: number | null = deviceSettings['rssi@1m'] || null;
+	let currentRefRssi: number | null = null; // Will set after fetch
 
 	// Local storage for all device messages (keyed by nodeId)
 	let deviceMessages: Record<string, DeviceMessage[]> = {};
+
+	// Function to fetch device settings based on deviceId
+	async function fetchDeviceSettings() {
+		try {
+			const response = await fetch(`${base}/api/device/${deviceId}`);
+			if (response.ok) {
+				deviceSettings = await response.json();
+				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
+			} else {
+				const errorData = await response.text();
+				toastStore.trigger({ message: `Error fetching device settings: ${errorData || response.statusText}`, background: 'variant-filled-error' });
+			}
+		} catch (error) {
+			console.error(`Error fetching settings for device ${deviceId}:`, error);
+			toastStore.trigger({ message: 'Error fetching device settings.', background: 'variant-filled-error' });
+		}
+	}
 
 	// Function to fetch node settings
 	async function fetchNodeSettings(nodeId: string) {
@@ -61,7 +78,8 @@
 		}
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		await fetchDeviceSettings(); // Fetch settings on mount
 		if (deviceId) {
 			wsManager.subscribeToEvent('deviceMessage', handleDeviceMessage);
 			wsManager.subscribeDeviceMessage(deviceId);
@@ -86,11 +104,10 @@
 	let rssiValues: { [key: string]: number | null } = {};
 	let includedNodes: { [key: string]: boolean } = {};
 	let calculatedRefRssi: number | null = null;
-	let stabilityScore: number = 0;
 
-	// Error handling from initial load
-	$: if (data.settings?.error) {
-		const t: ToastSettings = { message: data.settings.error, background: 'variant-filled-error' };
+	// Error handling adjusted for fetched settings
+	$: if (deviceSettings?.error) {
+		const t: ToastSettings = { message: deviceSettings.error, background: 'variant-filled-error' };
 		toastStore.trigger(t);
 	}
 
@@ -116,7 +133,6 @@
 	$: if (selectedFloorId && calibrationSpot) {
 		rssiValues = {};
 		calculatedRefRssi = null;
-		stabilityScore = 0;
 	}
 
 	// Update Z coordinate when height changes
@@ -133,9 +149,9 @@
 		// Fetch settings for each node
 		nodeDistances.forEach((node) => {
 			// Set default inclusion
-		if (includedNodes[node.id] === undefined) {
-			includedNodes[node.id] = true;
-		}
+			if (includedNodes[node.id] === undefined) {
+				includedNodes[node.id] = true;
+			}
 
 			// Fetch node settings if not already fetched
 			if (!nodeSettings[node.id]) {
@@ -152,8 +168,8 @@
 				// Use all messages for this node to calculate average RSSI
 				const messages = deviceMessages[node.id];
 				const validRssiValues = messages
-					.map(msg => msg.rssi)
-					.filter(rssi => rssi !== null && rssi !== undefined) as number[];
+					.map((msg) => msg.rssi)
+					.filter((rssi) => rssi !== null && rssi !== undefined) as number[];
 
 				if (validRssiValues.length > 0) {
 					// Calculate the average RSSI from all messages
@@ -173,11 +189,8 @@
 		}
 	}
 
-	// Update stability score based on all device messages
-	$: stabilityScore = calculateStabilityScore();
-
 	// Calculate final RSSI using all device messages when enough data is collected
-	$: if (Object.values(deviceMessages).some(msgs => msgs.length >= 5)) {
+	$: if (Object.values(deviceMessages).some((msgs) => msgs.length >= 5)) {
 		calculatedRefRssi = calculateFinalRssi();
 	}
 
@@ -188,7 +201,7 @@
 		if (values.length <= 1) return 0;
 
 		const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-		const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
+		const squaredDiffs = values.map((val) => Math.pow(val - mean, 2));
 		const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
 
 		return Math.sqrt(variance);
@@ -238,13 +251,13 @@
 			if (!includedNodes[nodeId] || messages.length < 5) return;
 
 			// Find the associated node in nodeDistances
-			const node = nodeDistances.find(n => n.id === nodeId);
+			const node = nodeDistances.find((n) => n.id === nodeId);
 			if (!node || node.distance < 0.1) return;
 
 			// Extract valid RSSI values
 			const validRssiValues = messages
-				.map(msg => msg.rssi)
-				.filter(rssi => rssi !== null && rssi !== undefined) as number[];
+				.map((msg) => msg.rssi)
+				.filter((rssi) => rssi !== null && rssi !== undefined) as number[];
 
 			if (validRssiValues.length < 5) return;
 
@@ -274,53 +287,24 @@
 		return Math.round(rawValue);
 	}
 
-	// Update stability score calculation to use all device messages
-	function calculateStabilityScore() {
-		const nodeVariances: { [key: string]: number } = {};
-
-		Object.entries(deviceMessages).forEach(([nodeId, messages]) => {
-			if (messages.length < 3) return;
-
-			// Get valid RSSI values
-			const validRssiValues = messages
-				.slice(-10) // Only use most recent 10 messages for variance
-				.map(msg => msg.rssi)
-				.filter(rssi => rssi !== null && rssi !== undefined) as number[];
-
-			if (validRssiValues.length < 3) return;
-
-			// Calculate variance
-			const stdDev = calculateStdDev(validRssiValues);
-			nodeVariances[nodeId] = stdDev * stdDev; // variance is stdDev squared
-		});
-
-		const variances: number[] = Object.values(nodeVariances);
-		if (variances.length === 0) {
-			// Return a score based on message count if no variances
-			const totalMessages = Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0);
-			return Math.min(20, totalMessages * 2);
-		}
-
-		const avgVariance = variances.reduce((sum, val) => sum + val, 0) / variances.length;
-
-		// Lower variance means higher stability
-		return Math.max(20, Math.min(100, 100 - avgVariance * 8));
-	}
-
 	function toggleNodeInclusion(nodeId: string) {
 		includedNodes[nodeId] = !includedNodes[nodeId];
 		includedNodes = { ...includedNodes }; // Trigger reactivity
 	}
 
 	$: messageStats = calculateMessageStats(deviceMessages);
+
 	// Get message statistics for display
 	function calculateMessageStats(deviceMessages: Record<string, DeviceMessage[]>) {
-		const stats: Record<string, { count: number, avgRssi: number | null, minRssi: number | null, maxRssi: number | null, stdDev: number | null }> = {};
+		const stats: Record<
+			string,
+			{ count: number; avgRssi: number | null; minRssi: number | null; maxRssi: number | null; stdDev: number | null }
+		> = {};
 
 		Object.entries(deviceMessages).forEach(([nodeId, messages]) => {
 			const validRssiValues = messages
-				.map(msg => msg.rssi)
-				.filter(rssi => rssi !== null && rssi !== undefined) as number[];
+				.map((msg) => msg.rssi)
+				.filter((rssi) => rssi !== null && rssi !== undefined) as number[];
 
 			if (validRssiValues.length > 0) {
 				const sum = validRssiValues.reduce((acc, val) => acc + val, 0);
@@ -348,7 +332,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(`${base}/api/device/${deviceSettings.originalId}`, {
+			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId || deviceId}`, { // Adjusted to use deviceId as fallback
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -364,7 +348,6 @@
 			toastStore.trigger({ message: error.message, background: 'variant-filled-error' });
 		}
 	}
-
 </script>
 
 <svelte:head>
@@ -372,7 +355,7 @@
 </svelte:head>
 
 <div class="container mx-auto p-4 max-w-7xl">
-	<h2 class="h2 mb-4">Device Calibration: {data.settings?.id}</h2>
+	<h2 class="h2 mb-4">Device Calibration: {deviceId}</h2> <!-- Changed from data.settings?.id -->
 
 	<div class="card p-4 mb-6 variant-soft">
 		<header class="font-semibold mb-2">Instructions</header>
@@ -413,7 +396,10 @@
 						/>
 						<button
 							class="variant-filled-primary"
-							on:click={() => calibrationSpotHeight = calibrationSpotHeight}>Set</button>
+							on:click={() => (calibrationSpotHeight = calibrationSpotHeight)}
+						>
+							Set
+						</button>
 					</div>
 				</div>
 			{/if}
@@ -474,7 +460,12 @@
 										{/if}
 									</td>
 									<td>
-										<input type="checkbox" checked={includedNodes[node.id] || false} on:change={() => toggleNodeInclusion(node.id)} class="checkbox" />
+										<input
+											type="checkbox"
+											checked={includedNodes[node.id] || false}
+											on:change={() => toggleNodeInclusion(node.id)}
+											class="checkbox"
+										/>
 									</td>
 								</tr>
 							{/each}
@@ -498,7 +489,7 @@
 						</thead>
 						<tbody>
 							{#each Object.entries(messageStats) as [nodeId, stats]}
-								{@const node = nodeDistances.find(n => n.id === nodeId)}
+								{@const node = nodeDistances.find((n) => n.id === nodeId)}
 								<tr>
 									<td>{node?.name || nodeId}</td>
 									<td>{stats.count}</td>
@@ -516,15 +507,17 @@
 			<div class="col-span-1 lg:col-span-4 space-y-6">
 				<div class="card p-4 variant-soft">
 					<header class="font-semibold mb-2">Data Collection Status</header>
-					<div class="mt-4">
-					</div>
+					<div class="mt-4"></div>
 					<div class="mt-4">
 						<div class="flex justify-between mb-1">
 							<span>Total Messages:</span>
 							<span class="font-medium">{Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0)}</span>
 						</div>
 						<div class="progress h-2">
-							<div class="progress-bar bg-primary-500" style="width: {Math.min(100, Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0) / 2)}%"></div>
+							<div
+								class="progress-bar bg-primary-500"
+								style="width: {Math.min(100, Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0) / 2)}%"
+							></div>
 						</div>
 					</div>
 					<p class="mt-4 text-sm">Keep the device stationary for best results.</p>
@@ -557,7 +550,7 @@
 					<button
 						class="btn btn-lg variant-filled-primary w-full"
 						on:click={saveCalibration}
-						disabled={calculatedRefRssi == null || (currentRefRssi === calculatedRefRssi)}
+						disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}
 					>
 						Accept New Calibration
 					</button>
