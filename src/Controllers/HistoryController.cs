@@ -28,6 +28,15 @@ namespace ESPresense.Controllers
             var history = await dh.List(id);
             return new DeviceHistoryResponse(history);
         }
+
+        [HttpGet("{id}/range")]
+        public async Task<DeviceHistoryResponse> GetRange(string id, [FromQuery] DateTime start, [FromQuery] DateTime end)
+        {
+            var dh = await _databaseFactory.GetDeviceHistory();
+            var history = await dh.List(id, start, end) ?? new List<DeviceHistory>(); // Return empty list if null
+            return new DeviceHistoryResponse(history);
+        }
+
     }
 
     public  record DeviceHistoryResponse(IList<DeviceHistory> history);

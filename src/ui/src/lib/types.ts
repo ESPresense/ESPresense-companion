@@ -208,3 +208,15 @@ export interface CalibrationResponse {
 export function isNode(d: Device | Node | null): d is Node {
 	return (d as Node)?.telemetry !== undefined;
 }
+
+
+export interface DeviceHistory {
+	id: string;
+	when: string; // ISO date string
+	location: { x: number; y: number; z: number };
+	confidence?: number;
+	fixes?: number;
+	scale?: number;
+	room?: string; // Room ID
+	floor?: string; // Floor ID
+}
