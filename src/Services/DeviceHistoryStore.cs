@@ -38,4 +38,11 @@ public class DeviceHistoryStore
         if (!_initialized) return null;
         return await _sqliteConnection.Table<DeviceHistory>().Where(x => x.Id == id).ToListAsync();
     }
+
+    public async Task<IList<DeviceHistory>?> List(string id, DateTime start, DateTime end)
+    {
+        if (!_initialized) return null;
+        // Query for records within the specified time range and order by time
+        return await _sqliteConnection.Table<DeviceHistory>().Where(x => x.Id == id && x.When >= start && x.When <= end).OrderBy(x => x.When).ToListAsync();
+    }
 }
