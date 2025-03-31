@@ -4,21 +4,25 @@
   import { type ToastSettings } from '@skeletonlabs/skeleton-svelte';
   import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
 
-  // Props
-  /** Exposes component props */
-  export let parent: any; // The Svelte parent component that triggered the modal
-  export let deviceSetting: DeviceSetting; // Passed in from trigger
+	// Props
+	/** Exposes component props */
+	export let parent: any; // The Svelte parent component that triggered the modal
+	export let deviceSetting: DeviceSetting; // Passed in from trigger
 
-  const modalStore = getModalStore();
-  const toastStore = getToastStore();
+	const modalStore = getModalStore();
+	const toastStore = getToastStore();
 
-  // Create a local copy to avoid directly mutating the prop
-  let localSettings = { ...deviceSetting };
+	// Create a local copy to avoid directly mutating the prop
+	let localSettings = { ...deviceSetting };
+	let isSaving = false; // Track saving state
 
-  function save() {
-    // Ensure rssi@1m is a number or null
-    const rssiRef = Math.floor(parseFloat(localSettings['rssi@1m'] + ''));
-    localSettings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
+	async function save() {
+		try {
+			isSaving = true;
+
+			// Ensure rssi@1m is a number or null
+			const rssiRef = Math.floor(parseFloat(localSettings['rssi@1m'] + ''));
+			localSettings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
     fetch(`${base}/api/device/${deviceSetting.id}`, { // Use original deviceSetting.id for the PUT request URL
       method: 'PUT',
@@ -48,21 +52,25 @@
       });
   }
 
-  function handleCancel() {
-    modalStore.close(); // Close the modal on cancel
-  }
+	function handleCancel() {
+		modalStore.close(); // Close the modal on cancel
+	}
 </script>
 
 <!-- Added card class for background and padding -->
 <div class="card p-4 space-y-4">
-  <!-- Use the DeviceSettings component, passing the local state -->
-  <!-- Note: DeviceSettings now expects 'originalId' within the settings object -->
-  <!-- We need to ensure localSettings includes originalId -->
-  <DeviceSettings settings={localSettings} />
+	<!-- Use the DeviceSettings component, passing the local state -->
+	<DeviceSettings settings={localSettings} />
 
-  <!-- Modal Actions -->
-  <footer class="modal-footer flex justify-end space-x-2 pt-4">
-    <button class="btn" on:click={handleCancel}>Cancel</button>
-    <button class="btn preset-filled-primary-500" on:click={save}>Save</button>
-  </footer>
+	<!-- Modal Actions -->
+	<footer class="modal-footer flex justify-end space-x-2 pt-4">
+		<button class="btn" on:click={handleCancel}>Cancel</button>
+		<button class="btn preset-filled-primary-500" on:click={save}>
+			{#if isSaving}
+				Saving...
+			{:else}
+				Save
+			{/if}</button
+		>
+	</footer>
 </div>

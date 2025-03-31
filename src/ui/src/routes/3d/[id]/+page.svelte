@@ -65,9 +65,8 @@
 			const response = await fetch(
 				`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`
 			);
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
-			}
+			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
 			const data: { history: DeviceHistory[] } = await response.json();
 			deviceHistoryData = data.history || [];
 			console.log(`Fetched ${deviceHistoryData.length} history points.`);

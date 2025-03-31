@@ -139,9 +139,7 @@
 
 		try {
 			const response = await fetch(`${base}/api/node/${row.id}`);
-			if (!response.ok) {
-				throw new Error(`Failed to fetch node settings details: ${response.statusText}`);
-			}
+			if (!response.ok) throw new Error(`Failed to fetch node settings details: ${response.statusText}`);
 
 			const nodeSettingsDetails: NodeSettingDetails = await response.json();
 

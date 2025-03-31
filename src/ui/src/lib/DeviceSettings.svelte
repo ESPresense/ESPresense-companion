@@ -23,7 +23,6 @@
 	</label>
 	<label class="label base-font-color">
 		<span>RSSI@1m</span>
-		<!-- Changed type to number to match modal -->
 		<input class="input bg-surface-100-900 base-font-color" type="number" placeholder="e.g., -65" bind:value={settings['rssi@1m']} />
 	</label>
 {:else}

@@ -4,12 +4,16 @@ using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
-public class NodeSettings(string id, string? name = null)
+public class NodeSettings(string? id = null, string? name = null)
 {
     [JsonPropertyName("id")]
     [JsonProperty("id")]
     [StringLength(64)]
-    public string Id => id;
+    public string? Id
+    {
+        get => id;
+        set => id = value;
+    }
 
     [JsonPropertyName("name")]
     [JsonProperty("name")]
