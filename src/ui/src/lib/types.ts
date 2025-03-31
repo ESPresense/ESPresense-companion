@@ -106,9 +106,9 @@ export type NodeSetting = {
 		skipMs: number | null;
 	};
 	calibration: {
+		absorption: number | null;
 		rxRefRssi: number | null;
 		rxAdjRssi: number | null;
-		absorption: number | null;
 		txRefRssi: number | null;
 	};
 };
