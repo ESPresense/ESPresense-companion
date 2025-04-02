@@ -18,7 +18,7 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : ILoc
                                                 Math.Pow(dn.Node!.Location.Z - x[2], 2));
             double error = dn.Distance - expectedDistance;
             double fallbackVariance = 1e-6; // This should be a small positive number
-            double variance = dn.Variance ?? fallbackVariance;
+            double variance = dn.DistVar ?? fallbackVariance;
             variance = Math.Max(variance, fallbackVariance); // Ensure variance is never zero
 
             return error * error / (2 * variance);
