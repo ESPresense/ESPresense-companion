@@ -84,12 +84,14 @@ public class State
             {
                 var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
                 var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx!.Name, Location = meas.Rx.Location });
+                if (meas.Current)
                 os.Measures.Add(new Measure()
                 {
-                    Current = meas.Current,
                     Distance = meas.Distance,
-                    RefRssi = meas.RefRssi,
+                    DistVar = meas.DistVar,
                     Rssi = meas.Rssi,
+                    RssiVar = meas.RssiVar,
+                    RefRssi = meas.RefRssi,
                     Tx = tx,
                     Rx = rx,
                 });

@@ -20,7 +20,7 @@ public class DeviceToNodeConverter : JsonConverter<ConcurrentDictionary<string, 
     {
         var d = distances.Where(a => a.Value.Current).ToDictionary(
             a => a.Key,
-            a => new { dist = a.Value.Distance, var = a.Value.Variance, lh = a.Value.LastHit.RelativeMilliseconds() } as object
+            a => new { dist = a.Value.Distance, var = a.Value.DistVar, lh = a.Value.LastHit.RelativeMilliseconds() } as object
         );
 
         DefaultDictConverter.Write(writer, d, options);
