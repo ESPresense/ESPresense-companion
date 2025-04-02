@@ -6,7 +6,7 @@
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import type { Group } from 'three';
-	import { goto } from '$app/navigation'; // Import goto for navigation
+	import { detail3d } from '$lib/urls';
 
 	// --- Props ---
 	export let devicesToShow: Device[] = [];
@@ -546,8 +546,7 @@
 			// Check if it's a mesh (our sphere) and has a name (our device ID)
 			if (firstIntersected instanceof THREE.Mesh && firstIntersected.name) {
 				const deviceId = firstIntersected.name;
-				console.log('Clicked device:', deviceId);
-				goto(`/3d/${deviceId}`); // Navigate to the detail page
+				detail3d(deviceId);
 			}
 		}
 	}
