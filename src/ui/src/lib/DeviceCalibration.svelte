@@ -10,13 +10,12 @@
 
 	const toastStore = getToastStore();
 
-	// Changed from 'export let data' to 'export let deviceId'
-	export let deviceId: string;
+	// Changed from 'export let deviceId' to 'export let deviceSettings'
+	export let deviceSettings: DeviceSetting;
 
 	let nodeSettings: Record<string, NodeSetting | null> = {};
 
 	// Device state - adjusted to fetch based on deviceId
-	let deviceSettings: DeviceSetting | null = null; // Will fetch in onMount
 	let selectedFloorId: string | null = null;
 	let calibrationSpot: { x: number; y: number; z?: number } | null = null;
 	let calibrationSpotHeight = 1.0; // Default height in meters
@@ -25,22 +24,6 @@
 	// Local storage for all device messages (keyed by nodeId)
 	let deviceMessages: Record<string, DeviceMessage[]> = {};
 
-	// Function to fetch device settings based on deviceId
-	async function fetchDeviceSettings() {
-		try {
-			const response = await fetch(`${base}/api/device/${deviceId}`);
-			if (response.ok) {
-				deviceSettings = await response.json();
-				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
-			} else {
-				const errorData = await response.text();
-				toastStore.trigger({ message: `Error fetching device settings: ${errorData || response.statusText}`, background: 'variant-filled-error' });
-			}
-		} catch (error) {
-			console.error(`Error fetching settings for device ${deviceId}:`, error);
-			toastStore.trigger({ message: 'Error fetching device settings.', background: 'variant-filled-error' });
-		}
-	}
 
 	// Function to fetch node settings
 	async function fetchNodeSettings(nodeId: string) {
@@ -59,7 +42,7 @@
 
 	// Update the message handler to store all messages in an array
 	function handleDeviceMessage(eventData: { deviceId: string; nodeId: string; data: DeviceMessage }) {
-		if (eventData.deviceId === deviceId) {
+		if (eventData.deviceId === deviceSettings.id) {
 			// Initialize array if it doesn't exist
 			if (!deviceMessages[eventData.nodeId]) {
 				deviceMessages[eventData.nodeId] = [];
@@ -79,21 +62,22 @@
 	}
 
 	onMount(async () => {
-		await fetchDeviceSettings(); // Fetch settings on mount
-		if (deviceId) {
+		// Initialize currentRefRssi from deviceSettings
+		currentRefRssi = deviceSettings?.['rssi@1m'] || null;
+		if (deviceSettings?.id) {
 			wsManager.subscribeToEvent('deviceMessage', handleDeviceMessage);
-			wsManager.subscribeDeviceMessage(deviceId);
-			console.log('Subscribed to device messages for', deviceId);
+			wsManager.subscribeDeviceMessage(deviceSettings.id);
+			console.log('Subscribed to device messages for', deviceSettings.id);
 		}
 	});
 
 	onDestroy(() => {
-		if (deviceId) {
+		if (deviceSettings?.id) {
 			wsManager.unsubscribeFromEvent('deviceMessage', handleDeviceMessage);
 			wsManager.sendMessage({
 				command: 'unsubscribe',
 				type: 'deviceMessage',
-				deviceId
+				deviceId: deviceSettings.id
 			});
 			deviceMessages = {};
 		}
@@ -112,13 +96,13 @@
 	}
 
 	// Reactive device and floor lookup
-	$: device = $devices?.find((d: any) => d.id === deviceId);
+	$: device = $devices?.find((d: any) => d.id === deviceSettings.id);
 	$: floor = $config?.floors.find((f: any) => f.id === selectedFloorId);
 	$: bounds = floor?.bounds;
 
 	// Initialize from device data when available
-	$: if ($devices && deviceId && !calibrationSpot) {
-		const device = $devices?.find((d: any) => d.id === deviceId);
+	$: if ($devices && deviceSettings?.id && !calibrationSpot) {
+		const device = $devices?.find((d: any) => d.id === deviceSettings.id);
 		if (device) {
 			if (device.floor !== null) {
 				selectedFloorId = device.floor.id;
@@ -176,12 +160,6 @@
 					const avgRssi = validRssiValues.reduce((sum, val) => sum + val, 0) / validRssiValues.length;
 					newRssiValues[node.id] = avgRssi;
 				}
-			} else {
-				// Fallback to device data if no messages are available
-				const device = $devices?.find((d: any) => d.id === deviceId);
-				if (device && device.nodes && device.nodes[node.id]) {
-					newRssiValues[node.id] = device.nodes[node.id]?.rssi ?? null;
-				}
 			}
 		});
 		if (Object.keys(newRssiValues).length > 0) {
@@ -208,7 +186,7 @@
 	}
 
 	function calculateNodeDistances(
-		calibrationSpot: { x: number; y: number; z: number } | null,
+		calibrationSpot: { x: number; y: number; z?: number } | null,
 		selectedFloorId: string | null,
 		nodes: any[] | undefined,
 		bounds: any,
@@ -216,6 +194,12 @@
 	) {
 		if (!nodes || !calibrationSpot || !selectedFloorId) {
 			return [];
+		}
+
+		// Ensure z is defined before using it in calculations
+		if (calibrationSpot.z === undefined) {
+			const floorLowerZ = bounds ? bounds[0][2] : 0;
+			calibrationSpot.z = floorLowerZ + calibrationSpotHeight;
 		}
 		return nodes
 			.filter((node: any) => {
@@ -226,7 +210,7 @@
 				const distance = Math.sqrt(
 					Math.pow(node.location.x - calibrationSpot.x, 2) +
 					Math.pow(node.location.y - calibrationSpot.y, 2) +
-					Math.pow(node.location.z - calibrationSpot.z, 2)
+					Math.pow(node.location.z - calibrationSpot.z!, 2)
 				);
 
 				const floorLowerZ = bounds ? bounds[0][2] : 0;
@@ -332,7 +316,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId || deviceId}`, { // Adjusted to use deviceId as fallback
+			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId }`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -355,7 +339,7 @@
 </svelte:head>
 
 <div class="container mx-auto p-4 max-w-7xl">
-	<h2 class="h2 mb-4">Device Calibration: {deviceId}</h2> <!-- Changed from data.settings?.id -->
+	<h2 class="h2 mb-4">Device Calibration</h2>
 
 	<div class="card p-4 mb-6 variant-soft">
 		<header class="font-semibold mb-2">Instructions</header>

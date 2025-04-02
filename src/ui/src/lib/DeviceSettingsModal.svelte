@@ -32,9 +32,7 @@
 				body: JSON.stringify(localSettings)
 			});
 
-			if (!response.ok) {
-				throw new Error(`Save failed: ${response.statusText}`);
-			}
+			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
 			const t: ToastSettings = {
 				message: 'Settings saved successfully!',
