@@ -339,9 +339,7 @@ async function updateDevice(id, data) {
     body: JSON.stringify(data)
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to update device');
-  }
+  if (!response.ok) throw new Error('Failed to update device');
 
   // No need to update local store - WebSocket will handle it
 }

@@ -17,9 +17,8 @@
 		loadingEdit = true;
 		try {
 			const response = await fetch(`${base}/api/device/${row.id}`);
-			if (!response.ok) {
-				throw new Error(`Failed to fetch settings details: ${response.statusText}`);
-			}
+			if (!response.ok) throw new Error(`Failed to fetch settings details: ${response.statusText}`);
+
 			const deviceSettingsDetails: DeviceSettingsDetails = await response.json();
 
 			if (!deviceSettingsDetails.settings) {

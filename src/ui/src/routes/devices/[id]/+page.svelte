@@ -55,7 +55,7 @@
 			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
 		{:else if tab === 'calibration'}
 			{#if data.settings?.id}
-				<DeviceCalibration deviceId={data.settings.id} />
+				<DeviceCalibration deviceSettings={data.settings} />
 			{:else}
 				<p class="p-4">Device ID not found.</p>
 			{/if}

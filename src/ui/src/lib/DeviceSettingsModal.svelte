@@ -24,33 +24,45 @@
 			const rssiRef = Math.floor(parseFloat(localSettings['rssi@1m'] + ''));
 			localSettings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
-    fetch(`${base}/api/device/${deviceSetting.id}`, { // Use original deviceSetting.id for the PUT request URL
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(localSettings) // Send the local copy
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
-        const t: ToastSettings = { message: 'Settings saved successfully!', background: 'preset-filled-success-500' };
-        toastStore.trigger(t);
-        // Optionally, update the parent component or state if needed
-        if (parent && parent.onSettingsSaved) {
-          parent.onSettingsSaved(localSettings);
-        }
-        modalStore.close(); // Close modal on successful save
-      })
-      .catch((e) => {
-        console.error('Error saving settings:', e);
-        let errorMessage = 'An unknown error occurred while saving.';
-        if (e instanceof Error) {
-          errorMessage = `Error saving: ${e.message}`;
-        }
-        const t: ToastSettings = { message: errorMessage, background: 'preset-filled-error-500' };
-        toastStore.trigger(t);
-      });
-  }
+			const response = await fetch(`${base}/api/device/${deviceSetting.id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(localSettings)
+			});
+
+			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
+
+			const t: ToastSettings = {
+				message: 'Settings saved successfully!',
+				background: 'variant-filled-success'
+			};
+			toastStore.trigger(t);
+
+			// Optionally, update the parent component or state if needed
+			if (parent && parent.onSettingsSaved) {
+				parent.onSettingsSaved(localSettings);
+			}
+
+			modalStore.close(); // Close modal on successful save
+		} catch (error) {
+			console.error('Error saving settings:', error);
+			let errorMessage = 'An unknown error occurred while saving.';
+
+			if (error instanceof Error) {
+				errorMessage = `Error saving: ${error.message}`;
+			}
+
+			const t: ToastSettings = {
+				message: errorMessage,
+				background: 'variant-filled-error'
+			};
+			toastStore.trigger(t);
+		} finally {
+			isSaving = false;
+		}
+	}
 
 	function handleCancel() {
 		modalStore.close(); // Close the modal on cancel
