@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '../app.postcss';
+	import '../app.css';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { AppShell, AppRail, AppRailAnchor, Drawer, Toast, Modal, initializeStores, storePopup } from '@skeletonlabs/skeleton';
