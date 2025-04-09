@@ -40,7 +40,7 @@ public class AbsorptionLineFitOptimizer : IOptimizer
             double absorption = linearModel.Item2 / 10;
             if (absorption < _state.Config?.Optimization.AbsorptionMin) continue;
             if (absorption > _state.Config?.Optimization.AbsorptionMax) continue;
-            or.RxNodes.Add(g.Key.Id, new ProposedValues { Absorption = absorption });
+            or.Nodes.Add(g.Key.Id, new ProposedValues { Absorption = absorption });
         }
 
         return or;
