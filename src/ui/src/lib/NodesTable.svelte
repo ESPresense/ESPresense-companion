@@ -35,7 +35,7 @@
 <div class="p-2">
 	{#if $nodes}
 		<VersionPicker bind:updateMethod={$updateMethod} bind:firmwareSource={$firmwareSource} bind:flavor={$flavor} bind:version={$version} bind:artifact={$artifact} />
-		<SvelteTable {columns} rows={$nodes} classNameTable="table table-hover table-compact" on:clickRow={onRowClick} sortBy="id" />
+		<SvelteTable {columns} rows={$nodes} classNameTable="table  table-compact" on:clickRow={onRowClick} sortBy="id" />
 	{/if}
 </div>
 

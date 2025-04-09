@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import type { DeviceSetting } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { type ToastSettings } from '@skeletonlabs/skeleton-svelte';
 	import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
+	import { toaster as toastStore } from '$lib/toaster';
 
 	// Props
 	/** Exposes component props */
 	export let parent: any; // The Svelte parent component that triggered the modal
 	export let deviceSetting: DeviceSetting; // Passed in from trigger
-
-	const modalStore = getModalStore();
-	const toastStore = getToastStore();
 
 	// Create a local copy to avoid directly mutating the prop
 	let localSettings = { ...deviceSetting };
@@ -36,7 +34,7 @@
 
 			const t: ToastSettings = {
 				message: 'Settings saved successfully!',
-				background: 'variant-filled-success'
+				background: 'preset-filled-success-500'
 			};
 			toastStore.trigger(t);
 
@@ -56,7 +54,7 @@
 
 			const t: ToastSettings = {
 				message: errorMessage,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			};
 			toastStore.trigger(t);
 		} finally {
@@ -77,7 +75,7 @@
 	<!-- Modal Actions -->
 	<footer class="modal-footer flex justify-end space-x-2 pt-4">
 		<button class="btn" on:click={handleCancel} disabled={isSaving}>Cancel</button>
-		<button class="btn variant-filled-primary" on:click={save} disabled={isSaving}>
+		<button class="btn preset-filled-primary-500" on:click={save} disabled={isSaving}>
 			{#if isSaving}
 				Saving...
 			{:else}

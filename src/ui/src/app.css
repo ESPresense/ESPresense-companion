@@ -1,4 +1,9 @@
 @import "tailwindcss";
+@import "@skeletonlabs/skeleton";
+@import "@skeletonlabs/skeleton/optional/presets";
+@import "@skeletonlabs/skeleton/themes/legacy";
+
+@source "../node_modules/@skeletonlabs/skeleton-svelte/dist";
 
 /*place global styles here */
 html,

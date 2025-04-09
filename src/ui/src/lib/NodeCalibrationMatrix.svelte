@@ -1,10 +1,9 @@
 <script lang="ts">
+	import { Popover } from '@skeletonlabs/skeleton-svelte';
 	import { calibration } from '$lib/stores';
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-	import { popup } from '@skeletonlabs/skeleton';
-	import { getToastStore } from '@skeletonlabs/skeleton';
-	import { getModalStore } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
 	import { base } from '$app/paths';
+	import { toaster as toastStore } from '$lib/toaster';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -69,17 +68,17 @@
 
 	let data_point: DataPoint = 0;
 
-	const toastStore = getToastStore();
-	const modalStore = getModalStore();
+	let showConfirm = false;
+	let confirmResolver: ((r: boolean) => void) | null = null;
 
 	async function resetCalibration() {
-		const confirmed = await new Promise(resolve => {
-			modalStore.trigger({
-				type: 'confirm',
-				title: 'Reset Calibration',
-				body: 'Are you sure you want to reset the calibration? This will reset rx_adj_rssi, tx_ref_rssi, and absorption for all nodes. This action cannot be undone.',
-				response: (r: boolean) => resolve(r)
-			});
+		const confirmed = await new Promise<boolean>(resolve => {
+			showConfirm = true;
+			confirmResolver = (r: boolean) => {
+				resolve(r);
+				showConfirm = false;
+				confirmResolver = null;
+			};
 		});
 
 		if (!confirmed) return;
@@ -87,9 +86,9 @@
 		try {
 			const response = await fetch(`${base}/api/state/calibration/reset`, { method: 'POST' });
 			if (response.ok) {
-				toastStore.trigger({
-					message: 'Calibration reset successfully',
-					background: 'variant-filled-success'
+				toastStore.success({
+					title: 'Success',
+					description: 'Calibration reset successfully'
 				});
 			} else {
 				const errorText = await response.text();
@@ -97,9 +96,9 @@
 			}
 		} catch (error: any) {
 			console.error('Error resetting calibration:', error);
-			toastStore.trigger({
-				message: `Failed to reset calibration: ${error.message}`,
-				background: 'variant-filled-error'
+			toastStore.error({
+				title: 'Error',
+				description: `Failed to reset calibration: ${error.message}`
 			});
 		}
 	}
@@ -108,13 +107,13 @@
 {#if $calibration?.matrix}
 	{#each Object.entries($calibration?.matrix) as [id1, n1] (id1)}
 		{#each rxColumns as id2 (id2)}
-			<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
+			<div class="card preset-filled-secondary-500 p-4" data-popup={'popup-' + id1 + '-' + id2}>
 				{#if n1[id2]}
 					Map Distance {Number(n1[id2].mapDistance?.toPrecision(3))} - Measured {Number(n1[id2]?.distance?.toPrecision(3))} = Error {Number(n1[id2]?.diff?.toPrecision(3))}
 				{:else}
 					No beacon Received in last 30 seconds
 				{/if}
-				<div class="arrow variant-filled-secondary" />
+				<div class="arrow preset-filled-secondary-500" />
 			</div>
 		{/each}
 	{/each}
@@ -124,19 +123,29 @@
 	{#if $calibration?.matrix}
 		<header>
 			<div class="flex justify-between items-center p-2">
-				<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
-					<RadioItem bind:group={data_point} name="justify" value={0}>Error %</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={1}>Error (m)</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={2}>Absorption</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
-				</RadioGroup>
-				<button class="btn variant-filled-warning" on:click={resetCalibration}> Reset Calibration </button>
+				<Segment active="preset-filled-primary-500" hover="hover:preset-tonal-primary">
+					<Segment.Item bind:group={data_point} name="justify" value={0}>Error %</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={1}>Error (m)</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={2}>Absorption</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</Segment.Item>
+					<Segment.Item bind:group={data_point} name="justify" value={5}>Variance (m)</Segment.Item>
+				</Segment>
+				<button class="btn preset-filled-warning-500" on:click={resetCalibration}> Reset Calibration </button>
+
+				{#if showConfirm}
+					<Popover on:close={() => { showConfirm = false; confirmResolver = null; }} title="Reset Calibration">
+						<p>Are you sure you want to reset the calibration? This will reset rx_adj_rssi, tx_ref_rssi, and absorption for all nodes. This action cannot be undone.</p>
+						<div class="flex justify-end gap-2 mt-4">
+							<button class="btn btn-sm preset-filled-error-500" on:click={() => confirmResolver && confirmResolver(true)}>Yes, Reset</button>
+							<button class="btn btn-sm" on:click={() => confirmResolver && confirmResolver(false)}>Cancel</button>
+						</div>
+					</Popover>
+				{/if}
 			</div>
 		</header>
 		<section class="p-4 pt-0">
-			<table class="table table-hover">
+			<table class="table ">
 				<thead>
 					<tr>
 						<th>Name</th>

@@ -3,7 +3,7 @@
 	import { nodes } from '$lib/stores';
 	import { readable } from 'svelte/store';
 	import type { NodeSettingDetails } from '$lib/types';
-	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
+	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
 	import Map from '$lib/Map.svelte';
 	import NodeDetailTabs from '$lib/NodeDetailTabs.svelte';
@@ -52,7 +52,7 @@
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
 		<Accordion>
-			<AccordionItem spacing="space-y-4" open>
+			<Accordion.Item spacing="space-y-4" open>
 				<svelte:fragment slot="summary">
 					<h3 class="h3">Details</h3>
 				</svelte:fragment>
@@ -66,7 +66,7 @@
 						{/each}
 					{/if}
 				</svelte:fragment>
-			</AccordionItem>
+			</Accordion.Item>
 		</Accordion>
 	</div>
 </div>
