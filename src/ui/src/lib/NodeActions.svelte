@@ -3,33 +3,36 @@
 	import { detail } from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { Popover } from '@skeletonlabs/skeleton-svelte';
 	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from './NodeSettingsModal.svelte';
+	import { toaster as toastStore } from '$lib/toaster';
 
 	export let row: Node; // Node data for this row
 	export let col: string; // Column identifier from parent table
 	$: _ = col; // Suppress unused variable warning while preserving the prop
 
-	const modalStore = getModalStore();
-	const toastStore = getToastStore();
 	let loadingEdit = false;
+	let showSettingsPopover = false;
+	let nodeSetting: NodeSetting | null = null;
+	let showFirmwarePopover = false;
+	let firmwareProps: any = null;
 
 	async function onRestart(node: Node) {
 		try {
 			const response = await fetch(`${base}/api/node/${node.id}/restart`, { method: 'POST' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
 
-			toastStore.trigger({
-				message: `${node.name || node.id} asked to reboot`,
-				background: 'variant-filled-primary'
+			toastStore.success({
+				title: 'Reboot Requested',
+				description: `${node.name || node.id} asked to reboot`
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
-				message: error instanceof Error ? error.message : 'Failed to restart node',
-				background: 'variant-filled-error'
+			toastStore.error({
+				title: 'Error',
+				description: error instanceof Error ? error.message : 'Failed to restart node'
 			});
 		}
 	}
@@ -94,15 +97,15 @@
 
 			if (!response.ok) throw new Error(response.statusText || 'Update failed');
 
-			toastStore.trigger({
-				message: `${node.name || node.id} asked to update ${updateDescription}`,
-				background: 'variant-filled-primary'
+			toastStore.success({
+				title: 'Update Requested',
+				description: `${node.name || node.id} asked to update ${updateDescription}`
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
-				message: error instanceof Error ? error.message : 'Update failed',
-				background: 'variant-filled-error'
+			toastStore.error({
+				title: 'Error',
+				description: error instanceof Error ? error.message : 'Update failed'
 			});
 		}
 	}
@@ -112,22 +115,15 @@
 		const updateDescription = getUpdateDescription(node.flavor?.value);
 
 		if ($updateMethod === 'recovery') {
-			modalStore.trigger({
-				title: `Update ${node.name || node.id} Firmware`,
-				body: updateDescription,
-				type: 'component',
-				component: {
-					ref: Firmware,
-					props: {
-						node,
-						firmwareSource: $firmwareSource,
-						flavor: flavorValue,
-						cpu: node.cpu?.value,
-						version: $version,
-						artifact: $artifact
-					}
-				}
-			});
+			firmwareProps = {
+				node,
+				firmwareSource: $firmwareSource,
+				flavor: flavorValue,
+				cpu: node.cpu?.value,
+				version: $version,
+				artifact: $artifact
+			};
+			showFirmwarePopover = true;
 		} else {
 			handleStandardUpdate(node, flavorValue, updateDescription);
 		}
@@ -158,20 +154,17 @@
 				console.warn(`Node settings for ${row.id} not found in API response, using defaults.`);
 			}
 
-			const nodeSetting: NodeSetting = nodeSettingsDetails.settings;
+			nodeSetting = nodeSettingsDetails.settings;
 
-			modalStore.trigger({
-				type: 'component',
-				component: { ref: NodeSettingsModal, props: { nodeSetting } },
-				title: `Edit Settings for ${nodeSetting.name || nodeSetting.id}`
-			});
+			nodeSetting = nodeSettingsDetails.settings;
+			showSettingsPopover = true;
 		} catch (ex) {
 			console.error('Error fetching node settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading node settings: ${ex.message}` : 'An unknown error occurred while loading node settings.';
 
-			toastStore.trigger({
-				message: errorMessage,
-				background: 'variant-filled-error'
+			toastStore.error({
+				title: 'Error',
+				description: errorMessage
 			});
 		} finally {
 			loadingEdit = false;
@@ -181,7 +174,7 @@
 
 <div class="flex gap-1">
 	{#if row.online}
-		<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
+		<button class="btn btn-sm preset-filled-primary-500" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
 			{#if loadingEdit}
 				<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 			{:else}
@@ -189,21 +182,33 @@
 			{/if}
 		</button>
 
-		<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
+		<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
 
 		{#if row.telemetry?.version}
-			<button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
+			<button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm preset-filled-tertiary-500" aria-label="Update node firmware"> Update </button>
 		{/if}
 
 		{#if row.telemetry}
-			<button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
+			<button on:click={() => onRestart(row)} class="btn btn-sm preset-filled-warning-500" aria-label="Restart node"> Restart </button>
 		{/if}
 
 		{#if row.telemetry?.ip}
-			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
+			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm preset-filled" aria-label="Open node web interface">
 				<span>Visit</span>
 				<span><img class="w-4" src={link} alt="External Link" /></span>
 			</a>
 		{/if}
 	{/if}
 </div>
+
+{#if showFirmwarePopover && firmwareProps}
+	<Popover on:close={() => showFirmwarePopover = false} title={`Update ${firmwareProps.node.name || firmwareProps.node.id} Firmware`}>
+		<Firmware {...firmwareProps} />
+	</Popover>
+{/if}
+
+{#if showSettingsPopover && nodeSetting}
+	<Popover on:close={() => showSettingsPopover = false} title={`Edit Settings for ${nodeSetting?.name || nodeSetting?.id || ''}`}>
+		<NodeSettingsModal {nodeSetting} on:close={() => showSettingsPopover = false} />
+	</Popover>
+{/if}

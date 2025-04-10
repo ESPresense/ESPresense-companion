@@ -1,7 +1,6 @@
 <script lang="ts">
 	import NodesTable from '$lib/NodesTable.svelte';
-	import { getToastStore, SlideToggle } from '@skeletonlabs/skeleton';
-	import type { ToastSettings } from '@skeletonlabs/skeleton';
+	import type { ToastSettings } from '@skeletonlabs/skeleton-svelte';
 	import { base } from '$app/paths';
 	import type { NodeSettingDetails } from '$lib/types';
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
@@ -11,7 +10,6 @@
 	let prerelease: boolean | null;
 	let loading = true;
 	let saving = false;
-	const toastStore = getToastStore();
 
 	async function saveSettings() {
 		try {
@@ -36,7 +34,7 @@
 			// Optional: Show success toast
 			const t: ToastSettings = {
 				message: 'Settings saved successfully',
-				background: 'variant-filled-success'
+				background: 'preset-filled-success-500'
 			};
 			toastStore.trigger(t);
 		} catch (error) {
@@ -44,7 +42,7 @@
 			const message = error instanceof Error ? error.message : 'Unknown error occurred';
 			const t: ToastSettings = {
 				message,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			};
 			toastStore.trigger(t);
 		} finally {
@@ -67,7 +65,7 @@
 			const message = error instanceof Error ? error.message : 'Unknown error occurred';
 			const t: ToastSettings = {
 				message,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			};
 			toastStore.trigger(t);
 		} finally {
