@@ -6,7 +6,7 @@ namespace ESPresense.Models;
 public class OptimizationResults
 {
 
-    public Dictionary<string, ProposedValues> RxNodes { get; set; } = new();
+    public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
     public double Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss)
     {
@@ -20,7 +20,7 @@ public class OptimizationResults
                 var tx = nss.Get(m.Tx.Id);
                 var rx = nss.Get(m.Rx.Id);
 
-                RxNodes.TryGetValue(m.Rx.Id, out var pv);
+                Nodes.TryGetValue(m.Rx.Id, out var pv);
                 double rxAdjRssi = pv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
                 double txPower = tx.Calibration.TxRefRssi ?? -59;
                 double pathLossExponent = pv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;

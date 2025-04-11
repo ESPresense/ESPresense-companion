@@ -22,7 +22,7 @@ public class AbsorptionErrOptimizer : IOptimizer
 
         foreach (var g in os.ByRx())
         {
-            var rxNodes = g.Where(b => b.Current).ToArray();
+            var rxNodes = g.ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
             double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (dn.RefRssi - dn.Rssi) / (10.0d * x[0]));
@@ -51,7 +51,7 @@ public class AbsorptionErrOptimizer : IOptimizer
                 var absorption = result.MinimizingPoint[0];
                 if (absorption < optimization?.AbsorptionMin) continue;
                 if (absorption > optimization?.AbsorptionMax) continue;
-                results.RxNodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = null, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
+                results.Nodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = null, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
             }
             catch (Exception ex)
             {

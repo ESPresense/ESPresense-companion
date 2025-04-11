@@ -64,7 +64,7 @@ internal class OptimizationRunner : BackgroundService
                         continue;
                     }
                     Log.Information("Optimizer {0,-24} found better results, rms {1:0.000}<{2:0.000}", optimizer.Name, d, best);
-                    foreach (var (id, result) in results.RxNodes)
+                    foreach (var (id, result) in results.Nodes)
                     {
                         Log.Information("Optimizer set {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} Error: {3}", id, result.Absorption, result.RxAdjRssi, result.Error);
                         var a = _nsd.Get(id);

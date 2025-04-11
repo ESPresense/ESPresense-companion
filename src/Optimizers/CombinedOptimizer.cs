@@ -23,7 +23,7 @@ public class CombinedOptimizer : IOptimizer
         var results = new OptimizationResults();
         var optimization = _state.Config?.Optimization;
 
-        var allNodes = os.ByRx().SelectMany(g => g).Where(b => b.Current).ToList();
+        var allNodes = os.ByRx().SelectMany(g => g).ToList();
         var uniqueDeviceIds = allNodes.SelectMany(n => new[] { n.Rx.Id, n.Tx.Id }).Distinct().ToList();
 
         if (allNodes.Count < 3) return results;
@@ -42,7 +42,7 @@ public class CombinedOptimizer : IOptimizer
                 if (rxAdjRssiDict.TryGetValue(deviceId, out var rxAdjRssi) &&
                     nodeAbsorptions.TryGetValue(deviceId, out var absorption))
                 {
-                    results.RxNodes[deviceId] = new ProposedValues
+                    results.Nodes[deviceId] = new ProposedValues
                     {
                         RxAdjRssi = rxAdjRssi,
                         Absorption = absorption,

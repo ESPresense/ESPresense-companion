@@ -32,12 +32,13 @@ public class OptNode
 
 public class Measure
 {
-    public bool Current { get; set; }
     public OptNode Rx { get; set; }
     public OptNode Tx { get; set; }
-    public double RefRssi { get; set; }
+
     public double Rssi { get; set; }
+    public double? RssiVar { get; set; }
+    public double RefRssi { get; set; }
+
     public double Distance { get; set; }
     public double? DistVar { get; set; }
-    public double? RssiVar { get; set; }
 }

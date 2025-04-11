@@ -34,7 +34,7 @@ public class AbsorptionAvgOptimizer : IOptimizer
                 var absorption = pathLossExponents.Average();
                 if (absorption < _state.Config?.Optimization.AbsorptionMin) continue;
                 if (absorption > _state.Config?.Optimization.AbsorptionMax) continue;
-                results.RxNodes.Add(g.Key.Id, new ProposedValues { Absorption = absorption });
+                results.Nodes.Add(g.Key.Id, new ProposedValues { Absorption = absorption });
             }
         }
 

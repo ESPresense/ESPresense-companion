@@ -26,7 +26,7 @@ public class RxAdjRssiOptimizer : IOptimizer
 
         foreach (var g in os.ByRx())
         {
-            var rxNodes = g.Where(b => b.Current).ToArray();
+            var rxNodes = g.ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
             double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (-59 + x[0] - dn.Rssi ) / (10.0d * absorption));
@@ -53,7 +53,7 @@ public class RxAdjRssiOptimizer : IOptimizer
                 var rxAdjRssi = result.MinimizingPoint[0];
                 if (rxAdjRssi < optimization?.RxAdjRssiMin) rxAdjRssi = optimization.RxAdjRssiMin;
                 if (rxAdjRssi > optimization?.RxAdjRssiMax) rxAdjRssi = optimization.RxAdjRssiMax;
-                or.RxNodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = rxAdjRssi, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
+                or.Nodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = rxAdjRssi, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
             }
             catch (Exception ex)
             {
