@@ -6,9 +6,11 @@ public class NodeToNode(Node tx, Node rx)
     public Node Rx { get; } = rx;
 
     public double Distance { get; set; }
+    public double? DistVar { get; set; }
+
     public double Rssi { get; set; }
+    public double? RssiVar { get; set; }
     public double RefRssi { get; set; }
-    public double? Variance { get; set; }
 
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
@@ -19,8 +21,9 @@ public class NodeToNode(Node tx, Node rx)
     public bool ReadMessage(DeviceMessage payload)
     {
         Rssi = payload.Rssi;
+        RssiVar = payload.RssiVar;
         RefRssi = payload.RefRssi;
-        Variance = payload.Variance;
+        DistVar = payload.DistVar;
         var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;
         if (moved) LastDistance = payload.Distance;
         Distance = payload.Distance;

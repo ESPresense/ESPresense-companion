@@ -114,7 +114,7 @@
 				{:else}
 					No beacon Received in last 30 seconds
 				{/if}
-				<div class="arrow variant-filled-secondary" />
+				<div class="arrow variant-filled-secondary"></div>
 			</div>
 		{/each}
 	{/each}
@@ -153,7 +153,7 @@
 								{#if n1[id2]}
 									<td use:popup={{ event: 'hover', target: 'popup-' + id1 + '-' + id2, placement: 'top' }} style={coloring(n1[id2]?.percent)}>{value(n1[id2], data_point)}</td>
 								{:else}
-									<td />
+									<td></td>
 								{/if}
 							{/each}
 						</tr>

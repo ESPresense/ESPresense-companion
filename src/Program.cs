@@ -93,7 +93,7 @@ app.UseWebSockets(new WebSocketOptions
 app.UseSerilogRequestLogging(o =>
 {
     o.EnrichDiagnosticContext = (dc, ctx) => dc.Set("UserAgent", ctx?.Request.Headers.UserAgent);
-    o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : LogEventLevel.Verbose;
+    o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : ctx.Request.Path.Value.IndexOf("/state", StringComparison.OrdinalIgnoreCase) > 0 ? LogEventLevel.Verbose : LogEventLevel.Debug;
 });
 
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");
