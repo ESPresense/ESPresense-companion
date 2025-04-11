@@ -9,7 +9,7 @@ public class NodeToNode(Node tx, Node rx)
     public double? DistVar { get; set; }
 
     public double Rssi { get; set; }
-    public double? RssiVar { get; private set; }
+    public double? RssiVar { get; set; }
     public double RefRssi { get; set; }
 
     public DateTime? LastHit { get; set; }
