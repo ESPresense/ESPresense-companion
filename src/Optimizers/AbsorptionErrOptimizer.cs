@@ -51,7 +51,7 @@ public class AbsorptionErrOptimizer : IOptimizer
                 var absorption = result.MinimizingPoint[0];
                 if (absorption < optimization?.AbsorptionMin) continue;
                 if (absorption > optimization?.AbsorptionMax) continue;
-                results.RxNodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = null, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
+                results.Nodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = null, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
             }
             catch (Exception ex)
             {

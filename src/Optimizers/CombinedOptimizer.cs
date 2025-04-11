@@ -42,7 +42,7 @@ public class CombinedOptimizer : IOptimizer
                 if (rxAdjRssiDict.TryGetValue(deviceId, out var rxAdjRssi) &&
                     nodeAbsorptions.TryGetValue(deviceId, out var absorption))
                 {
-                    results.RxNodes[deviceId] = new ProposedValues
+                    results.Nodes[deviceId] = new ProposedValues
                     {
                         RxAdjRssi = rxAdjRssi,
                         Absorption = absorption,
