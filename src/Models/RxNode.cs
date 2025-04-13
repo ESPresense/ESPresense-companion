@@ -9,6 +9,7 @@ public class RxNode
     public double? DistVar { get; set; }
 
     public double Rssi { get; set; }
+    public double? RssiRxAdj { get; set; }
     public double? RssiVar { get; set; }
     public double RefRssi { get; set; }
 
@@ -24,6 +25,7 @@ public class RxNode
     public bool ReadMessage(DeviceMessage payload)
     {
         Rssi = payload.Rssi;
+        RssiRxAdj = payload.RssiRxAdj;
         RssiVar = payload.RssiVar;
         RefRssi = payload.RefRssi;
         var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;

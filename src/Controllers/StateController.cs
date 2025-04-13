@@ -60,6 +60,12 @@ public class StateController : ControllerBase
     public Calibration GetCalibration()
     {
         var c = new Calibration();
+
+        // Lists to track all distance measurements for statistical calculations
+        var mapDistances = new List<double>();
+        var actualDistances = new List<double>();
+        var squaredDiffs = new List<double>();
+
         foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
         {
             var txNs = _nsd.Get(txId);
@@ -77,8 +83,46 @@ public class StateController : ControllerBase
                 rxM["diff"] = rx.Distance - rx.MapDistance;
                 rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
                 if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
+
+                // Collect values for statistical calculations if they're valid
+                if (rx.MapDistance > 0 && rx.Distance > 0)
+                {
+                    mapDistances.Add(rx.MapDistance);
+                    actualDistances.Add(rx.Distance);
+                    squaredDiffs.Add(Math.Pow(rx.Distance - rx.MapDistance, 2));
+                }
             }
         }
+
+        // Calculate Pearson correlation coefficient inline
+        if (mapDistances.Count > 0)
+        {
+            double sumX = mapDistances.Sum();
+            double sumY = actualDistances.Sum();
+            double sumXY = 0;
+            double sumX2 = 0;
+            double sumY2 = 0;
+
+            for (int i = 0; i < mapDistances.Count; i++)
+            {
+                sumXY += mapDistances[i] * actualDistances[i];
+                sumX2 += mapDistances[i] * mapDistances[i];
+                sumY2 += actualDistances[i] * actualDistances[i];
+            }
+
+            double n = mapDistances.Count;
+            double numerator = n * sumXY - sumX * sumY;
+            double denominator = Math.Sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+
+            c.R = denominator == 0 ? 0 : numerator / denominator;
+        }
+        else
+        {
+            c.R = 0;
+        }
+
+        // Calculate RMSE inline
+        c.RMSE = mapDistances.Count > 0 ? Math.Sqrt(squaredDiffs.Sum() / mapDistances.Count) : 0;
 
         return c;
     }
@@ -99,7 +143,7 @@ public class StateController : ControllerBase
         ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
-            changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions (JsonSerializerDefaults.Web)));
+            changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             newMessage.Set();
         }
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
@@ -109,7 +153,7 @@ public class StateController : ControllerBase
         {
             if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
-        };
+        }
 
         void OnDeviceMessageReceived(object? sender, DeviceMessageEventArgs args)
         {
@@ -229,9 +273,9 @@ public class StateController : ControllerBase
             foreach (var node in _state.Nodes.Values)
             {
                 var nodeSettings = _nsd.Get(node.Id);
-                nodeSettings.Calibration.TxRefRssi = null;
-                nodeSettings.Calibration.RxAdjRssi = null;
-                nodeSettings.Calibration.Absorption = null;
+                nodeSettings.Calibration.TxRefRssi = 0;
+                nodeSettings.Calibration.RxAdjRssi = 0;
+                nodeSettings.Calibration.Absorption = 0;
                 await _nsd.Set(node.Id, nodeSettings);
             }
 

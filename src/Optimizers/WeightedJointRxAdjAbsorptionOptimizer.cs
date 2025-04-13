@@ -77,7 +77,7 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
                 var rxAdjRssi = Math.Clamp(result.MinimizingPoint[0], rxAdjMin, rxAdjMax);
                 var absorption = Math.Clamp(result.MinimizingPoint[1], absorptionMin, absorptionMax);
 
-                Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}",
+                Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3:0.0}",
                     g.Key.Id, rxAdjRssi, absorption, result.FunctionInfoAtMinimum.Value);
 
                 or.Nodes.Add(g.Key.Id, new ProposedValues

@@ -92,7 +92,7 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                 var resultAbs = solverAbs.FindMinimum(objAbs, initialGuessAbs);
                 var absorption = Math.Clamp(resultAbs.MinimizingPoint[0], absorptionMin, absorptionMax); // Fixed index from [1] to [0]
 
-                Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}",
+                Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3:0.0}",
                     g.Key.Id, rxAdjRssi, absorption, resultAbs.FunctionInfoAtMinimum.Value);
 
                 or.Nodes.Add(g.Key.Id, new ProposedValues

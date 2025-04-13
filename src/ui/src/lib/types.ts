@@ -208,6 +208,8 @@ export interface NodeCalibrationMatrix {
 
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
+	rmse?: number;
+	r?: number;
 }
 
 export function isNode(d: Device | Node | null): d is Node {
@@ -217,11 +219,11 @@ export function isNode(d: Device | Node | null): d is Node {
 
 export interface DeviceHistory {
 	id: string;
-	when: string; // ISO date string
+	when: string;
 	location: { x: number; y: number; z: number };
 	confidence?: number;
 	fixes?: number;
 	scale?: number;
-	room?: string; // Room ID
-	floor?: string; // Floor ID
+	room?: string;
+	floor?: string;
 }

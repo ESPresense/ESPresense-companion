@@ -117,7 +117,7 @@ namespace ESPresense.Models
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
         [YamlMember(Alias = "interval_secs")] public int IntervalSecs { get; set; } = 60;
-        [YamlMember(Alias = "max_snapshots")] public int MaxSnapshots { get; set; } = 60;
+        [YamlMember(Alias = "keep_snapshot_mins")] public int KeepSnapshotMins { get; set; } = 5;
 
         [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set;  } = new();
 

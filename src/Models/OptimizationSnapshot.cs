@@ -36,9 +36,15 @@ public class Measure
     public OptNode Tx { get; set; }
 
     public double Rssi { get; set; }
+    public double? RssiRxAdj { get; set; }
     public double? RssiVar { get; set; }
     public double RefRssi { get; set; }
 
     public double Distance { get; set; }
     public double? DistVar { get; set; }
+
+    public double GetUnadjustedRssi()
+    {
+        return Rssi + RssiRxAdj.GetValueOrDefault(0);
+    }
 }

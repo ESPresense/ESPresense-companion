@@ -78,26 +78,34 @@ public class State
     public OptimizationSnapshot TakeOptimizationSnapshot()
     {
         Dictionary<string, OptNode> nodes = new();
-        var os = new OptimizationSnapshot();
+        var os = new OptimizationSnapshot
+        {
+            Timestamp = DateTime.UtcNow
+        };
         foreach (var (txId, txNode) in Nodes)
             foreach (var (rxId, meas) in txNode.RxNodes)
             {
                 var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
                 var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx!.Name, Location = meas.Rx.Location });
                 if (meas.Current)
-                os.Measures.Add(new Measure()
                 {
-                    Distance = meas.Distance,
-                    DistVar = meas.DistVar,
-                    Rssi = meas.Rssi,
-                    RssiVar = meas.RssiVar,
-                    RefRssi = meas.RefRssi,
-                    Tx = tx,
-                    Rx = rx,
-                });
+                    os.Measures.Add(new Measure()
+                    {
+                        Distance = meas.Distance,
+                        DistVar = meas.DistVar,
+                        Rssi = meas.Rssi,
+                        RssiVar = meas.RssiVar,
+                        RefRssi = meas.RefRssi,
+                        Tx = tx,
+                        Rx = rx,
+                    });
+                }
             }
 
-        if (OptimizationSnaphots.Count > Config?.Optimization.MaxSnapshots) OptimizationSnaphots.RemoveAt(0);
+        // Remove expired snapshots by time
+        var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
+        var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
+        OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
         OptimizationSnaphots.Add(os);
 
         return os;

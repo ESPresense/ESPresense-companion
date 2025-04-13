@@ -14,6 +14,9 @@ namespace ESPresense.Models
         [JsonProperty("rssi")]
         public double Rssi { get; set; }
 
+        [JsonProperty("rxAdj")]
+        public double? RssiRxAdj { get; set; }
+
         [JsonProperty("rssiVar")]
         public double? RssiVar { get; set; }
 
