@@ -16,6 +16,16 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
 
     public string Name => "Joint RxAdj & Absorption";
 
+    /// <summary>
+    /// Optimizes radio receiver adjustment (RxAdjRssi) and absorption parameters for each receiver group in the provided snapshot.
+    /// </summary>
+    /// <param name="os">The snapshot containing groups of receiver nodes to process for optimization.</param>
+    /// <returns>
+    /// An <see cref="OptimizationResults"/> object aggregating the optimized values for each receiver group.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the optimization configuration is not available in the state.
+    /// </exception>
     public OptimizationResults Optimize(OptimizationSnapshot os)
     {
         OptimizationResults or = new();

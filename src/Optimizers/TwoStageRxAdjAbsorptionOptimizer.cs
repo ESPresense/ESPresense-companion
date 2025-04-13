@@ -16,6 +16,19 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
 
     public string Name => "Two-Stage RxAdj & Absorption";
 
+    /// <summary>
+    /// Optimizes radio signal parameters using a two-stage process.
+    /// </summary>
+    /// <remarks>
+    /// The method retrieves configuration settings to establish bounds for the Rx RSSI adjustment and absorption parameters. It processes groups of nodes from the provided snapshot (ignoring groups with fewer than three nodes). In stage 1, it calibrates the Rx RSSI adjustment using nearby nodes (or all nodes if no close ones are found) with a fixed absorption value. In stage 2, it refines the absorption parameter based on all nodes with the previously optimized Rx RSSI adjustment. Optimization is performed using the Nelder–Mead simplex algorithm, and results are clamped within the specified bounds. Exceptions during group processing are caught and logged, while an InvalidOperationException is thrown if the required optimization configuration is missing.
+    /// </remarks>
+    /// <param name="os">A snapshot representing the current node groups to optimize.</param>
+    /// <returns>
+    /// An OptimizationResults object mapping node identifiers to their proposed values, including the optimized Rx RSSI adjustment, absorption, and error measurement.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if the optimization configuration is not found in the current state.
+    /// </exception>
     public OptimizationResults Optimize(OptimizationSnapshot os)
     {
         OptimizationResults or = new();

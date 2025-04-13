@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.IO;
 using System.Text;
@@ -56,6 +56,18 @@ public class StateController : ControllerBase
         return _config.Config ?? new Config();
     }
 
+    /// <summary>
+    /// Retrieves calibration data and computes statistical measures based on active node distance measurements.
+    /// </summary>
+    /// <remarks>
+    /// Iterates through active transmitter and receiver node pairs to populate a calibration matrix with various parameters,
+    /// while collecting valid mapped and actual distance measurements. It then calculates the Pearson correlation coefficient (R)
+    /// between mapped and actual distances and the root mean square error (RMSE) to quantify deviations. The results are returned
+    /// in a Calibration object.
+    /// </remarks>
+    /// <returns>
+    /// A Calibration object containing the calibration matrix along with computed values for R and RMSE.
+    /// </returns>
     [HttpGet("api/state/calibration")]
     public Calibration GetCalibration()
     {
@@ -127,6 +139,18 @@ public class StateController : ControllerBase
         return c;
     }
 
+    /// <summary>
+    /// Opens a WebSocket connection to stream real-time state updates.
+    /// </summary>
+    /// <remarks>
+    /// This asynchronous method verifies that the request is a valid WebSocket connection and, if so, establishes the connection.
+    /// It registers event handlers to deliver updates for configuration, calibration, node state, and device changes.
+    /// Additionally, the method processes incoming commands to adjust filtering and device message subscriptions based on client input.
+    /// If the request is not a valid WebSocket request, it responds with a 400 Bad Request status.
+    /// </remarks>
+    /// <param name="showAll">
+    /// Determines whether to include all device updates (true) or only updates for tracked devices (false).
+    /// </param>
     [ApiExplorerSettings(IgnoreApi = true)]
     [Route("/ws")]
     public async Task Get([FromQuery] bool showAll = false)
@@ -264,6 +288,12 @@ public class StateController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Resets calibration settings for every node by setting TxRefRssi, RxAdjRssi, and Absorption to zero.
+    /// </summary>
+    /// <remarks>
+    /// Iterates over all nodes, updates their calibration values to zero asynchronously, and returns an HTTP 200 response on success. If an exception occurs during the process, logs the error and returns an HTTP 500 response with an error message.
+    /// </remarks>
     [HttpPost("api/state/calibration/reset")]
     public async Task<IActionResult> ResetCalibration()
     {
