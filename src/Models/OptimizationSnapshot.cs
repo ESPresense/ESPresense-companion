@@ -44,7 +44,7 @@ public class Measure
     public double? DistVar { get; set; }
 
     /// <summary>
-    /// Calculates and returns the unadjusted RSSI value by adding the base RSSI to the adjusted RSSI,
+    /// Calculates and returns the unadjusted RSSI value by backing out the Rx Adj RSSI to the adjusted RSSI,
     /// which defaults to 0 if not set.
     /// </summary>
     /// <returns>The computed unadjusted RSSI value.</returns>
