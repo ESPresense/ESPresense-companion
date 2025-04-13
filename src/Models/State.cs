@@ -103,6 +103,7 @@ public class State
                         Distance = meas.Distance,
                         DistVar = meas.DistVar,
                         Rssi = meas.Rssi,
+                        RssiRxAdj = meas.RssiRxAdj,
                         RssiVar = meas.RssiVar,
                         RefRssi = meas.RefRssi,
                         Tx = tx,
