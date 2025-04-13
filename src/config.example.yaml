@@ -28,6 +28,7 @@ away_timeout: 120
 optimization:
   enabled: true
   interval_secs: 3600
+  keep_snapshot_mins: 5   # How long to keep optimization snapshots (default: 5 minutes)
   limits:
     absorption_min: 2.5
     absorption_max: 3.5

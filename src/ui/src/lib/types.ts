@@ -208,8 +208,19 @@ export interface NodeCalibrationMatrix {
 
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
+	rmse?: number;
+	r?: number;
 }
 
+/**
+ * Determines if the provided object is a Node.
+ *
+ * This type guard checks if the object has a defined telemetry property,
+ * confirming it as a Node rather than a Device or null.
+ *
+ * @param d - Object to check (can be a Device, Node, or null).
+ * @returns True if the object is a Node; otherwise, false.
+ */
 export function isNode(d: Device | Node | null): d is Node {
 	return (d as Node)?.telemetry !== undefined;
 }
@@ -217,11 +228,11 @@ export function isNode(d: Device | Node | null): d is Node {
 
 export interface DeviceHistory {
 	id: string;
-	when: string; // ISO date string
+	when: string;
 	location: { x: number; y: number; z: number };
 	confidence?: number;
 	fixes?: number;
 	scale?: number;
-	room?: string; // Room ID
-	floor?: string; // Floor ID
+	room?: string;
+	floor?: string;
 }

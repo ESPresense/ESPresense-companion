@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using ESPresense.Models;
 using Serilog;
 
@@ -26,57 +26,86 @@ namespace ESPresense.Services
             return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new NodeSettings(id);
         }
 
+        /// <summary>
+        /// Asynchronously updates a node's settings by sending updates only for properties that have changed.
+        /// </summary>
+        /// <param name="id">The identifier of the node. If set to "*", the updates are marked to be retained.</param>
+        /// <param name="ds">A NodeSettings object containing the new configuration values; only properties that differ from the current settings are updated.</param>
+        /// <remarks>
+        /// Compares the new settings with the current stored settings and, for each changed property,
+        /// sends an update via the MQTT coordinator along with the previous value.
+        /// </remarks>
         public async Task Set(string id, NodeSettings ds)
         {
             var retain = id == "*";
             var old = Get(id);
 
             if (ds.Name != null && ds.Name != old.Name)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/name/set", ds.Name, retain);
+                await mqtt.UpdateSetting(id, "name", ds.Name, retain, old.Name);
 
             // Updating settings
             if (ds.Updating.AutoUpdate != null && ds.Updating.AutoUpdate != old.Updating.AutoUpdate)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/auto_update/set", ds.Updating.AutoUpdate == true ? "ON" : "OFF", retain);
+                await mqtt.UpdateSetting(id, "auto_update", ds.Updating.AutoUpdate, retain, old.Updating.AutoUpdate);
+
             if (ds.Updating.Prerelease != null && ds.Updating.Prerelease != old.Updating.Prerelease)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/prerelease/set", ds.Updating.Prerelease == true ? "ON" : "OFF", retain);
+                await mqtt.UpdateSetting(id, "prerelease", ds.Updating.Prerelease, retain, old.Updating.Prerelease);
 
             // Scanning settings
             if (ds.Scanning.ForgetAfterMs != null && ds.Scanning.ForgetAfterMs != old.Scanning.ForgetAfterMs)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/forget_after_ms/set", $"{ds.Scanning.ForgetAfterMs}", retain);
+                await mqtt.UpdateSetting(id, "forget_after_ms", ds.Scanning.ForgetAfterMs, retain, old.Scanning.ForgetAfterMs);
 
             // Counting settings
             if (ds.Counting.IdPrefixes != null && ds.Counting.IdPrefixes != old.Counting.IdPrefixes)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_ids/set", $"{ds.Counting.IdPrefixes}", retain);
+                await mqtt.UpdateSetting(id, "count_ids", ds.Counting.IdPrefixes, retain, old.Counting.IdPrefixes);
+
             if (ds.Counting.MinDistance != null && ds.Counting.MinDistance != old.Counting.MinDistance)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_min_dist/set", $"{ds.Counting.MinDistance:0.00}", retain);
+                await mqtt.UpdateSetting(id, "count_min_dist", ds.Counting.MinDistance, retain, old.Counting.MinDistance);
+
             if (ds.Counting.MaxDistance != null && ds.Counting.MaxDistance != old.Counting.MaxDistance)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_max_dist/set", $"{ds.Counting.MaxDistance:0.00}", retain);
+                await mqtt.UpdateSetting(id, "count_max_dist", ds.Counting.MaxDistance, retain, old.Counting.MaxDistance);
+
             if (ds.Counting.MinMs != null && ds.Counting.MinMs != old.Counting.MinMs)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/count_ms/set", $"{ds.Counting.MinMs}", retain);
+                await mqtt.UpdateSetting(id, "count_ms", ds.Counting.MinMs, retain, old.Counting.MinMs);
 
             // Filtering settings
             if (ds.Filtering.IncludeIds != null && ds.Filtering.IncludeIds != old.Filtering.IncludeIds)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/include/set", $"{ds.Filtering.IncludeIds}", retain);
+                await mqtt.UpdateSetting(id, "include", ds.Filtering.IncludeIds, retain, old.Filtering.IncludeIds);
+
             if (ds.Filtering.ExcludeIds != null && ds.Filtering.ExcludeIds != old.Filtering.ExcludeIds)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/exclude/set", $"{ds.Filtering.ExcludeIds}", retain);
+                await mqtt.UpdateSetting(id, "exclude", ds.Filtering.ExcludeIds, retain, old.Filtering.ExcludeIds);
+
             if (ds.Filtering.MaxDistance != null && ds.Filtering.MaxDistance != old.Filtering.MaxDistance)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/max_distance/set", $"{ds.Filtering.MaxDistance:0.00}", retain);
+                await mqtt.UpdateSetting(id, "max_distance", ds.Filtering.MaxDistance, retain, old.Filtering.MaxDistance);
+
             if (ds.Filtering.SkipDistance != null && ds.Filtering.SkipDistance != old.Filtering.SkipDistance)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/skip_distance/set", $"{ds.Filtering.SkipDistance:0.00}", retain);
+                await mqtt.UpdateSetting(id, "skip_distance", ds.Filtering.SkipDistance, retain, old.Filtering.SkipDistance);
+
             if (ds.Filtering.SkipMs != null && ds.Filtering.SkipMs != old.Filtering.SkipMs)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/skip_ms/set", $"{ds.Filtering.SkipMs}", retain);
+                await mqtt.UpdateSetting(id, "skip_ms", ds.Filtering.SkipMs, retain, old.Filtering.SkipMs);
 
             // Calibration settings
             if (ds.Calibration.Absorption != null && ds.Calibration.Absorption != old.Calibration.Absorption)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/absorption/set", $"{ds.Calibration.Absorption:0.00}", retain);
+                await mqtt.UpdateSetting(id, "absorption", ds.Calibration.Absorption, retain, old.Calibration.Absorption);
+
             if (ds.Calibration.RxAdjRssi != null && ds.Calibration.RxAdjRssi != old.Calibration.RxAdjRssi)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/rx_adj_rssi/set", $"{ds.Calibration.RxAdjRssi}", retain);
+                await mqtt.UpdateSetting(id, "rx_adj_rssi", ds.Calibration.RxAdjRssi, retain, old.Calibration.RxAdjRssi);
+
             if (ds.Calibration.TxRefRssi != null && ds.Calibration.TxRefRssi != old.Calibration.TxRefRssi)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/tx_ref_rssi/set", $"{ds.Calibration.TxRefRssi}", retain);
+                await mqtt.UpdateSetting(id, "tx_ref_rssi", ds.Calibration.TxRefRssi, retain, old.Calibration.TxRefRssi);
+
             if (ds.Calibration.RxRefRssi != null && ds.Calibration.RxRefRssi != old.Calibration.RxRefRssi)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/ref_rssi/set", $"{ds.Calibration.RxRefRssi}", retain);
+                await mqtt.UpdateSetting(id, "ref_rssi", ds.Calibration.RxRefRssi, retain, old.Calibration.RxRefRssi);
         }
 
+        /// <summary>
+        /// Asynchronously listens for and processes incoming node setting updates via MQTT.
+        /// </summary>
+        /// <remarks>
+        /// Registers an event handler on the MQTT coordinator's NodeSettingReceivedAsync event to parse and update node settings
+        /// based on incoming messages. Depending on the setting type, the handler updates various properties of a node's settings in an in-memory store.
+        /// The method runs indefinitely until cancellation is requested via the provided token.
+        /// </remarks>
+        /// <param name="stoppingToken">A token that signals the request to stop the service gracefully.</param>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             mqtt.NodeSettingReceivedAsync += arg =>

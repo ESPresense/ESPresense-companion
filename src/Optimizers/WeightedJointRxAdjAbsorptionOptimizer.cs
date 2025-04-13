@@ -16,6 +16,19 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
 
     public string Name => "Weighted Joint RxAdj & Absorption";
 
+    /// <summary>
+    /// Optimizes RSSI adjustment and absorption parameters for each receiver group based on measurement data.
+    /// </summary>
+    /// <param name="os">An optimization snapshot containing groups of measurements organized by receiver.</param>
+    /// <returns>
+    /// An <see cref="OptimizationResults"/> instance mapping receiver node IDs to their proposed RxAdj, absorption, and error values.
+    /// </returns>
+    /// <remarks>
+    /// The method derives configuration bounds from the state (or defaults if undefined) and logs these bounds. For each receiver group with at least three measurements,
+    /// it computes distances between transmitter and receiver positions and defines an objective function that evaluates a weighted squared error between observed and
+    /// predicted distances. Optimization is then performed using the Nelder-Mead simplex method, and the resulting parameters are clamped within the specified bounds.
+    /// Any exceptions during a group’s optimization are caught and logged.
+    /// </remarks>
     public OptimizationResults Optimize(OptimizationSnapshot os)
     {
         OptimizationResults or = new();
@@ -77,7 +90,7 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
                 var rxAdjRssi = Math.Clamp(result.MinimizingPoint[0], rxAdjMin, rxAdjMax);
                 var absorption = Math.Clamp(result.MinimizingPoint[1], absorptionMin, absorptionMax);
 
-                Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}",
+                Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3:0.0}",
                     g.Key.Id, rxAdjRssi, absorption, result.FunctionInfoAtMinimum.Value);
 
                 or.Nodes.Add(g.Key.Id, new ProposedValues

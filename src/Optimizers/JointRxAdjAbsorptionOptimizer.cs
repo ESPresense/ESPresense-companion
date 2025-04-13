@@ -16,6 +16,16 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
 
     public string Name => "Joint RxAdj & Absorption";
 
+    /// <summary>
+    /// Optimizes radio receiver adjustment (RxAdjRssi) and absorption parameters for each receiver group in the provided snapshot.
+    /// </summary>
+    /// <param name="os">The snapshot containing groups of receiver nodes to process for optimization.</param>
+    /// <returns>
+    /// An <see cref="OptimizationResults"/> object aggregating the optimized values for each receiver group.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the optimization configuration is not available in the state.
+    /// </exception>
     public OptimizationResults Optimize(OptimizationSnapshot os)
     {
         OptimizationResults or = new();
@@ -54,7 +64,7 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
 
                         error += 0.25 * ( Math.Abs(x[0]) + Math.Pow(x[1] - absorptionMiddle, 2));
 
-                        Log.Debug("Optimized {0,-20}     : RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}", g.Key.Id, x[0], x[1], error);
+                        Log.Debug("Optimized {0,-20}     : RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3:0.0}", g.Key.Id, x[0], x[1], error);
                         return error;
                     });
 
@@ -67,7 +77,7 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
                 var rxAdjRssi = Math.Clamp(result.MinimizingPoint[0], optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
                 var absorption = Math.Clamp(result.MinimizingPoint[1], optimization.AbsorptionMin, optimization.AbsorptionMax);
 
-                Log.Information("Optimized {0,-20}     : RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3}",
+                Log.Information("Optimized {0,-20}     : RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3:0.0}",
                     g.Key.Id, rxAdjRssi, absorption, result.FunctionInfoAtMinimum.Value);
 
                 or.Nodes.Add(g.Key.Id, new ProposedValues

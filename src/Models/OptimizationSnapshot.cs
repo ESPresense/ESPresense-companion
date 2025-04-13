@@ -36,9 +36,20 @@ public class Measure
     public OptNode Tx { get; set; }
 
     public double Rssi { get; set; }
+    public double? RssiRxAdj { get; set; }
     public double? RssiVar { get; set; }
     public double RefRssi { get; set; }
 
     public double Distance { get; set; }
     public double? DistVar { get; set; }
+
+    /// <summary>
+    /// Calculates and returns the unadjusted RSSI value by adding the base RSSI to the adjusted RSSI,
+    /// which defaults to 0 if not set.
+    /// </summary>
+    /// <returns>The computed unadjusted RSSI value.</returns>
+    public double GetUnadjustedRssi()
+    {
+        return Rssi + RssiRxAdj.GetValueOrDefault(0);
+    }
 }

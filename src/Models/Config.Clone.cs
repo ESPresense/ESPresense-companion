@@ -98,13 +98,19 @@ namespace ESPresense.Models
 
     public partial class ConfigOptimization
     {
+        /// <summary>
+        /// Creates a deep copy of the current ConfigOptimization instance.
+        /// </summary>
+        /// <returns>
+        /// A new ConfigOptimization instance with duplicated settings, including a separate copy of the Limits dictionary.
+        /// </returns>
         public ConfigOptimization Clone()
         {
             return new ConfigOptimization
             {
                 Enabled = Enabled,
                 IntervalSecs = IntervalSecs,
-                MaxSnapshots = MaxSnapshots,
+                KeepSnapshotMins = KeepSnapshotMins,
                 Limits = new Dictionary<string, double>(Limits)
             };
         }

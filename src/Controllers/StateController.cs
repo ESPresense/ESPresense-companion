@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.IO;
 using System.Text;
@@ -56,10 +56,28 @@ public class StateController : ControllerBase
         return _config.Config ?? new Config();
     }
 
+    /// <summary>
+    /// Retrieves calibration data and computes statistical measures based on active node distance measurements.
+    /// </summary>
+    /// <remarks>
+    /// Iterates through active transmitter and receiver node pairs to populate a calibration matrix with various parameters,
+    /// while collecting valid mapped and actual distance measurements. It then calculates the Pearson correlation coefficient (R)
+    /// between mapped and actual distances and the root mean square error (RMSE) to quantify deviations. The results are returned
+    /// in a Calibration object.
+    /// </remarks>
+    /// <returns>
+    /// A Calibration object containing the calibration matrix along with computed values for R and RMSE.
+    /// </returns>
     [HttpGet("api/state/calibration")]
     public Calibration GetCalibration()
     {
         var c = new Calibration();
+
+        // Lists to track all distance measurements for statistical calculations
+        var mapDistances = new List<double>();
+        var actualDistances = new List<double>();
+        var squaredDiffs = new List<double>();
+
         foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
         {
             var txNs = _nsd.Get(txId);
@@ -77,12 +95,62 @@ public class StateController : ControllerBase
                 rxM["diff"] = rx.Distance - rx.MapDistance;
                 rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
                 if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
+
+                // Collect values for statistical calculations if they're valid
+                if (rx.MapDistance > 0 && rx.Distance > 0)
+                {
+                    mapDistances.Add(rx.MapDistance);
+                    actualDistances.Add(rx.Distance);
+                    squaredDiffs.Add(Math.Pow(rx.Distance - rx.MapDistance, 2));
+                }
             }
         }
+
+        // Calculate Pearson correlation coefficient inline
+        if (mapDistances.Count > 0)
+        {
+            double sumX = mapDistances.Sum();
+            double sumY = actualDistances.Sum();
+            double sumXY = 0;
+            double sumX2 = 0;
+            double sumY2 = 0;
+
+            for (int i = 0; i < mapDistances.Count; i++)
+            {
+                sumXY += mapDistances[i] * actualDistances[i];
+                sumX2 += mapDistances[i] * mapDistances[i];
+                sumY2 += actualDistances[i] * actualDistances[i];
+            }
+
+            double n = mapDistances.Count;
+            double numerator = n * sumXY - sumX * sumY;
+            double denominator = Math.Sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+
+            c.R = denominator == 0 ? 0 : numerator / denominator;
+        }
+        else
+        {
+            c.R = 0;
+        }
+
+        // Calculate RMSE inline
+        c.RMSE = mapDistances.Count > 0 ? Math.Sqrt(squaredDiffs.Sum() / mapDistances.Count) : 0;
 
         return c;
     }
 
+    /// <summary>
+    /// Opens a WebSocket connection to stream real-time state updates.
+    /// </summary>
+    /// <remarks>
+    /// This asynchronous method verifies that the request is a valid WebSocket connection and, if so, establishes the connection.
+    /// It registers event handlers to deliver updates for configuration, calibration, node state, and device changes.
+    /// Additionally, the method processes incoming commands to adjust filtering and device message subscriptions based on client input.
+    /// If the request is not a valid WebSocket request, it responds with a 400 Bad Request status.
+    /// </remarks>
+    /// <param name="showAll">
+    /// Determines whether to include all device updates (true) or only updates for tracked devices (false).
+    /// </param>
     [ApiExplorerSettings(IgnoreApi = true)]
     [Route("/ws")]
     public async Task Get([FromQuery] bool showAll = false)
@@ -99,7 +167,7 @@ public class StateController : ControllerBase
         ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
-            changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions (JsonSerializerDefaults.Web)));
+            changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             newMessage.Set();
         }
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
@@ -109,7 +177,7 @@ public class StateController : ControllerBase
         {
             if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
-        };
+        }
 
         void OnDeviceMessageReceived(object? sender, DeviceMessageEventArgs args)
         {
@@ -220,6 +288,12 @@ public class StateController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Resets calibration settings for every node by setting TxRefRssi, RxAdjRssi, and Absorption to zero.
+    /// </summary>
+    /// <remarks>
+    /// Iterates over all nodes, updates their calibration values to zero asynchronously, and returns an HTTP 200 response on success. If an exception occurs during the process, logs the error and returns an HTTP 500 response with an error message.
+    /// </remarks>
     [HttpPost("api/state/calibration/reset")]
     public async Task<IActionResult> ResetCalibration()
     {
@@ -229,9 +303,9 @@ public class StateController : ControllerBase
             foreach (var node in _state.Nodes.Values)
             {
                 var nodeSettings = _nsd.Get(node.Id);
-                nodeSettings.Calibration.TxRefRssi = null;
-                nodeSettings.Calibration.RxAdjRssi = null;
-                nodeSettings.Calibration.Absorption = null;
+                nodeSettings.Calibration.TxRefRssi = 0;
+                nodeSettings.Calibration.RxAdjRssi = 0;
+                nodeSettings.Calibration.Absorption = 0;
                 await _nsd.Set(node.Id, nodeSettings);
             }
 

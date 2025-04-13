@@ -75,29 +75,46 @@ public class State
     public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
     public IWeighting? Weighting { get; set; }
 
+    /// <summary>
+    /// Creates an optimization snapshot from current node measurements and purges expired snapshots.
+    /// </summary>
+    /// <remarks>
+    /// Iterates through all nodes and their receiver measurements, recording only those marked as current into a new snapshot
+    /// timestamped with the current UTC time. It then removes any snapshots older than the configured expiration threshold
+    /// (defaulting to 5 minutes) before adding the new snapshot to the collection.
+    /// </remarks>
+    /// <returns>The newly created optimization snapshot containing active measurements.</returns>
     public OptimizationSnapshot TakeOptimizationSnapshot()
     {
         Dictionary<string, OptNode> nodes = new();
-        var os = new OptimizationSnapshot();
+        var os = new OptimizationSnapshot
+        {
+            Timestamp = DateTime.UtcNow
+        };
         foreach (var (txId, txNode) in Nodes)
             foreach (var (rxId, meas) in txNode.RxNodes)
             {
                 var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
                 var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx!.Name, Location = meas.Rx.Location });
                 if (meas.Current)
-                os.Measures.Add(new Measure()
                 {
-                    Distance = meas.Distance,
-                    DistVar = meas.DistVar,
-                    Rssi = meas.Rssi,
-                    RssiVar = meas.RssiVar,
-                    RefRssi = meas.RefRssi,
-                    Tx = tx,
-                    Rx = rx,
-                });
+                    os.Measures.Add(new Measure()
+                    {
+                        Distance = meas.Distance,
+                        DistVar = meas.DistVar,
+                        Rssi = meas.Rssi,
+                        RssiVar = meas.RssiVar,
+                        RefRssi = meas.RefRssi,
+                        Tx = tx,
+                        Rx = rx,
+                    });
+                }
             }
 
-        if (OptimizationSnaphots.Count > Config?.Optimization.MaxSnapshots) OptimizationSnaphots.RemoveAt(0);
+        // Remove expired snapshots by time
+        var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
+        var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
+        OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
         OptimizationSnaphots.Add(os);
 
         return os;
