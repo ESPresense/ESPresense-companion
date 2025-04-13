@@ -96,6 +96,7 @@ public class State
                         Rssi = meas.Rssi,
                         RssiVar = meas.RssiVar,
                         RefRssi = meas.RefRssi,
+                        RssiRxAdj = meas.RssiRxAdj,
                         Tx = tx,
                         Rx = rx,
                     });
