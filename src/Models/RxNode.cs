@@ -1,4 +1,4 @@
-﻿namespace ESPresense.Models;
+namespace ESPresense.Models;
 
 public class RxNode
 {
@@ -22,6 +22,13 @@ public class RxNode
 
     public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Tx?.Config?.Timeout ?? 30);
 
+    /// <summary>
+    /// Updates the node's measurement data using values from the provided device message and determines if the node has moved significantly.
+    /// </summary>
+    /// <param name="payload">A DeviceMessage containing updated metrics for signal strength, distance, and variance.</param>
+    /// <returns>
+    /// True if the absolute difference between the last recorded distance and the new distance exceeds 0.25 units; otherwise, false.
+    /// </returns>
     public bool ReadMessage(DeviceMessage payload)
     {
         Rssi = payload.Rssi;

@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using ESPresense.Models;
 using Serilog;
 
@@ -26,6 +26,15 @@ namespace ESPresense.Services
             return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new NodeSettings(id);
         }
 
+        /// <summary>
+        /// Asynchronously updates a node's settings by sending updates only for properties that have changed.
+        /// </summary>
+        /// <param name="id">The identifier of the node. If set to "*", the updates are marked to be retained.</param>
+        /// <param name="ds">A NodeSettings object containing the new configuration values; only properties that differ from the current settings are updated.</param>
+        /// <remarks>
+        /// Compares the new settings with the current stored settings and, for each changed property,
+        /// sends an update via the MQTT coordinator along with the previous value.
+        /// </remarks>
         public async Task Set(string id, NodeSettings ds)
         {
             var retain = id == "*";
@@ -88,6 +97,15 @@ namespace ESPresense.Services
                 await mqtt.UpdateSetting(id, "ref_rssi", ds.Calibration.RxRefRssi, retain, old.Calibration.RxRefRssi);
         }
 
+        /// <summary>
+        /// Asynchronously listens for and processes incoming node setting updates via MQTT.
+        /// </summary>
+        /// <remarks>
+        /// Registers an event handler on the MQTT coordinator's NodeSettingReceivedAsync event to parse and update node settings
+        /// based on incoming messages. Depending on the setting type, the handler updates various properties of a node's settings in an in-memory store.
+        /// The method runs indefinitely until cancellation is requested via the provided token.
+        /// </remarks>
+        /// <param name="stoppingToken">A token that signals the request to stop the service gracefully.</param>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             mqtt.NodeSettingReceivedAsync += arg =>

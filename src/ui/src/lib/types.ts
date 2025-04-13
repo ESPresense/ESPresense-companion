@@ -212,6 +212,15 @@ export interface CalibrationResponse {
 	r?: number;
 }
 
+/**
+ * Determines if the provided object is a Node.
+ *
+ * This type guard checks if the object has a defined telemetry property,
+ * confirming it as a Node rather than a Device or null.
+ *
+ * @param d - Object to check (can be a Device, Node, or null).
+ * @returns True if the object is a Node; otherwise, false.
+ */
 export function isNode(d: Device | Node | null): d is Node {
 	return (d as Node)?.telemetry !== undefined;
 }
