@@ -52,6 +52,8 @@ public class AbsorptionErrOptimizer : IOptimizer
 
                 // Initial guess uses node setting if available, else midpoint of global bounds
                 var initialGuessValue = nodeSettings?.Calibration?.Absorption ?? (absorptionMax - absorptionMin) / 2 + absorptionMin;
+                // Clamp initial guess within global bounds
+                initialGuessValue = Math.Clamp(initialGuessValue, absorptionMin, absorptionMax);
                 var initialGuess = Vector<double>.Build.DenseOfArray(new[] { initialGuessValue });
 
                 var solver = new NelderMeadSimplex(1e-4, 10000);

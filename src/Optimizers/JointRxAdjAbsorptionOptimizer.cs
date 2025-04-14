@@ -79,6 +79,9 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
                 // Initial guess uses node settings if available, else global bounds/midpoint
                 var initialRxAdjGuess = nodeSettings?.Calibration?.RxAdjRssi ?? rxAdjMin; // Fallback to min bound
                 var initialAbsGuess = nodeSettings?.Calibration?.Absorption ?? absorptionMiddle;
+                // Clamp initial guess values within global bounds
+                initialRxAdjGuess = Math.Clamp(initialRxAdjGuess, rxAdjMin, rxAdjMax);
+                initialAbsGuess = Math.Clamp(initialAbsGuess, absorptionMin, absorptionMax);
                 var initialGuess = Vector<double>.Build.DenseOfArray(new[] { initialRxAdjGuess, initialAbsGuess });
                 var initialPert = Vector<double>.Build.DenseOfArray(new[] { rxAdjMax, absorptionMiddle }); // Perturbation uses global bounds
 

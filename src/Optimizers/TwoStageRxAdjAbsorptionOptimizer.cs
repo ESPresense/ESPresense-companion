@@ -79,6 +79,8 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
 
                 // Initial guess for RxAdj uses node setting if available, else midpoint of global bounds
                 var initialRxAdjGuessValue = nodeSettings?.Calibration?.RxAdjRssi ?? (rxAdjMax - rxAdjMin) / 2 + rxAdjMin;
+                // Clamp initial guess within global bounds
+                initialRxAdjGuessValue = Math.Clamp(initialRxAdjGuessValue, rxAdjMin, rxAdjMax);
                 var initialGuessRxAdj = Vector<double>.Build.DenseOfArray(new[] { initialRxAdjGuessValue });
                 var solverRxAdj = new NelderMeadSimplex(1e-3, 1000);
                 var resultRxAdj = solverRxAdj.FindMinimum(objRxAdj, initialGuessRxAdj);
@@ -107,6 +109,8 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
 
                 // Initial guess for Absorption uses node setting if available, else midpoint of global bounds
                 var initialAbsGuessValue = nodeSettings?.Calibration?.Absorption ?? absorptionMiddle;
+                // Clamp initial guess within global bounds
+                initialAbsGuessValue = Math.Clamp(initialAbsGuessValue, absorptionMin, absorptionMax);
                 var initialGuessAbs = Vector<double>.Build.DenseOfArray(new[] { initialAbsGuessValue });
                 var solverAbs = new NelderMeadSimplex(1e-7, 1000);
                 var resultAbs = solverAbs.FindMinimum(objAbs, initialGuessAbs);

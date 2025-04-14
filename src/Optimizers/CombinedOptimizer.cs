@@ -96,11 +96,13 @@ public class CombinedOptimizer : IOptimizer
         {
             existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
             // Initial guess uses node setting if available, else 0
-            initialGuess[i] = nodeSettings?.Calibration?.RxAdjRssi ?? 0;
+            // Clamp initial guess within global bounds
+            initialGuess[i] = Math.Clamp(nodeSettings?.Calibration?.RxAdjRssi ?? 0, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
         }
         for (int i = uniqueDeviceIds.Count; i < initialGuess.Count; i++)
         {
-            initialGuess[i] = (optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d;
+            // Clamp initial guess within global bounds (Path absorption uses global midpoint, clamped)
+            initialGuess[i] = Math.Clamp((optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d, optimization.AbsorptionMin, optimization.AbsorptionMax);
         }
 
         var solver = new NelderMeadSimplex(1e-7, 20000);
@@ -175,7 +177,8 @@ public class CombinedOptimizer : IOptimizer
             existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
             double absorptionMin = optimization?.AbsorptionMin ?? 2.5; // Need global bounds for fallback midpoint
             double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
-            initialGuess[i] = nodeSettings?.Calibration?.Absorption ?? (absorptionMax - absorptionMin) / 2 + absorptionMin;
+            // Clamp initial guess within global bounds
+            initialGuess[i] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? (absorptionMax - absorptionMin) / 2 + absorptionMin, absorptionMin, absorptionMax);
         }
 
         var solver = new BfgsMinimizer(1e-7, 1e-7, 1e-7);

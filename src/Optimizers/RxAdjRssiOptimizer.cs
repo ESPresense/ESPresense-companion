@@ -46,7 +46,17 @@ public class RxAdjRssiOptimizer : IOptimizer
                         return error;
                     });
 
-                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { 0d });
+                // Get node settings and bounds inside the try block to ensure scope
+                existingSettings.TryGetValue(g.Key.Id, out var nodeSettings);
+                double rxAdjMin = optimization?.RxAdjRssiMin ?? -15;
+                double rxAdjMax = optimization?.RxAdjRssiMax ?? 25;
+
+                // Initial guess uses node setting if available, else 0
+                var initialGuessValue = nodeSettings?.Calibration?.RxAdjRssi ?? 0d;
+                // Clamp initial guess within global bounds
+                initialGuessValue = Math.Clamp(initialGuessValue, rxAdjMin, rxAdjMax);
+                // Explicitly create double array
+                var initialGuess = Vector<double>.Build.DenseOfArray(new double[] { initialGuessValue });
 
                 var solver = new NelderMeadSimplex(1e-7, 1000);
                 var result = solver.FindMinimum(obj, initialGuess);

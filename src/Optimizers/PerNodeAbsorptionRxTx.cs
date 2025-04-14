@@ -218,14 +218,17 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         {
             int baseIndex = rxIndexMap[rxId];
             existingSettings.TryGetValue(rxId, out var nodeSettings);
-            initialGuess[baseIndex] = nodeSettings?.Calibration?.RxAdjRssi ?? 0;
-            initialGuess[baseIndex + 1] = nodeSettings?.Calibration?.Absorption ?? ((optimization.AbsorptionMax - optimization.AbsorptionMin) / 2.0) + optimization.AbsorptionMin;
+            // Clamp initial guess within global bounds
+            initialGuess[baseIndex] = Math.Clamp(nodeSettings?.Calibration?.RxAdjRssi ?? 0, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
+            // Clamp initial guess within global bounds
+            initialGuess[baseIndex + 1] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? ((optimization.AbsorptionMax - optimization.AbsorptionMin) / 2.0) + optimization.AbsorptionMin, optimization.AbsorptionMin, optimization.AbsorptionMax);
         }
         foreach (var txId in uniqueTxIds)
         {
             existingSettings.TryGetValue(txId, out var nodeSettings);
             // Initial guess uses node setting if available, else -59
-            initialGuess[txIndexMap[txId]] = nodeSettings?.Calibration?.TxRefRssi ?? -59;
+            // Clamp initial guess within global bounds
+            initialGuess[txIndexMap[txId]] = Math.Clamp(nodeSettings?.Calibration?.TxRefRssi ?? -59, optimization.TxRefRssiMin, optimization.TxRefRssiMax);
         }
 
         try

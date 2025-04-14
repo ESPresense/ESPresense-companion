@@ -88,8 +88,11 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
                     });
 
                 // Initial guess uses node settings if available, else defaults
-                var initialRxAdjGuess = nodeSettings?.Calibration?.RxAdjRssi ?? 0;
+                double initialRxAdjGuess = nodeSettings?.Calibration?.RxAdjRssi ?? 0;
                 var initialAbsGuess = nodeSettings?.Calibration?.Absorption ?? 2.85;
+                // Clamp initial guess values within global bounds
+                initialRxAdjGuess = Math.Clamp(initialRxAdjGuess, rxAdjMin, rxAdjMax);
+                initialAbsGuess = Math.Clamp(initialAbsGuess, absorptionMin, absorptionMax);
                 var initialGuess = Vector<double>.Build.DenseOfArray(new[] { initialRxAdjGuess, initialAbsGuess });
                 Log.Information("Node {0}: Starting RxAdj={1:0.00}, Abs={2:0.00}", g.Key.Id, initialGuess[0], initialGuess[1]);
 
