@@ -29,18 +29,10 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
     /// <exception cref="InvalidOperationException">
     /// Thrown if the optimization configuration is not found in the current state.
     /// </exception>
-    public OptimizationResults Optimize(OptimizationSnapshot os)
+    public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         OptimizationResults or = new();
         ConfigOptimization optimization = _state.Config?.Optimization ?? throw new InvalidOperationException("Optimization config not found");
-
-        var rxAdjMin = optimization.RxAdjRssiMin;
-        var rxAdjMax = optimization.RxAdjRssiMax;
-        var absorptionMin = optimization.AbsorptionMin;
-        var absorptionMax = optimization.AbsorptionMax;
-        var absorptionMiddle = optimization.AbsorptionMin + (optimization.AbsorptionMax - optimization.AbsorptionMin) / 2;
-
-        Log.Information("Bounds: RxAdj [{0}, {1}], Absorption [{2}, {3}]", rxAdjMin, rxAdjMax, absorptionMin, absorptionMax);
 
         foreach (var g in os.ByRx())
         {
@@ -48,6 +40,18 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
             if (rxNodes.Length < 3) continue;
+
+            // Get node-specific settings, fallback to global config if not found
+            existingSettings.TryGetValue(g.Key.Id, out var nodeSettings);
+
+            // Bounds should always come from global config
+            double rxAdjMin = optimization.RxAdjRssiMin;
+            double rxAdjMax = optimization.RxAdjRssiMax;
+            double absorptionMin = optimization.AbsorptionMin;
+            double absorptionMax = optimization.AbsorptionMax;
+            double absorptionMiddle = absorptionMin + (absorptionMax - absorptionMin) / 2; // Used for fixed absorption in stage 1
+
+            Log.Information("Bounds: RxAdj [{0}, {1}], Absorption [{2}, {3}]", rxAdjMin, rxAdjMax, absorptionMin, absorptionMax);
 
             try
             {
@@ -73,8 +77,9 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                         return error / nodesToUse.Length;
                     });
 
-                var initialRxAdj = 0;
-                var initialGuessRxAdj = Vector<double>.Build.DenseOfArray(new[] { (double)initialRxAdj });
+                // Initial guess for RxAdj uses node setting if available, else midpoint of global bounds
+                var initialRxAdjGuessValue = nodeSettings?.Calibration?.RxAdjRssi ?? (rxAdjMax - rxAdjMin) / 2 + rxAdjMin;
+                var initialGuessRxAdj = Vector<double>.Build.DenseOfArray(new[] { initialRxAdjGuessValue });
                 var solverRxAdj = new NelderMeadSimplex(1e-3, 1000);
                 var resultRxAdj = solverRxAdj.FindMinimum(objRxAdj, initialGuessRxAdj);
                 var rxAdjRssi = Math.Clamp(resultRxAdj.MinimizingPoint[0], rxAdjMin, rxAdjMax);
@@ -100,10 +105,12 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                         return error / rxNodes.Length;
                     });
 
-                var initialGuessAbs = Vector<double>.Build.DenseOfArray(new[] { 2.85 });
+                // Initial guess for Absorption uses node setting if available, else midpoint of global bounds
+                var initialAbsGuessValue = nodeSettings?.Calibration?.Absorption ?? absorptionMiddle;
+                var initialGuessAbs = Vector<double>.Build.DenseOfArray(new[] { initialAbsGuessValue });
                 var solverAbs = new NelderMeadSimplex(1e-7, 1000);
                 var resultAbs = solverAbs.FindMinimum(objAbs, initialGuessAbs);
-                var absorption = Math.Clamp(resultAbs.MinimizingPoint[0], absorptionMin, absorptionMax); // Fixed index from [1] to [0]
+                var absorption = Math.Clamp(resultAbs.MinimizingPoint[0], absorptionMin, absorptionMax);
 
                 Log.Information("Optimized {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3:0.0}",
                     g.Key.Id, rxAdjRssi, absorption, resultAbs.FunctionInfoAtMinimum.Value);

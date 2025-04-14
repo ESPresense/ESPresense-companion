@@ -16,7 +16,7 @@ public class RxAdjRssiOptimizer : IOptimizer
 
     public string Name => "Rx Adj Rssi";
 
-    public OptimizationResults Optimize(OptimizationSnapshot os)
+    public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
 
         OptimizationResults or = new();

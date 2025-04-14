@@ -14,12 +14,19 @@ public class OptimizationSnapshot
 
     public ILookup<OptNode, Measure> ByRx()
     {
-       return Measures.ToLookup(a => a.Rx);
+        return Measures.ToLookup(a => a.Rx);
     }
 
     public ILookup<OptNode, Measure> ByTx()
     {
         return Measures.ToLookup(a => a.Tx);
+    }
+
+    public string[] GetNodeIds()
+    {
+        return Measures.SelectMany(m => new[] { m.Rx.Id, m.Tx.Id })
+            .Distinct()
+            .ToArray();
     }
 }
 
@@ -43,13 +50,8 @@ public class Measure
     public double Distance { get; set; }
     public double? DistVar { get; set; }
 
-    /// <summary>
-    /// Calculates and returns the unadjusted RSSI value by backing out the Rx Adj RSSI to the adjusted RSSI,
-    /// which defaults to 0 if not set.
-    /// </summary>
-    /// <returns>The computed unadjusted RSSI value.</returns>
-    public double GetUnadjustedRssi()
+    internal double GetAdjustedRssi(double? newRxAdjRssi)
     {
-        return Rssi + RssiRxAdj.GetValueOrDefault(0);
+        return newRxAdjRssi == null || RssiRxAdj == null ? Rssi : Rssi + RssiRxAdj.Value - newRxAdjRssi.Value;
     }
 }

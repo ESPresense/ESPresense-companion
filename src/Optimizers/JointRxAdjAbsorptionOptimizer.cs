@@ -26,7 +26,7 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
     /// <exception cref="InvalidOperationException">
     /// Thrown when the optimization configuration is not available in the state.
     /// </exception>
-    public OptimizationResults Optimize(OptimizationSnapshot os)
+    public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         OptimizationResults or = new();
         ConfigOptimization optimization = _state.Config?.Optimization ?? throw new InvalidOperationException("Optimization config not found");
@@ -35,7 +35,16 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
         {
             var rxNodes = g.ToArray();
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
-            var absorptionMiddle = optimization.AbsorptionMin + (optimization.AbsorptionMax - optimization.AbsorptionMin) / 2;
+
+            // Get node-specific settings, fallback to global config if not found
+            existingSettings.TryGetValue(g.Key.Id, out var nodeSettings);
+
+            // Bounds should always come from global config
+            double rxAdjMin = optimization.RxAdjRssiMin;
+            double rxAdjMax = optimization.RxAdjRssiMax;
+            double absorptionMin = optimization.AbsorptionMin;
+            double absorptionMax = optimization.AbsorptionMax;
+            double absorptionMiddle = absorptionMin + (absorptionMax - absorptionMin) / 2; // Used for regularization and initial guess fallback
 
             double Distance(Vector<double> x, Measure dn) => Math.Pow(10, (-60 + x[0] - dn.Rssi) / (10.0d * x[1]));
 
@@ -46,13 +55,12 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
-                        if (x[0] < optimization!.RxAdjRssiMin || x[0] > optimization.RxAdjRssiMax)
+                        if (x[0] < rxAdjMin || x[0] > rxAdjMax)
                         {
                             Log.Debug("RxAdjRssi OOB {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}", g.Key.Id, x[0], x[1]);
                             return double.PositiveInfinity;
-
                         }
-                        if (x[1] < optimization.AbsorptionMin || x[1] > optimization.AbsorptionMax)
+                        if (x[1] < absorptionMin || x[1] > absorptionMax)
                         {
                             Log.Debug("Absorption OOB {0,-20}: RxAdj: {1:0.00} dBm, Absorption: {2:0.00}", g.Key.Id, x[0], x[1]);
                             return double.PositiveInfinity;
@@ -68,14 +76,17 @@ public class JointRxAdjAbsorptionOptimizer : IOptimizer
                         return error;
                     });
 
-                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { optimization.RxAdjRssiMin, absorptionMiddle });
-                var initialPert = Vector<double>.Build.DenseOfArray(new[] { optimization.RxAdjRssiMax, absorptionMiddle });
+                // Initial guess uses node settings if available, else global bounds/midpoint
+                var initialRxAdjGuess = nodeSettings?.Calibration?.RxAdjRssi ?? rxAdjMin; // Fallback to min bound
+                var initialAbsGuess = nodeSettings?.Calibration?.Absorption ?? absorptionMiddle;
+                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { initialRxAdjGuess, initialAbsGuess });
+                var initialPert = Vector<double>.Build.DenseOfArray(new[] { rxAdjMax, absorptionMiddle }); // Perturbation uses global bounds
 
                 var solver = new NelderMeadSimplex(1e-9, 10000);
                 var result = solver.FindMinimum(obj, initialGuess, initialPert);
 
-                var rxAdjRssi = Math.Clamp(result.MinimizingPoint[0], optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
-                var absorption = Math.Clamp(result.MinimizingPoint[1], optimization.AbsorptionMin, optimization.AbsorptionMax);
+                var rxAdjRssi = Math.Clamp(result.MinimizingPoint[0], rxAdjMin, rxAdjMax);
+                var absorption = Math.Clamp(result.MinimizingPoint[1], absorptionMin, absorptionMax);
 
                 Log.Information("Optimized {0,-20}     : RxAdj: {1:0.00} dBm, Absorption: {2:0.00}, Error: {3:0.0}",
                     g.Key.Id, rxAdjRssi, absorption, result.FunctionInfoAtMinimum.Value);
