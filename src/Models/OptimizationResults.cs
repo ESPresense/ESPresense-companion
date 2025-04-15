@@ -1,6 +1,7 @@
 using ESPresense.Services;
 using Serilog;
 using System;
+using ESPresense.Companion.Utils;
 using System.Collections.Generic;
 
 namespace ESPresense.Models;
@@ -43,32 +44,7 @@ public class OptimizationResults
             }
         }
 
-        return CalculatePearsonCorrelation(predictedValues, measuredValues);
+        return MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
     }
 
-    private double CalculatePearsonCorrelation(List<double> x, List<double> y)
-    {
-        if (x.Count != y.Count || x.Count < 2)
-            return 0;
-
-        double sumX = 0;
-        double sumY = 0;
-        double sumXY = 0;
-        double sumX2 = 0;
-        double sumY2 = 0;
-        int n = x.Count;
-
-        for (int i = 0; i < n; i++)
-        {
-            sumX += x[i];
-            sumY += y[i];
-            sumXY += x[i] * y[i];
-            sumX2 += x[i] * x[i];
-            sumY2 += y[i] * y[i];
-        }
-
-        double numerator = n * sumXY - sumX * sumY;
-        double denominator = Math.Sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
-        return (denominator != 0) ? numerator / denominator : 0;
-    }
 }

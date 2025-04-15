@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using ESPresense.Extensions;
+using ESPresense.Companion.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -109,24 +110,7 @@ public class StateController : ControllerBase
         // Calculate Pearson correlation coefficient inline
         if (mapDistances.Count > 0)
         {
-            double sumX = mapDistances.Sum();
-            double sumY = actualDistances.Sum();
-            double sumXY = 0;
-            double sumX2 = 0;
-            double sumY2 = 0;
-
-            for (int i = 0; i < mapDistances.Count; i++)
-            {
-                sumXY += mapDistances[i] * actualDistances[i];
-                sumX2 += mapDistances[i] * mapDistances[i];
-                sumY2 += actualDistances[i] * actualDistances[i];
-            }
-
-            double n = mapDistances.Count;
-            double numerator = n * sumXY - sumX * sumY;
-            double denominator = Math.Sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
-
-            c.R = denominator == 0 ? 0 : numerator / denominator;
+            c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
         }
         else
         {

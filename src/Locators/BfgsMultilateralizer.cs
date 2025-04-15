@@ -1,4 +1,5 @@
-﻿using ESPresense.Extensions;
+﻿using ESPresense.Companion.Utils;
+using ESPresense.Extensions;
 using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
@@ -89,6 +90,17 @@ public class BfgsMultilateralizer : ILocate
 
                 scenario.ReasonForExit = result.ReasonForExit;
                 confidence = (int)Math.Max(10, Math.Min(100, Math.Min(100, 100 * pos.Length / 4.0) - result.FunctionInfoAtMinimum.Value));
+
+                if (nodes.Length >= 2)
+                {
+                    var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
+                    var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
+                    scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
+                }
+                else
+                {
+                    scenario.PearsonCorrelation = null; // Not enough data points
+                }
             }
         }
         catch (Exception ex)

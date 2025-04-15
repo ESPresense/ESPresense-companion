@@ -1,4 +1,5 @@
-﻿using ESPresense.Extensions;
+﻿using ESPresense.Companion.Utils;
+using ESPresense.Extensions;
 using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
@@ -65,6 +66,17 @@ public class IterativeCentroidMultilateralizer(Device device, Floor floor) : ILo
                 var err = CalculateError(centroid, original);
                 scenario.Error = err;
                 scenario.Confidence = Math.Clamp((10000 - (int?)Math.Ceiling(100 * err)) ?? 0, 0, 100);
+
+                if (nodes.Length >= 2)
+                {
+                    var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
+                    var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
+                    scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
+                }
+                else
+                {
+                    scenario.PearsonCorrelation = null; // Not enough data points
+                }
                 scenario.UpdateLocation(new Point3D(centroid[0], centroid[1], centroid[2]));
                 scenario.Room = floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
                 return Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) >= 0.1;
