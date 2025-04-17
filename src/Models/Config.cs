@@ -8,10 +8,10 @@ namespace ESPresense.Models
     public partial class Config
     {
         [YamlMember(Alias = "mqtt")]
-        public ConfigMqtt? Mqtt { get; set; }
+        public ConfigMqtt Mqtt { get; set; } = new();
 
         [YamlMember(Alias = "bounds")]
-        public double[][]? Bounds { get; set; }
+        public double[][] Bounds { get; set; } = [];
 
         [YamlMember(Alias = "timeout")]
         public int Timeout { get; set; } = 30;
