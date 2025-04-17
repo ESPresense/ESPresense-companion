@@ -2,8 +2,6 @@ using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using Serilog;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ESPresense.Optimizers;
 
@@ -18,7 +16,7 @@ public class CombinedOptimizer : IOptimizer
 
     public string Name => "Two-Step Optimized Combined RxAdjRssi and Absorption";
 
-    public OptimizationResults Optimize(OptimizationSnapshot os)
+    public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         var results = new OptimizationResults();
         var optimization = _state.Config?.Optimization;
@@ -31,10 +29,10 @@ public class CombinedOptimizer : IOptimizer
         try
         {
             // Step 1: Optimize RxAdjRssi and path-specific absorptions
-            var (rxAdjRssiDict, pathAbsorptionDict, error) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization);
+            var (rxAdjRssiDict, pathAbsorptionDict, error) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
 
             // Step 2: Optimize node-specific absorptions while keeping RxAdjRssi constant
-            var nodeAbsorptions = OptimizeNodeAbsorptions(allNodes, uniqueDeviceIds, rxAdjRssiDict, pathAbsorptionDict, optimization);
+            var nodeAbsorptions = OptimizeNodeAbsorptions(allNodes, uniqueDeviceIds, rxAdjRssiDict, pathAbsorptionDict, optimization, existingSettings);
 
             // Process and store results
             foreach (var deviceId in uniqueDeviceIds)
@@ -60,7 +58,7 @@ public class CombinedOptimizer : IOptimizer
     }
 
     private (Dictionary<string, double> RxAdjRssi, Dictionary<(string, string), double> PathAbsorption, double Error)
-        OptimizeRxAdjRssiAndPathAbsorption(List<Measure> allNodes, List<string> uniqueDeviceIds, ConfigOptimization optimization)
+        OptimizeRxAdjRssiAndPathAbsorption(List<Measure> allNodes, List<string> uniqueDeviceIds, ConfigOptimization optimization, Dictionary<string, NodeSettings> existingSettings)
     {
         var pathPairs = new HashSet<(string, string)>(allNodes.Select(n => (Min(n.Rx.Id, n.Tx.Id), Max(n.Rx.Id, n.Tx.Id))));
 
@@ -72,7 +70,11 @@ public class CombinedOptimizer : IOptimizer
             for (int i = 0; i < uniqueDeviceIds.Count; i++)
             {
                 var rxAdjRssi = x[i];
-                if (rxAdjRssi < optimization?.RxAdjRssiMin || rxAdjRssi > optimization?.RxAdjRssiMax)
+                existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
+                // Bounds should always come from global config
+                double rxAdjMin = optimization?.RxAdjRssiMin ?? -15;
+                double rxAdjMax = optimization?.RxAdjRssiMax ?? 25;
+                if (rxAdjRssi < rxAdjMin || rxAdjRssi > rxAdjMax)
                     return double.PositiveInfinity;
                 rxAdjRssiDict[uniqueDeviceIds[i]] = rxAdjRssi;
             }
@@ -92,11 +94,15 @@ public class CombinedOptimizer : IOptimizer
         var initialGuess = Vector<double>.Build.Dense(uniqueDeviceIds.Count + pathPairs.Count);
         for (int i = 0; i < uniqueDeviceIds.Count; i++)
         {
-            initialGuess[i] = 0; // Initial guess for RxAdjRssi
+            existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
+            // Initial guess uses node setting if available, else 0
+            // Clamp initial guess within global bounds
+            initialGuess[i] = Math.Clamp(nodeSettings?.Calibration?.RxAdjRssi ?? 0, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
         }
         for (int i = uniqueDeviceIds.Count; i < initialGuess.Count; i++)
         {
-            initialGuess[i] = (optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d;
+            // Clamp initial guess within global bounds (Path absorption uses global midpoint, clamped)
+            initialGuess[i] = Math.Clamp((optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d, optimization.AbsorptionMin, optimization.AbsorptionMax);
         }
 
         var solver = new NelderMeadSimplex(1e-7, 20000);
@@ -120,7 +126,7 @@ public class CombinedOptimizer : IOptimizer
     }
 
     private Dictionary<string, double> OptimizeNodeAbsorptions(List<Measure> allNodes, List<string> uniqueDeviceIds,
-        Dictionary<string, double> rxAdjRssiDict, Dictionary<(string, string), double> pathAbsorptionDict, ConfigOptimization optimization)
+        Dictionary<string, double> rxAdjRssiDict, Dictionary<(string, string), double> pathAbsorptionDict, ConfigOptimization optimization, Dictionary<string, NodeSettings> existingSettings)
     {
         // Fix: Use ObjectiveFunction.Gradient() instead of ValueAndGradient
         var obj = ObjectiveFunction.Gradient(
@@ -129,11 +135,15 @@ public class CombinedOptimizer : IOptimizer
                 for (int i = 0; i < uniqueDeviceIds.Count; i++)
                 {
                     var absorption = x[i];
-                    if (absorption < optimization?.AbsorptionMin || absorption > optimization?.AbsorptionMax)
+                    existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
+                    // Bounds should always come from global config
+                    double absorptionMin = optimization?.AbsorptionMin ?? 2.5;
+                    double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
+                    if (absorption < absorptionMin || absorption > absorptionMax)
                         return double.PositiveInfinity;
                     nodeAbsorptionDict[uniqueDeviceIds[i]] = absorption;
                 }
-                
+
                 return CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: nodeAbsorptionDict);
             },
             x => {
@@ -142,7 +152,7 @@ public class CombinedOptimizer : IOptimizer
                 {
                     nodeAbsorptionDict[uniqueDeviceIds[i]] = x[i];
                 }
-                
+
                 // Numerically approximate the gradient
                 var gradient = Vector<double>.Build.Dense(x.Count);
                 double epsilon = 1e-5;
@@ -152,7 +162,7 @@ public class CombinedOptimizer : IOptimizer
                 {
                     var tempDict = new Dictionary<string, double>(nodeAbsorptionDict);
                     tempDict[uniqueDeviceIds[i]] += epsilon;
-                    
+
                     var errorPlusEps = CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: tempDict);
                     gradient[i] = (errorPlusEps - baseError) / epsilon;
                 }
@@ -160,8 +170,16 @@ public class CombinedOptimizer : IOptimizer
                 return gradient;
             });
 
-        var initialGuess = Vector<double>.Build.Dense(uniqueDeviceIds.Count,
-            (optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d);
+        // Initial guess uses node setting if available, else global midpoint
+        var initialGuess = Vector<double>.Build.Dense(uniqueDeviceIds.Count);
+        for (int i = 0; i < uniqueDeviceIds.Count; i++)
+        {
+            existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
+            double absorptionMin = optimization?.AbsorptionMin ?? 2.5; // Need global bounds for fallback midpoint
+            double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
+            // Clamp initial guess within global bounds
+            initialGuess[i] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? (absorptionMax - absorptionMin) / 2 + absorptionMin, absorptionMin, absorptionMax);
+        }
 
         var solver = new BfgsMinimizer(1e-7, 1e-7, 1e-7);
         var result = solver.FindMinimum(obj, initialGuess);

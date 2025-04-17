@@ -29,11 +29,19 @@ optimization:
   enabled: true
   interval_secs: 3600
   keep_snapshot_mins: 5   # How long to keep optimization snapshots (default: 5 minutes)
+  optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:
     absorption_min: 2.5
     absorption_max: 3.5
     rx_adj_rssi_min: -5
     rx_adj_rssi_max: 25
+    tx_ref_rssi_min: -80
+    tx_ref_rssi_max: -40
+  weights:
+    # Weighting factor for Pearson Correlation in best scenario scoring (default: 0.5)
+    correlation: 0.5
+    # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5)
+    rmse: 0.5
 
 history:
   enabled: false # Enable to log history to db (Beta)

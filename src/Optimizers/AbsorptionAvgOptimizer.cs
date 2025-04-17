@@ -13,7 +13,7 @@ public class AbsorptionAvgOptimizer : IOptimizer
 
     public string Name => "Absorption Avg";
 
-    public OptimizationResults Optimize(OptimizationSnapshot os)
+    public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         var results = new OptimizationResults();
 

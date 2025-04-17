@@ -29,19 +29,26 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
     /// predicted distances. Optimization is then performed using the Nelder-Mead simplex method, and the resulting parameters are clamped within the specified bounds.
     /// Any exceptions during a group’s optimization are caught and logged.
     /// </remarks>
-    public OptimizationResults Optimize(OptimizationSnapshot os)
+    public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         OptimizationResults or = new();
         var optimization = _state.Config?.Optimization;
-        var rxAdjMin = optimization?.RxAdjRssiMin ?? -15; // Match logs
-        var rxAdjMax = optimization?.RxAdjRssiMax ?? 25;
-        var absorptionMin = optimization?.AbsorptionMin ?? 2.5;
-        var absorptionMax = optimization?.AbsorptionMax ?? 3.5;
-        Log.Information("Bounds: RxAdj [{0}, {1}], Absorption [{2}, {3}]", rxAdjMin, rxAdjMax, absorptionMin, absorptionMax);
+
+        // (Removed duplicate foreach loop and moved per-node logic into the main loop below)
 
         foreach (var g in os.ByRx())
         {
+            NodeSettings nodeSettings;
+            existingSettings.TryGetValue(g.Key.Id, out nodeSettings);
             var rxNodes = g.ToArray();
+
+            // Per-node bounds
+            // Bounds should always come from global config
+            double rxAdjMin = optimization?.RxAdjRssiMin ?? -15;
+            double rxAdjMax = optimization?.RxAdjRssiMax ?? 25;
+            double absorptionMin = optimization?.AbsorptionMin ?? 2.5;
+            double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
+            Log.Information("Bounds: RxAdj [{0}, {1}], Absorption [{2}, {3}]", rxAdjMin, rxAdjMax, absorptionMin, absorptionMax);
             var pos = rxNodes.Select(n => n.Rx.Location.DistanceTo(n.Tx.Location)).ToArray();
 
             Log.Debug("Node {0}: {1} measurements", g.Key.Id, rxNodes.Length);
@@ -80,8 +87,13 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
                         return error / rxNodes.Length;
                     });
 
-                var initialRxAdj = 0;
-                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { initialRxAdj, 2.85 });
+                // Initial guess uses node settings if available, else defaults
+                double initialRxAdjGuess = nodeSettings?.Calibration?.RxAdjRssi ?? 0;
+                var initialAbsGuess = nodeSettings?.Calibration?.Absorption ?? 2.85;
+                // Clamp initial guess values within global bounds
+                initialRxAdjGuess = Math.Clamp(initialRxAdjGuess, rxAdjMin, rxAdjMax);
+                initialAbsGuess = Math.Clamp(initialAbsGuess, absorptionMin, absorptionMax);
+                var initialGuess = Vector<double>.Build.DenseOfArray(new[] { initialRxAdjGuess, initialAbsGuess });
                 Log.Information("Node {0}: Starting RxAdj={1:0.00}, Abs={2:0.00}", g.Key.Id, initialGuess[0], initialGuess[1]);
 
                 var solver = new NelderMeadSimplex(1e-6, 10000);

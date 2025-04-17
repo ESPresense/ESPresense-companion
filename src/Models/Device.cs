@@ -84,6 +84,7 @@ public class Device
             yield return new KeyValuePair<string, string>($"{s.Name} Probability", $"{s.Probability:F4}");
             yield return new KeyValuePair<string, string>($"{s.Name} Room", $"{s.Room}");
             yield return new KeyValuePair<string, string>($"{s.Name} Confidence", $"{s.Confidence}");
+            yield return new KeyValuePair<string, string>($"{s.Name} Pearson Correlation", $"{s.PearsonCorrelation:F4}");
             yield return new KeyValuePair<string, string>($"{s.Name} Fixes", $"{s.Fixes}");
             yield return new KeyValuePair<string, string>($"{s.Name} Error", $"{s.Error}");
             yield return new KeyValuePair<string, string>($"{s.Name} Iterations", $"{s.Iterations}");

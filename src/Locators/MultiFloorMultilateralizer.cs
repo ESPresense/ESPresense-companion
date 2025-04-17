@@ -1,4 +1,5 @@
-﻿using ESPresense.Extensions;
+﻿using ESPresense.Utils;
+using ESPresense.Extensions;
 using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
@@ -86,6 +87,17 @@ public class MultiFloorMultilateralizer : ILocate
         }
 
         scenario.Confidence = confidence;
+
+        if (nodes.Length >= 2)
+        {
+            var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
+            var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
+            scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
+        }
+        else
+        {
+            scenario.PearsonCorrelation = null; // Not enough data points
+        }
 
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
