@@ -37,6 +37,11 @@ optimization:
     rx_adj_rssi_max: 25
     tx_ref_rssi_min: -80
     tx_ref_rssi_max: -40
+  weights:
+    # Weighting factor for Pearson Correlation in best scenario scoring (default: 0.5)
+    correlation: 0.5
+    # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5)
+    rmse: 0.5
 
 history:
   enabled: false # Enable to log history to db (Beta)

@@ -77,7 +77,6 @@ public class StateController : ControllerBase
         // Lists to track all distance measurements for statistical calculations
         var mapDistances = new List<double>();
         var actualDistances = new List<double>();
-        var squaredDiffs = new List<double>();
 
         foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
         {
@@ -97,29 +96,16 @@ public class StateController : ControllerBase
                 rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
                 if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
 
-                // Collect values for statistical calculations if they're valid
                 if (rx.MapDistance > 0 && rx.Distance > 0)
                 {
                     mapDistances.Add(rx.MapDistance);
                     actualDistances.Add(rx.Distance);
-                    squaredDiffs.Add(Math.Pow(rx.Distance - rx.MapDistance, 2));
                 }
             }
         }
 
-        // Calculate Pearson correlation coefficient inline
-        if (mapDistances.Count > 0)
-        {
-            c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
-        }
-        else
-        {
-            c.R = 0;
-        }
-
-        // Calculate RMSE inline
-        c.RMSE = mapDistances.Count > 0 ? Math.Sqrt(squaredDiffs.Sum() / mapDistances.Count) : 0;
-
+        c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
+        c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
         return c;
     }
 
@@ -252,15 +238,25 @@ public class StateController : ControllerBase
 
             EnqueueAndSignal(new { type = "time", data = DateTime.UtcNow.RelativeMilliseconds() });
 
-            while (!webSocket.CloseStatus.HasValue)
+            while (webSocket.State == WebSocketState.Open)
             {
                 while (changes.TryDequeue(out var jsonEvent))
-                    await webSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(jsonEvent)), WebSocketMessageType.Text, true, CancellationToken.None);
+                {
+                    try
+                    {
+                        await webSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(jsonEvent)), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+                    catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.InvalidState)
+                    {
+                        _logger.LogDebug("WebSocket send failed as client disconnected: {CloseStatus}", webSocket.CloseStatus);
+                    }
+                }
 
-                await newMessage.WaitAsync();
+                if (webSocket.State == WebSocketState.Open)
+                    await newMessage.WaitAsync();
             }
 
-            await webSocket.CloseAsync(webSocket.CloseStatus.Value, webSocket.CloseStatusDescription, CancellationToken.None);
+            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, webSocket.CloseStatusDescription, CancellationToken.None);
         }
         finally
         {

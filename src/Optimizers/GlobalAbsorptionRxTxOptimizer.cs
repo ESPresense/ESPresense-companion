@@ -273,7 +273,8 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
             // Fallback to midpoint if no nodes have absorption set
             initialGlobalAbsorptionGuess = (optimization.AbsorptionMax + optimization.AbsorptionMin) / 2.0;
         }
-        initialGuess[globalAbsorptionIndex] = initialGlobalAbsorptionGuess;
+        // Clamp the initial guess for global absorption
+        initialGuess[globalAbsorptionIndex] = Math.Clamp(initialGlobalAbsorptionGuess, optimization.AbsorptionMin, optimization.AbsorptionMax);
 
         // Initialize Rx node parameters
         foreach (var rxId in uniqueRxIds)
@@ -288,7 +289,6 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         {
             existingSettings.TryGetValue(txId, out var nodeSettings);
             // Clamp initial guess within global bounds
-            initialGuess[txIndexMap[txId]] = Math.Clamp(nodeSettings?.Calibration?.TxRefRssi ?? -59, optimization.TxRefRssiMin, optimization.TxRefRssiMax);
             initialGuess[txIndexMap[txId]] = Math.Clamp(nodeSettings?.Calibration?.TxRefRssi ?? -59, optimization.TxRefRssiMin, optimization.TxRefRssiMax);
         }
 

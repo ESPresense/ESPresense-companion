@@ -6,6 +6,15 @@ namespace ESPresense.Companion.Utils
 {
     public static class MathUtils
     {
+        public static double CalculateRMSE(List<double> predicted, List<double> measured)
+        {
+            if (predicted == null || measured == null || predicted.Count != measured.Count || predicted.Count == 0)
+                return double.NaN;
+
+            double mse = predicted.Zip(measured, (p, m) => Math.Pow(p - m, 2)).Average();
+            return Math.Sqrt(mse);
+        }
+
         /// <summary>
         /// Calculates the Pearson correlation coefficient between two lists of doubles.
         /// </summary>
@@ -15,7 +24,7 @@ namespace ESPresense.Companion.Utils
         public static double CalculatePearsonCorrelation(List<double> x, List<double> y)
         {
             if (x == null || y == null || x.Count != y.Count || x.Count < 2)
-                return 0;
+                return double.NaN;
 
             double sumX = 0;
             double sumY = 0;

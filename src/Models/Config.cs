@@ -119,7 +119,8 @@ namespace ESPresense.Models
         [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "legacy"; // Options: global_absorption, per_node_absorption, legacy
         [YamlMember(Alias = "interval_secs")] public int IntervalSecs { get; set; } = 60;
         [YamlMember(Alias = "keep_snapshot_mins")] public int KeepSnapshotMins { get; set; } = 5;
-        [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set;  } = new();
+        [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set; } = new();
+        [YamlMember(Alias = "weights")] public Dictionary<string, double> Weights { get; set; } = new();
 
         [YamlIgnore] public double AbsorptionMin => Limits.TryGetValue("absorption_min", out var val) ? val : 2;
         [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 4;
@@ -127,6 +128,9 @@ namespace ESPresense.Models
         [YamlIgnore] public double TxRefRssiMax => Limits.TryGetValue("tx_ref_rssi_max", out var val) ? val : -50;
         [YamlIgnore] public double RxAdjRssiMin => Limits.TryGetValue("rx_adj_rssi_min", out var val) ? val : -5;
         [YamlIgnore] public double RxAdjRssiMax => Limits.TryGetValue("rx_adj_rssi_max", out var val) ? val : 30;
+
+        [YamlIgnore] public double CorrelationWeight => Weights.TryGetValue("correlation", out var val) ? val : 0.5;
+        [YamlIgnore] public double RmseWeight => Weights.TryGetValue("rmse", out var val) ? val : 0.5;
     }
 
     public partial class ConfigHistory

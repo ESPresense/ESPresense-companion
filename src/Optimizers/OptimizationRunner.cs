@@ -1,6 +1,10 @@
 ﻿using ESPresense.Models;
 using ESPresense.Services;
+using ESPresense.Companion.Utils;
 using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ESPresense.Optimizers;
 
@@ -21,9 +25,7 @@ internal class OptimizationRunner : BackgroundService
         _logger = logger;
         _cfg = cfg;
         _optimizers = new List<IOptimizer>();
-        _lastOptimizerMode = null;
 
-        // Subscribe to config changes for live optimizer updates
         _cfg.ConfigChanged += (_, config) =>
         {
             var optimizerMode = config?.Optimization?.Optimizer?.ToLowerInvariant() ?? "legacy";
@@ -37,7 +39,6 @@ internal class OptimizationRunner : BackgroundService
             }
         };
 
-        // Initialize optimizers from current config
         var initialMode = _cfg.Config?.Optimization?.Optimizer?.ToLowerInvariant() ?? "legacy";
         _optimizers = BuildOptimizers(initialMode);
         _lastOptimizerMode = initialMode;
@@ -58,23 +59,16 @@ internal class OptimizationRunner : BackgroundService
             }
         };
     }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        double best;
-
-        // Removed the reEvaluate task since we're now recalculating the baseline
-        // at each optimization cycle with the current snapshots
-
         while (!stoppingToken.IsCancellationRequested)
         {
             var optimization = _state.Config?.Optimization;
-            int run = 0;
             while (optimization is not { Enabled: true })
             {
-                if (run++ == 0) Log.Information("Optimization disabled");
-                optimization = _state.Config?.Optimization;
+                Log.Information("Optimization disabled");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                optimization = _state.Config?.Optimization;
             }
 
             Log.Information("Optimization enabled");
@@ -83,53 +77,66 @@ internal class OptimizationRunner : BackgroundService
             for (int i = 0; i < 3; i++)
             {
                 _state.TakeOptimizationSnapshot();
-                await Task.Delay(TimeSpan.FromSeconds(optimization?.IntervalSecs ?? 60), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
             }
 
-            run = 0;
             while (optimization is { Enabled: true })
             {
-                if (run++ == 0) Log.Information("Optimization started");
+                Log.Information("Optimization cycle started");
                 var os = _state.TakeOptimizationSnapshot();
 
-                best = new OptimizationResults().Evaluate(_state.OptimizationSnaphots, _nsd);
+                var baselineResults = new OptimizationResults();
+                var (bestCorr, bestRmse) = baselineResults.Evaluate(_state.OptimizationSnaphots, _nsd);
+                // Use weights from ConfigOptimization
+                double correlationWeight = optimization.CorrelationWeight;
+                double rmseWeight = optimization.RmseWeight;
+                double bestScore = (bestCorr * correlationWeight) + ((1 - bestRmse / (1 + bestRmse)) * rmseWeight);
+                Log.Information("Baseline metrics: R={0:0.000}, RMSE={1:0.000}, Composite={2:0.000}", bestCorr, bestRmse, bestScore);
 
                 IList<IOptimizer> currentOptimizers;
                 lock (_optimizersLock)
-                {
                     currentOptimizers = _optimizers.ToList();
-                }
 
                 var currentSettings = os.GetNodeIds().ToDictionary(id => id, _nsd.Get);
+
                 foreach (var optimizer in currentOptimizers)
                 {
                     var results = optimizer.Optimize(os, currentSettings);
-                    var d = results.Evaluate(_state.OptimizationSnaphots, _nsd);
-                    if (d <= best || double.IsNaN(d) || double.IsInfinity(d))
+                    var (corr, rmse) = results.Evaluate(_state.OptimizationSnaphots, _nsd);
+                    // Use weights from ConfigOptimization
+                    var composite = (corr * correlationWeight) + ((1 - rmse / (1 + rmse)) * rmseWeight);
+
+                    if (double.IsNaN(composite) || double.IsInfinity(composite) || composite <= bestScore)
                     {
-                        Log.Information("Optimizer {0,-24} found worse results, r={1:0.000}<{2:0.000}", optimizer.Name, d, best);
+                        Log.Information("Optimizer {0,-24} found worse results, Composite={1:0.000} <= Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
+                            optimizer.Name, composite, bestScore, corr, rmse);
+
                         foreach (var (id, result) in results.Nodes)
-                            Log.Debug("Optimizer wanted {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} TxAdj: {3:00} Error: {4}", id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
+                            Log.Debug("Rejected {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
+                                id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
                         continue;
                     }
-                    Log.Information("Optimizer {0,-24} found better results, r={1:0.000}>{2:0.000}", optimizer.Name, d, best);
+
+                    Log.Information("Optimizer {0,-24} found better results, Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
+                        optimizer.Name, composite, bestScore, corr, rmse);
+
                     foreach (var (id, result) in results.Nodes)
                     {
-                        Log.Information("Optimizer set {0,-20} to Absorption: {1:0.00} RxAdj: {2:00} TxAdj: {3:00} Error: {4}", id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
-                        var a = _nsd.Get(id);
-                        if (optimization == null) continue;
-                        if (result.Absorption != null) a.Calibration.Absorption = result.Absorption;
-                        if (result.RxAdjRssi != null) a.Calibration.RxAdjRssi = result.RxAdjRssi == null ? 0 : (int?)Math.Round(result.RxAdjRssi.Value);
-                        if (result.TxRefRssi != null) a.Calibration.TxRefRssi = result.TxRefRssi == null ? 0 : (int?)Math.Round(result.TxRefRssi.Value);
-                        await _nsd.Set(id, a);
+                        Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
+                            id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
+
+                        var nodeSettings = _nsd.Get(id);
+                        if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
+                        if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
+                        if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
+                        await _nsd.Set(id, nodeSettings);
                     }
 
-                    best = d;
+                    bestScore = composite;
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(optimization?.IntervalSecs ?? 60), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
             }
         }
-
     }
 }

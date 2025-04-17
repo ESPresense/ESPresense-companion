@@ -1,8 +1,8 @@
 using ESPresense.Services;
-using Serilog;
-using System;
 using ESPresense.Companion.Utils;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ESPresense.Models;
 
@@ -10,10 +10,10 @@ public class OptimizationResults
 {
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
-    public double Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss)
+    public (double Correlation, double RMSE) Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss)
     {
-        List<double> predictedValues = new List<double>();
-        List<double> measuredValues = new List<double>();
+        List<double> predictedValues = new();
+        List<double> measuredValues = new();
 
         foreach (var os in oss)
         {
@@ -26,9 +26,7 @@ public class OptimizationResults
                 Nodes.TryGetValue(m.Rx.Id, out var rxPv);
 
                 if (m.Rx?.Location == null || m.Tx?.Location == null)
-                {
-                    continue; // Skip this measurement if locations are missing
-                }
+                    continue;
 
                 double mapDistance = m.Rx.Location.DistanceTo(m.Tx.Location);
 
@@ -44,7 +42,9 @@ public class OptimizationResults
             }
         }
 
-        return MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
-    }
+        var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
+        var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
 
+        return (correlation, rmse);
+    }
 }
