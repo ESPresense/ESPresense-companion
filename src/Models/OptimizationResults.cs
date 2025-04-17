@@ -1,5 +1,5 @@
 using ESPresense.Services;
-using ESPresense.Companion.Utils;
+using ESPresense.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;

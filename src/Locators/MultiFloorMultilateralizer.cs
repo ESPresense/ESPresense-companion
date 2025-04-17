@@ -1,4 +1,4 @@
-﻿using ESPresense.Companion.Utils;
+﻿using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;

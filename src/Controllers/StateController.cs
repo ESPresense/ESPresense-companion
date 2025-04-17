@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using ESPresense.Extensions;
-using ESPresense.Companion.Utils;
+using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;

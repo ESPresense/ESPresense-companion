@@ -1,6 +1,6 @@
 ﻿using ESPresense.Models;
 using ESPresense.Services;
-using ESPresense.Companion.Utils;
+using ESPresense.Utils;
 using Serilog;
 using System;
 using System.Collections.Generic;
