@@ -206,10 +206,18 @@ export interface NodeCalibrationMatrix {
 	};
 }
 
+export interface OptimizerState {
+	optimizers: string;
+	bestRMSE?: number;
+	bestR?: number;
+}
+
+
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
 	rmse?: number;
 	r?: number;
+	optimizerState?: OptimizerState;
 }
 
 /**

@@ -92,10 +92,13 @@ internal class OptimizationRunner : BackgroundService
                 double rmseWeight = optimization.RmseWeight;
                 double bestScore = (bestCorr * correlationWeight) + ((1 - bestRmse / (1 + bestRmse)) * rmseWeight);
                 Log.Information("Baseline metrics: R={0:0.000}, RMSE={1:0.000}, Composite={2:0.000}", bestCorr, bestRmse, bestScore);
+                _state.OptimizerState.BestR = bestCorr;
+                _state.OptimizerState.BestRMSE = bestRmse;
 
                 IList<IOptimizer> currentOptimizers;
                 lock (_optimizersLock)
                     currentOptimizers = _optimizers.ToList();
+                _state.OptimizerState.Optimizers = string.Join(", ", currentOptimizers.Select(o => o.Name));
 
                 var currentSettings = os.GetNodeIds().ToDictionary(id => id, _nsd.Get);
 
@@ -119,6 +122,8 @@ internal class OptimizationRunner : BackgroundService
 
                     Log.Information("Optimizer {0,-24} found better results, Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
                         optimizer.Name, composite, bestScore, corr, rmse);
+                    _state.OptimizerState.BestR = corr;
+                    _state.OptimizerState.BestRMSE = rmse;
 
                     foreach (var (id, result) in results.Nodes)
                     {
@@ -129,6 +134,7 @@ internal class OptimizationRunner : BackgroundService
                         if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
                         if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
                         if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
+                        // Removed: nodeSettings.Calibration.Optimizer = optimizer.Name;
                         await _nsd.Set(id, nodeSettings);
                     }
 
