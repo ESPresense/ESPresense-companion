@@ -134,9 +134,12 @@
 				</RadioGroup>
 				<button class="btn variant-filled-warning" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
-			<div class="flex gap-8 items-center m-4 mt-0">
+			<div class="flex gap-8 items-center m-4 mt-2">
 				<span class="font-semibold">RMSE:</span> <span>{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</span>
 				<span class="font-semibold">R:</span> <span>{$calibration?.r?.toFixed(3) ?? 'n/a'}</span>
+				<span class="font-semibold">Best RMSE:</span> <span>{$calibration?.optimizerState?.bestRMSE?.toFixed(3) ?? 'n/a'}</span>
+				<span class="font-semibold">Best R:</span> <span>{$calibration?.optimizerState?.bestR?.toFixed(3) ?? 'n/a'}</span>
+				<span class="font-semibold ml-4">Active Optimizers:</span> <span>{$calibration?.optimizerState?.optimizers ?? 'n/a'}</span>
 			</div>
 		</header>
 		<section class="p-4 pt-0">
