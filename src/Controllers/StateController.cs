@@ -73,6 +73,7 @@ public class StateController : ControllerBase
     public Calibration GetCalibration()
     {
         var c = new Calibration();
+        c.OptimizerState = _state.OptimizerState;
 
         // Lists to track all distance measurements for statistical calculations
         var mapDistances = new List<double>();
