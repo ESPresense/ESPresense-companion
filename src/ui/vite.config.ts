@@ -9,6 +9,10 @@ export default defineConfig({
 		include: ['src/**/*.{test,spec}.{js,ts}']
 	},
 
+	build: {
+		sourcemap: true
+	},
+
 	server: {
 		port: 44490,
 		proxy: {
