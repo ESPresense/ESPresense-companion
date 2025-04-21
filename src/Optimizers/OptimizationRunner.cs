@@ -82,9 +82,12 @@ internal class OptimizationRunner : BackgroundService
                 await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
             }
 
+            Log.Information("Optimization cycle started");
+            double previousBestCorr = double.NaN;
+            double previousBestRmse = double.NaN;
+
             while (optimization is { Enabled: true })
             {
-                Log.Information("Optimization cycle started");
                 var os = _state.TakeOptimizationSnapshot();
 
                 var baselineResults = new OptimizationResults();
@@ -93,7 +96,14 @@ internal class OptimizationRunner : BackgroundService
                 double correlationWeight = optimization.CorrelationWeight;
                 double rmseWeight = optimization.RmseWeight;
                 double bestScore = (bestCorr * correlationWeight) + ((1 - bestRmse / (1 + bestRmse)) * rmseWeight);
-                Log.Information("Baseline metrics: R={0:0.000}, RMSE={1:0.000}, Composite={2:0.000}", bestCorr, bestRmse, bestScore);
+
+                if (double.IsNaN(previousBestCorr) || double.IsNaN(previousBestRmse) || Math.Abs(bestCorr - previousBestCorr) > 0.001 || Math.Abs(bestRmse - previousBestRmse) > 0.001)
+                {
+                    Log.Information("Baseline metrics: Composite={2:0.000} (R={0:0.000}, RMSE={1:0.000})", bestCorr, bestRmse, bestScore);
+                    previousBestCorr = bestCorr;
+                    previousBestRmse = bestRmse;
+                }
+
                 _state.OptimizerState.BestR = bestCorr;
                 _state.OptimizerState.BestRMSE = bestRmse;
 
@@ -113,7 +123,7 @@ internal class OptimizationRunner : BackgroundService
 
                     if (double.IsNaN(composite) || double.IsInfinity(composite) || composite <= bestScore)
                     {
-                        Log.Information("Optimizer {0,-24} found worse results, Composite={1:0.000} <= Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
+                        Log.Information("Optimizer {0,-24} found worse results: Composite={1:0.000} <= Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
                             optimizer.Name, composite, bestScore, corr, rmse);
 
                         foreach (var (id, result) in results.Nodes)
@@ -122,7 +132,7 @@ internal class OptimizationRunner : BackgroundService
                         continue;
                     }
 
-                    Log.Information("Optimizer {0,-24} found better results, Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
+                    Log.Information("Optimizer {0,-24} found better results: Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
                         optimizer.Name, composite, bestScore, corr, rmse);
                     _state.OptimizerState.BestR = corr;
                     _state.OptimizerState.BestRMSE = rmse;
