@@ -1,114 +1,107 @@
+using System;
+using System.Linq;
 using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
 using MathNet.Spatial.Euclidean;
 using Serilog;
+using ESPresense.Services;
 
 namespace ESPresense.Locators;
 
-public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state) : ILocate
+public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, NodeTelemetryStore nts) : ILocate
 {
+    private const double MaxErr          = 10.0;   // weightedError ≥ 10 ⇒ errScore 0
+    private const double AlphaErr        = 0.60;   // weight on errScore   (0-1)
+    private const double BetaR           = 0.40;   // weight on rScore     (Alpha+Beta = 1)
+    private const int    ConfidenceFloor = 5;      // never publish <5 %
+
     public bool Locate(Scenario scenario)
     {
-        var confidence = scenario.Confidence;
-
-        var nodes = device.Nodes.Values
-            .Where(a => a.Current && (a.Node?.Floors?.Contains(floor) ?? false))
-            .OrderBy(a => a.Distance)
+        var heard = device.Nodes.Values
+            .Where(n => n.Current && (n.Node?.Floors?.Contains(floor) ?? false))
+            .OrderBy(n => n.Distance)
             .ToArray();
 
-        var positions = nodes.Select(a => a.Node!.Location).ToArray();
-
-        scenario.Minimum = nodes.Min(a => (double?)a.Distance);
-        scenario.LastHit = nodes.Max(a => a.LastHit);
-        scenario.Fixes = positions.Length;
-
-        if (positions.Length <= 1)
+        if (heard.Length <= 1)
         {
-            scenario.Room = null;
             scenario.Confidence = 0;
-            scenario.Error = null;
-            scenario.Floor = null;
+            scenario.Room       = null;
+            scenario.Error      = null;
             return false;
         }
 
-        scenario.Floor = floor;
+        scenario.Minimum = heard.Min(n => (double?)n.Distance);
+        scenario.LastHit = heard.Max(n => n.LastHit);
+        scenario.Fixes   = heard.Length;
+        scenario.Floor   = floor;
 
-        var guess = confidence < 5
-            ? Point3D.MidPoint(positions[0], positions[1])
-            : scenario.Location;
+        Point3D est;
+        double  weightedError = 0;
 
         try
         {
-            if (positions.Length < 3 || floor.Bounds == null)
+            if (heard.Length < 3 || floor.Bounds == null)
             {
-                confidence = 1;
-                scenario.UpdateLocation(guess);
+                est = Point3D.MidPoint(heard[0].Node!.Location, heard[1].Node!.Location);
             }
             else
             {
-                // Nadaraya-Watson estimator implementation
-                double epsilon = 1e-6;
+                const double EPS = 1e-6;
+                var weights = heard.Select(n => 1.0 / (Math.Pow(n.Distance, 2) + EPS)).ToArray();
+                var wSum    = weights.Sum();
 
-                var weights = nodes.Select(dn =>
-                {
-                    return 1.0 / (Math.Pow(dn.Distance, 2) + epsilon);
-                }).ToArray();
-
-                var totalWeight = weights.Sum();
-
-                var weightedX = nodes.Zip(weights, (dn, w) => dn.Node!.Location.X * w).Sum();
-                var weightedY = nodes.Zip(weights, (dn, w) => dn.Node!.Location.Y * w).Sum();
-                var weightedZ = nodes.Zip(weights, (dn, w) => dn.Node!.Location.Z * w).Sum();
-
-                var estimatedLocation = new Point3D(
-                    weightedX / totalWeight,
-                    weightedY / totalWeight,
-                    weightedZ / totalWeight
+                est = new Point3D(
+                    heard.Zip(weights, (n, w) => n.Node!.Location.X * w).Sum() / wSum,
+                    heard.Zip(weights, (n, w) => n.Node!.Location.Y * w).Sum() / wSum,
+                    heard.Zip(weights, (n, w) => n.Node!.Location.Z * w).Sum() / wSum
                 );
 
-                scenario.UpdateLocation(estimatedLocation);
-
-                // Calculate weighted error
-                var weightedError = nodes.Zip(weights, (dn, w) =>
+                weightedError = heard.Zip(weights, (n, w) =>
                 {
-                    var estimatedDistance = estimatedLocation.DistanceTo(dn.Node!.Location);
-                    var residual = estimatedDistance - dn.Distance;
-                    return w * Math.Pow(residual, 2);
-                }).Sum() / totalWeight;
+                    double diff = est.DistanceTo(n.Node!.Location) - n.Distance;
+                    return w * diff * diff;
+                }).Sum() / wSum;
 
                 scenario.Error = weightedError;
-                scenario.Iterations = null;
-                //scenario.ReasonForExit = ;
-
-                confidence = (int)Math.Min(100, Math.Max(10, 100.0 - (weightedError * 10)));
             }
+
+            scenario.UpdateLocation(est);
+
+            var measured   = heard.Select(n => n.Distance).ToList();
+            var calculated = heard.Select(n => est.DistanceTo(n.Node!.Location)).ToList();
+            scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measured, calculated);
+
+            var now = DateTime.UtcNow;
+            int nodesSeen = heard.Length;
+            int nodesPossibleOnline = state.Nodes.Values
+                .Count(n =>
+                    (n.Floors?.Contains(floor) ?? false) &&
+                    (nts.Online(n.Id)));
+            if (nodesPossibleOnline == 0) nodesPossibleOnline = 1; // safety
+
+            double coveragePart = 50.0 * nodesSeen / nodesPossibleOnline; // 0-50
+
+            double errScore = Math.Clamp(1.0 - (weightedError / MaxErr), 0.0, 1.0); // 1→0
+            double rScore   = Math.Max(0.0, scenario.PearsonCorrelation ?? 0.0);  // 0…1
+            double qualityPart = 50.0 * (AlphaErr * errScore + BetaR * rScore);
+
+            int conf = (int)Math.Round(coveragePart + qualityPart);
+            scenario.Confidence = (int)Math.Max(conf, (float)ConfidenceFloor);
         }
         catch (Exception ex)
         {
-            confidence = 0;
-            scenario.UpdateLocation(new Point3D());
-            Log.Error("Error finding location for {0}: {1}", device, ex.Message);
+            scenario.UpdateLocation(scenario.Location); // revert to last good
+            scenario.Confidence = 0;
+            scenario.Error      = null;
+            Log.Error("Locator error for {Device}: {Message}", device, ex.Message);
         }
 
-        scenario.Confidence = confidence;
+        if (scenario.Confidence <= 0) return false;
+        if (scenario.Location.DistanceTo(scenario.LastLocation) < 0.1) return false;
 
-        if (nodes.Length >= 2)
-        {
-            var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
-            var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
-            scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
-        }
-        else
-        {
-            scenario.PearsonCorrelation = null; // Not enough data points
-        }
-
-        if (confidence <= 0) return false;
-        if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
-
-        scenario.Room = floor.Rooms.Values.FirstOrDefault(a =>
-            a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
+        scenario.Room = floor.Rooms.Values.FirstOrDefault(r =>
+            r.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
 
         return true;
     }
