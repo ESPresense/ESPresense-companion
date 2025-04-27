@@ -11,11 +11,6 @@ namespace ESPresense.Locators;
 
 public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, NodeTelemetryStore nts) : ILocate
 {
-    private const double MaxErr          = 10.0;   // weightedError ≥ 10 ⇒ errScore 0
-    private const double AlphaErr        = 0.60;   // weight on errScore   (0-1)
-    private const double BetaR           = 0.40;   // weight on rScore     (Alpha+Beta = 1)
-    private const int    ConfidenceFloor = 5;      // never publish <5 %
-
     public bool Locate(Scenario scenario)
     {
         var heard = device.Nodes.Values
@@ -72,22 +67,19 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             var calculated = heard.Select(n => est.DistanceTo(n.Node!.Location)).ToList();
             scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measured, calculated);
 
-            var now = DateTime.UtcNow;
-            int nodesSeen = heard.Length;
+            // Get count of possible online nodes for this floor
             int nodesPossibleOnline = state.Nodes.Values
                 .Count(n =>
                     (n.Floors?.Contains(floor) ?? false) &&
                     (nts.Online(n.Id)));
-            if (nodesPossibleOnline == 0) nodesPossibleOnline = 1; // safety
 
-            double coveragePart = 50.0 * nodesSeen / nodesPossibleOnline; // 0-50
-
-            double errScore = Math.Clamp(1.0 - (weightedError / MaxErr), 0.0, 1.0); // 1→0
-            double rScore   = Math.Max(0.0, scenario.PearsonCorrelation ?? 0.0);  // 0…1
-            double qualityPart = 50.0 * (AlphaErr * errScore + BetaR * rScore);
-
-            int conf = (int)Math.Round(coveragePart + qualityPart);
-            scenario.Confidence = (int)Math.Max(conf, (float)ConfidenceFloor);
+            // Use the centralized confidence calculation
+            scenario.Confidence = MathUtils.CalculateConfidence(
+                scenario.Error,
+                scenario.PearsonCorrelation,
+                heard.Length,
+                nodesPossibleOnline
+            );
         }
         catch (Exception ex)
         {
