@@ -85,8 +85,8 @@ namespace ESPresense.Utils
             // Calculate final confidence score
             int confidence = (int)Math.Round(coveragePart + qualityPart);
 
-            // Never return less than the minimum confidence floor
-            return Math.Max(confidence, ConfidenceFloor);
+            // Ensure confidence is within the defined floor and ceiling (100)
+            return Math.Clamp(confidence, ConfidenceFloor, 100);
         }
     }
 }
