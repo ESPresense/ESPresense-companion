@@ -93,6 +93,15 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "max_distance")]
         public double? MaxDistance { get; set; }
+
+        [YamlMember(Alias = "hysteresis_margin")]
+        public double? HysteresisMargin { get; set; }
+
+        [YamlMember(Alias = "max_distance_per_node")]
+        public Dictionary<string, double> MaxDistancePerNode { get; set; } = new();
+
+        [YamlMember(Alias = "hysteresis_margin_per_node")]
+        public Dictionary<string, double> HysteresisMarginPerNode { get; set; } = new();
     }
 
     public partial class ConfigMap
