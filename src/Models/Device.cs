@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Serialization;
 using ESPresense.Converters;
+using ESPresense.Extensions;
 using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Models;
@@ -9,6 +10,14 @@ namespace ESPresense.Models;
 public class Device
 {
     private DateTime? _lastSeen;
+
+    // Kalman filter for location smoothing
+    private readonly KalmanLocation _kalmanLocation = new();
+
+    /// <summary>
+    /// Access to the device's Kalman filter for prediction
+    /// </summary>
+    [JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
 
     public Device(string id, string? discoveryId, TimeSpan timeout)
     {
@@ -65,7 +74,17 @@ public class Device
     [JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
 
     [JsonConverter(typeof(Point3DConverter))]
-    public Point3D? Location => BestScenario?.Location;
+    public Point3D? Location
+    {
+        get
+        {
+            // If no best scenario, return null
+            if (BestScenario == null) return null;
+
+            // Return the smoothed location
+            return _kalmanLocation.Location;
+        }
+    }
 
     [JsonIgnore] public DateTime? LastCalculated { get; set; }
 
@@ -73,6 +92,16 @@ public class Device
     [JsonIgnore] public string? ReportedState { get; set; }
     [JsonConverter(typeof(TimeSpanMillisConverter))]
     public TimeSpan Timeout { get; set; }
+
+    /// <summary>
+    /// Updates the device's location using Kalman filtering for smooth transitions
+    /// </summary>
+    /// <param name="newLocation">The new location from the best scenario</param>
+    /// <param name="confidence">The confidence level of the new location</param>
+    public void UpdateLocation(Point3D newLocation, int confidence)
+    {
+        _kalmanLocation.Update(newLocation, confidence);
+    }
 
     public IEnumerable<KeyValuePair<string, string>> GetDetails()
     {

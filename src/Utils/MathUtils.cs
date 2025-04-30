@@ -6,6 +6,12 @@ namespace ESPresense.Utils
 {
     public static class MathUtils
     {
+        // Constants for confidence calculation
+        private const double MaxErr = 10.0;
+        private const double AlphaErr = 0.60;
+        private const double BetaR = 0.40;
+        private const int ConfidenceFloor = 5;
+
         public static double CalculateRMSE(List<double> predicted, List<double> measured)
         {
             if (predicted == null || measured == null || predicted.Count != measured.Count || predicted.Count == 0)
@@ -47,6 +53,43 @@ namespace ESPresense.Utils
 
             // Avoid division by zero if variance is zero
             return (denominator != 0) ? numerator / denominator : 0;
+        }
+
+        /// <summary>
+        /// Calculate standardized confidence score based on error, correlation, and node coverage
+        /// </summary>
+        /// <param name="error">Error value (lower is better)</param>
+        /// <param name="pearsonCorrelation">Pearson correlation coefficient (higher is better)</param>
+        /// <param name="nodeCount">Number of nodes used in calculation</param>
+        /// <param name="possibleNodeCount">Total number of possible nodes</param>
+        /// <returns>Confidence value between ConfidenceFloor and 100</returns>
+        public static int CalculateConfidence(double? error, double? pearsonCorrelation, int nodeCount, int possibleNodeCount)
+        {
+            // Ensure we have at least one node in possibleNodeCount to avoid division by zero
+            if (possibleNodeCount <= 0) possibleNodeCount = 1;
+
+            // Clamp nodeCount to ensure it doesn't exceed possibleNodeCount
+            nodeCount = Math.Min(nodeCount, possibleNodeCount);
+
+            // Calculate coverage component (0-50 points)
+            double coveragePart = 50.0 * nodeCount / possibleNodeCount;
+
+            // Calculate error score (0-1 range, 1 is best)
+            double errScore = error.HasValue
+                ? Math.Clamp(1.0 - (error.Value / MaxErr), 0.0, 1.0)
+                : 0.0;
+
+            // Calculate correlation score (0-1 range, 1 is best)
+            double rScore = Math.Max(0.0, pearsonCorrelation ?? 0.0);
+
+            // Calculate quality component (0-50 points)
+            double qualityPart = 50.0 * (AlphaErr * errScore + BetaR * rScore);
+
+            // Calculate final confidence score
+            int confidence = (int)Math.Round(coveragePart + qualityPart);
+
+            // Ensure confidence is within the defined floor and ceiling (100)
+            return Math.Clamp(confidence, ConfidenceFloor, 100);
         }
     }
 }

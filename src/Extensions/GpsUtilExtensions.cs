@@ -1,17 +1,14 @@
 using ESPresense.Models; // Need this for ConfigGps
-using System; // Need this for Math functions
 
-namespace ESPresense.Utils;
+namespace ESPresense.Extensions;
 
-static class GpsUtil
+static class GpsUtilExtensions // Renamed class to follow convention
 {
     private const double R = 6378137; // Earth's mean radius in meters
 
-    // Updated method signature to accept ConfigGps
-    public static (double? lat, double? lon) Add(double? x, double? y, ConfigGps gpsConfig)
+    public static (double? lat, double? lon) Add(this ConfigGps? gpsConfig, double? x, double? y)
     {
-        // Check for null inputs
-        if (!x.HasValue || !y.HasValue || !gpsConfig.Latitude.HasValue || !gpsConfig.Longitude.HasValue)
+        if (gpsConfig == null || !gpsConfig.Latitude.HasValue || !gpsConfig.Longitude.HasValue || !x.HasValue || !y.HasValue)
         {
             return (null, null);
         }

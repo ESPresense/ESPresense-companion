@@ -11,8 +11,11 @@ namespace ESPresense.Models;
 
 public class State
 {
-    public State(ConfigLoader cl)
+    private readonly NodeTelemetryStore _nts;
+
+    public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
+        _nts = nts;
         void LoadConfig(Config c)
         {
             Config = c;
@@ -149,10 +152,10 @@ public class State
 
             if (nadarayaWatson?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
-                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this, _nts), floor.Name);
 
             if (nearestNode?.Enabled ?? false)
-                yield return new Scenario(Config, new NearestNode(device), "NearestNode");
+                yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
         }
         else
         {

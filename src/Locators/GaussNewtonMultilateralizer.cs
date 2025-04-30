@@ -74,8 +74,6 @@ public class GaussNewtonMultilateralizer : ILocate
                 scenario.Iterations = gaussNewton.Iterations;
 
                 scenario.ReasonForExit = ExitCondition.Converged;
-
-                confidence = (int)Math.Min(100, Math.Max(10, 100.0 - Math.Pow(scenario.Minimum ?? 1, 2)));
             }
         }
         catch (MaximumIterationsException)
@@ -91,8 +89,6 @@ public class GaussNewtonMultilateralizer : ILocate
             Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
         }
 
-        scenario.Confidence = confidence;
-
         if (nodes.Length >= 2)
         {
             var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
@@ -104,7 +100,19 @@ public class GaussNewtonMultilateralizer : ILocate
             scenario.PearsonCorrelation = null; // Not enough data points
         }
 
-        if (confidence <= 0) return false;
+        // Calculate number of possible nodes for this floor
+        int nodesPossibleOnline = _state.Nodes.Values
+            .Count(n => n.Floors?.Contains(_floor) ?? false);
+
+        // Use the centralized confidence calculation
+        scenario.Confidence = MathUtils.CalculateConfidence(
+            scenario.Error,
+            scenario.PearsonCorrelation,
+            nodes.Length,
+            nodesPossibleOnline
+        );
+
+        if (scenario.Confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
         scenario.Room = _floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
         return true;
