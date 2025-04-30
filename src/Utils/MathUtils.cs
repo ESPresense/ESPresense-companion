@@ -68,6 +68,9 @@ namespace ESPresense.Utils
             // Ensure we have at least one node in possibleNodeCount to avoid division by zero
             if (possibleNodeCount <= 0) possibleNodeCount = 1;
 
+            // Clamp nodeCount to ensure it doesn't exceed possibleNodeCount
+            nodeCount = Math.Min(nodeCount, possibleNodeCount);
+
             // Calculate coverage component (0-50 points)
             double coveragePart = 50.0 * nodeCount / possibleNodeCount;
 

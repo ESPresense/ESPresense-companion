@@ -3,7 +3,7 @@ using ESPresense.Models;
 using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
 using Newtonsoft.Json;
-using ESPresense.Services;
+using ESPresense.Extensions;
 
 namespace ESPresense.Services;
 
@@ -22,8 +22,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    State state,
                                    MqttCoordinator mqtt,
                                    GlobalEventDispatcher globalEventDispatcher,
-                                   DeviceHistoryStore deviceHistory,
-                                   NodeTelemetryStore nts) : BackgroundService
+                                   DeviceHistoryStore deviceHistory) : BackgroundService
 {
     private const double PriorWeight     = 0.7;  // temporal smoothing
     private const double NewDataWeight   = 0.3;
@@ -125,7 +124,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
                 var gps      = state?.Config?.Gps;
                 var location = device.Location ?? new Point3D();
-                var (lat, lon) = GpsUtil.Add(location.X, location.Y, gps);
+                // Use extension method syntax again, now that the namespace is imported
+                var (lat, lon) = gps.Add(location.X, location.Y);
 
                 var payload = JsonConvert.SerializeObject(new
                 {

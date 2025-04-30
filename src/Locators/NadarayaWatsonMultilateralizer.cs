@@ -39,12 +39,14 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             if (heard.Length < 3 || floor.Bounds == null)
             {
                 est = Point3D.MidPoint(heard[0].Node!.Location, heard[1].Node!.Location);
+                scenario.Error = null;
+                scenario.PearsonCorrelation = null;
             }
             else
             {
                 const double EPS = 1e-6;
                 var weights = heard.Select(n => 1.0 / (Math.Pow(n.Distance, 2) + EPS)).ToArray();
-                var wSum    = weights.Sum();
+                var wSum = weights.Sum();
 
                 est = new Point3D(
                     heard.Zip(weights, (n, w) => n.Node!.Location.X * w).Sum() / wSum,

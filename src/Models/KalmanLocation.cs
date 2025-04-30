@@ -104,6 +104,8 @@ public class KalmanLocation
             : 0.1; // Default to 100ms if no previous update
         _lastLocationUpdate = now;
 
+        dt = Math.Max(dt, 0.001); // Minimum 1ms interval
+
         // Check if the proposed move exceeds human movement capabilities
         // Calculate the distance between the current and new location
         double distanceToNewLocation = Location.DistanceTo(newLocation);
