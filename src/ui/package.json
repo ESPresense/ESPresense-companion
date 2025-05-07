@@ -13,7 +13,7 @@
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.24.0",
+		"@eslint/js": "^9.26.0",
 		"@floating-ui/dom": "^1.6.13",
 		"@skeletonlabs/skeleton": "^2.11.0",
 		"@skeletonlabs/tw-plugin": "^0.4.1",
