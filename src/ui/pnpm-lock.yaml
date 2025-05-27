@@ -42,7 +42,7 @@ importers:
         specifier: ^0.175.0
         version: 0.175.0
       '@typescript-eslint/eslint-plugin':
-        specifier: ^8.32.0
+        specifier: ^8.33.0
         version: 8.33.0(@typescript-eslint/parser@8.33.0(eslint@9.27.0(jiti@1.21.7))(typescript@5.8.3))(eslint@9.27.0(jiti@1.21.7))(typescript@5.8.3)
       '@typescript-eslint/parser':
         specifier: ^8.29.1
@@ -2576,7 +2576,7 @@ snapshots:
     dependencies:
       '@typescript-eslint/tsconfig-utils': 8.33.0(typescript@5.8.3)
       '@typescript-eslint/types': 8.33.0
-      debug: 4.4.0
+      debug: 4.4.1
     transitivePeerDependencies:
       - supports-color
       - typescript
