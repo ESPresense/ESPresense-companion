@@ -49,7 +49,7 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
 
             var device = state.Devices.GetOrAdd(deviceId, id =>
             {
-                var d = new Device(id, arg.AutoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = arg.AutoDiscover.Message.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
+                var d = new Device(id, arg.AutoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), TimeSpan.FromSeconds(state.Config?.AwayTimeout ?? 120)) { Name = arg.AutoDiscover.Message.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
                 foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                 Log.Information("[+] Track: {Device} (disc)", d);
                 return d;
@@ -87,7 +87,7 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
                     tele.IncrementMessages();
                     var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
                     {
-                        var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
+                        var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), TimeSpan.FromSeconds(state.Config?.AwayTimeout ?? 120)) { Check = true };
                         foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                         return d;
                     });

@@ -66,7 +66,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 }
 
                 double delta = predictedLocation.DistanceTo(scenario.Location);
-                double mcw   = Math.Exp(-(delta * delta) / (2 * MotionSigma * MotionSigma));
+                double mcw = Math.Exp(-(delta * delta) / (2 * MotionSigma * MotionSigma));
                 scenario.WeightedConfidence = (scenario.Confidence ?? 0) * mcw;
             }
 
@@ -116,55 +116,57 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", newState);
                     device.ReportedState = newState;
                 }
-            }
 
-            if (moved > 0 && bestScenario != null)
-            {
-                device.ReportedLocation = device.Location ?? new Point3D();
-
-                var gps      = state?.Config?.Gps;
-                var location = device.Location ?? new Point3D();
-                // Use extension method syntax again, now that the namespace is imported
-                var (lat, lon) = gps.Add(location.X, location.Y);
-
-                var payload = JsonConvert.SerializeObject(new
+                if (moved > 0)
                 {
-                    source_type   = "espresense",
-                    latitude      = lat,
-                    longitude     = lon,
-                    elevation     = location.Z + gps?.Elevation,
-                    x             = location.X,
-                    y             = location.Y,
-                    z             = location.Z,
-                    confidence    = bestScenario.Confidence,
-                    fixes         = bestScenario.Fixes,
-                    best_scenario = bestScenario.Name,
-                    last_seen     = device.LastSeen
-                }, SerializerSettings.NullIgnore);
+                    device.ReportedLocation = device.Location ?? new Point3D();
 
-                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
+                    var gps = state?.Config?.Gps;
+                    var location = device.Location ?? new Point3D();
 
-                globalEventDispatcher.OnDeviceChanged(device, false);
-
-                // optional history
-                if (state?.Config?.History?.Enabled ?? false)
-                {
-                    foreach (var ds in device.Scenarios.Where(ds => ds.Confidence != 0))
+                    var payload = JsonConvert.SerializeObject(new
                     {
-                        await deviceHistory.Add(new DeviceHistory
+                        source_type = "espresense",
+                        x = location.X,
+                        y = location.Y,
+                        z = location.Z,
+                        confidence = bestScenario.Confidence,
+                        fixes = bestScenario.Fixes,
+                        best_scenario = bestScenario.Name,
+                        last_seen = device.LastSeen,
+                    }, SerializerSettings.NullIgnore);
+
+                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
+
+                    globalEventDispatcher.OnDeviceChanged(device, false);
+
+                    // optional history
+                    if (state?.Config?.History?.Enabled ?? false)
+                    {
+                        foreach (var ds in device.Scenarios.Where(ds => ds.Confidence != 0))
                         {
-                            Id        = device.Id,
-                            When      = DateTime.UtcNow,
-                            X         = ds.Location.X,
-                            Y         = ds.Location.Y,
-                            Z         = ds.Location.Z,
-                            Confidence = ds.Confidence ?? 0,
-                            Fixes      = ds.Fixes ?? 0,
-                            Scenario   = ds.Name,
-                            Best       = ds == bestScenario
-                        });
+                            await deviceHistory.Add(new DeviceHistory
+                            {
+                                Id = device.Id,
+                                When = DateTime.UtcNow,
+                                X = ds.Location.X,
+                                Y = ds.Location.Y,
+                                Z = ds.Location.Z,
+                                Confidence = ds.Confidence ?? 0,
+                                Fixes = ds.Fixes ?? 0,
+                                Scenario = ds.Name,
+                                Best = ds == bestScenario
+                            });
+                        }
                     }
                 }
+            }
+            else if (device.ReportedState != "not_home" && device.IsAway())
+            {
+                // Publish device as not home
+                var newState = "not_home";
+                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", newState);
+                device.ReportedState = newState;
             }
         }
     }

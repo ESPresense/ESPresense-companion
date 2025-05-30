@@ -19,10 +19,11 @@ public class Device
     /// </summary>
     [JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
 
-    public Device(string id, string? discoveryId, TimeSpan timeout)
+    public Device(string id, string? discoveryId, TimeSpan timeout, TimeSpan awayTimeout)
     {
         Id = id;
         Timeout = timeout;
+        AwayTimeout = awayTimeout;
         HassAutoDiscovery.Add(new AutoDiscovery("device_tracker", this, discoveryId, "bluetooth"));
     }
 
@@ -57,7 +58,7 @@ public class Device
     {
         get
         {
-            var lastSeen =  BestScenario?.LastHit ?? Nodes.Values.Max(a => a.LastHit);
+            var lastSeen = BestScenario?.LastHit ?? Nodes.Values.Max(a => a.LastHit);
             if (_lastSeen == null || lastSeen > _lastSeen) _lastSeen = lastSeen;
             return _lastSeen;
         }
@@ -92,6 +93,7 @@ public class Device
     [JsonIgnore] public string? ReportedState { get; set; }
     [JsonConverter(typeof(TimeSpanMillisConverter))]
     public TimeSpan Timeout { get; set; }
+    public TimeSpan AwayTimeout { get; set; }
 
     /// <summary>
     /// Updates the device's location using Kalman filtering for smooth transitions
@@ -136,5 +138,10 @@ public class Device
             yield return new KeyValuePair<string, string>($"{s.Name} Y", $"{s.Location.Y:##.000}");
             yield return new KeyValuePair<string, string>($"{s.Name} Z", $"{s.Location.Z:##.000}");
         }
+    }
+
+    public bool IsAway()
+    {
+        return DateTime.UtcNow - LastSeen > AwayTimeout;
     }
 }
