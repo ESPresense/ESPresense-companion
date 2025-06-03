@@ -149,7 +149,8 @@ namespace ESPresense.Models
             {
                 Latitude = Latitude,
                 Longitude = Longitude,
-                Elevation = Elevation
+                Elevation = Elevation,
+                Report = Report
             };
         }
     }
