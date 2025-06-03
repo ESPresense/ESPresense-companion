@@ -51,7 +51,7 @@ public class State
             NamesToTrack = namesToTrack;
             ConfigDeviceByName = configDeviceByName;
 
-            var w = c?.Locators?.NealderMead?.Weighting;
+            var w = c?.Locators?.NelderMead?.Weighting;
             Weighting = w?.Algorithm switch
             {
                 "equal" => new EqualWeighting(),
@@ -140,14 +140,14 @@ public class State
 
     public IEnumerable<Scenario> GetScenarios(Device device)
     {
-        var nealderMead = Config?.Locators?.NealderMead;
+        var nelderMead = Config?.Locators?.NelderMead;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
 
-        if ((nealderMead?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        if ((nelderMead?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
         {
-            if (nealderMead?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(nealderMead?.Floors))
+            if (nelderMead?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
                     yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
 
             if (nadarayaWatson?.Enabled ?? false)

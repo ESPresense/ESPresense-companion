@@ -17,7 +17,7 @@ public class ConfigTests
             floors: [""floor1"", ""floor2""]
             bandwidth: 0.5
             kernel: ""gaussian""
-          nealder_mead:
+          nelder_mead:
             enabled: false
             floors: [""floor3""]
           nearest_node:
@@ -37,9 +37,9 @@ public class ConfigTests
         Assert.That(nadarayaWatson.Bandwidth, Is.EqualTo(0.5));
         Assert.That(nadarayaWatson.Kernel, Is.EqualTo("gaussian"));
 
-        var nealderMead = config.Locators.NealderMead;
-        Assert.False(nealderMead.Enabled);
-        Assert.That(nealderMead.Floors, Is.EqualTo(new[] { "floor3" }));
+        var nelderMead = config.Locators.NelderMead;
+        Assert.False(nelderMead.Enabled);
+        Assert.That(nelderMead.Floors, Is.EqualTo(new[] { "floor3" }));
 
         var nearestNode = config.Locators.NearestNode;
         Assert.True(nearestNode.Enabled);

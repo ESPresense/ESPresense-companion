@@ -52,8 +52,8 @@ namespace ESPresense.Models
         [YamlMember(Alias = "nadaraya_watson")]
         public NadarayaWatsonConfig NadarayaWatson { get; set; } = new();
 
-        [YamlMember(Alias = "nealder_mead")]
-        public NealderMeadConfig NealderMead { get; set; } = new();
+        [YamlMember(Alias = "nelder_mead")]
+        public NelderMeadConfig NelderMead { get; set; } = new();
 
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
@@ -74,7 +74,7 @@ namespace ESPresense.Models
         public string Kernel { get; set; } = "gaussian";
     }
 
-    public partial class NealderMeadConfig
+    public partial class NelderMeadConfig
     {
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }

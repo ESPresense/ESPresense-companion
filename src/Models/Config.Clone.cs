@@ -36,7 +36,7 @@ namespace ESPresense.Models
             return new ConfigLocators
             {
                 NadarayaWatson = NadarayaWatson.Clone(),
-                NealderMead = NealderMead.Clone(),
+                NelderMead = NelderMead.Clone(),
                 NearestNode = NearestNode.Clone()
             };
         }
@@ -56,11 +56,11 @@ namespace ESPresense.Models
         }
     }
 
-    public partial class NealderMeadConfig
+    public partial class NelderMeadConfig
     {
-        public NealderMeadConfig Clone()
+        public NelderMeadConfig Clone()
         {
-            return new NealderMeadConfig
+            return new NelderMeadConfig
             {
                 Enabled = Enabled,
                 Floors = Floors?.ToArray(),
