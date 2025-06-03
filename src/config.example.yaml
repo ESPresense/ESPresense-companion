@@ -54,7 +54,7 @@ locators:
     bandwidth: 0.5
     kernel: gaussian
 
-  nealder_mead:
+  nelder_mead:
     enabled: false
     floors: ["first", "second"]
     weighting:
