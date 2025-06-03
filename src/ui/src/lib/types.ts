@@ -66,10 +66,11 @@ export interface MapConfig {
 }
 
 export interface ConfigGps {
-	latitude?: number | null;
-	longitude?: number | null;
-	elevation?: number | null;
-	rotation?: number | null; // Degrees clockwise from North
+        latitude?: number | null;
+        longitude?: number | null;
+        elevation?: number | null;
+        rotation?: number | null; // Degrees clockwise from North
+        report?: boolean; // Include GPS coordinates when reporting to Home Assistant
 }
 
 
