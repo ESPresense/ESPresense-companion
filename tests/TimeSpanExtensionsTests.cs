@@ -1,5 +1,6 @@
 using System;
 using ESPresense.Extensions;
+using NUnit.Framework;
 
 namespace ESPresense.Companion.Tests;
 
