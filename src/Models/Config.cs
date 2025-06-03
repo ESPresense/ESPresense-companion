@@ -164,6 +164,8 @@ namespace ESPresense.Models
         public double? Elevation { get; set; }
         [YamlMember(Alias = "rotation")]
         public double? Rotation { get; set; } // Degrees clockwise from North
+        [YamlMember(Alias = "report")]
+        public bool Report { get; set; } = false;
     }
 
     public partial class ConfigMqtt

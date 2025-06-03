@@ -124,15 +124,17 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
                 var gps      = state?.Config?.Gps;
                 var location = device.Location ?? new Point3D();
-                // Use extension method syntax again, now that the namespace is imported
-                var (lat, lon) = gps.Add(location.X, location.Y);
+
+                // Only include GPS coordinates if reporting is enabled
+                var (lat, lon) = gps?.Report == true ? gps.Add(location.X, location.Y) : (null, null);
+                var elevation = gps?.Report == true ? location.Z + gps?.Elevation : null;
 
                 var payload = JsonConvert.SerializeObject(new
                 {
                     source_type   = "espresense",
                     latitude      = lat,
                     longitude     = lon,
-                    elevation     = location.Z + gps?.Elevation,
+                    elevation     = elevation,
                     x             = location.X,
                     y             = location.Y,
                     z             = location.Z,
