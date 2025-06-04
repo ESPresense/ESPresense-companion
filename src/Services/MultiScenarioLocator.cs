@@ -28,10 +28,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
     private const double NewDataWeight   = 0.3;
     private const double MotionSigma     = 2.0;  // metres, for Gaussian weight
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    internal async Task ProcessDevice(Device device)
     {
-        await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
-        {
             // -----------------------------------------------------------------
             // 1. Refresh all scenarios -------------------------------------------------
             // -----------------------------------------------------------------
@@ -174,6 +172,13 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     }
                 }
             }
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
+        {
+            await ProcessDevice(device);
         }
     }
 }
