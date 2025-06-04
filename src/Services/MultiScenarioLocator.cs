@@ -117,6 +117,12 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     device.ReportedState = newState;
                 }
             }
+            else if (device.ReportedState != "not_home")
+            {
+                moved += 1;
+                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", "not_home");
+                device.ReportedState = "not_home";
+            }
 
             if (moved > 0 && bestScenario != null)
             {
