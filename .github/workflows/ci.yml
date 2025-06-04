@@ -19,6 +19,14 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+    - name: Enable pnpm via Corepack
+      run: corepack enable
+
+    - name: Install pnpm
+      run: |
+        corepack prepare pnpm@latest --activate
+        pnpm --version
+
     - name: Restore dependencies
       run: dotnet restore
 
