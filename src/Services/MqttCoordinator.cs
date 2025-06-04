@@ -258,7 +258,7 @@ public class MqttCoordinator
 
     private bool ReadOnly => _mqttClient?.Options.ClientOptions.ClientId.ToLower().Contains("read") ?? false;
 
-    public async Task EnqueueAsync(string topic, string? payload, bool retain = false)
+    public virtual async Task EnqueueAsync(string topic, string? payload, bool retain = false)
     {
         var client = await GetClient();
 
