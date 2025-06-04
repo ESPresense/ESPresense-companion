@@ -11,7 +11,9 @@ A Home Assistant Add-on / Docker container that solves indoor positions using MQ
 - Adjusts device-specific settings
 - Monitors and controls automatic node optimization
 
+
 ![image](https://user-images.githubusercontent.com/1491145/208942192-d8716e50-c822-48a7-a6d3-46b53ab9373e.png)
+
 
 ## Documentation
 1. [Installation Guide](https://espresense.com/companion/installation)
@@ -27,3 +29,4 @@ A Home Assistant Add-on / Docker container that solves indoor positions using MQ
 ## Contributing
 - Submit pull requests
 - Improve our [documentation](https://espresense.com)
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and quick-start instructions

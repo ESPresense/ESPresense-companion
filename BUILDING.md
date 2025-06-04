@@ -1,13 +1,25 @@
 # Building
 
-Git Clone, Open folder in VSCode, it'll ask to install dependencies, click yes, you'll need to install .NET SDK 8.0 as well then type into the terminal:
+This project uses a C# backend and a SvelteKit frontend. To run it locally you need the **.NET 8 SDK** and **Node.js 20**.
 
-`dotnet watch --project src`
+1. Clone the repository and install dependencies:
+   ```bash
+   git clone https://github.com/ESPresense/ESPresense-companion.git
+   cd ESPresense-companion
+   dotnet restore
+   npm install --prefix src/ui
+   ```
 
-Browse to [http://localhost:5279/]
+2. Start the backend and frontend in watch mode:
+   ```bash
+   dotnet watch --project src
+   npm run --prefix src/ui dev
+   ```
+   The UI will be available at [http://localhost:5279](http://localhost:5279).
 
-While developing you use vite as your webserver and it proxies /api and /ws to the dotnet webserver.
+3. To run the unit tests:
+   ```bash
+   dotnet test -c Release --no-build --verbosity normal --filter "Category!=LongRunning"
+   ```
 
-On deployment it's the opposite, the dotnet server runs and serves up precompiled html and js files.
-
-Join us on discord for development talk: [https://discord.gg/jbqmn7V6n6]
+For development discussion join us on [Discord](https://discord.gg/jbqmn7V6n6).
