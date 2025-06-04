@@ -1,7 +1,10 @@
 using System;
 using System.IO;
 using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 using ESPresense.Models;
+using ESPresense.Converters;
+using ESPresense.Services;
 
 namespace ESPresense.Companion.Tests;
 
@@ -44,5 +47,25 @@ public class ConfigTests
         var nearestNode = config.Locators.NearestNode;
         Assert.True(nearestNode.Enabled);
         Assert.That(nearestNode.MaxDistance, Is.EqualTo(10.0));
+    }
+
+    [Test]
+    public void SecretsAreResolved()
+    {
+        string yaml = @"
+mqtt:
+  password: !secret mqtt_password
+";
+
+        var secrets = new Dictionary<string, string> { ["mqtt_password"] = "1234" };
+        var deserializer = new DeserializerBuilder()
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
+            .Build();
+
+        var method = typeof(ConfigLoader).GetMethod("ReplaceSecrets", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        yaml = (string)method.Invoke(null, new object[] { yaml, secrets })!;
+        var config = deserializer.Deserialize<Config>(yaml);
+
+        Assert.That(config.Mqtt.Password, Is.EqualTo("1234"));
     }
 }
