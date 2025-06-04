@@ -1,6 +1,6 @@
 # Building
 
-Git Clone, Open folder in VSCode, it'll ask to install dependencies, click yes, you'll need to install .NET SDK 8.0 as well then type into the terminal:
+Git Clone, open the folder in VSCode and install dependencies when prompted. You will need to install the .NET SDK 8.0 and Node.js 20 with pnpm (run `corepack enable` to activate pnpm) then type into the terminal:
 
 `dotnet watch --project src`
 

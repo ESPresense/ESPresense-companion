@@ -19,6 +19,15 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+
+    - name: Enable pnpm via Corepack
+      run: corepack enable
+
     - name: Restore dependencies
       run: dotnet restore
 
