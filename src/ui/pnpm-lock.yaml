@@ -53,6 +53,12 @@ importers:
       d3:
         specifier: ^7.9.0
         version: 7.9.0
+      d3-interpolate:
+        specifier: ^3.0.1
+        version: 3.0.1
+      d3-selection:
+        specifier: ^3.0.0
+        version: 3.0.0
       d3-zoom:
         specifier: ^3.0.0
         version: 3.0.0
