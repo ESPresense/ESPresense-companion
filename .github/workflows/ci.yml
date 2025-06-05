@@ -24,15 +24,7 @@ jobs:
       with:
         version: 10
         run_install: false
-        working-directory: src/ui
   
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'pnpm'
-        cache-dependency-path: src/ui/pnpm-lock.yaml
-
     - name: Restore dependencies
       run: dotnet restore
 
