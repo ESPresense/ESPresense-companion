@@ -31,7 +31,7 @@ jobs:
       with:
         node-version: 20
         cache: 'pnpm'
-        working-directory: src/ui
+        cache-dependency-path: src/ui
 
     - name: Restore dependencies
       run: dotnet restore
