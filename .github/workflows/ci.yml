@@ -31,7 +31,7 @@ jobs:
       with:
         node-version: 20
         cache: 'pnpm'
-        cache-dependency-path: src/ui
+        cache-dependency-path: src/ui/pnpm-lock.yaml
 
     - name: Restore dependencies
       run: dotnet restore
