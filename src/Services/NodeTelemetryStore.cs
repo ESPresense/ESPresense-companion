@@ -50,5 +50,7 @@ public class NodeTelemetryStore : BackgroundService
 
         await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/telemetry", null, true);
         await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/status", null, true);
+
+        await _mqttCoordinator.ClearRetainedAsync($"espresense/rooms/{id}/#");
     }
 }

@@ -117,6 +117,8 @@ namespace ESPresense.Services
             mqtt.NodeSettingReceivedAsync += arg =>
             {
                 Log.Debug("Received {0} for {1}: {2}", arg.Setting, arg.NodeId, arg.Payload);
+                if (string.IsNullOrEmpty(arg.Payload) && !_storeById.ContainsKey(arg.NodeId))
+                    return Task.CompletedTask;
                 try
                 {
                     var ns = Get(arg.NodeId);
@@ -209,8 +211,6 @@ namespace ESPresense.Services
 
         public async Task Delete(string id)
         {
-            _storeById.TryRemove(id, out _);
-
             string[] settings = new[]
             {
                 "name",
@@ -234,6 +234,10 @@ namespace ESPresense.Services
 
             foreach (var setting in settings)
                 await mqtt.EnqueueAsync($"espresense/rooms/{id}/{setting}", null, true);
+
+            await mqtt.ClearRetainedAsync($"espresense/rooms/{id}/#");
+
+            _storeById.TryRemove(id, out _);
         }
     }
 }

@@ -6,6 +6,7 @@ using MQTTnet.Client;
 using MQTTnet.Diagnostics;
 using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace ESPresense.Services;
 
@@ -280,6 +281,27 @@ public class MqttCoordinator
             var sanitizedTopic = topic.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
             _logger.LogInformation("ReadOnly, would have sent to {Topic}: {Payload}", sanitizedTopic, payload);
         }
+    }
+
+    public async Task ClearRetainedAsync(string topicFilter, CancellationToken cancellationToken = default)
+    {
+        var client = await GetClient();
+        var topics = new HashSet<string>();
+
+        Task handler(MqttApplicationMessageReceivedEventArgs arg)
+        {
+            topics.Add(arg.ApplicationMessage.Topic);
+            return Task.CompletedTask;
+        }
+
+        client.ApplicationMessageReceivedAsync += handler;
+        await client.SubscribeAsync(topicFilter);
+        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        await client.UnsubscribeAsync(topicFilter);
+        client.ApplicationMessageReceivedAsync -= handler;
+
+        foreach (var topic in topics)
+            await client.EnqueueAsync(topic, null, retain: true);
     }
 
     private async Task ProcessTelemetryMessage(string nodeId, string? payload)
