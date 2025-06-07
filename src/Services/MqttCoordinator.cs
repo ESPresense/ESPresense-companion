@@ -396,13 +396,6 @@ public class MqttCoordinator
         {
             _logger.LogTrace($"Received discovery message on topic: {topic}");
 
-            if (payload == null)
-            {
-                // Null payload indicates deletion of retained message
-                PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs { AutoDiscover = null });
-                return;
-            }
-
             if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg))
                 throw new MqttMessageProcessingException("Failed to deserialize discovery message", topic, payload, "Discovery");
 
