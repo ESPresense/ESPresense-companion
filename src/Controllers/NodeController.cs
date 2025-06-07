@@ -7,7 +7,7 @@ namespace ESPresense.Controllers;
 
 [Route("api/node")]
 [ApiController]
-public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : ControllerBase
+public class NodeController(NodeSettingsStore nodeSettingsStore, NodeTelemetryStore nodeTelemetryStore, State state) : ControllerBase
 {
     [HttpGet("{id}")]
     public NodeSettingsDetails Get(string id)
@@ -37,6 +37,15 @@ public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : 
     public async Task Restart(string id)
     {
         await nodeSettingsStore.Restart(id);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        await nodeSettingsStore.Delete(id);
+        await nodeTelemetryStore.Delete(id);
+        state.Nodes.TryRemove(id, out _);
+        return NoContent();
     }
 
     public class NodeUpdate

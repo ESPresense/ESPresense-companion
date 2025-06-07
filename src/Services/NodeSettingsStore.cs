@@ -200,5 +200,34 @@ namespace ESPresense.Services
         {
             await mqtt.EnqueueAsync($"espresense/rooms/{id}/restart/set", "PRESS");
         }
+
+        public async Task Delete(string id)
+        {
+            _storeById.TryRemove(id, out _);
+
+            string[] settings = new[]
+            {
+                "name",
+                "auto_update",
+                "prerelease",
+                "forget_after_ms",
+                "count_ids",
+                "count_min_dist",
+                "count_max_dist",
+                "count_ms",
+                "include",
+                "exclude",
+                "max_distance",
+                "skip_distance",
+                "skip_ms",
+                "absorption",
+                "rx_adj_rssi",
+                "tx_ref_rssi",
+                "ref_rssi"
+            };
+
+            foreach (var setting in settings)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/{setting}", null, true);
+        }
     }
 }

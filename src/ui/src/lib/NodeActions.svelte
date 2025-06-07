@@ -16,10 +16,10 @@
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
-	async function onRestart(node: Node) {
-		try {
-			const response = await fetch(`${base}/api/node/${node.id}/restart`, { method: 'POST' });
-			if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
+        async function onRestart(node: Node) {
+                try {
+                        const response = await fetch(`${base}/api/node/${node.id}/restart`, { method: 'POST' });
+                        if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to reboot`,
@@ -31,8 +31,27 @@
 				message: error instanceof Error ? error.message : 'Failed to restart node',
 				background: 'variant-filled-error'
 			});
-		}
-	}
+                }
+        }
+
+        async function onDelete(node: Node) {
+                if (!confirm(`Delete ${node.name || node.id}?`)) return;
+                try {
+                        const response = await fetch(`${base}/api/node/${node.id}`, { method: 'DELETE' });
+                        if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
+
+                        toastStore.trigger({
+                                message: `${node.name || node.id} deleted`,
+                                background: 'variant-filled-primary'
+                        });
+                } catch (error) {
+                        console.error(error);
+                        toastStore.trigger({
+                                message: error instanceof Error ? error.message : 'Failed to delete node',
+                                background: 'variant-filled-error'
+                        });
+                }
+        }
 
 	function getUpdateDescription(flavorId: string | undefined): string {
 		const selectedFlavorId = $flavor === '-' ? flavorId : $flavor;
@@ -195,14 +214,16 @@
 			<button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
 		{/if}
 
-		{#if row.telemetry}
-			<button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
-		{/if}
+                {#if row.telemetry}
+                        <button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
+                {/if}
 
-		{#if row.telemetry?.ip}
-			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
-				<span>Visit</span>
-				<span><img class="w-4" src={link} alt="External Link" /></span>
+                <button on:click={() => onDelete(row)} class="btn btn-sm variant-filled-error" aria-label="Delete node">Delete</button>
+
+                {#if row.telemetry?.ip}
+                        <a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
+                                <span>Visit</span>
+                                <span><img class="w-4" src={link} alt="External Link" /></span>
 			</a>
 		{/if}
 	{/if}

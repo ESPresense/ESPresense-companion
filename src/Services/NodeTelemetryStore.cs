@@ -42,4 +42,13 @@ public class NodeTelemetryStore : BackgroundService
     {
         return _onlineById.TryGetValue(id, out var online) && online;
     }
+
+    public async Task Delete(string id)
+    {
+        _storeById.TryRemove(id, out _);
+        _onlineById.TryRemove(id, out _);
+
+        await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/telemetry", null, true);
+        await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/status", null, true);
+    }
 }
