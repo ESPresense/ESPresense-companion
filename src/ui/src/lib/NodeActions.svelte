@@ -199,32 +199,32 @@
 </script>
 
 <div class="flex gap-1">
-	{#if row.online}
-		<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
-			{#if loadingEdit}
-				<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
-			{:else}
-				Edit
-			{/if}
-		</button>
+       {#if row.online}
+               <button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
+                       {#if loadingEdit}
+                               <span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+                       {:else}
+                               Edit
+                       {/if}
+               </button>
 
-		<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
+               <button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
 
-		{#if row.telemetry?.version}
-			<button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
-		{/if}
+               {#if row.telemetry?.version}
+                       <button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
+               {/if}
 
-                {#if row.telemetry}
-                        <button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
-                {/if}
+               {#if row.telemetry}
+                       <button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
+               {/if}
 
-                <button on:click={() => onDelete(row)} class="btn btn-sm variant-filled-error" aria-label="Delete node">Delete</button>
-
-                {#if row.telemetry?.ip}
-                        <a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
-                                <span>Visit</span>
-                                <span><img class="w-4" src={link} alt="External Link" /></span>
-			</a>
-		{/if}
-	{/if}
+               {#if row.telemetry?.ip}
+                       <a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
+                               <span>Visit</span>
+                               <span><img class="w-4" src={link} alt="External Link" /></span>
+                       </a>
+               {/if}
+       {:else}
+               <button on:click={() => onDelete(row)} class="btn btn-sm variant-filled-error" aria-label="Delete node">Delete</button>
+       {/if}
 </div>
