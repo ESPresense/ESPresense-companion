@@ -32,6 +32,7 @@ ENV HTTP_PORTS=8267 \
     HTTPS_PORTS="" \
     OTA_UPDATE_PORT=8268 \
     CONFIG_DIR="/config/espresense"
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
 
 COPY --from=build-env /App/out .
 
