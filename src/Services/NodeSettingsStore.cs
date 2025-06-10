@@ -19,6 +19,12 @@ namespace ESPresense.Services
                 _ => bool.Parse(value)
             };
         }
+
+        private static double? ParseDouble(string? value) =>
+            double.TryParse(value, out var v) ? v : null;
+
+        private static int? ParseInt(string? value) =>
+            int.TryParse(value, out var v) ? v : null;
         private readonly ConcurrentDictionary<string, NodeSettings> _storeById = new();
 
         public NodeSettings Get(string id)
@@ -111,6 +117,8 @@ namespace ESPresense.Services
             mqtt.NodeSettingReceivedAsync += arg =>
             {
                 Log.Debug("Received {0} for {1}: {2}", arg.Setting, arg.NodeId, arg.Payload);
+                if (string.IsNullOrEmpty(arg.Payload) && !_storeById.ContainsKey(arg.NodeId))
+                    return Task.CompletedTask;
                 try
                 {
                     var ns = Get(arg.NodeId);
@@ -133,10 +141,10 @@ namespace ESPresense.Services
                             ns.Counting.IdPrefixes = arg.Payload;
                             break;
                         case "count_min_dist":
-                            ns.Counting.MinDistance = double.Parse(arg.Payload);
+                            ns.Counting.MinDistance = ParseDouble(arg.Payload);
                             break;
                         case "count_max_dist":
-                            ns.Counting.MaxDistance = double.Parse(arg.Payload);
+                            ns.Counting.MaxDistance = ParseDouble(arg.Payload);
                             break;
 
                         // Filtering settings
@@ -147,27 +155,27 @@ namespace ESPresense.Services
                             ns.Filtering.ExcludeIds = arg.Payload;
                             break;
                         case "max_distance":
-                            ns.Filtering.MaxDistance = double.Parse(arg.Payload);
+                            ns.Filtering.MaxDistance = ParseDouble(arg.Payload);
                             break;
                         case "skip_distance":
-                            ns.Filtering.SkipDistance = double.Parse(arg.Payload);
+                            ns.Filtering.SkipDistance = ParseDouble(arg.Payload);
                             break;
                         case "skip_ms":
-                            ns.Filtering.SkipMs = int.Parse(arg.Payload);
+                            ns.Filtering.SkipMs = ParseInt(arg.Payload);
                             break;
 
                         // Calibration settings
                         case "absorption":
-                            ns.Calibration.Absorption = double.Parse(arg.Payload);
+                            ns.Calibration.Absorption = ParseDouble(arg.Payload);
                             break;
                         case "rx_adj_rssi":
-                            ns.Calibration.RxAdjRssi = int.Parse(arg.Payload);
+                            ns.Calibration.RxAdjRssi = ParseInt(arg.Payload);
                             break;
                         case "tx_ref_rssi":
-                            ns.Calibration.TxRefRssi = int.Parse(arg.Payload);
+                            ns.Calibration.TxRefRssi = ParseInt(arg.Payload);
                             break;
                         case "ref_rssi":
-                            ns.Calibration.RxRefRssi = int.Parse(arg.Payload);
+                            ns.Calibration.RxRefRssi = ParseInt(arg.Payload);
                             break;
 
                         default:
@@ -199,6 +207,37 @@ namespace ESPresense.Services
         public async Task Restart(string id)
         {
             await mqtt.EnqueueAsync($"espresense/rooms/{id}/restart/set", "PRESS");
+        }
+
+        public async Task Delete(string id)
+        {
+            string[] settings = new[]
+            {
+                "name",
+                "auto_update",
+                "prerelease",
+                "forget_after_ms",
+                "count_ids",
+                "count_min_dist",
+                "count_max_dist",
+                "count_ms",
+                "include",
+                "exclude",
+                "max_distance",
+                "skip_distance",
+                "skip_ms",
+                "absorption",
+                "rx_adj_rssi",
+                "tx_ref_rssi",
+                "ref_rssi"
+            };
+
+            foreach (var setting in settings)
+                await mqtt.EnqueueAsync($"espresense/rooms/{id}/{setting}", null, true);
+
+            await mqtt.ClearRetainedAsync($"espresense/rooms/{id}/#");
+
+            _storeById.TryRemove(id, out _);
         }
     }
 }

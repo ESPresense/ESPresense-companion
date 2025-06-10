@@ -6,6 +6,7 @@ using MQTTnet.Client;
 using MQTTnet.Diagnostics;
 using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace ESPresense.Services;
 
@@ -282,13 +283,35 @@ public class MqttCoordinator
         }
     }
 
+    public async Task ClearRetainedAsync(string topicFilter, CancellationToken cancellationToken = default)
+    {
+        var client = await GetClient();
+        var topics = new HashSet<string>();
+
+        Task handler(MqttApplicationMessageReceivedEventArgs arg)
+        {
+            topics.Add(arg.ApplicationMessage.Topic);
+            return Task.CompletedTask;
+        }
+
+        client.ApplicationMessageReceivedAsync += handler;
+        await client.SubscribeAsync(topicFilter);
+        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        await client.UnsubscribeAsync(topicFilter);
+        client.ApplicationMessageReceivedAsync -= handler;
+
+        foreach (var topic in topics)
+            await client.EnqueueAsync(topic, null, retain: true);
+    }
+
     private async Task ProcessTelemetryMessage(string nodeId, string? payload)
     {
-        if (NodeTelemetryReceivedAsync == null) return;
+        if (NodeTelemetryReceivedAsync == null || string.IsNullOrEmpty(payload))
+            return;
 
         try
         {
-            var telemetry = JsonConvert.DeserializeObject<NodeTelemetry>(payload ?? "");
+            var telemetry = JsonConvert.DeserializeObject<NodeTelemetry>(payload);
             if (telemetry == null)
                 throw new MqttMessageProcessingException(
                     "Telemetry data was null after deserialization",
@@ -315,10 +338,8 @@ public class MqttCoordinator
 
     private async Task ProcessStatusMessage(string nodeId, string? payload)
     {
-        if (NodeStatusReceivedAsync == null) return;
-
-        if (payload == null)
-            throw new MqttMessageProcessingException("Status payload was null", $"espresense/rooms/{nodeId}/status", null, "Status");
+        if (NodeStatusReceivedAsync == null || string.IsNullOrEmpty(payload))
+            return;
 
         var online = payload == "online";
         await NodeStatusReceivedAsync(new NodeStatusReceivedEventArgs
@@ -330,7 +351,8 @@ public class MqttCoordinator
 
     private async Task ProcessDeviceMessage(string deviceId, string nodeId, string? payload)
     {
-        if (DeviceMessageReceivedAsync == null) return;
+        if (DeviceMessageReceivedAsync == null || string.IsNullOrEmpty(payload))
+            return;
 
         try
         {
