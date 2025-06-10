@@ -351,7 +351,8 @@ public class MqttCoordinator
 
     private async Task ProcessDeviceMessage(string deviceId, string nodeId, string? payload)
     {
-        if (DeviceMessageReceivedAsync == null) return;
+        if (DeviceMessageReceivedAsync == null || string.IsNullOrEmpty(payload))
+            return;
 
         try
         {

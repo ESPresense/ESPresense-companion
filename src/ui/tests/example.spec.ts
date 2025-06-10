@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('index page has expected h1', async ({ page }) => {
-	await page.goto('/');
-	await expect(page.getByRole('heading', { name: 'Welcome to SvelteKit' })).toBeVisible();
+test('nodes page has expected heading', async ({ page }) => {
+        await page.goto('/nodes');
+        await expect(page.getByRole('heading', { name: 'Nodes' })).toBeVisible();
 });
