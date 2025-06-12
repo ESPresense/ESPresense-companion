@@ -34,6 +34,25 @@
 		}
 	}
 
+	async function onDelete(node: Node) {
+		if (!confirm(`Delete ${node.name || node.id}?`)) return;
+		try {
+			const response = await fetch(`${base}/api/node/${node.id}`, { method: 'DELETE' });
+			if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
+
+			toastStore.trigger({
+				message: `${node.name || node.id} deleted`,
+				background: 'variant-filled-primary'
+			});
+		} catch (error) {
+			console.error(error);
+			toastStore.trigger({
+				message: error instanceof Error ? error.message : 'Failed to delete node',
+				background: 'variant-filled-error'
+			});
+		}
+	}
+
 	function getUpdateDescription(flavorId: string | undefined): string {
 		const selectedFlavorId = $flavor === '-' ? flavorId : $flavor;
 		const flavorName = selectedFlavorId ? $flavorNames?.get(selectedFlavorId) : undefined;
@@ -205,5 +224,7 @@
 				<span><img class="w-4" src={link} alt="External Link" /></span>
 			</a>
 		{/if}
+	{:else}
+		<button on:click={() => onDelete(row)} class="btn btn-sm variant-filled-error" aria-label="Delete node">Delete</button>
 	{/if}
 </div>

@@ -39,6 +39,14 @@ public class NodeController(NodeSettingsStore nodeSettingsStore, State state) : 
         await nodeSettingsStore.Restart(id);
     }
 
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        await nodeSettingsStore.Delete(id);
+        state.Nodes.TryRemove(id, out _);
+        return NoContent();
+    }
+
     public class NodeUpdate
     {
         public string? Url { get; set; }
