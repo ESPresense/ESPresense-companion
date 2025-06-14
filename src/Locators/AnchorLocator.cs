@@ -8,7 +8,9 @@ public class AnchorLocator(Point3D anchor) : ILocate
     private readonly Point3D _anchor = anchor;
     public bool Locate(Scenario scenario)
     {
-        var moved = scenario.Location.DistanceTo(_anchor) > 0.01;
+        const double Epsilon = 0.01;
+        var moved = scenario.Location != null &&
+                    scenario.Location.DistanceTo(_anchor) > Epsilon;
         scenario.Scale = 1;
         scenario.Error = 0;
         scenario.Iterations = 0;
