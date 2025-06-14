@@ -121,7 +121,7 @@
 		<form class="modal-form {cForm}">
 			<label class="label">
 				<span>Flavor</span>
-				<select id="flavor" class="flex-grow select" bind:value={flavor}>
+				<select id="flavor" class="grow select" bind:value={flavor}>
 					{#each $firmwareTypes.flavors as item}
 						<option value={item.value}>{item.name}</option>
 					{/each}
@@ -129,7 +129,7 @@
 			</label>
 			<label class="label">
 				<span>CPU</span>
-				<select id="cpu" class="flex-grow select" bind:value={cpu}>
+				<select id="cpu" class="grow select" bind:value={cpu}>
 					{#each selectedFlavor?.cpus ?? [] as item}
 						<option value={item}>{$cpuNames?.get(item)}</option>
 					{/each}
@@ -137,7 +137,7 @@
 			</label>
 			<label class="label">
 				<span>Firmware</span>
-				<select id="firmware" class="flex-grow select" bind:value={firmware}>
+				<select id="firmware" class="grow select" bind:value={firmware}>
 					{#each possibleFirmware ?? [] as item}
 						<option value={item.name}>{item.name}</option>
 					{/each}

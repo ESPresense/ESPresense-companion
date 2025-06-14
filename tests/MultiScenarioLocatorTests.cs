@@ -31,7 +31,8 @@ public class MultiScenarioLocatorTests
             new MqttNetLogger(),
             supervisor);
 
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object);
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), deviceSettingsStore);
         var tele = new TelemetryService(mqttMock.Object);
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher());
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);

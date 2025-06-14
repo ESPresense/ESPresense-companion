@@ -44,7 +44,7 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0">
-	<div class="flex flex-col flex-grow min-h-0">
+	<div class="flex flex-col grow min-h-0">
 		<!-- Breadcrumb Navigation -->
 		<NodeBreadcrumb nodeName={node?.name || node?.id || 'Unknown Node'} bind:currentFloorId={floorId} {node} />
 

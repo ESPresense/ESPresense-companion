@@ -36,7 +36,7 @@ public class DeviceAliasIntegrationTests
 
         // Create real instances for integration testing
         _deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object);
-        _state = new State(_mockConfigLoader.Object, _mockNodeTelemetryStore.Object);
+        _state = new State(_mockConfigLoader.Object, _mockNodeTelemetryStore.Object, _deviceSettingsStore);
         
         // Create DeviceService with required dependencies
         var mqttCoordinator = CreateMockMqttCoordinator();

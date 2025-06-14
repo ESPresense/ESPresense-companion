@@ -53,6 +53,7 @@ export interface Device {
 	room: { id: string; name: string };
 	floor: { id: string; name: string };
 	location: { x: number; y: number; z: number };
+	anchor?: { x: number; y: number; z: number } | null;
 	confidence: number;
 	scale: number;
 	fixes: number;
@@ -128,6 +129,9 @@ export type DeviceSetting = {
 	id: string | null;
 	name: string | null;
 	'rssi@1m': number | null;
+	x?: number | null;
+	y?: number | null;
+	z?: number | null;
 	error?: string;
 };
 

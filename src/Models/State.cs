@@ -5,6 +5,8 @@ using ESPresense.Extensions;
 using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Weighting;
+using MathNet.Spatial.Euclidean;
+using System.Linq;
 using Serilog;
 
 namespace ESPresense.Models;
@@ -12,6 +14,7 @@ namespace ESPresense.Models;
 public class State
 {
     private readonly NodeTelemetryStore _nts;
+    private readonly DeviceSettingsStore _deviceSettingsStore;
 
     /// <summary>
     /// Initializes a new State, wiring telemetry and configuration handling.
@@ -21,9 +24,10 @@ public class State
     /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
     /// selects the locators' weighting strategy, and marks existing Devices for checking.
     /// </remarks>
-    public State(ConfigLoader cl, NodeTelemetryStore nts)
+    public State(ConfigLoader cl, NodeTelemetryStore nts, DeviceSettingsStore deviceSettingsStore)
     {
         _nts = nts;
+        _deviceSettingsStore = deviceSettingsStore;
         void LoadConfig(Config c)
         {
             Config = c;
@@ -124,6 +128,26 @@ public class State
                 }
             }
 
+        foreach (var device in Devices.Values.Where(d => d.Anchor != null))
+            foreach (var (rxId, dn) in device.Nodes)
+            {
+                var tx = nodes.GetOrAdd(device.Id, a => new OptNode { Id = device.Id, Name = device.Name, Location = device.Anchor!.Value });
+                var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = dn.Node.Name, Location = dn.Node.Location });
+                if (dn.Current)
+                {
+                    os.Measures.Add(new Measure
+                    {
+                        Distance = dn.Distance,
+                        DistVar = dn.DistVar,
+                        Rssi = dn.Rssi,
+                        RssiVar = dn.RssiVar,
+                        RefRssi = dn.RefRssi,
+                        Tx = tx,
+                        Rx = rx,
+                    });
+                }
+            }
+
         // Remove expired snapshots by time
         var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
         var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
@@ -148,6 +172,20 @@ public class State
 
     public IEnumerable<Scenario> GetScenarios(Device device)
     {
+        if (device.Anchor != null)
+        {
+            var anchor = device.Anchor.Value;
+            var floor = Floors.Values.FirstOrDefault(f => f.Contained(anchor.Z));
+            var room = floor?.Rooms.Values.FirstOrDefault(r => r.Polygon?.EnclosesPoint(anchor.ToPoint2D()) ?? false);
+            var scenario = new Scenario(Config, new AnchorLocator(anchor), "Anchor")
+            {
+                Floor = floor,
+                Room = room,
+                Confidence = 100
+            };
+            yield return scenario;
+            yield break;
+        }
         var nelderMead = Config?.Locators?.NelderMead;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
@@ -178,19 +216,39 @@ public class State
         if (IsExcluded(device))
             return false;
 
+        bool shouldTrack = false;
+
+        // Check DeviceSettings for anchor coordinates and tracking
+        var deviceSettings = _deviceSettingsStore.Get(device.Id);
+        if (deviceSettings != null)
+        {
+            if (!string.IsNullOrWhiteSpace(deviceSettings.Name))
+                device.Name = deviceSettings.Name;
+            if (deviceSettings.X.HasValue && deviceSettings.Y.HasValue && deviceSettings.Z.HasValue)
+                device.Anchor = new Point3D(deviceSettings.X.Value, deviceSettings.Y.Value, deviceSettings.Z.Value);
+            shouldTrack = true;
+        }
+
         if (ConfigDeviceById.TryGetValue(device.Id, out var cdById))
         {
             if (!string.IsNullOrWhiteSpace(cdById.Name))
                 device.Name = cdById.Name;
-            return true;
+            if (cdById.Point?.Length >= 3)
+                device.Anchor = new Point3D(cdById.Point[0], cdById.Point[1], cdById.Point[2]);
+            shouldTrack = true;
         }
-        if (!string.IsNullOrWhiteSpace(device.Name) && ConfigDeviceByName.TryGetValue(device.Name, out _))
-            return true;
+        if (!string.IsNullOrWhiteSpace(device.Name) && ConfigDeviceByName.TryGetValue(device.Name, out var cdByName))
+        {
+            if (cdByName.Point?.Length >= 3)
+                device.Anchor = new Point3D(cdByName.Point[0], cdByName.Point[1], cdByName.Point[2]);
+            shouldTrack = true;
+        }
         if (!string.IsNullOrWhiteSpace(device.Id) && IdsToTrack.Any(a => a.IsMatch(device.Id)))
-            return true;
+            shouldTrack = true;
         if (!string.IsNullOrWhiteSpace(device.Name) && NamesToTrack.Any(a => a.IsMatch(device.Name)))
-            return true;
-        return false;
+            shouldTrack = true;
+
+        return shouldTrack;
     }
 
     private bool IsExcluded(Device device)

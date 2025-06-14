@@ -51,7 +51,7 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0">
-	<div class="flex flex-col flex-grow min-h-0">
+	<div class="flex flex-col grow min-h-0">
 		<!-- Breadcrumb Navigation -->
 		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView={currentTab === 'calibration' ? 'calibration' : 'map'} />
 
@@ -71,7 +71,7 @@
 			{/if}
 		{/if}
 	</div>
-	<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
+	<div class="w-64 shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
 		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>
 			<Accordion.Item value="details">
 				{#snippet control()}

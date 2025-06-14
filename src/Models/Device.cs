@@ -38,6 +38,9 @@ public class Device
     public string Id { get; init; }
     public string? Name { get; set; }
 
+    [JsonConverter(typeof(Point3DConverter))]
+    public Point3D? Anchor { get; set; }
+
     [JsonIgnore] public Point3D ReportedLocation { get; set; }
 
     [JsonConverter(typeof(DeviceToNodeConverter))]
