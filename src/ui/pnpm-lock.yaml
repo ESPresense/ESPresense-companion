@@ -22,10 +22,10 @@ importers:
         version: 0.4.1(tailwindcss@3.4.17)
       '@sveltejs/adapter-static':
         specifier: ^3.0.8
-        version: 3.0.8(@sveltejs/kit@2.21.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))
+        version: 3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))
       '@sveltejs/kit':
-        specifier: ^2.20.8
-        version: 2.21.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))
+        specifier: ^2.21.5
+        version: 2.21.5(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^5.0.3
         version: 5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))
@@ -522,8 +522,8 @@ packages:
     peerDependencies:
       '@sveltejs/kit': ^2.0.0
 
-  '@sveltejs/kit@2.21.1':
-    resolution: {integrity: sha512-vLbtVwtDcK8LhJKnFkFYwM0uCdFmzioQnif0bjEYH1I24Arz22JPr/hLUiXGVYAwhu8INKx5qrdvr4tHgPwX6w==}
+  '@sveltejs/kit@2.21.5':
+    resolution: {integrity: sha512-P5m7yZtvD1Kx/Z6JcjgJtdMqef/tCGMDrd9B9S2q8j+FMnkeKTMxW1nidnjVzk4HEDRGf4IlBI94/niy6t3hLA==}
     engines: {node: '>=18.13'}
     hasBin: true
     peerDependencies:
@@ -2422,16 +2422,20 @@ snapshots:
     dependencies:
       acorn: 8.14.1
 
-  '@sveltejs/adapter-static@3.0.8(@sveltejs/kit@2.21.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))':
+  '@sveltejs/acorn-typescript@1.0.5(acorn@8.15.0)':
     dependencies:
-      '@sveltejs/kit': 2.21.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))
+      acorn: 8.15.0
 
-  '@sveltejs/kit@2.21.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))':
+  '@sveltejs/adapter-static@3.0.8(@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))':
     dependencies:
-      '@sveltejs/acorn-typescript': 1.0.5(acorn@8.14.1)
+      '@sveltejs/kit': 2.21.5(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))
+
+  '@sveltejs/kit@2.21.5(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))':
+    dependencies:
+      '@sveltejs/acorn-typescript': 1.0.5(acorn@8.15.0)
       '@sveltejs/vite-plugin-svelte': 5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))
       '@types/cookie': 0.6.0
-      acorn: 8.14.1
+      acorn: 8.15.0
       cookie: 0.6.0
       devalue: 5.1.1
       esm-env: 1.2.2
@@ -2443,6 +2447,7 @@ snapshots:
       sirv: 3.0.1
       svelte: 5.33.13
       vite: 6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)
+      vitefu: 1.0.6(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))
 
   '@sveltejs/vite-plugin-svelte-inspector@4.0.1(@sveltejs/vite-plugin-svelte@5.0.3(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0)))(svelte@5.33.13)(vite@6.3.5(@types/node@22.15.23)(jiti@1.21.7)(yaml@2.8.0))':
     dependencies:
@@ -2832,10 +2837,6 @@ snapshots:
       tinyrainbow: 2.0.0
 
   '@webgpu/types@0.1.60': {}
-
-  acorn-jsx@5.3.2(acorn@8.14.1):
-    dependencies:
-      acorn: 8.14.1
 
   acorn-jsx@5.3.2(acorn@8.15.0):
     dependencies:
@@ -3299,8 +3300,8 @@ snapshots:
 
   espree@10.3.0:
     dependencies:
-      acorn: 8.14.1
-      acorn-jsx: 5.3.2(acorn@8.14.1)
+      acorn: 8.15.0
+      acorn-jsx: 5.3.2(acorn@8.15.0)
       eslint-visitor-keys: 4.2.1
 
   espree@10.4.0:
