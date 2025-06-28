@@ -30,29 +30,37 @@
 				</select>
 				{#if firmwareSource === 'release'}
 					<label for="version" class="whitespace-nowrap">Version:</label>
-					<select id="version" class="flex-grow select" bind:value={version}>
-						{#each Array.from($releases.entries()).reverse() as [key, value]}
-							<optgroup label={key}>
-								{#each value as item}
-									<option value={item.tag_name}>{item.name}</option>
-								{/each}
-							</optgroup>
-						{/each}
-					</select>
+					{#if $releases.size === 0}
+						<span>Loading...</span>
+					{:else}
+						<select id="version" class="flex-grow select" bind:value={version}>
+							{#each Array.from($releases.entries()).reverse() as [key, value]}
+								<optgroup label={key}>
+									{#each value as item}
+										<option value={item.tag_name}>{item.name}</option>
+									{/each}
+								</optgroup>
+							{/each}
+						</select>
+					{/if}
 				{/if}
 				{#if firmwareSource === 'artifact'}
 					<label for="artifact" class="whitespace-nowrap">Artifact:</label>
-					<select id="artifact" class="select" bind:value={artifact}>
-						{#each Array.from($artifacts.entries()).reverse() as [key, value]}
-							<optgroup label={key}>
-								{#each value as item}
-									<option value={item.id}>
-										{item.head_sha.substring(0, 7)}: {item.head_commit.message.split('\n')[0]}
-									</option>
-								{/each}
-							</optgroup>
-						{/each}
-					</select>
+					{#if $artifacts.size === 0}
+						<span>Loading...</span>
+					{:else}
+						<select id="artifact" class="select" bind:value={artifact}>
+							{#each Array.from($artifacts.entries()).reverse() as [key, value]}
+								<optgroup label={key}>
+									{#each value as item}
+										<option value={item.id}>
+											{item.head_sha.substring(0, 7)}: {item.head_commit.message.split('\n')[0]}
+										</option>
+									{/each}
+								</optgroup>
+							{/each}
+						</select>
+					{/if}
 				{/if}
 			</div>
 		{/if}

@@ -211,7 +211,7 @@
 		<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
 
 		{#if row.telemetry?.version}
-			<button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
+			<button on:click={() => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
 		{/if}
 
 		{#if row.telemetry}
