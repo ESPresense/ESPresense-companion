@@ -57,7 +57,7 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
 
             double Distance(Vector<double> x, Measure dn)
             {
-                double exponent = (-59 + x[0] - dn.Rssi) / (10.0d * x[1]);
+                double exponent = (txRefRssi + x[0] - dn.Rssi) / (10.0d * x[1]);
                 return (x[1] > 0 && !double.IsInfinity(exponent)) ? Math.Pow(10, exponent) : double.MaxValue;
             }
 
