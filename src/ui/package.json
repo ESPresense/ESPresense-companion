@@ -41,7 +41,7 @@
 		"prettier-plugin-svelte": "^3.3.3",
 		"s-ago": "^2.2.0",
 		"svelte": "^5.33.13",
-		"svelte-check": "^4.1.7",
+		"svelte-check": "^4.2.2",
 		"svelte-eslint-parser": "^1.2.0",
 		"svelte-table": "^0.6.4",
 		"three": "^0.175.0",
