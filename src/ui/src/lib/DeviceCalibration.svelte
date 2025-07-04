@@ -370,7 +370,7 @@
 	</div>
 
 	{#if $config?.floors}
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+		<div class="grid grid-cols-1 gap-4 mb-4">
 			<div>
 				<label class="label font-medium mb-1" for="floor-select">Select Floor</label>
 				<select id="floor-select" bind:value={selectedFloorId} class="select w-full">
@@ -523,7 +523,7 @@
 				</div>
 				<div class="card p-4 preset-tonal">
 					<header class="font-semibold mb-4">Calibration Results</header>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+					<div class="grid grid-cols-1 gap-4 mb-4">
 						<div class="card p-4 preset-tonal">
 							<header class="font-semibold mb-2">Current Values</header>
 							<p class="text-xl font-bold">
