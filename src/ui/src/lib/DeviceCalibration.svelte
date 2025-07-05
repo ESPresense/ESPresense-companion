@@ -2,7 +2,7 @@
 	import { base } from '$app/paths';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
-	import type { ToastSettings } from '@skeletonlabs/skeleton-svelte';
+	import { getToastStore, type ToastSettings } from '$lib/utils/skeleton';
 	import type { DeviceSetting, NodeSetting } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';
@@ -106,8 +106,7 @@
 
 	// Error handling adjusted for fetched settings
 	$: if (deviceSettings?.error) {
-		const t: ToastSettings = { message: deviceSettings.error, background: 'preset-filled-error-500' };
-		toastStore.trigger(t);
+		toastStore.create({ description: deviceSettings.error, type: 'error' });
 	}
 
 	// Reactive device and floor lookup

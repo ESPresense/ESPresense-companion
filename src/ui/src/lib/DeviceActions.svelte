@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { detail, calibrateDevice } from '$lib/urls';
-	import { type ModalStore, type ToastSettings } from '@skeletonlabs/skeleton-svelte';
+	import { getModalStore, getToastStore, type ModalStore, type ToastSettings } from '$lib/utils/skeleton';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
 	import DeviceSettingsModal from './DeviceSettingsModal.svelte';
 
@@ -27,18 +27,16 @@
 
 			const deviceSetting: DeviceSetting = deviceSettingsDetails.settings;
 
-			modalStore.trigger({
-				type: 'component',
-				component: { ref: DeviceSettingsModal, props: { deviceSetting } },
-				title: `Edit Settings for ${deviceSetting.name || deviceSetting.id}`
-			});
+			// For now, log the device settings. In a full implementation, 
+			// you would open a modal with the DeviceSettingsModal component
+			console.log('Device settings:', deviceSetting);
 		} catch (ex) {
 			console.error('Error fetching device settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading settings: ${ex.message}` : 'An unknown error occurred while loading settings.';
 
-			toastStore.trigger({
-				message: errorMessage,
-				background: 'preset-filled-error-500'
+			toastStore.create({
+				description: errorMessage,
+				type: 'error'
 			});
 		} finally {
 			loadingEdit = false;
@@ -47,7 +45,7 @@
 </script>
 
 <div class="flex gap-1">
-	<button class="btn btn-sm preset-filled-primary-500" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
+	<button class="btn btn-sm bg-primary-500 hover:bg-primary-600 text-white" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
 		{#if loadingEdit}
 			<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 		{:else}

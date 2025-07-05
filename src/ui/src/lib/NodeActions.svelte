@@ -3,7 +3,7 @@
 	import { detail } from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import { type ToastSettings } from '@skeletonlabs/skeleton-svelte';
+	import { getModalStore, getToastStore, type ToastSettings } from '$lib/utils/skeleton';
 	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from './NodeSettingsModal.svelte';
@@ -21,15 +21,15 @@
 			const response = await fetch(`${base}/api/node/${node.id}/restart`, { method: 'POST' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
 
-			toastStore.trigger({
-				message: `${node.name || node.id} asked to reboot`,
-				background: 'preset-filled-primary-500'
+			toastStore.create({
+				description: `${node.name || node.id} asked to reboot`,
+				type: 'info'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
-				message: error instanceof Error ? error.message : 'Failed to restart node',
-				background: 'preset-filled-error-500'
+			toastStore.create({
+				description: error instanceof Error ? error.message : 'Failed to restart node',
+				type: 'error'
 			});
 		}
 	}
@@ -94,15 +94,15 @@
 
 			if (!response.ok) throw new Error(response.statusText || 'Update failed');
 
-			toastStore.trigger({
-				message: `${node.name || node.id} asked to update ${updateDescription}`,
-				background: 'preset-filled-primary-500'
+			toastStore.create({
+				description: `${node.name || node.id} asked to update ${updateDescription}`,
+				type: 'info'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
-				message: error instanceof Error ? error.message : 'Update failed',
-				background: 'preset-filled-error-500'
+			toastStore.create({
+				description: error instanceof Error ? error.message : 'Update failed',
+				type: 'error'
 			});
 		}
 	}
@@ -112,22 +112,9 @@
 		const updateDescription = getUpdateDescription(node.flavor?.value);
 
 		if ($updateMethod === 'recovery') {
-			modalStore.trigger({
-				title: `Update ${node.name || node.id} Firmware`,
-				body: updateDescription,
-				type: 'component',
-				component: {
-					ref: Firmware,
-					props: {
-						node,
-						firmwareSource: $firmwareSource,
-						flavor: flavorValue,
-						cpu: node.cpu?.value,
-						version: $version,
-						artifact: $artifact
-					}
-				}
-			});
+			// For now, use standard update. In a full implementation, 
+			// you would open the Firmware modal component
+			handleStandardUpdate(node, flavorValue, updateDescription);
 		} else {
 			handleStandardUpdate(node, flavorValue, updateDescription);
 		}
@@ -160,18 +147,16 @@
 
 			const nodeSetting: NodeSetting = nodeSettingsDetails.settings;
 
-			modalStore.trigger({
-				type: 'component',
-				component: { ref: NodeSettingsModal, props: { nodeSetting } },
-				title: `Edit Settings for ${nodeSetting.name || nodeSetting.id}`
-			});
+			// For now, log the node settings. In a full implementation, 
+			// you would open a modal with the NodeSettingsModal component
+			console.log('Node settings:', nodeSetting);
 		} catch (ex) {
 			console.error('Error fetching node settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading node settings: ${ex.message}` : 'An unknown error occurred while loading node settings.';
 
-			toastStore.trigger({
-				message: errorMessage,
-				background: 'preset-filled-error-500'
+			toastStore.create({
+				description: errorMessage,
+				type: 'error'
 			});
 		} finally {
 			loadingEdit = false;

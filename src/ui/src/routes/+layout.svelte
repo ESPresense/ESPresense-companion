@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import { Navigation, ToastProvider } from '@skeletonlabs/skeleton-svelte';
 	import { computePosition, autoUpdate, offset, shift, flip, arrow } from '@floating-ui/dom';
+	import { Modal } from '@skeletonlabs/skeleton-svelte';
 
 	import logo from '$lib/images/logo.svg';
 	import github from '$lib/images/github.svg';
@@ -13,9 +14,7 @@
 	import calibration from '$lib/images/calibration.svg';
 	import cube from '$lib/images/cube.svg';
 
-	initializeStores();
-
-	storePopup.set({ computePosition, autoUpdate, offset, shift, flip, arrow });
+	// Skeleton v3 no longer requires initializeStores or storePopup configuration
 
 
 	$: current = $page.url.pathname;
@@ -31,38 +30,37 @@
 </script>
 
 <div class="app h-full">
-	<Modal />
 	<ToastProvider />
-	<AppShell>
-		<svelte:fragment slot="sidebarLeft">
-			<Navigation>
-				<svelte:fragment slot="lead">
-					<AppRailAnchor href="https://espresense.com/companion" target="_blank" group="main">
-						<img src={logo} class="px-6" alt="ESPresense Companion" />
-					</AppRailAnchor>
-				</svelte:fragment>
-
-				{#each routes as route}
-					<AppRailAnchor
-						href="{base}{route.href}"
-						name={route.name}
-						selected={current === `${base}${route.href}`}
-					>
-						<img src={route.icon} class="px-6" alt={route.alt} />
-						<span>{route.alt}</span>
-					</AppRailAnchor>
-				{/each}
-
-				<svelte:fragment slot="trail">
-					<AppRailAnchor href="https://github.com/ESPresense/ESPresense-companion" target="_blank">
-						<img src={github} class="px-4" alt="GitHub" />
-					</AppRailAnchor>
-				</svelte:fragment>
-			</Navigation>
-		</svelte:fragment>
-		<slot />
-		<Drawer width="400px" />
-	</AppShell>
+	<div class="flex h-full">
+		<!-- Sidebar -->
+		<div class="w-20 bg-surface-800 flex flex-col items-center py-4 space-y-4">
+			<!-- Logo -->
+			<a href="https://espresense.com/companion" target="_blank" class="p-2">
+				<img src={logo} class="w-12 h-12" alt="ESPresense Companion" />
+			</a>
+			
+			<!-- Navigation Links -->
+			{#each routes as route}
+				<a
+					href="{base}{route.href}"
+					class="p-2 rounded-lg transition-colors {current === `${base}${route.href}` ? 'bg-primary-500 text-white' : 'hover:bg-surface-700'}"
+					title={route.alt}
+				>
+					<img src={route.icon} class="w-8 h-8" alt={route.alt} />
+				</a>
+			{/each}
+			
+			<!-- GitHub Link -->
+			<a href="https://github.com/ESPresense/ESPresense-companion" target="_blank" class="p-2 mt-auto hover:bg-surface-700 rounded-lg">
+				<img src={github} class="w-6 h-6" alt="GitHub" />
+			</a>
+		</div>
+		
+		<!-- Main Content -->
+		<div class="flex-1 overflow-hidden">
+			<slot />
+		</div>
+	</div>
 </div>
 
 <style>

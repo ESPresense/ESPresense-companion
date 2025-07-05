@@ -2,6 +2,7 @@
 	import { calibration } from '$lib/stores';
 	import { Segment } from '@skeletonlabs/skeleton-svelte';
 	import { base } from '$app/paths';
+	import { getModalStore, getToastStore, popup } from '$lib/utils/skeleton';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -84,9 +85,9 @@
 		try {
 			const response = await fetch(`${base}/api/state/calibration/reset`, { method: 'POST' });
 			if (response.ok) {
-				toastStore.trigger({
-					message: 'Calibration reset successfully',
-					background: 'preset-filled-success-500'
+				toastStore.create({
+					description: 'Calibration reset successfully',
+					type: 'success'
 				});
 			} else {
 				const errorText = await response.text();
@@ -94,9 +95,9 @@
 			}
 		} catch (error: any) {
 			console.error('Error resetting calibration:', error);
-			toastStore.trigger({
-				message: `Failed to reset calibration: ${error.message}`,
-				background: 'preset-filled-error-500'
+			toastStore.create({
+				description: `Failed to reset calibration: ${error.message}`,
+				type: 'error'
 			});
 		}
 	}
@@ -111,7 +112,7 @@
 				{:else}
 					No beacon Received in last 30 seconds
 				{/if}
-				<div class="arrow preset-filled-secondary-500" />
+				<div class="arrow preset-filled-secondary-500"></div>
 			</div>
 		{/each}
 	{/each}
@@ -121,7 +122,7 @@
 	{#if $calibration?.matrix}
 		<header>
 			<div class="flex justify-between items-center p-2">
-				<Segment active="preset-filled-primary-500" hover="hover:preset-tonal-primary">
+				<Segment>
 					<Segment.Item bind:group={data_point} name="justify" value={0}>Error %</Segment.Item>
 					<Segment.Item bind:group={data_point} name="justify" value={1}>Error (m)</Segment.Item>
 					<Segment.Item bind:group={data_point} name="justify" value={2}>Absorption</Segment.Item>
@@ -129,7 +130,7 @@
 					<Segment.Item bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</Segment.Item>
 					<Segment.Item bind:group={data_point} name="justify" value={5}>Variance (m)</Segment.Item>
 				</Segment>
-				<button class="btn preset-filled-warning-500" on:click={resetCalibration}> Reset Calibration </button>
+				<button class="btn bg-warning-500 hover:bg-warning-600 text-white" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
 		</header>
 		<section class="p-4 pt-0">
@@ -150,7 +151,7 @@
 								{#if n1[id2]}
 									<td use:popup={{ event: 'hover', target: 'popup-' + id1 + '-' + id2, placement: 'top' }} style={coloring(n1[id2]?.percent)}>{value(n1[id2], data_point)}</td>
 								{:else}
-									<td />
+									<td></td>
 								{/if}
 							{/each}
 						</tr>
