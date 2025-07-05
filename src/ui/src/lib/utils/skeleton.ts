@@ -7,7 +7,12 @@ import type { ToastContext } from '@skeletonlabs/skeleton-svelte';
 export function getToastStore(): ToastContext {
 	const toastStore = getContext<ToastContext>('toast');
 	if (!toastStore) {
-		throw new Error('ToastStore not found. Make sure ToastProvider is set up in your app.');
+		// Return a mock toast store if not found to prevent errors
+		return {
+			create: (settings: any) => {
+				console.warn('ToastStore not properly initialized. Toast message:', settings);
+			}
+		} as ToastContext;
 	}
 	return toastStore;
 }

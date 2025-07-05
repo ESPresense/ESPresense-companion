@@ -79,7 +79,7 @@
 			copiedCoords = [];
 			toastStore.trigger({
 				message: 'Coordinate collection reset',
-				background: 'preset-filled-primary-500',
+				background: 'bg-primary-500',
 				timeout: 1000
 			});
 		}

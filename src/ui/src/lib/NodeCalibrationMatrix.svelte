@@ -106,7 +106,7 @@
 {#if $calibration?.matrix}
 	{#each Object.entries($calibration?.matrix) as [id1, n1] (id1)}
 		{#each rxColumns as id2 (id2)}
-			<div class="card preset-filled-secondary-500 p-4" data-popup={'popup-' + id1 + '-' + id2}>
+			<div class="card preset-filled-secondary-500 p-4 hidden" data-popup={'popup-' + id1 + '-' + id2}>
 				{#if n1[id2]}
 					Map Distance {Number(n1[id2].mapDistance?.toPrecision(3))} - Measured {Number(n1[id2]?.distance?.toPrecision(3))} = Error {Number(n1[id2]?.diff?.toPrecision(3))}
 				{:else}
@@ -122,15 +122,15 @@
 	{#if $calibration?.matrix}
 		<header>
 			<div class="flex justify-between items-center p-2">
-				<Segment>
-					<Segment.Item bind:group={data_point} name="justify" value={0}>Error %</Segment.Item>
-					<Segment.Item bind:group={data_point} name="justify" value={1}>Error (m)</Segment.Item>
-					<Segment.Item bind:group={data_point} name="justify" value={2}>Absorption</Segment.Item>
-					<Segment.Item bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</Segment.Item>
-					<Segment.Item bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</Segment.Item>
-					<Segment.Item bind:group={data_point} name="justify" value={5}>Variance (m)</Segment.Item>
-				</Segment>
-				<button class="btn bg-warning-500 hover:bg-warning-600 text-white" on:click={resetCalibration}> Reset Calibration </button>
+				<div class="btn-group">
+					<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 0}>Error %</button>
+					<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 1}>Error (m)</button>
+					<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 2}>Absorption</button>
+					<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 3}>Rx Rssi Adj</button>
+					<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 4}>Tx Rssi Ref</button>
+					<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 5}>Variance (m)</button>
+				</div>
+				<button class="btn preset-filled-warning-500" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
 		</header>
 		<section class="p-4 pt-0">

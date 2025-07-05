@@ -51,21 +51,23 @@
 		{/if}
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
-		<Accordion>
-			<Accordion.Item spacing="space-y-4" open>
-				<svelte:fragment slot="summary">
+		<Accordion value={['details']} collapsible>
+			<Accordion.Item value="details">
+				{#snippet control()}
 					<h3 class="h3">Details</h3>
-				</svelte:fragment>
-				<svelte:fragment slot="content">
-					{#if $nodeDetails}
-						{#each $nodeDetails as d}
-							<label>
-								<span>{d.key}</span>
-								<input class="input" type="text" disabled bind:value={d.value} />
-							</label>
-						{/each}
-					{/if}
-				</svelte:fragment>
+				{/snippet}
+				{#snippet panel()}
+					<div class="space-y-4">
+						{#if $nodeDetails}
+							{#each $nodeDetails as d}
+								<label class="flex flex-col gap-1">
+									<span>{d.key}</span>
+									<input class="input" type="text" disabled bind:value={d.value} />
+								</label>
+							{/each}
+						{/if}
+					</div>
+				{/snippet}
 			</Accordion.Item>
 		</Accordion>
 	</div>

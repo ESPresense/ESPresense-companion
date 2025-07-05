@@ -1,6 +1,5 @@
 <script lang="ts">
 	import NodesTable from '$lib/NodesTable.svelte';
-	import { Switch } from '@skeletonlabs/skeleton-svelte';
 	import { getToastStore, type ToastSettings } from '$lib/utils/skeleton';
 	import { base } from '$app/paths';
 	import type { NodeSettingDetails } from '$lib/types';

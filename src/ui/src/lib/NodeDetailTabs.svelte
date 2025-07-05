@@ -35,7 +35,7 @@
 				<h4 class="h4">Node: {node?.name || node?.id}</h4>
 			</div>
 		{/if}
-		<Segment active="preset-filled-primary-500" hover="hover:preset-tonal-primary">
+		<Segment active="bg-primary-500 text-white" hover="hover:bg-primary-100">
 			{#if $config?.floors}
 				{#each $config?.floors as { id, name }}
 					<Segment.Item bind:group={floorId} {name} value={id}>{name}</Segment.Item>
