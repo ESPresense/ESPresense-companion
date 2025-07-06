@@ -218,7 +218,7 @@
 				const distance = Math.sqrt(
 					Math.pow(node.location.x - calibrationSpot.x, 2) +
 					Math.pow(node.location.y - calibrationSpot.y, 2) +
-					Math.pow(node.location.z - calibrationSpot.z!, 2)
+					Math.pow(node.location.z - calibrationSpot.z, 2)
 				);
 
 				const floorLowerZ = bounds ? bounds[0][2] : 0;
