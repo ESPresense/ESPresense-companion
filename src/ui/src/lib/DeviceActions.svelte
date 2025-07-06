@@ -27,9 +27,11 @@
 
 			const deviceSetting: DeviceSetting = deviceSettingsDetails.settings;
 
-			// For now, log the device settings. In a full implementation, 
-			// you would open a modal with the DeviceSettingsModal component
-			console.log('Device settings:', deviceSetting);
+			modalStore.trigger({
+				type: 'component',
+				component: { ref: DeviceSettingsModal, props: { deviceSetting } },
+				title: `Edit Settings for ${deviceSetting.name || deviceSetting.id}`
+			});
 		} catch (ex) {
 			console.error('Error fetching device settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading settings: ${ex.message}` : 'An unknown error occurred while loading settings.';
