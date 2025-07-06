@@ -200,7 +200,7 @@
 	}
 
 	function calculateNodeDistances(
-		calibrationSpot: { x: number; y: number; z?: number } | null,
+		calibrationSpot: { x: number; y: number; z: number } | null,
 		selectedFloorId: string | null,
 		nodes: any[] | undefined,
 		bounds: any,
