@@ -209,12 +209,6 @@
 		if (!nodes || !calibrationSpot || !selectedFloorId) {
 			return [];
 		}
-
-		// Ensure z is defined before using it in calculations
-		if (calibrationSpot.z === undefined) {
-			const floorLowerZ = bounds ? bounds[0][2] : 0;
-			calibrationSpot.z = floorLowerZ + calibrationSpotHeight;
-		}
 		return nodes
 			.filter((node: any) => {
 				return node.floors.includes(selectedFloorId) && node.location.x != null && node.location.y != null;
