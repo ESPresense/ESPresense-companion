@@ -4,9 +4,12 @@
 	import * as THREE from 'three';
 	import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+	import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
+	import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import type { Group } from 'three';
 	import { detail3d } from '$lib/urls';
+	import logoSvg from '$lib/images/logo.svg?raw';
 
 	// --- Props ---
 	export let devicesToShow: Device[] = [];
@@ -40,7 +43,8 @@
 	const PULSE_MIN = 0.8;
 	const PULSE_MAX = 1.2;
 	const geoSphere = new THREE.SphereGeometry(0.2, 32, 16); // Reusable geometry
-	const trackerMaterials = [ // Cycle through materials
+	const trackerMaterials = [
+		// Cycle through materials
 		new THREE.MeshStandardMaterial({ emissive: 0xff0000, emissiveIntensity: 2, transparent: true, opacity: 0.8 }),
 		new THREE.MeshStandardMaterial({ emissive: 0xffbb00, emissiveIntensity: 2, transparent: true, opacity: 0.8 }),
 		new THREE.MeshStandardMaterial({ emissive: 0xffee00, emissiveIntensity: 2, transparent: true, opacity: 0.8 })
@@ -49,7 +53,6 @@
 	let trackingSpheres: THREE.Mesh[] = []; // Still need this for pulsing scale updates
 	// Map to store device labels for efficient updates
 	let deviceLabels: { [id: string]: { label: CSS2DObject; element: HTMLDivElement; line1: HTMLDivElement; line2: HTMLDivElement } } = {};
-
 
 	// Room visualization state
 	const roomMaterials = {
@@ -60,12 +63,34 @@
 
 	// Node visualization state
 	const nodeMaterials = {
-		online: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0x5555ff, emissiveIntensity: 2, shininess: 100, toneMapped: false }),
-		offline: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xff2222, emissiveIntensity: 2, shininess: 100, toneMapped: false })
+		online: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0x5555ff, emissiveIntensity: 2, shininess: 100, toneMapped: false, side: THREE.DoubleSide }),
+		offline: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xff2222, emissiveIntensity: 2, shininess: 100, toneMapped: false, side: THREE.DoubleSide })
 	};
+	let nodeLogoGeometry: THREE.BufferGeometry | null = null;
 	let nodeGroup: THREE.Group | null = null;
 	// Map to store node labels for efficient updates
 	let nodeLabels: { [id: string]: { label: CSS2DObject; element: HTMLDivElement } } = {};
+
+	function getNodeLogoGeometry(): THREE.BufferGeometry {
+		if (nodeLogoGeometry) return nodeLogoGeometry;
+		const loader = new SVGLoader();
+		const svgData = loader.parse(logoSvg);
+		const extrudeSettings = { depth: 20, bevelEnabled: false };
+		const geometries: THREE.BufferGeometry[] = [];
+		svgData.paths.forEach((path) => {
+			// Skip white background circle
+			if (path.color && path.color.toLowerCase() === '#ffffff') return;
+			const shapes = SVGLoader.createShapes(path);
+			shapes.forEach((shape) => {
+				geometries.push(new THREE.ExtrudeGeometry(shape, extrudeSettings));
+			});
+		});
+		nodeLogoGeometry = mergeGeometries(geometries);
+		nodeLogoGeometry.center();
+		const scale = 0.0008;
+		nodeLogoGeometry.scale(scale, scale, scale);
+		return nodeLogoGeometry;
+	}
 
 	// History path state
 	const historyPathMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
@@ -177,14 +202,7 @@
 	}
 
 	// --- Scene Updates ---
-	function updateSceneObjects(
-		currentDevices: Device[],
-		currentNodes: Node[],
-		currentHistory: DeviceHistory[],
-		shouldShowDevices: boolean,
-		shouldShowNodes: boolean,
-		shouldShowHistory: boolean
-	) {
+	function updateSceneObjects(currentDevices: Device[], currentNodes: Node[], currentHistory: DeviceHistory[], shouldShowDevices: boolean, shouldShowNodes: boolean, shouldShowHistory: boolean) {
 		if (!contentGroup) return;
 
 		// Devices
@@ -208,7 +226,6 @@
 			cleanupHistoryPath();
 		}
 	}
-
 
 	// --- Room Rendering ---
 	function calculateRoomCenter(points: THREE.Vector2[]) {
@@ -241,7 +258,8 @@
 			const floor_base = floor.bounds[0][2];
 			const floor_ceiling = floor.bounds[1][2];
 
-			floor.rooms?.forEach((room: any) => { // TODO: Use proper Room type if available
+			floor.rooms?.forEach((room: any) => {
+				// TODO: Use proper Room type if available
 				const points3d: THREE.Vector3[] = [];
 				const pointsFloor: THREE.Vector2[] = [];
 
@@ -301,11 +319,11 @@
 		rotationPivot.position.copy(planCenter);
 		contentGroup.position.copy(planCenter).negate();
 
-        // Update controls target after centering
-        if (controls) {
-            controls.target.copy(planCenter);
-            controls.update();
-        }
+		// Update controls target after centering
+		if (controls) {
+			controls.target.copy(planCenter);
+			controls.update();
+		}
 	}
 
 	// --- Node Rendering ---
@@ -329,7 +347,7 @@
 				return;
 			}
 
-			// --- Sphere ---
+			// --- Logo Mesh ---
 			let mesh = nodeGroup?.getObjectByName('node#' + node.id) as THREE.Mesh | undefined;
 			const material = nodeMaterials[node.online ? 'online' : 'offline'];
 			if (mesh) {
@@ -340,7 +358,7 @@
 				}
 			} else {
 				// Create new mesh
-				mesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 32, 16), material);
+				mesh = new THREE.Mesh(getNodeLogoGeometry().clone(), material);
 				mesh.position.set(node.location.x, node.location.y, node.location.z);
 				mesh.name = 'node#' + node.id;
 				nodeGroup?.add(mesh); // Check if nodeGroup exists
@@ -364,7 +382,7 @@
 		});
 
 		// Remove labels/meshes for nodes that are no longer present
-		existingNodeIds.forEach(nodeId => {
+		existingNodeIds.forEach((nodeId) => {
 			if (!currentNodeIds.has(nodeId)) {
 				// Remove label
 				const labelToRemove = nodeLabels[nodeId];
@@ -460,7 +478,7 @@
 		trackingSpheres = localTrackingSpheres;
 
 		// Remove labels/spheres for devices that are no longer present
-		existingDeviceIds.forEach(deviceId => {
+		existingDeviceIds.forEach((deviceId) => {
 			if (!currentDeviceIds.has(deviceId)) {
 				// Remove label
 				const labelToRemove = deviceLabels[deviceId];
@@ -500,7 +518,6 @@
 		return { element, line1, line2 };
 	}
 
-
 	function updatePulse() {
 		if (startTime === null || trackingSpheres.length === 0) return;
 		const elapsed = (performance.now() - startTime) / 1000;
@@ -514,9 +531,7 @@
 		cleanupHistoryPath(); // Clear previous path
 		if (!contentGroup || history.length < 2) return;
 
-		const points = history
-			.filter((h) => h.location)
-			.map((h) => new THREE.Vector3(h.location.x, h.location.y, h.location.z));
+		const points = history.filter((h) => h.location).map((h) => new THREE.Vector3(h.location.x, h.location.y, h.location.z));
 
 		if (points.length > 1) {
 			const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -592,7 +607,7 @@
 				object.geometry?.dispose();
 				// Dispose material(s) carefully, especially if shared
 				if (Array.isArray(object.material)) {
-					object.material.forEach(material => material.dispose());
+					object.material.forEach((material) => material.dispose());
 				} else if (object.material) {
 					object.material.dispose();
 				}
@@ -601,9 +616,9 @@
 		});
 
 		// Ensure our label maps are cleared and DOM elements removed during full cleanup
-		Object.values(nodeLabels).forEach(info => info.element.remove());
+		Object.values(nodeLabels).forEach((info) => info.element.remove());
 		nodeLabels = {};
-		Object.values(deviceLabels).forEach(info => info.element.remove());
+		Object.values(deviceLabels).forEach((info) => info.element.remove());
 		deviceLabels = {};
 
 		// Call specific group cleanups which also handle map clearing now
@@ -646,7 +661,7 @@
 		// Clear the label map and remove elements from DOM
 		// Do this even if nodeGroup was already null or removed
 		if (Object.keys(nodeLabels).length > 0) {
-			Object.values(nodeLabels).forEach(info => {
+			Object.values(nodeLabels).forEach((info) => {
 				// Ensure label is removed from group *before* element removal if group still exists
 				nodeGroup?.remove(info.label);
 				info.element.remove();
@@ -663,7 +678,7 @@
 		// Clear the label map and remove elements from DOM
 		// Do this even if deviceGroup was already null or removed
 		if (Object.keys(deviceLabels).length > 0) {
-			Object.values(deviceLabels).forEach(info => {
+			Object.values(deviceLabels).forEach((info) => {
 				// Ensure label is removed from group *before* element removal if group still exists
 				deviceGroup?.remove(info.label);
 				info.element.remove();
@@ -682,7 +697,6 @@
 			historyPathLine = null;
 		}
 	}
-
 </script>
 
 <div class="w-full h-full relative" bind:this={container}>
