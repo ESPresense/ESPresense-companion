@@ -79,7 +79,8 @@
 		const geometries: THREE.BufferGeometry[] = [];
 		svgData.paths.forEach((path) => {
 			// Skip white background circle
-			if (path.color && path.color.toLowerCase() === '#ffffff') return;
+			const fill = path.userData?.style?.fill;
+			if (fill && typeof fill === 'string' && fill.toLowerCase() === '#ffffff') return;
 			const shapes = SVGLoader.createShapes(path);
 			shapes.forEach((shape) => {
 				geometries.push(new THREE.ExtrudeGeometry(shape, extrudeSettings));
@@ -136,7 +137,7 @@
 			container?.removeEventListener('click', onCanvasClick); // Remove click listener
 			cleanupScene();
 		};
-	});
+		});
 
 	// --- Scene Initialization ---
 	function initScene() {
@@ -270,7 +271,7 @@
 					overallBounds.expandByPoint(vec3Base);
 					overallBounds.expandByPoint(vec3Ceiling);
 					pointsFloor.push(new THREE.Vector2(points[0], points[1]));
-				});
+		});
 
 				// Connect back to the first point to close the floor loop
 				if (room.points.length > 0) {
@@ -281,7 +282,7 @@
 				// Create ceiling lines (separate loop for clarity)
 				room.points.forEach((points: number[]) => {
 					points3d.push(new THREE.Vector3(points[0], points[1], floor_ceiling));
-				});
+		});
 				// Close the ceiling loop
 				if (room.points.length > 0) {
 					const firstPoint = room.points[0];
@@ -304,7 +305,7 @@
 				const label = createLabelForRoom(room.name, pointsFloor);
 				label.position.z = floor_base; // Position label slightly above floor
 				newRoomGroup.add(label);
-			});
+		});
 		});
 
 		contentGroup.add(newRoomGroup);
@@ -648,7 +649,7 @@
 				if (object instanceof CSS2DObject) {
 					object.element?.remove();
 				}
-			});
+		});
 			contentGroup?.remove(roomGroup);
 			roomGroup = null;
 		}
@@ -665,7 +666,7 @@
 				// Ensure label is removed from group *before* element removal if group still exists
 				nodeGroup?.remove(info.label);
 				info.element.remove();
-			});
+		});
 			nodeLabels = {};
 		}
 		nodeGroup = null; // Ensure group is nullified
@@ -682,7 +683,7 @@
 				// Ensure label is removed from group *before* element removal if group still exists
 				deviceGroup?.remove(info.label);
 				info.element.remove();
-			});
+		});
 			deviceLabels = {};
 		}
 		deviceGroup = null; // Ensure group is nullified
