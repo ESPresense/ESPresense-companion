@@ -37,7 +37,7 @@
 		"globals": "^16.0.0",
 		"layercake": "^8.4.3",
 		"ol": "^10.5.0",
-		"prettier": "^3.5.3",
+		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.3.3",
 		"s-ago": "^2.2.0",
 		"svelte": "^5.33.13",
