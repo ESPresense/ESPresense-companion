@@ -108,6 +108,8 @@
 	$: if (config && scene && contentGroup) setupRooms(); // Re-setup rooms if config changes
 
 	onMount(() => {
+		// Precompute node logo geometry once to avoid expensive SVG parsing
+		getNodeLogoGeometry();
 		if (container) {
 			initScene();
 			isAnimating = true;
@@ -359,7 +361,8 @@
 				}
 			} else {
 				// Create new mesh
-				mesh = new THREE.Mesh(getNodeLogoGeometry().clone(), material);
+				if (!nodeLogoGeometry) nodeLogoGeometry = getNodeLogoGeometry();
+				mesh = new THREE.Mesh(nodeLogoGeometry.clone(), material);
 				mesh.position.set(node.location.x, node.location.y, node.location.z);
 				mesh.name = 'node#' + node.id;
 				nodeGroup?.add(mesh); // Check if nodeGroup exists
