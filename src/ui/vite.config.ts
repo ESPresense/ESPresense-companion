@@ -1,9 +1,10 @@
 import { purgeCss } from 'vite-plugin-tailwind-purgecss';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
-	plugins: [sveltekit(), purgeCss()],
+	plugins: [sveltekit(), purgeCss(), devtoolsJson()],
 
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}']
