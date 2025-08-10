@@ -45,26 +45,26 @@
 	// Device visualization state
 	const geoSphere = new THREE.SphereGeometry(0.2, 32, 16); // Reusable geometry
 	const trackerMaterials = [
-		new THREE.MeshStandardMaterial({ 
-			color: 0xff4444, 
-			emissive: 0xff2222, 
+		new THREE.MeshStandardMaterial({
+			color: 0xff4444,
+			emissive: 0xff2222,
 			emissiveIntensity: 0.5,
-			metalness: 0.3, 
-			roughness: 0.4 
+			metalness: 0.3,
+			roughness: 0.4
 		}),
-		new THREE.MeshStandardMaterial({ 
-			color: 0xffbb44, 
-			emissive: 0xff8800, 
+		new THREE.MeshStandardMaterial({
+			color: 0xffbb44,
+			emissive: 0xff8800,
 			emissiveIntensity: 0.5,
-			metalness: 0.3, 
-			roughness: 0.4 
+			metalness: 0.3,
+			roughness: 0.4
 		}),
-		new THREE.MeshStandardMaterial({ 
-			color: 0xffff44, 
-			emissive: 0xffdd00, 
+		new THREE.MeshStandardMaterial({
+			color: 0xffff44,
+			emissive: 0xffdd00,
 			emissiveIntensity: 0.5,
-			metalness: 0.3, 
-			roughness: 0.4 
+			metalness: 0.3,
+			roughness: 0.4
 		})
 	];
 	let deviceGroup: THREE.Group | null = null;
@@ -95,16 +95,16 @@
 		0x483D8B, // Dark slate blue (deep blue-purple)
 		0xA0522D  // Sienna (earthy brown)
 	];
-	let roomFloorMaterials: THREE.MeshBasicMaterial[] = [];
+	let roomFloorMaterials: THREE.MeshStandardMaterial[] = [];
 
 	// Create materials for each room
 	function createRoomFloorMaterials() {
 		if (roomFloorMaterials.length === 0) { // Only create once
 			roomFloorMaterials = roomColors.map(color =>
-				new THREE.MeshBasicMaterial({
+				new THREE.MeshStandardMaterial({
 					color: color,
 					side: THREE.DoubleSide,
-					opacity: 0.3,
+					opacity: 0.2,
 					transparent: true
 				})
 			);
