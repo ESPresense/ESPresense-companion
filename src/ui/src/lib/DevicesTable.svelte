@@ -3,7 +3,7 @@
 	import { devices } from '$lib/stores';
 	import type { Device } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
-	import SvelteTable from 'svelte-table';
+	import DataTable from '$lib/DataTable.svelte';
 	import ago from 's-ago';
 
 	let dispatcher = createEventDispatcher();
@@ -35,7 +35,7 @@
 
 <div class="p-2">
 	{#if $devices}
-		<SvelteTable {columns} classNameTable="table table-hover table-compact" rows={$devices} on:clickRow={onRowClick} sortBy="id" />
+		<DataTable {columns} classNameTable="table table-hover table-compact" rows={$devices} on:clickRow={onRowClick} sortBy="id" />
 	{/if}
 </div>
 

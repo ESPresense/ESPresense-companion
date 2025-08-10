@@ -43,7 +43,6 @@
 		"svelte": "^5.33.13",
 		"svelte-check": "^4.2.2",
 		"svelte-eslint-parser": "^1.2.0",
-		"svelte-table": "^0.6.4",
 		"three": "^0.175.0",
 		"tslib": "^2.8.1",
 		"typescript": "^5.8.3",

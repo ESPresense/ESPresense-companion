@@ -98,9 +98,6 @@ importers:
       svelte-eslint-parser:
         specifier: ^1.2.0
         version: 1.2.0(svelte@5.33.13)
-      svelte-table:
-        specifier: ^0.6.4
-        version: 0.6.4
       three:
         specifier: ^0.175.0
         version: 0.175.0
@@ -1872,9 +1869,6 @@ packages:
     peerDependenciesMeta:
       svelte:
         optional: true
-
-  svelte-table@0.6.4:
-    resolution: {integrity: sha512-6Rla/xdGIH84R24OFsEm6Fu6/Nugh7k/nYGTO7CvJiEiQwOHywnZgLIc1dRQyPdDA81JEgWarcYiFy6s7KgUxQ==}
 
   svelte@5.33.13:
     resolution: {integrity: sha512-uT3BAPpHGaJqpOgdwJwIK7P4JkBkSS0vylbaRXxQjt1gr+DZ9BiPkhmbZw3ql8LJofUyz5XyrzzQDgQQdfP86Q==}
@@ -3810,8 +3804,6 @@ snapshots:
       postcss-selector-parser: 7.1.0
     optionalDependencies:
       svelte: 5.33.13
-
-  svelte-table@0.6.4: {}
 
   svelte@5.33.13:
     dependencies:
