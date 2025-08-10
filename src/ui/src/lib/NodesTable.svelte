@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SvelteTable from 'svelte-table';
+	import DataTable from '$lib/DataTable.svelte';
 	import { nodes } from '$lib/stores';
 	import { updateMethod, firmwareSource, flavor, version, artifact } from '$lib/firmware';
 	import type { Node } from '$lib/types';
@@ -35,7 +35,7 @@
 <div class="p-2">
 	{#if $nodes}
 		<VersionPicker bind:updateMethod={$updateMethod} bind:firmwareSource={$firmwareSource} bind:flavor={$flavor} bind:version={$version} bind:artifact={$artifact} />
-		<SvelteTable {columns} rows={$nodes} classNameTable="table table-hover table-compact" on:clickRow={onRowClick} sortBy="id" />
+		<DataTable {columns} rows={$nodes} classNameTable="table table-hover table-compact" on:clickRow={onRowClick} sortBy="id" />
 	{/if}
 </div>
 
