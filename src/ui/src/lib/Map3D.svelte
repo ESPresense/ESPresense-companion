@@ -6,6 +6,9 @@
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 	import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 	import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+	import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+	import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+	import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import type { Group } from 'three';
 	import { detail3d } from '$lib/urls';
@@ -32,39 +35,87 @@
 	let contentGroup: THREE.Group;
 	let isAnimating = false;
 	let animationFrameId: number;
-	let startTime: number | null = null; // For pulsing animation
 	let lastTime: number | null = null; // For rotation animation delta
 	let planCenter = new THREE.Vector3(0, 0, 0);
 	let raycaster = new THREE.Raycaster(); // Raycaster for click detection
 	let mouse = new THREE.Vector2(); // Mouse coordinates for raycaster
+	let composer: EffectComposer;
+	let bloomPass: UnrealBloomPass;
 
 	// Device visualization state
-	const PULSE_SPEED = 2;
-	const PULSE_MIN = 0.8;
-	const PULSE_MAX = 1.2;
 	const geoSphere = new THREE.SphereGeometry(0.2, 32, 16); // Reusable geometry
 	const trackerMaterials = [
-		// Cycle through materials
-		new THREE.MeshStandardMaterial({ emissive: 0xff0000, emissiveIntensity: 2, transparent: true, opacity: 0.8 }),
-		new THREE.MeshStandardMaterial({ emissive: 0xffbb00, emissiveIntensity: 2, transparent: true, opacity: 0.8 }),
-		new THREE.MeshStandardMaterial({ emissive: 0xffee00, emissiveIntensity: 2, transparent: true, opacity: 0.8 })
+		new THREE.MeshStandardMaterial({ 
+			color: 0xff4444, 
+			emissive: 0xff2222, 
+			emissiveIntensity: 0.5,
+			metalness: 0.3, 
+			roughness: 0.4 
+		}),
+		new THREE.MeshStandardMaterial({ 
+			color: 0xffbb44, 
+			emissive: 0xff8800, 
+			emissiveIntensity: 0.5,
+			metalness: 0.3, 
+			roughness: 0.4 
+		}),
+		new THREE.MeshStandardMaterial({ 
+			color: 0xffff44, 
+			emissive: 0xffdd00, 
+			emissiveIntensity: 0.5,
+			metalness: 0.3, 
+			roughness: 0.4 
+		})
 	];
 	let deviceGroup: THREE.Group | null = null;
-	let trackingSpheres: THREE.Mesh[] = []; // Still need this for pulsing scale updates
 	// Map to store device labels for efficient updates
 	let deviceLabels: { [id: string]: { label: CSS2DObject; element: HTMLDivElement; line1: HTMLDivElement; line2: HTMLDivElement } } = {};
 
 	// Room visualization state
 	const roomMaterials = {
-		green1: new THREE.LineBasicMaterial({ color: 0x03a062, transparent: true, opacity: 0.6 })
+		walls: new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.6 })
 	};
-	const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x03a062, side: THREE.DoubleSide, opacity: 0.1, transparent: true });
+
+	// Attractive, distinct floor colors for rooms
+	const roomColors = [
+		0x8B4513, // Saddle brown (warm brown for bedrooms/office spaces)
+		0x228B22, // Forest green (natural, calming for living areas)
+		0x6A5ACD, // Slate blue (sophisticated purple)
+		0xDC143C, // Crimson red (vibrant accent)
+		0xFF8C00, // Dark orange (warm, energetic)
+		0x4682B4, // Steel blue (cool, professional)
+		0x9932CC, // Dark orchid (rich purple)
+		0x2E8B57, // Sea green (fresh, natural)
+		0xB22222, // Fire brick (deep red)
+		0x4169E1, // Royal blue (elegant blue)
+		0xD2691E, // Chocolate (rich brown)
+		0x8A2BE2, // Blue violet (vibrant purple)
+		0x006400, // Dark green (deep forest)
+		0xCD5C5C, // Indian red (muted red)
+		0x483D8B, // Dark slate blue (deep blue-purple)
+		0xA0522D  // Sienna (earthy brown)
+	];
+	let roomFloorMaterials: THREE.MeshBasicMaterial[] = [];
+
+	// Create materials for each room
+	function createRoomFloorMaterials() {
+		if (roomFloorMaterials.length === 0) { // Only create once
+			roomFloorMaterials = roomColors.map(color =>
+				new THREE.MeshBasicMaterial({
+					color: color,
+					side: THREE.DoubleSide,
+					opacity: 0.3,
+					transparent: true
+				})
+			);
+		}
+	}
 	let roomGroup: THREE.Group | null = null;
 
 	// Node visualization state
 	const nodeMaterials = {
-		online: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0x5555ff, emissiveIntensity: 2, shininess: 100, toneMapped: false, side: THREE.DoubleSide }),
-		offline: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xff2222, emissiveIntensity: 2, shininess: 100, toneMapped: false, side: THREE.DoubleSide })
+		online: new THREE.MeshPhongMaterial({ color: 0x001122, emissive: 0x00aaff, emissiveIntensity: 1.5, shininess: 100, toneMapped: false, side: THREE.DoubleSide }),
+		offline: new THREE.MeshPhongMaterial({ color: 0x220011, emissive: 0xff4444, emissiveIntensity: 1.5, shininess: 100, toneMapped: false, side: THREE.DoubleSide })
 	};
 	let nodeLogoGeometry: THREE.BufferGeometry | null = null;
 	let nodeGroup: THREE.Group | null = null;
@@ -128,6 +179,8 @@
 			renderer.setSize(width, height);
 			renderer.setPixelRatio(window.devicePixelRatio);
 			labelRenderer.setSize(width, height);
+			composer?.setSize(width, height);
+			bloomPass?.setSize(width, height);
 		};
 
 		window.addEventListener('resize', handleResize);
@@ -139,7 +192,7 @@
 			container?.removeEventListener('click', onCanvasClick); // Remove click listener
 			cleanupScene();
 		};
-		});
+	});
 
 	// --- Scene Initialization ---
 	function initScene() {
@@ -153,8 +206,10 @@
 		});
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.setSize(container.clientWidth, container.clientHeight);
-		renderer.setClearColor(0x1e293b, 1); // Tailwind slate-800
-		renderer.autoClear = false; // Rely on explicit clear in animate loop
+		renderer.setClearColor(0x1e293b, 1); // Back to slate-800
+		renderer.autoClear = true;
+		renderer.shadowMap.enabled = true;
+		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 		container.appendChild(renderer.domElement);
 
 		// Label Renderer
@@ -175,6 +230,15 @@
 		camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
 		scene.add(camera); // Add camera to scene
 
+		// Lighting
+		const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+		scene.add(ambient);
+		const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+		dirLight.position.set(10, 20, 10);
+		dirLight.castShadow = true;
+		dirLight.shadow.mapSize.set(1024, 1024);
+		scene.add(dirLight);
+
 		// Controls
 		controls = new OrbitControls(camera, renderer.domElement);
 		controls.enableDamping = true;
@@ -183,16 +247,14 @@
 		controls.maxDistance = CONTROLS_MAX_DISTANCE;
 		controls.enablePan = true;
 
-		// Depth Test
-		const gl = renderer.getContext();
-		gl.enable(gl.DEPTH_TEST);
-		gl.depthFunc(gl.LEQUAL);
+		// Depth test is handled automatically by Three.js
 
 		// Rotation Pivot & Content Group (for centering)
 		rotationPivot = new THREE.Group();
 		scene.add(rotationPivot);
 		contentGroup = new THREE.Group();
 		rotationPivot.add(contentGroup);
+
 
 		// Initial Setup
 		setupRooms(); // Setup rooms first to calculate center
@@ -253,9 +315,11 @@
 		if (!config?.floors || !rotationPivot || !contentGroup) return;
 
 		cleanupRooms(); // Clear existing rooms first
+		createRoomFloorMaterials(); // Initialize colored floor materials
 		const newRoomGroup = new THREE.Group();
 		newRoomGroup.name = 'RoomGroup';
 		const overallBounds = new THREE.Box3();
+		let roomIndex = 0;
 
 		config.floors.forEach((floor) => {
 			const floor_base = floor.bounds[0][2];
@@ -273,7 +337,7 @@
 					overallBounds.expandByPoint(vec3Base);
 					overallBounds.expandByPoint(vec3Ceiling);
 					pointsFloor.push(new THREE.Vector2(points[0], points[1]));
-		});
+				});
 
 				// Connect back to the first point to close the floor loop
 				if (room.points.length > 0) {
@@ -284,7 +348,7 @@
 				// Create ceiling lines (separate loop for clarity)
 				room.points.forEach((points: number[]) => {
 					points3d.push(new THREE.Vector3(points[0], points[1], floor_ceiling));
-		});
+				});
 				// Close the ceiling loop
 				if (room.points.length > 0) {
 					const firstPoint = room.points[0];
@@ -293,21 +357,25 @@
 
 				// Walls
 				const lines = new THREE.BufferGeometry().setFromPoints(points3d);
-				const roomLine = new THREE.Line(lines, roomMaterials.green1);
+				const roomLine = new THREE.Line(lines, roomMaterials.walls);
 				newRoomGroup.add(roomLine);
 
-				// Floor plane
+				// Floor plane with unique color per room
 				const floorShape = new THREE.Shape(pointsFloor);
 				const floorGeometry = new THREE.ShapeGeometry(floorShape);
+				const floorMaterial = roomFloorMaterials[roomIndex % roomFloorMaterials.length];
 				const plane = new THREE.Mesh(floorGeometry, floorMaterial);
 				plane.position.z = floor_base; // Position floor at its base Z
+				plane.receiveShadow = true;
 				newRoomGroup.add(plane);
 
 				// Room Label
 				const label = createLabelForRoom(room.name, pointsFloor);
 				label.position.z = floor_base; // Position label slightly above floor
 				newRoomGroup.add(label);
-		});
+
+				roomIndex++; // Move to next color for next room
+			});
 		});
 
 		contentGroup.add(newRoomGroup);
@@ -365,6 +433,8 @@
 				mesh = new THREE.Mesh(nodeLogoGeometry.clone(), material);
 				mesh.position.set(node.location.x, node.location.y, node.location.z);
 				mesh.name = 'node#' + node.id;
+				mesh.castShadow = true;
+				mesh.receiveShadow = true;
 				nodeGroup?.add(mesh); // Check if nodeGroup exists
 			}
 
@@ -457,6 +527,8 @@
 				sphere = new THREE.Mesh(geoSphere, material); // Reuse geometry
 				sphere.name = trackName; // Store device ID in name for click detection
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
+				sphere.castShadow = true;
+				sphere.receiveShadow = true;
 				deviceGroup?.add(sphere); // Check if deviceGroup exists
 			}
 			localTrackingSpheres.push(sphere); // Add to list for pulsing
@@ -478,8 +550,6 @@
 			}
 		});
 
-		// Update component-level tracking spheres for pulsing
-		trackingSpheres = localTrackingSpheres;
 
 		// Remove labels/spheres for devices that are no longer present
 		existingDeviceIds.forEach((deviceId) => {
@@ -522,13 +592,6 @@
 		return { element, line1, line2 };
 	}
 
-	function updatePulse() {
-		if (startTime === null || trackingSpheres.length === 0) return;
-		const elapsed = (performance.now() - startTime) / 1000;
-		const phase = (elapsed * PULSE_SPEED * Math.PI) % (Math.PI * 2);
-		const scale = PULSE_MIN + ((Math.sin(phase) + 1) * (PULSE_MAX - PULSE_MIN)) / 2;
-		trackingSpheres.forEach((sphere) => sphere.scale.set(scale, scale, scale));
-	}
 
 	// --- History Path Rendering ---
 	function renderHistoryPath(history: DeviceHistory[]) {
@@ -587,16 +650,8 @@
 			rotationPivot.rotation.z %= Math.PI * 2; // Keep rotation within 0-2PI
 		}
 
-		// Pulse animation for devices
-		if (showDevices) {
-			if (startTime === null) startTime = currentTime; // Initialize pulse timer only when needed
-			updatePulse();
-		} else {
-			startTime = null; // Reset pulse timer if devices are hidden
-		}
 
 		// Render scene
-		renderer?.clear(true, true, true); // Explicitly clear buffers to prevent trails
 		renderer?.render(scene, camera);
 		labelRenderer?.render(scene, camera); // Keep label rendering enabled
 
@@ -635,13 +690,14 @@
 		renderer?.dispose();
 		renderer?.forceContextLoss(); // Important for WebGL context release
 		labelRenderer?.domElement?.remove(); // Remove label renderer DOM element
+		composer = undefined as any;
+		bloomPass = undefined as any;
 
 		// Nullify references
 		roomGroup = null;
 		nodeGroup = null;
 		deviceGroup = null;
 		historyPathLine = null;
-		trackingSpheres = [];
 	}
 
 	function cleanupRooms() {
@@ -652,7 +708,7 @@
 				if (object instanceof CSS2DObject) {
 					object.element?.remove();
 				}
-		});
+			});
 			contentGroup?.remove(roomGroup);
 			roomGroup = null;
 		}
@@ -669,7 +725,7 @@
 				// Ensure label is removed from group *before* element removal if group still exists
 				nodeGroup?.remove(info.label);
 				info.element.remove();
-		});
+			});
 			nodeLabels = {};
 		}
 		nodeGroup = null; // Ensure group is nullified
@@ -686,11 +742,10 @@
 				// Ensure label is removed from group *before* element removal if group still exists
 				deviceGroup?.remove(info.label);
 				info.element.remove();
-		});
+			});
 			deviceLabels = {};
 		}
 		deviceGroup = null; // Ensure group is nullified
-		trackingSpheres = []; // Clear spheres list
 	}
 
 	function cleanupHistoryPath() {
