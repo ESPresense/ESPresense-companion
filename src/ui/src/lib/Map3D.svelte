@@ -42,31 +42,74 @@
 	let composer: EffectComposer;
 	let bloomPass: UnrealBloomPass;
 
-	// Device visualization state
-	const geoSphere = new THREE.SphereGeometry(0.2, 32, 16); // Reusable geometry
-	const trackerMaterials = [
-		new THREE.MeshStandardMaterial({
-			color: 0xff4444,
-			emissive: 0xff2222,
-			emissiveIntensity: 0.5,
-			metalness: 0.3,
-			roughness: 0.4
-		}),
-		new THREE.MeshStandardMaterial({
-			color: 0xffbb44,
-			emissive: 0xff8800,
-			emissiveIntensity: 0.5,
-			metalness: 0.3,
-			roughness: 0.4
-		}),
-		new THREE.MeshStandardMaterial({
-			color: 0xffff44,
-			emissive: 0xffdd00,
-			emissiveIntensity: 0.5,
-			metalness: 0.3,
-			roughness: 0.4
-		})
-	];
+	// Device visualization state - different sizes for different confidence levels
+	function getDeviceGeometry(confidence: number): THREE.SphereGeometry {
+		// Scale sphere size based on confidence (0-100%)
+		// Min size: 0.1, Max size: 0.3
+		const baseSize = 0.1;
+		const maxSize = 0.3;
+		const confidenceRatio = Math.max(0, Math.min(100, confidence)) / 100;
+		const radius = baseSize + (maxSize - baseSize) * confidenceRatio;
+		
+		return new THREE.SphereGeometry(radius, 16, 12); // Lower poly for smaller spheres
+	}
+	
+	// Cache for device materials to avoid recreating them constantly
+	const deviceMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
+	
+	// Function to get room-based device material
+	function getDeviceMaterial(device: any): THREE.MeshStandardMaterial {
+		const roomId = device.room?.id;
+		const cacheKey = roomId || 'default';
+		
+		// Return cached material if it exists
+		if (deviceMaterialCache.has(cacheKey)) {
+			return deviceMaterialCache.get(cacheKey)!;
+		}
+		
+		let material: THREE.MeshStandardMaterial;
+		
+		if (roomId && config?.floors) {
+			// Find which room index this device's room corresponds to (matching floor creation logic)
+			let roomIndex = 0;
+			let found = false;
+			
+			for (const floor of config.floors) {
+				if (floor.rooms) {
+					for (const room of floor.rooms) {
+						if (room.id === roomId) {
+							found = true;
+							break;
+						}
+						roomIndex++;
+					}
+				}
+				if (found) break;
+			}
+			
+			const roomColor = roomColors[roomIndex % roomColors.length];
+			material = new THREE.MeshStandardMaterial({
+				color: roomColor,
+				emissive: roomColor,
+				emissiveIntensity: 0.2,
+				metalness: 0.3,
+				roughness: 0.4
+			});
+		} else {
+			// Default material for devices without room assignment
+			material = new THREE.MeshStandardMaterial({
+				color: 0xff4444,
+				emissive: 0xff2222,
+				emissiveIntensity: 0.2,
+				metalness: 0.3,
+				roughness: 0.4
+			});
+		}
+		
+		// Cache the material
+		deviceMaterialCache.set(cacheKey, material);
+		return material;
+	}
 	let deviceGroup: THREE.Group | null = null;
 	// Map to store device labels for efficient updates
 	let deviceLabels: { [id: string]: { label: CSS2DObject; element: HTMLDivElement; line1: HTMLDivElement; line2: HTMLDivElement } } = {};
@@ -105,7 +148,9 @@
 					color: color,
 					side: THREE.DoubleSide,
 					opacity: 0.2,
-					transparent: true
+					transparent: true,
+					roughness: 1.0,
+					metalness: 0.0
 				})
 			);
 		}
@@ -231,12 +276,22 @@
 		scene.add(camera); // Add camera to scene
 
 		// Lighting
-		const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+		const ambient = new THREE.AmbientLight(0xffffff, 0.2);
 		scene.add(ambient);
-		const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-		dirLight.position.set(10, 20, 10);
+		
+		// Single directional light from above
+		const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+		dirLight.position.set(0, 0, 4);
+		dirLight.target.position.set(0, 0, -2);
 		dirLight.castShadow = true;
-		dirLight.shadow.mapSize.set(1024, 1024);
+		dirLight.shadow.mapSize.set(2048, 2048);
+		dirLight.shadow.camera.left = -25;
+		dirLight.shadow.camera.right = 25;
+		dirLight.shadow.camera.top = 25;
+		dirLight.shadow.camera.bottom = -25;
+		dirLight.shadow.camera.near = 0.1;
+		dirLight.shadow.camera.far = 8;
+		dirLight.shadow.bias = -0.0005;
 		scene.add(dirLight);
 
 		// Controls
@@ -324,7 +379,7 @@
 		config.floors.forEach((floor) => {
 			const floor_base = floor.bounds[0][2];
 			const floor_ceiling = floor.bounds[1][2];
-
+			
 			floor.rooms?.forEach((room: any) => {
 				// TODO: Use proper Room type if available
 				const points3d: THREE.Vector3[] = [];
@@ -367,6 +422,7 @@
 				const plane = new THREE.Mesh(floorGeometry, floorMaterial);
 				plane.position.z = floor_base; // Position floor at its base Z
 				plane.receiveShadow = true;
+				plane.castShadow = true; // Floor casts shadows to occlude lower floors
 				newRoomGroup.add(plane);
 
 				// Room Label
@@ -513,18 +569,19 @@
 
 			// --- Sphere ---
 			let sphere = deviceGroup?.getObjectByName(trackName) as THREE.Mesh | undefined;
-			const material = trackerMaterials[localTrackingSpheres.length % trackerMaterials.length]; // Assign material based on current count
+			const material = getDeviceMaterial(device); // Assign material based on room
+			const geometry = getDeviceGeometry(device.confidence || 0); // Size based on confidence
+			
 			if (sphere) {
 				// Update existing sphere
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
-				// Potentially update material if needed, though cycling might be intended
-				if (sphere.material !== material) {
-					// This logic might need adjustment if material cycling per frame isn't desired
-					// sphere.material = material;
-				}
+				// Update material to match room color
+				sphere.material = material;
+				// Update geometry to reflect confidence change
+				sphere.geometry = geometry;
 			} else {
 				// Create new sphere
-				sphere = new THREE.Mesh(geoSphere, material); // Reuse geometry
+				sphere = new THREE.Mesh(geometry, material);
 				sphere.name = trackName; // Store device ID in name for click detection
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
 				sphere.castShadow = true;
