@@ -75,8 +75,8 @@ importers:
         specifier: ^16.3.0
         version: 16.3.0
       layercake:
-        specifier: ^8.4.3
-        version: 8.4.3(svelte@5.38.1)(typescript@5.8.3)
+        specifier: ^9.0.0
+        version: 9.0.0(svelte@5.38.1)(typescript@5.8.3)
       ol:
         specifier: ^10.5.0
         version: 10.5.0
@@ -357,6 +357,9 @@ packages:
   '@jridgewell/gen-mapping@0.3.12':
     resolution: {integrity: sha512-OuLGC46TjB5BbN1dH8JULVVZY4WTdkF7tV9Ys6wLL1rubZnCMstOhNHueU5bLCrnRuDhKPDM4g6sw4Bel5Gzqg==}
 
+  '@jridgewell/gen-mapping@0.3.13':
+    resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
+
   '@jridgewell/remapping@2.3.4':
     resolution: {integrity: sha512-aG+WvAz17rhbzhKNkSeMLgbkPPK82ovXdONvmucbGhUqcroRFLLVhoGAk4xEI17gHpXgNX3sr0/B1ybRUsbEWw==}
 
@@ -370,11 +373,17 @@ packages:
   '@jridgewell/sourcemap-codec@1.5.4':
     resolution: {integrity: sha512-VT2+G1VQs/9oz078bLrYbecdZKs912zQlkelYpuf+SXF+QvZDYJlbx/LSx+meSAwdDFnF8FVXW92AVjjkVmgFw==}
 
+  '@jridgewell/sourcemap-codec@1.5.5':
+    resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
 
   '@jridgewell/trace-mapping@0.3.29':
     resolution: {integrity: sha512-uw6guiW/gcAGPDhLmd77/6lW8QLeiV5RUTsAX46Db6oLhGaVj4lhnPwb184s1bkc8kdVg/+h988dro8GRDpmYQ==}
+
+  '@jridgewell/trace-mapping@0.3.30':
+    resolution: {integrity: sha512-GQ7Nw5G2lTu/BtHTKfXhKHok2WGetd4XYcVKGx00SjAk8GMwgJM3zr6zORiPGuOE+/vkc90KtTosSSvaCjKb2Q==}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -1413,8 +1422,9 @@ packages:
   known-css-properties@0.37.0:
     resolution: {integrity: sha512-JCDrsP4Z1Sb9JwG0aJ8Eo2r7k4Ou5MwmThS/6lcIe1ICyb7UBJKGRIUUdqc2ASdE/42lgz6zFUnzAIhtXnBVrQ==}
 
-  layercake@8.4.3:
-    resolution: {integrity: sha512-PZDduaPFxgHHkxlmsz5MVBECf6ZCT39DI3LgMVvuMwrmlrtlXwXUM/elJp46zHYzCE1j+cGyDuBDxnANv94tOQ==}
+  layercake@9.0.0:
+    resolution: {integrity: sha512-dtt/YcYE9AeZ9ayPBwJRVc7h3rfDUP44MGa8HytHQ4kUtXsM3xWIoC/Okj3G5dsu0UToF0SQIOo2AMmz8w6ZDw==}
+    engines: {node: ^20.17.0 || >=22.9.0, npm: '>=11.0.0'}
     peerDependencies:
       svelte: 3 - 5 || >=5.0.0-next.120
       typescript: ^5.0.2
@@ -2271,6 +2281,11 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.4
       '@jridgewell/trace-mapping': 0.3.29
 
+  '@jridgewell/gen-mapping@0.3.13':
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/trace-mapping': 0.3.30
+
   '@jridgewell/remapping@2.3.4':
     dependencies:
       '@jridgewell/gen-mapping': 0.3.12
@@ -2282,6 +2297,8 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.4': {}
 
+  '@jridgewell/sourcemap-codec@1.5.5': {}
+
   '@jridgewell/trace-mapping@0.3.25':
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
@@ -2291,6 +2308,11 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.4
+
+  '@jridgewell/trace-mapping@0.3.30':
+    dependencies:
+      '@jridgewell/resolve-uri': 3.1.2
+      '@jridgewell/sourcemap-codec': 1.5.5
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -3386,7 +3408,7 @@ snapshots:
 
   known-css-properties@0.37.0: {}
 
-  layercake@8.4.3(svelte@5.38.1)(typescript@5.8.3):
+  layercake@9.0.0(svelte@5.38.1)(typescript@5.8.3):
     dependencies:
       d3-array: 3.2.4
       d3-color: 3.1.0
@@ -3766,7 +3788,7 @@ snapshots:
 
   sucrase@3.35.0:
     dependencies:
-      '@jridgewell/gen-mapping': 0.3.12
+      '@jridgewell/gen-mapping': 0.3.13
       commander: 4.1.1
       glob: 10.4.5
       lines-and-columns: 1.2.4
