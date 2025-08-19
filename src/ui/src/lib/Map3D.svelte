@@ -70,24 +70,17 @@
 		let material: THREE.MeshStandardMaterial;
 
 		if (roomId && config?.floors) {
-			// Find which room index this device's room corresponds to (matching floor creation logic)
-			let roomIndex = 0;
-			let found = false;
-
+			// Look up explicit color for room from config (auto-assigned by backend if unspecified)
+			let hex = '#FF4444';
 			for (const floor of config.floors) {
-				if (floor.rooms) {
-					for (const room of floor.rooms) {
-						if (room.id === roomId) {
-							found = true;
-							break;
-						}
-						roomIndex++;
+				for (const room of floor.rooms ?? []) {
+					if (room.id === roomId) {
+						hex = room.color ?? getRoomColor2D(config, room.id);
+						break;
 					}
 				}
-				if (found) break;
 			}
-
-			const roomColor = roomColors[roomIndex % roomColors.length];
+			const roomColor = hexToThreeNumber(hex);
 			material = new THREE.MeshStandardMaterial({
 				color: roomColor,
 				emissive: roomColor,
@@ -164,44 +157,7 @@
 		walls: new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.6 })
 	};
 
-	// Attractive, distinct floor colors for rooms
-	const roomColors = [
-		0x8b4513, // Saddle brown (warm brown for bedrooms/office spaces)
-		0x228b22, // Forest green (natural, calming for living areas)
-		0x6a5acd, // Slate blue (sophisticated purple)
-		0xdc143c, // Crimson red (vibrant accent)
-		0xff8c00, // Dark orange (warm, energetic)
-		0x4682b4, // Steel blue (cool, professional)
-		0x9932cc, // Dark orchid (rich purple)
-		0x2e8b57, // Sea green (fresh, natural)
-		0xb22222, // Fire brick (deep red)
-		0x4169e1, // Royal blue (elegant blue)
-		0xd2691e, // Chocolate (rich brown)
-		0x8a2be2, // Blue violet (vibrant purple)
-		0x006400, // Dark green (deep forest)
-		0xcd5c5c, // Indian red (muted red)
-		0x483d8b, // Dark slate blue (deep blue-purple)
-		0xa0522d // Sienna (earthy brown)
-	];
-	let roomFloorMaterials: THREE.MeshStandardMaterial[] = [];
-
-	// Create materials for each room
-	function createRoomFloorMaterials() {
-		if (roomFloorMaterials.length === 0) {
-			// Only create once
-			roomFloorMaterials = roomColors.map(
-				(color) =>
-					new THREE.MeshStandardMaterial({
-						color: color,
-						side: THREE.DoubleSide,
-						opacity: 0.2,
-						transparent: true,
-						roughness: 1.0,
-						metalness: 0.0
-					})
-			);
-		}
-	}
+	import { hexToThreeNumber, getRoomColor as getRoomColor2D } from '$lib/colors';
 	let roomGroup: THREE.Group | null = null;
 
 	// Node visualization state
@@ -416,11 +372,9 @@
 		if (!config?.floors || !rotationPivot || !contentGroup) return;
 
 		cleanupRooms(); // Clear existing rooms first
-		createRoomFloorMaterials(); // Initialize colored floor materials
 		const newRoomGroup = new THREE.Group();
 		newRoomGroup.name = 'RoomGroup';
 		const overallBounds = new THREE.Box3();
-		let roomIndex = 0;
 
 		config.floors.forEach((floor) => {
 			const floor_base = floor.bounds[0][2];
@@ -464,7 +418,15 @@
 				// Floor plane with unique color per room
 				const floorShape = new THREE.Shape(pointsFloor);
 				const floorGeometry = new THREE.ShapeGeometry(floorShape);
-				const floorMaterial = roomFloorMaterials[roomIndex % roomFloorMaterials.length];
+				const colorHex = getRoomColor2D(config, room.id);
+				const floorMaterial = new THREE.MeshStandardMaterial({
+					color: hexToThreeNumber(colorHex),
+					side: THREE.DoubleSide,
+					opacity: 0.2,
+					transparent: true,
+					roughness: 1.0,
+					metalness: 0.0
+				});
 				const plane = new THREE.Mesh(floorGeometry, floorMaterial);
 				plane.position.z = floor_base; // Position floor at its base Z
 				plane.receiveShadow = true;
@@ -476,7 +438,6 @@
 				label.position.z = floor_base; // Position label slightly above floor
 				newRoomGroup.add(label);
 
-				roomIndex++; // Move to next color for next room
 			});
 		});
 

@@ -45,6 +45,8 @@ public class ConfigLoader : BackgroundService
 
             var reader = await File.ReadAllTextAsync(_configPath);
             Config = FixIds(_deserializer.Deserialize<Config>(reader));
+            // Assign/normalize room colors with adjacency-aware algorithm
+            Utils.ColorAssigner.AssignRoomColors(Config);
             ConfigChanged?.Invoke(this, Config);
             _lastModified = fi.LastWriteTimeUtc;
         }
@@ -68,7 +70,11 @@ public class ConfigLoader : BackgroundService
             floor.Id ??= floor.GetId();
 
         foreach (var room in config.Floors?.SelectMany(a => a.Rooms ?? Enumerable.Empty<ConfigRoom>()) ?? Enumerable.Empty<ConfigRoom>())
+        {
             room.Id ??= room.GetId();
+        }
+
+        // Colors now handled in AssignRoomColors()
 
         return config;
     }

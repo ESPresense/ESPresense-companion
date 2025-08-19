@@ -5,10 +5,9 @@
 	import { interpolateLab } from 'd3-interpolate';
 	import { fade } from 'svelte/transition';
 
-	import type { ScaleOrdinal } from 'd3';
 	import type { Device, LayerCakeContext } from '$lib/types';
-
-	let colors: ScaleOrdinal<string, string> = getContext('colors');
+	import { config } from '$lib/stores';
+	import { getRoomColor } from '$lib/colors';
 
 	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
 	export let d: Device;
@@ -22,7 +21,7 @@
 
 	$: x.set(d?.location?.x);
 	$: y.set(d?.location?.y);
-	$: c.set(visible && d?.room?.id ? colors(d?.room?.id) : '#000');
+	$: c.set(visible && d?.room?.id ? getRoomColor($config, d?.room?.id) : '#000');
 
 	let hovered = '';
 
