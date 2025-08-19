@@ -205,7 +205,8 @@ namespace ESPresense.Models
             {
                 Id = Id,
                 Name = Name,
-                Points = Points?.Select(p => p.ToArray()).ToArray()
+                Points = Points?.Select(p => p.ToArray()).ToArray(),
+                Color = Color
             };
         }
     }
