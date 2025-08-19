@@ -31,5 +31,14 @@ jobs:
     - name: Build
       run: dotnet build -c Release --no-restore
 
-    - name: Test
+    - name: Test backend
       run: dotnet test -c Release --no-build --verbosity normal --filter "Category!=LongRunning"
+
+    - name: Install frontend dependencies
+      run: pnpm -C src/ui install --frozen-lockfile
+
+    - name: Install Playwright
+      run: pnpm -C src/ui exec playwright install --with-deps
+
+    - name: Test frontend
+      run: pnpm -C src/ui test
