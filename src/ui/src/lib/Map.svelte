@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LayerCake, Svg, Html, Canvas } from 'layercake';
+	import { LayerCake, Svg } from 'layercake';
 	import { config } from '$lib/stores';
 	import { scaleOrdinal, schemeCategory10 } from 'd3';
 	import { select } from 'd3-selection';
@@ -23,7 +23,7 @@
 	export let nodeId: string | null = null;
 	export let exclusive: boolean = false;
 	export let calibrate: boolean = false;
-	export let calibrationSpot: { x: number, y: number } | null = null;
+	export let calibrationSpot: { x: number; y: number } | null = null;
 
 	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
@@ -134,7 +134,7 @@
 			<Rooms {transform} {floorId} />
 			<Nodes {transform} {floorId} {deviceId} {nodeId} on:selected on:hovered={hoveredNode} />
 			<Devices {transform} {floorId} {deviceId} {exclusive} on:selected on:hovered={hoveredDevice} />
-			{#if (calibrate && calibrationSpot)}
+			{#if calibrate && calibrationSpot}
 				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} />
 			{/if}
 		</Svg>
