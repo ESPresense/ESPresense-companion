@@ -1,4 +1,5 @@
 using ESPresense.Extensions;
+using AutoMapper;
 using ESPresense.Models;
 using ESPresense.Services;
 using MQTTnet.Diagnostics;
@@ -51,22 +52,21 @@ builder.Services.AddSingleton(a =>
     return sqLiteConnection;
 });
 
+builder.Services.AddAutoMapper(cfg => { }, typeof(MappingProfile).Assembly);
+
 builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttCoordinator>();
 builder.Services.AddSingleton<TelemetryService>();
-
+builder.Services.AddSingleton<GlobalEventDispatcher>();
+builder.Services.AddSingleton<DeviceTracker>();
+builder.Services.AddSingleton<SupervisorConfigLoader>();
 builder.Services.AddSingleton<DeviceHistoryStore>();
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();
-
-builder.Services.AddSingleton<MappingService>();
-builder.Services.AddSingleton<GlobalEventDispatcher>();
-builder.Services.AddSingleton<DeviceTracker>();
-builder.Services.AddSingleton<SupervisorConfigLoader>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
