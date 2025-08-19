@@ -19,6 +19,8 @@ export interface Room {
 	id: string;
 	name: string;
 	points: [number, number][];
+	// Optional display color for this room (e.g., "#1f77b4")
+	color?: string;
 }
 
 export interface Floor {

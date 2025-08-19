@@ -75,6 +75,8 @@ floors:
     bounds: [[0, 0, 0], [17, 18, 3]]
     rooms:
       - name: Powder
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
         points:
           - [6.3, 10.2]
           - [8.4, 10.2]

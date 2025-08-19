@@ -6,6 +6,9 @@
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 	import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 	import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+	import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+	import type { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+	import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import type { Group } from 'three';
 	import { detail3d } from '$lib/urls';
@@ -32,39 +35,135 @@
 	let contentGroup: THREE.Group;
 	let isAnimating = false;
 	let animationFrameId: number;
-	let startTime: number | null = null; // For pulsing animation
 	let lastTime: number | null = null; // For rotation animation delta
 	let planCenter = new THREE.Vector3(0, 0, 0);
 	let raycaster = new THREE.Raycaster(); // Raycaster for click detection
 	let mouse = new THREE.Vector2(); // Mouse coordinates for raycaster
+	let composer: EffectComposer;
+	let bloomPass: UnrealBloomPass;
 
-	// Device visualization state
-	const PULSE_SPEED = 2;
-	const PULSE_MIN = 0.8;
-	const PULSE_MAX = 1.2;
-	const geoSphere = new THREE.SphereGeometry(0.2, 32, 16); // Reusable geometry
-	const trackerMaterials = [
-		// Cycle through materials
-		new THREE.MeshStandardMaterial({ emissive: 0xff0000, emissiveIntensity: 2, transparent: true, opacity: 0.8 }),
-		new THREE.MeshStandardMaterial({ emissive: 0xffbb00, emissiveIntensity: 2, transparent: true, opacity: 0.8 }),
-		new THREE.MeshStandardMaterial({ emissive: 0xffee00, emissiveIntensity: 2, transparent: true, opacity: 0.8 })
-	];
+	// Device visualization state - different sizes for different confidence levels
+	function getDeviceGeometry(confidence: number): THREE.SphereGeometry {
+		// Scale sphere size based on confidence (0-100%)
+		// Min size: 0.1, Max size: 0.3
+		const baseSize = 0.1;
+		const maxSize = 0.3;
+		const confidenceRatio = Math.max(0, Math.min(100, confidence)) / 100;
+		const radius = baseSize + (maxSize - baseSize) * confidenceRatio;
+
+		return new THREE.SphereGeometry(radius, 16, 12); // Lower poly for smaller spheres
+	}
+
+	// Cache for device materials to avoid recreating them constantly
+	const deviceMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
+
+	// Function to get room-based device material
+	function getDeviceMaterial(device: any): THREE.MeshStandardMaterial {
+		const roomId = device.room?.id;
+		const cacheKey = roomId || 'default';
+
+		// Return cached material if it exists
+		if (deviceMaterialCache.has(cacheKey)) {
+			return deviceMaterialCache.get(cacheKey)!;
+		}
+
+		let material: THREE.MeshStandardMaterial;
+
+		if (roomId && config?.floors) {
+			// Look up explicit color for room from config (auto-assigned by backend if unspecified)
+			let hex = '#FF4444';
+			for (const floor of config.floors) {
+				for (const room of floor.rooms ?? []) {
+					if (room.id === roomId) {
+						hex = room.color ?? getRoomColor2D(config, room.id);
+						break;
+					}
+				}
+			}
+			const roomColor = hexToThreeNumber(hex);
+			material = new THREE.MeshStandardMaterial({
+				color: roomColor,
+				emissive: roomColor,
+				emissiveIntensity: 0.2,
+				metalness: 0.3,
+				roughness: 0.4
+			});
+		} else {
+			// Default material for devices without room assignment
+			material = new THREE.MeshStandardMaterial({
+				color: 0xff4444,
+				emissive: 0xff2222,
+				emissiveIntensity: 0.2,
+				metalness: 0.3,
+				roughness: 0.4
+			});
+		}
+
+		// Cache the material
+		deviceMaterialCache.set(cacheKey, material);
+		return material;
+	}
 	let deviceGroup: THREE.Group | null = null;
-	let trackingSpheres: THREE.Mesh[] = []; // Still need this for pulsing scale updates
 	// Map to store device labels for efficient updates
 	let deviceLabels: { [id: string]: { label: CSS2DObject; element: HTMLDivElement; line1: HTMLDivElement; line2: HTMLDivElement } } = {};
 
+	// Measured spheres visualization
+	let measuredSpheresGroup: THREE.Group | null = null;
+	let selectedDeviceId: string | null = null;
+
+	function showMeasuredSpheres(device: any) {
+		if (!measuredSpheresGroup) {
+			measuredSpheresGroup = new THREE.Group();
+			measuredSpheresGroup.name = 'MeasuredSpheres';
+			scene?.add(measuredSpheresGroup);
+		}
+
+		// Clear existing spheres
+		measuredSpheresGroup.clear();
+
+		// Create wireframe sphere for each node measurement
+		Object.entries(device.nodes || {}).forEach(([nodeId, measurement]: [string, any]) => {
+			// Find the node position
+			const node = nodesToShow?.find((n: Node) => n.id === nodeId);
+			if (!node || !node.location) return;
+
+			const distance = measurement.dist;
+			if (distance <= 0) return;
+
+			// Create wireframe sphere geometry with more triangles
+			const sphereGeometry = new THREE.SphereGeometry(distance, 32, 24);
+			const sphereMaterial = new THREE.MeshBasicMaterial({
+				color: 0x00ffff,
+				wireframe: true,
+				opacity: 0.5,
+				transparent: true
+			});
+
+			const measureSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+			measureSphere.position.set(node.location.x, node.location.y, node.location.z);
+			measuredSpheresGroup?.add(measureSphere);
+		});
+	}
+
+	function hideMeasuredSpheres() {
+		if (measuredSpheresGroup) {
+			measuredSpheresGroup.clear();
+		}
+		selectedDeviceId = null;
+	}
+
 	// Room visualization state
 	const roomMaterials = {
-		green1: new THREE.LineBasicMaterial({ color: 0x03a062, transparent: true, opacity: 0.6 })
+		walls: new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.6 })
 	};
-	const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x03a062, side: THREE.DoubleSide, opacity: 0.1, transparent: true });
+
+	import { hexToThreeNumber, getRoomColor as getRoomColor2D } from '$lib/colors';
 	let roomGroup: THREE.Group | null = null;
 
 	// Node visualization state
 	const nodeMaterials = {
-		online: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0x5555ff, emissiveIntensity: 2, shininess: 100, toneMapped: false, side: THREE.DoubleSide }),
-		offline: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xff2222, emissiveIntensity: 2, shininess: 100, toneMapped: false, side: THREE.DoubleSide })
+		online: new THREE.MeshPhongMaterial({ color: 0x001122, emissive: 0x00aaff, emissiveIntensity: 1.5, shininess: 100, toneMapped: false, side: THREE.DoubleSide }),
+		offline: new THREE.MeshPhongMaterial({ color: 0x220011, emissive: 0xff4444, emissiveIntensity: 1.5, shininess: 100, toneMapped: false, side: THREE.DoubleSide })
 	};
 	let nodeLogoGeometry: THREE.BufferGeometry | null = null;
 	let nodeGroup: THREE.Group | null = null;
@@ -128,6 +227,8 @@
 			renderer.setSize(width, height);
 			renderer.setPixelRatio(window.devicePixelRatio);
 			labelRenderer.setSize(width, height);
+			composer?.setSize(width, height);
+			bloomPass?.setSize(width, height);
 		};
 
 		window.addEventListener('resize', handleResize);
@@ -139,7 +240,7 @@
 			container?.removeEventListener('click', onCanvasClick); // Remove click listener
 			cleanupScene();
 		};
-		});
+	});
 
 	// --- Scene Initialization ---
 	function initScene() {
@@ -153,8 +254,10 @@
 		});
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.setSize(container.clientWidth, container.clientHeight);
-		renderer.setClearColor(0x1e293b, 1); // Tailwind slate-800
-		renderer.autoClear = false; // Rely on explicit clear in animate loop
+		renderer.setClearColor(0x1e293b, 1); // Back to slate-800
+		renderer.autoClear = true;
+		renderer.shadowMap.enabled = true;
+		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 		container.appendChild(renderer.domElement);
 
 		// Label Renderer
@@ -175,6 +278,25 @@
 		camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
 		scene.add(camera); // Add camera to scene
 
+		// Lighting
+		const ambient = new THREE.AmbientLight(0xffffff, 0.2);
+		scene.add(ambient);
+
+		// Single directional light from above
+		const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+		dirLight.position.set(0, 0, 4);
+		dirLight.target.position.set(0, 0, -2);
+		dirLight.castShadow = true;
+		dirLight.shadow.mapSize.set(2048, 2048);
+		dirLight.shadow.camera.left = -25;
+		dirLight.shadow.camera.right = 25;
+		dirLight.shadow.camera.top = 25;
+		dirLight.shadow.camera.bottom = -25;
+		dirLight.shadow.camera.near = 0.1;
+		dirLight.shadow.camera.far = 8;
+		dirLight.shadow.bias = -0.0005;
+		scene.add(dirLight);
+
 		// Controls
 		controls = new OrbitControls(camera, renderer.domElement);
 		controls.enableDamping = true;
@@ -183,10 +305,7 @@
 		controls.maxDistance = CONTROLS_MAX_DISTANCE;
 		controls.enablePan = true;
 
-		// Depth Test
-		const gl = renderer.getContext();
-		gl.enable(gl.DEPTH_TEST);
-		gl.depthFunc(gl.LEQUAL);
+		// Depth test is handled automatically by Three.js
 
 		// Rotation Pivot & Content Group (for centering)
 		rotationPivot = new THREE.Group();
@@ -273,7 +392,7 @@
 					overallBounds.expandByPoint(vec3Base);
 					overallBounds.expandByPoint(vec3Ceiling);
 					pointsFloor.push(new THREE.Vector2(points[0], points[1]));
-		});
+				});
 
 				// Connect back to the first point to close the floor loop
 				if (room.points.length > 0) {
@@ -284,7 +403,7 @@
 				// Create ceiling lines (separate loop for clarity)
 				room.points.forEach((points: number[]) => {
 					points3d.push(new THREE.Vector3(points[0], points[1], floor_ceiling));
-		});
+				});
 				// Close the ceiling loop
 				if (room.points.length > 0) {
 					const firstPoint = room.points[0];
@@ -293,21 +412,33 @@
 
 				// Walls
 				const lines = new THREE.BufferGeometry().setFromPoints(points3d);
-				const roomLine = new THREE.Line(lines, roomMaterials.green1);
+				const roomLine = new THREE.Line(lines, roomMaterials.walls);
 				newRoomGroup.add(roomLine);
 
-				// Floor plane
+				// Floor plane with unique color per room
 				const floorShape = new THREE.Shape(pointsFloor);
 				const floorGeometry = new THREE.ShapeGeometry(floorShape);
+				const colorHex = getRoomColor2D(config, room.id);
+				const floorMaterial = new THREE.MeshStandardMaterial({
+					color: hexToThreeNumber(colorHex),
+					side: THREE.DoubleSide,
+					opacity: 0.2,
+					transparent: true,
+					roughness: 1.0,
+					metalness: 0.0
+				});
 				const plane = new THREE.Mesh(floorGeometry, floorMaterial);
 				plane.position.z = floor_base; // Position floor at its base Z
+				plane.receiveShadow = true;
+				plane.castShadow = true; // Floor casts shadows to occlude lower floors
 				newRoomGroup.add(plane);
 
 				// Room Label
 				const label = createLabelForRoom(room.name, pointsFloor);
 				label.position.z = floor_base; // Position label slightly above floor
 				newRoomGroup.add(label);
-		});
+
+			});
 		});
 
 		contentGroup.add(newRoomGroup);
@@ -365,6 +496,8 @@
 				mesh = new THREE.Mesh(nodeLogoGeometry.clone(), material);
 				mesh.position.set(node.location.x, node.location.y, node.location.z);
 				mesh.name = 'node#' + node.id;
+				mesh.castShadow = true;
+				mesh.receiveShadow = true;
 				nodeGroup?.add(mesh); // Check if nodeGroup exists
 			}
 
@@ -443,20 +576,23 @@
 
 			// --- Sphere ---
 			let sphere = deviceGroup?.getObjectByName(trackName) as THREE.Mesh | undefined;
-			const material = trackerMaterials[localTrackingSpheres.length % trackerMaterials.length]; // Assign material based on current count
+			const material = getDeviceMaterial(device); // Assign material based on room
+			const geometry = getDeviceGeometry(device.confidence || 0); // Size based on confidence
+
 			if (sphere) {
 				// Update existing sphere
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
-				// Potentially update material if needed, though cycling might be intended
-				if (sphere.material !== material) {
-					// This logic might need adjustment if material cycling per frame isn't desired
-					// sphere.material = material;
-				}
+				// Update material to match room color
+				sphere.material = material;
+				// Update geometry to reflect confidence change
+				sphere.geometry = geometry;
 			} else {
 				// Create new sphere
-				sphere = new THREE.Mesh(geoSphere, material); // Reuse geometry
+				sphere = new THREE.Mesh(geometry, material);
 				sphere.name = trackName; // Store device ID in name for click detection
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
+				sphere.castShadow = true;
+				sphere.receiveShadow = true;
 				deviceGroup?.add(sphere); // Check if deviceGroup exists
 			}
 			localTrackingSpheres.push(sphere); // Add to list for pulsing
@@ -477,9 +613,6 @@
 				deviceGroup?.add(newLabel); // Check if deviceGroup exists
 			}
 		});
-
-		// Update component-level tracking spheres for pulsing
-		trackingSpheres = localTrackingSpheres;
 
 		// Remove labels/spheres for devices that are no longer present
 		existingDeviceIds.forEach((deviceId) => {
@@ -522,14 +655,6 @@
 		return { element, line1, line2 };
 	}
 
-	function updatePulse() {
-		if (startTime === null || trackingSpheres.length === 0) return;
-		const elapsed = (performance.now() - startTime) / 1000;
-		const phase = (elapsed * PULSE_SPEED * Math.PI) % (Math.PI * 2);
-		const scale = PULSE_MIN + ((Math.sin(phase) + 1) * (PULSE_MAX - PULSE_MIN)) / 2;
-		trackingSpheres.forEach((sphere) => sphere.scale.set(scale, scale, scale));
-	}
-
 	// --- History Path Rendering ---
 	function renderHistoryPath(history: DeviceHistory[]) {
 		cleanupHistoryPath(); // Clear previous path
@@ -565,8 +690,24 @@
 			// Check if it's a mesh (our sphere) and has a name (our device ID)
 			if (firstIntersected instanceof THREE.Mesh && firstIntersected.name) {
 				const deviceId = firstIntersected.name;
-				detail3d(deviceId);
+
+				// Toggle measured spheres display
+				if (selectedDeviceId === deviceId) {
+					// Clicking same device again - hide spheres and navigate
+					hideMeasuredSpheres();
+					detail3d(deviceId);
+				} else {
+					// Show measured spheres for clicked device
+					const device = devicesToShow.find((d) => d.id === deviceId);
+					if (device) {
+						selectedDeviceId = deviceId;
+						showMeasuredSpheres(device);
+					}
+				}
 			}
+		} else {
+			// Click on empty space - hide spheres
+			hideMeasuredSpheres();
 		}
 	}
 
@@ -587,16 +728,7 @@
 			rotationPivot.rotation.z %= Math.PI * 2; // Keep rotation within 0-2PI
 		}
 
-		// Pulse animation for devices
-		if (showDevices) {
-			if (startTime === null) startTime = currentTime; // Initialize pulse timer only when needed
-			updatePulse();
-		} else {
-			startTime = null; // Reset pulse timer if devices are hidden
-		}
-
 		// Render scene
-		renderer?.clear(true, true, true); // Explicitly clear buffers to prevent trails
 		renderer?.render(scene, camera);
 		labelRenderer?.render(scene, camera); // Keep label rendering enabled
 
@@ -635,13 +767,14 @@
 		renderer?.dispose();
 		renderer?.forceContextLoss(); // Important for WebGL context release
 		labelRenderer?.domElement?.remove(); // Remove label renderer DOM element
+		composer = undefined as any;
+		bloomPass = undefined as any;
 
 		// Nullify references
 		roomGroup = null;
 		nodeGroup = null;
 		deviceGroup = null;
 		historyPathLine = null;
-		trackingSpheres = [];
 	}
 
 	function cleanupRooms() {
@@ -652,7 +785,7 @@
 				if (object instanceof CSS2DObject) {
 					object.element?.remove();
 				}
-		});
+			});
 			contentGroup?.remove(roomGroup);
 			roomGroup = null;
 		}
@@ -669,7 +802,7 @@
 				// Ensure label is removed from group *before* element removal if group still exists
 				nodeGroup?.remove(info.label);
 				info.element.remove();
-		});
+			});
 			nodeLabels = {};
 		}
 		nodeGroup = null; // Ensure group is nullified
@@ -686,11 +819,10 @@
 				// Ensure label is removed from group *before* element removal if group still exists
 				deviceGroup?.remove(info.label);
 				info.element.remove();
-		});
+			});
 			deviceLabels = {};
 		}
 		deviceGroup = null; // Ensure group is nullified
-		trackingSpheres = []; // Clear spheres list
 	}
 
 	function cleanupHistoryPath() {

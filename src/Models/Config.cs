@@ -229,6 +229,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "points")]
         public double[][]? Points { get; set; }
 
+        [YamlMember(Alias = "color")]
+        public string? Color { get; set; }
+
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
