@@ -6,9 +6,9 @@ import devtoolsJson from 'vite-plugin-devtools-json';
 export default defineConfig({
 	plugins: [sveltekit(), purgeCss(), devtoolsJson()],
 
-	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}']
-	},
+test: {
+include: ['src/**/*.{test,spec,vitest}.{js,ts}']
+},
 
 	build: {
 		sourcemap: true
