@@ -6,9 +6,9 @@
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 	import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 	import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-	import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-	import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-	import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+	import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+	import type { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+	import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import type { Group } from 'three';
 	import { detail3d } from '$lib/urls';
@@ -50,30 +50,30 @@
 		const maxSize = 0.3;
 		const confidenceRatio = Math.max(0, Math.min(100, confidence)) / 100;
 		const radius = baseSize + (maxSize - baseSize) * confidenceRatio;
-		
+
 		return new THREE.SphereGeometry(radius, 16, 12); // Lower poly for smaller spheres
 	}
-	
+
 	// Cache for device materials to avoid recreating them constantly
 	const deviceMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
-	
+
 	// Function to get room-based device material
 	function getDeviceMaterial(device: any): THREE.MeshStandardMaterial {
 		const roomId = device.room?.id;
 		const cacheKey = roomId || 'default';
-		
+
 		// Return cached material if it exists
 		if (deviceMaterialCache.has(cacheKey)) {
 			return deviceMaterialCache.get(cacheKey)!;
 		}
-		
+
 		let material: THREE.MeshStandardMaterial;
-		
+
 		if (roomId && config?.floors) {
 			// Find which room index this device's room corresponds to (matching floor creation logic)
 			let roomIndex = 0;
 			let found = false;
-			
+
 			for (const floor of config.floors) {
 				if (floor.rooms) {
 					for (const room of floor.rooms) {
@@ -86,7 +86,7 @@
 				}
 				if (found) break;
 			}
-			
+
 			const roomColor = roomColors[roomIndex % roomColors.length];
 			material = new THREE.MeshStandardMaterial({
 				color: roomColor,
@@ -105,7 +105,7 @@
 				roughness: 0.4
 			});
 		}
-		
+
 		// Cache the material
 		deviceMaterialCache.set(cacheKey, material);
 		return material;
@@ -114,6 +114,51 @@
 	// Map to store device labels for efficient updates
 	let deviceLabels: { [id: string]: { label: CSS2DObject; element: HTMLDivElement; line1: HTMLDivElement; line2: HTMLDivElement } } = {};
 
+	// Measured spheres visualization
+	let measuredSpheresGroup: THREE.Group | null = null;
+	let selectedDeviceId: string | null = null;
+
+	function showMeasuredSpheres(device: any) {
+		if (!measuredSpheresGroup) {
+			measuredSpheresGroup = new THREE.Group();
+			measuredSpheresGroup.name = 'MeasuredSpheres';
+			scene?.add(measuredSpheresGroup);
+		}
+
+		// Clear existing spheres
+		measuredSpheresGroup.clear();
+
+		// Create wireframe sphere for each node measurement
+		Object.entries(device.nodes || {}).forEach(([nodeId, measurement]: [string, any]) => {
+			// Find the node position
+			const node = nodesToShow?.find((n: Node) => n.id === nodeId);
+			if (!node || !node.location) return;
+
+			const distance = measurement.dist;
+			if (distance <= 0) return;
+
+			// Create wireframe sphere geometry with more triangles
+			const sphereGeometry = new THREE.SphereGeometry(distance, 32, 24);
+			const sphereMaterial = new THREE.MeshBasicMaterial({
+				color: 0x00ffff,
+				wireframe: true,
+				opacity: 0.5,
+				transparent: true
+			});
+
+			const measureSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+			measureSphere.position.set(node.location.x, node.location.y, node.location.z);
+			measuredSpheresGroup?.add(measureSphere);
+		});
+	}
+
+	function hideMeasuredSpheres() {
+		if (measuredSpheresGroup) {
+			measuredSpheresGroup.clear();
+		}
+		selectedDeviceId = null;
+	}
+
 	// Room visualization state
 	const roomMaterials = {
 		walls: new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.6 })
@@ -121,37 +166,39 @@
 
 	// Attractive, distinct floor colors for rooms
 	const roomColors = [
-		0x8B4513, // Saddle brown (warm brown for bedrooms/office spaces)
-		0x228B22, // Forest green (natural, calming for living areas)
-		0x6A5ACD, // Slate blue (sophisticated purple)
-		0xDC143C, // Crimson red (vibrant accent)
-		0xFF8C00, // Dark orange (warm, energetic)
-		0x4682B4, // Steel blue (cool, professional)
-		0x9932CC, // Dark orchid (rich purple)
-		0x2E8B57, // Sea green (fresh, natural)
-		0xB22222, // Fire brick (deep red)
-		0x4169E1, // Royal blue (elegant blue)
-		0xD2691E, // Chocolate (rich brown)
-		0x8A2BE2, // Blue violet (vibrant purple)
+		0x8b4513, // Saddle brown (warm brown for bedrooms/office spaces)
+		0x228b22, // Forest green (natural, calming for living areas)
+		0x6a5acd, // Slate blue (sophisticated purple)
+		0xdc143c, // Crimson red (vibrant accent)
+		0xff8c00, // Dark orange (warm, energetic)
+		0x4682b4, // Steel blue (cool, professional)
+		0x9932cc, // Dark orchid (rich purple)
+		0x2e8b57, // Sea green (fresh, natural)
+		0xb22222, // Fire brick (deep red)
+		0x4169e1, // Royal blue (elegant blue)
+		0xd2691e, // Chocolate (rich brown)
+		0x8a2be2, // Blue violet (vibrant purple)
 		0x006400, // Dark green (deep forest)
-		0xCD5C5C, // Indian red (muted red)
-		0x483D8B, // Dark slate blue (deep blue-purple)
-		0xA0522D  // Sienna (earthy brown)
+		0xcd5c5c, // Indian red (muted red)
+		0x483d8b, // Dark slate blue (deep blue-purple)
+		0xa0522d // Sienna (earthy brown)
 	];
 	let roomFloorMaterials: THREE.MeshStandardMaterial[] = [];
 
 	// Create materials for each room
 	function createRoomFloorMaterials() {
-		if (roomFloorMaterials.length === 0) { // Only create once
-			roomFloorMaterials = roomColors.map(color =>
-				new THREE.MeshStandardMaterial({
-					color: color,
-					side: THREE.DoubleSide,
-					opacity: 0.2,
-					transparent: true,
-					roughness: 1.0,
-					metalness: 0.0
-				})
+		if (roomFloorMaterials.length === 0) {
+			// Only create once
+			roomFloorMaterials = roomColors.map(
+				(color) =>
+					new THREE.MeshStandardMaterial({
+						color: color,
+						side: THREE.DoubleSide,
+						opacity: 0.2,
+						transparent: true,
+						roughness: 1.0,
+						metalness: 0.0
+					})
 			);
 		}
 	}
@@ -278,7 +325,7 @@
 		// Lighting
 		const ambient = new THREE.AmbientLight(0xffffff, 0.2);
 		scene.add(ambient);
-		
+
 		// Single directional light from above
 		const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
 		dirLight.position.set(0, 0, 4);
@@ -309,7 +356,6 @@
 		scene.add(rotationPivot);
 		contentGroup = new THREE.Group();
 		rotationPivot.add(contentGroup);
-
 
 		// Initial Setup
 		setupRooms(); // Setup rooms first to calculate center
@@ -379,7 +425,7 @@
 		config.floors.forEach((floor) => {
 			const floor_base = floor.bounds[0][2];
 			const floor_ceiling = floor.bounds[1][2];
-			
+
 			floor.rooms?.forEach((room: any) => {
 				// TODO: Use proper Room type if available
 				const points3d: THREE.Vector3[] = [];
@@ -571,7 +617,7 @@
 			let sphere = deviceGroup?.getObjectByName(trackName) as THREE.Mesh | undefined;
 			const material = getDeviceMaterial(device); // Assign material based on room
 			const geometry = getDeviceGeometry(device.confidence || 0); // Size based on confidence
-			
+
 			if (sphere) {
 				// Update existing sphere
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
@@ -606,7 +652,6 @@
 				deviceGroup?.add(newLabel); // Check if deviceGroup exists
 			}
 		});
-
 
 		// Remove labels/spheres for devices that are no longer present
 		existingDeviceIds.forEach((deviceId) => {
@@ -649,7 +694,6 @@
 		return { element, line1, line2 };
 	}
 
-
 	// --- History Path Rendering ---
 	function renderHistoryPath(history: DeviceHistory[]) {
 		cleanupHistoryPath(); // Clear previous path
@@ -685,8 +729,24 @@
 			// Check if it's a mesh (our sphere) and has a name (our device ID)
 			if (firstIntersected instanceof THREE.Mesh && firstIntersected.name) {
 				const deviceId = firstIntersected.name;
-				detail3d(deviceId);
+
+				// Toggle measured spheres display
+				if (selectedDeviceId === deviceId) {
+					// Clicking same device again - hide spheres and navigate
+					hideMeasuredSpheres();
+					detail3d(deviceId);
+				} else {
+					// Show measured spheres for clicked device
+					const device = devicesToShow.find((d) => d.id === deviceId);
+					if (device) {
+						selectedDeviceId = deviceId;
+						showMeasuredSpheres(device);
+					}
+				}
 			}
+		} else {
+			// Click on empty space - hide spheres
+			hideMeasuredSpheres();
 		}
 	}
 
@@ -706,7 +766,6 @@
 			rotationPivot.rotation.z += deltaTime * zRotationSpeed;
 			rotationPivot.rotation.z %= Math.PI * 2; // Keep rotation within 0-2PI
 		}
-
 
 		// Render scene
 		renderer?.render(scene, camera);
