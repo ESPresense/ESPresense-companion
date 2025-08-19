@@ -7,6 +7,7 @@ using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
+using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
 using ESPresense.Events;
@@ -21,16 +22,16 @@ public class StateController : ControllerBase
     private readonly State _state;
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
-    private readonly MappingService _ms;
+    private readonly IMapper _mapper;
     private readonly GlobalEventDispatcher _eventDispatcher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, MappingService ms, GlobalEventDispatcher eventDispatcher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, IMapper mapper, GlobalEventDispatcher eventDispatcher)
     {
         _logger = logger;
         _state = state;
         _config = config;
         _nsd = nsd;
-        _ms = ms;
+        _mapper = mapper;
         _eventDispatcher = eventDispatcher;
     }
 
@@ -38,7 +39,7 @@ public class StateController : ControllerBase
     [HttpGet("api/state/nodes")]
     public IEnumerable<NodeState> GetNodes(bool includeTele = true)
     {
-        return includeTele ? _ms.Mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values) : _ms.Mapper.Map<IEnumerable<NodeState>>(_state.Nodes.Values);
+        return includeTele ? _mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values) : _mapper.Map<IEnumerable<NodeState>>(_state.Nodes.Values);
     }
 
     // GET: api/rooms
@@ -307,4 +308,3 @@ public class WebSocketCommand
     public string? Type { get; set; }
     public string? Value { get; set; }
 }
-
