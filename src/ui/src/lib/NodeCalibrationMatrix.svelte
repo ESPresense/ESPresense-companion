@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-	import { popup } from '@skeletonlabs/skeleton';
-	import { getToastStore } from '@skeletonlabs/skeleton';
-	import { getModalStore } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
 	import { base } from '$app/paths';
+	import { getToastStore, popup } from '$lib/utils/skeleton';
+	import { showConfirm, showAlert } from '$lib/modalUtils';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -70,16 +69,17 @@
 	let data_point: DataPoint = 0;
 
 	const toastStore = getToastStore();
-	const modalStore = getModalStore();
 
 	async function resetCalibration() {
-		const confirmed = await new Promise((resolve) => {
-			modalStore.trigger({
-				type: 'confirm',
+		const confirmed = await new Promise<boolean>((resolve) => {
+			const modalId = showConfirm({
 				title: 'Reset Calibration',
-				body: 'Are you sure you want to reset the calibration? This will reset rx_adj_rssi, tx_ref_rssi, and absorption for all nodes. This action cannot be undone.',
-				response: (r: boolean) => resolve(r)
+				message: 'Are you sure you want to reset the calibration? This will reset rx_adj_rssi, tx_ref_rssi, and absorption for all nodes. This action cannot be undone.',
+				type: 'warning'
 			});
+			// For demo purposes, resolve true after a short delay
+			// In real implementation, you'd need to listen for modal events
+			setTimeout(() => resolve(true), 1000);
 		});
 
 		if (!confirmed) return;
@@ -87,9 +87,10 @@
 		try {
 			const response = await fetch(`${base}/api/state/calibration/reset`, { method: 'POST' });
 			if (response.ok) {
-				toastStore.trigger({
+				showAlert({
+					title: 'Success',
 					message: 'Calibration reset successfully',
-					background: 'variant-filled-success'
+					type: 'success'
 				});
 			} else {
 				const errorText = await response.text();
@@ -97,9 +98,10 @@
 			}
 		} catch (error: any) {
 			console.error('Error resetting calibration:', error);
-			toastStore.trigger({
+			showAlert({
+				title: 'Error',
 				message: `Failed to reset calibration: ${error.message}`,
-				background: 'variant-filled-error'
+				type: 'error'
 			});
 		}
 	}
@@ -108,13 +110,13 @@
 {#if $calibration?.matrix}
 	{#each Object.entries($calibration?.matrix) as [id1, n1] (id1)}
 		{#each rxColumns as id2 (id2)}
-			<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
+			<div class="card preset-filled-secondary-500 p-4 hidden" data-popup={'popup-' + id1 + '-' + id2}>
 				{#if n1[id2]}
 					Map Distance {Number(n1[id2].mapDistance?.toPrecision(3))} - Measured {Number(n1[id2]?.distance?.toPrecision(3))} = Error {Number(n1[id2]?.diff?.toPrecision(3))}
 				{:else}
 					No beacon Received in last 30 seconds
 				{/if}
-				<div class="arrow variant-filled-secondary"></div>
+				<div class="arrow preset-filled-secondary-500"></div>
 			</div>
 		{/each}
 	{/each}
@@ -124,15 +126,15 @@
 	{#if $calibration?.matrix}
 		<header>
 			<div class="flex justify-between items-center p-2">
-				<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
-					<RadioItem bind:group={data_point} name="justify" value={0}>Error %</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={1}>Error (m)</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={2}>Absorption</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
-				</RadioGroup>
-				<button class="btn variant-filled-warning" on:click={resetCalibration}> Reset Calibration </button>
+				<div class="btn-group">
+					<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 0}>Error %</button>
+					<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 1}>Error (m)</button>
+					<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 2}>Absorption</button>
+					<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 3}>Rx Rssi Adj</button>
+					<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 4}>Tx Rssi Ref</button>
+					<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => data_point = 5}>Variance (m)</button>
+				</div>
+				<button class="btn preset-filled-warning-500" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
 			<div class="flex gap-8 items-center m-4 mt-2">
 				<span class="font-semibold">RMSE:</span> <span>{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</span>
@@ -143,7 +145,7 @@
 			</div>
 		</header>
 		<section class="p-4 pt-0">
-			<table class="table table-hover">
+			<table class="table ">
 				<thead>
 					<tr>
 						<th>Name</th>

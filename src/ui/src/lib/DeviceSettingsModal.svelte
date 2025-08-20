@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import type { DeviceSetting } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '$lib/utils/skeleton';
+	import { showAlert } from '$lib/modalUtils';
 	import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
 
 	// Props
@@ -9,7 +10,6 @@
 	export let parent: any; // The Svelte parent component that triggered the modal
 	export let deviceSetting: DeviceSetting; // Passed in from trigger
 
-	const modalStore = getModalStore();
 	const toastStore = getToastStore();
 
 	// Create a local copy to avoid directly mutating the prop
@@ -34,18 +34,18 @@
 
 			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
-			const t: ToastSettings = {
+			showAlert({
+				title: 'Success',
 				message: 'Settings saved successfully!',
-				background: 'variant-filled-success'
-			};
-			toastStore.trigger(t);
+				type: 'success'
+			});
 
 			// Optionally, update the parent component or state if needed
 			if (parent && parent.onSettingsSaved) {
 				parent.onSettingsSaved(localSettings);
 			}
 
-			modalStore.close(); // Close modal on successful save
+			if (parent && parent.onClose) parent.onClose(); // Close modal on successful save
 		} catch (error) {
 			console.error('Error saving settings:', error);
 			let errorMessage = 'An unknown error occurred while saving.';
@@ -54,18 +54,18 @@
 				errorMessage = `Error saving: ${error.message}`;
 			}
 
-			const t: ToastSettings = {
+			showAlert({
+				title: 'Error',
 				message: errorMessage,
-				background: 'variant-filled-error'
-			};
-			toastStore.trigger(t);
+				type: 'error'
+			});
 		} finally {
 			isSaving = false;
 		}
 	}
 
 	function handleCancel() {
-		modalStore.close(); // Close the modal on cancel
+		if (parent && parent.onClose) parent.onClose(); // Close the modal on cancel
 	}
 </script>
 
@@ -76,13 +76,13 @@
 
 	<!-- Modal Actions -->
 	<footer class="modal-footer flex justify-end space-x-2 pt-4">
-		<button class="btn" on:click={handleCancel} disabled={isSaving}>Cancel</button>
-		<button class="btn variant-filled-primary" on:click={save} disabled={isSaving}>
+		<button class="btn" on:click={handleCancel}>Cancel</button>
+		<button class="btn preset-filled-primary-500" on:click={save}>
 			{#if isSaving}
 				Saving...
 			{:else}
 				Save
-			{/if}
-		</button>
+			{/if}</button
+		>
 	</footer>
 </div>

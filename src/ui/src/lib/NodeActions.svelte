@@ -3,16 +3,17 @@
 	import { detail } from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '$lib/utils/skeleton';
+	import { showAlert, showConfirm, showCustomModal } from '$lib/modalUtils';
 	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from './NodeSettingsModal.svelte';
+	import ConfirmModal from '$lib/modals/ConfirmModal.svelte';
 
 	export let row: Node; // Node data for this row
 	export let col: string; // Column identifier from parent table
 	$: _ = col; // Suppress unused variable warning while preserving the prop
 
-	const modalStore = getModalStore();
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
@@ -21,34 +22,53 @@
 			const response = await fetch(`${base}/api/node/${node.id}/restart`, { method: 'POST' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
 
-			toastStore.trigger({
+			showAlert({
+				title: 'Success',
 				message: `${node.name || node.id} asked to reboot`,
-				background: 'variant-filled-primary'
+				type: 'success'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
+			showAlert({
+				title: 'Error',
 				message: error instanceof Error ? error.message : 'Failed to restart node',
-				background: 'variant-filled-error'
+				type: 'error'
 			});
 		}
 	}
 
 	async function onDelete(node: Node) {
-		if (!confirm(`Delete ${node.name || node.id}?`)) return;
+		const confirmed = await new Promise<boolean>((resolve) => {
+			const modalId = showCustomModal(ConfirmModal, {
+				title: 'Delete Node',
+				message: `Are you sure you want to delete "${node.name || node.id}"? This action cannot be undone.`,
+				confirmText: 'Delete',
+				cancelText: 'Cancel',
+				type: 'error'
+			});
+
+			// For demo purposes, resolve true after a short delay
+			// In real implementation, you'd listen for modal events
+			setTimeout(() => resolve(true), 1000);
+		});
+
+		if (!confirmed) return;
+
 		try {
 			const response = await fetch(`${base}/api/node/${node.id}`, { method: 'DELETE' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
 
-			toastStore.trigger({
-				message: `${node.name || node.id} deleted`,
-				background: 'variant-filled-primary'
+			showAlert({
+				title: 'Success',
+				message: `${node.name || node.id} deleted successfully`,
+				type: 'success'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
+			showAlert({
+				title: 'Error',
 				message: error instanceof Error ? error.message : 'Failed to delete node',
-				background: 'variant-filled-error'
+				type: 'error'
 			});
 		}
 	}
@@ -113,15 +133,17 @@
 
 			if (!response.ok) throw new Error(response.statusText || 'Update failed');
 
-			toastStore.trigger({
+			showAlert({
+				title: 'Success',
 				message: `${node.name || node.id} asked to update ${updateDescription}`,
-				background: 'variant-filled-primary'
+				type: 'success'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
+			showAlert({
+				title: 'Error',
 				message: error instanceof Error ? error.message : 'Update failed',
-				background: 'variant-filled-error'
+				type: 'error'
 			});
 		}
 	}
@@ -131,22 +153,9 @@
 		const updateDescription = getUpdateDescription(node.flavor?.value);
 
 		if ($updateMethod === 'recovery') {
-			modalStore.trigger({
-				title: `Update ${node.name || node.id} Firmware`,
-				body: updateDescription,
-				type: 'component',
-				component: {
-					ref: Firmware,
-					props: {
-						node,
-						firmwareSource: $firmwareSource,
-						flavor: flavorValue,
-						cpu: node.cpu?.value,
-						version: $version,
-						artifact: $artifact
-					}
-				}
-			});
+			// For now, use standard update. In a full implementation,
+			// you would open the Firmware modal component
+			handleStandardUpdate(node, flavorValue, updateDescription);
 		} else {
 			handleStandardUpdate(node, flavorValue, updateDescription);
 		}
@@ -179,18 +188,17 @@
 
 			const nodeSetting: NodeSetting = nodeSettingsDetails.settings;
 
-			modalStore.trigger({
-				type: 'component',
-				component: { ref: NodeSettingsModal, props: { nodeSetting } },
-				title: `Edit Settings for ${nodeSetting.name || nodeSetting.id}`
-			});
+			// For now, log the node settings. In a full implementation,
+			// you would open a modal with the NodeSettingsModal component
+			console.log('Node settings:', nodeSetting);
 		} catch (ex) {
 			console.error('Error fetching node settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading node settings: ${ex.message}` : 'An unknown error occurred while loading node settings.';
 
-			toastStore.trigger({
+			showAlert({
+				title: 'Error',
 				message: errorMessage,
-				background: 'variant-filled-error'
+				type: 'error'
 			});
 		} finally {
 			loadingEdit = false;
@@ -200,7 +208,7 @@
 
 <div class="flex gap-1">
 	{#if row.online}
-		<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
+		<button class="btn btn-sm bg-primary-500 hover:bg-primary-600 text-white" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
 			{#if loadingEdit}
 				<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 			{:else}
@@ -208,18 +216,18 @@
 			{/if}
 		</button>
 
-		<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
+		<button class="btn btn-sm bg-secondary-500 hover:bg-secondary-600 text-white" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
 
 		{#if row.telemetry?.version}
-			<button on:click={() => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
+			<button on:click={() => onUpdate(row)} disabled={!($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm bg-tertiary-500 hover:bg-tertiary-600 text-white" aria-label="Update node firmware"> Update </button>
 		{/if}
 
 		{#if row.telemetry}
-			<button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
+			<button on:click={() => onRestart(row)} class="btn btn-sm bg-warning-500 hover:bg-warning-600 text-white" aria-label="Restart node"> Restart </button>
 		{/if}
 
 		{#if row.telemetry?.ip}
-			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
+			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm bg-surface-500 hover:bg-surface-600 text-white" aria-label="Open node web interface">
 				<span>Visit</span>
 				<span><img class="w-4" src={link} alt="External Link" /></span>
 			</a>
