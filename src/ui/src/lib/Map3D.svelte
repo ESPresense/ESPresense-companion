@@ -12,7 +12,6 @@
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import type { Group } from 'three';
 	import { detail3d } from '$lib/urls';
-	import logoSvg from '$lib/images/logo.svg?raw';
 
 	// --- Props ---
 	export let devicesToShow: Device[] = [];
@@ -172,23 +171,8 @@
 
 	function getNodeLogoGeometry(): THREE.BufferGeometry {
 		if (nodeLogoGeometry) return nodeLogoGeometry;
-		const loader = new SVGLoader();
-		const svgData = loader.parse(logoSvg);
-		const extrudeSettings = { depth: 20, bevelEnabled: false };
-		const geometries: THREE.BufferGeometry[] = [];
-		svgData.paths.forEach((path) => {
-			// Skip white background circle
-			const fill = path.userData?.style?.fill;
-			if (fill && typeof fill === 'string' && fill.toLowerCase() === '#ffffff') return;
-			const shapes = SVGLoader.createShapes(path);
-			shapes.forEach((shape) => {
-				geometries.push(new THREE.ExtrudeGeometry(shape, extrudeSettings));
-			});
-		});
-		nodeLogoGeometry = mergeGeometries(geometries);
-		nodeLogoGeometry.center();
-		const scale = 0.0008;
-		nodeLogoGeometry.scale(scale, scale, scale);
+		// Create a simple box geometry as placeholder since logoSvg is removed
+		nodeLogoGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.1);
 		return nodeLogoGeometry;
 	}
 
@@ -690,20 +674,7 @@
 			// Check if it's a mesh (our sphere) and has a name (our device ID)
 			if (firstIntersected instanceof THREE.Mesh && firstIntersected.name) {
 				const deviceId = firstIntersected.name;
-
-				// Toggle measured spheres display
-				if (selectedDeviceId === deviceId) {
-					// Clicking same device again - hide spheres and navigate
-					hideMeasuredSpheres();
-					detail3d(deviceId);
-				} else {
-					// Show measured spheres for clicked device
-					const device = devicesToShow.find((d) => d.id === deviceId);
-					if (device) {
-						selectedDeviceId = deviceId;
-						showMeasuredSpheres(device);
-					}
-				}
+				detail3d(deviceId);
 			}
 		} else {
 			// Click on empty space - hide spheres

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import type { DeviceSetting } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getModalStore, getToastStore, type ToastSettings } from '$lib/utils/skeleton';
 	import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
 
 	// Props
@@ -34,18 +34,17 @@
 
 			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
-			const t: ToastSettings = {
-				message: 'Settings saved successfully!',
-				background: 'variant-filled-success'
-			};
-			toastStore.trigger(t);
+			toastStore.create({
+				description: 'Settings saved successfully!',
+				type: 'success'
+			});
 
 			// Optionally, update the parent component or state if needed
 			if (parent && parent.onSettingsSaved) {
 				parent.onSettingsSaved(localSettings);
 			}
 
-			modalStore.close(); // Close modal on successful save
+			if (parent && parent.onClose) parent.onClose(); // Close modal on successful save
 		} catch (error) {
 			console.error('Error saving settings:', error);
 			let errorMessage = 'An unknown error occurred while saving.';
@@ -54,11 +53,10 @@
 				errorMessage = `Error saving: ${error.message}`;
 			}
 
-			const t: ToastSettings = {
-				message: errorMessage,
-				background: 'variant-filled-error'
-			};
-			toastStore.trigger(t);
+			toastStore.create({
+				description: errorMessage,
+				type: 'error'
+			});
 		} finally {
 			isSaving = false;
 		}
@@ -76,13 +74,13 @@
 
 	<!-- Modal Actions -->
 	<footer class="modal-footer flex justify-end space-x-2 pt-4">
-		<button class="btn" on:click={handleCancel} disabled={isSaving}>Cancel</button>
-		<button class="btn variant-filled-primary" on:click={save} disabled={isSaving}>
+		<button class="btn" on:click={handleCancel}>Cancel</button>
+		<button class="btn preset-filled-primary-500" on:click={save}>
 			{#if isSaving}
 				Saving...
 			{:else}
 				Save
-			{/if}
-		</button>
+			{/if}</button
+		>
 	</footer>
 </div>
