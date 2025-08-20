@@ -1,10 +1,9 @@
-import { purgeCss } from 'vite-plugin-tailwind-purgecss';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import devtoolsJson from 'vite-plugin-devtools-json';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-	plugins: [sveltekit(), purgeCss(), devtoolsJson()],
+	plugins: [tailwindcss(), sveltekit()],
 
 test: {
 include: ['src/**/*.{test,spec,vitest}.{js,ts}']
