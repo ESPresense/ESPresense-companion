@@ -1,7 +1,6 @@
 <script lang="ts">
 	import DevicesTable from '$lib/DevicesTable.svelte';
 	import { detail } from '$lib/urls';
-	import { SlideToggle } from '@skeletonlabs/skeleton';
 	import { showAll } from '$lib/stores';
 </script>
 
@@ -13,7 +12,14 @@
 	<div class="flex justify-between items-center my-2 px-2">
 		<h1 class="text-3xl font-bold">Devices</h1>
 		<div class="flex items-center space-x-4">
-			<SlideToggle name="show-all" bind:checked={$showAll}>Show All</SlideToggle>
+			<label class="flex items-center space-x-2 cursor-pointer">
+				<input 
+					type="checkbox" 
+					bind:checked={$showAll}
+					class="checkbox"
+				/>
+				<span>Show All</span>
+			</label>
 		</div>
 	</div>
 	<DevicesTable on:selected={(d) => detail(d.detail)} />

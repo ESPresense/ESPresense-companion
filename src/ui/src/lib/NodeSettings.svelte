@@ -30,5 +30,5 @@
   <input class="input" type="number" bind:value={settings.filtering.maxDistance} />
 </label>
 {:else}
-  <div class="text-center text-token">Node settings not available.</div>
+  <div class="text-center text-surface-950-50">Node settings not available.</div>
 {/if}
