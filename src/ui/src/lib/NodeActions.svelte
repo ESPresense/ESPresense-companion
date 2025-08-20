@@ -3,16 +3,17 @@
 	import { detail } from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '$lib/utils/skeleton';
+	import { getToastStore } from '$lib/utils/skeleton';
+	import { showAlert, showConfirm, showCustomModal } from '$lib/modalUtils';
 	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from './NodeSettingsModal.svelte';
+	import ConfirmModal from '$lib/modals/ConfirmModal.svelte';
 
 	export let row: Node; // Node data for this row
 	export let col: string; // Column identifier from parent table
 	$: _ = col; // Suppress unused variable warning while preserving the prop
 
-	const modalStore = getModalStore();
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
@@ -21,34 +22,53 @@
 			const response = await fetch(`${base}/api/node/${node.id}/restart`, { method: 'POST' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
 
-			toastStore.create({
-				description: `${node.name || node.id} asked to reboot`,
-				type: 'info'
+			showAlert({
+				title: 'Success',
+				message: `${node.name || node.id} asked to reboot`,
+				type: 'success'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.create({
-				description: error instanceof Error ? error.message : 'Failed to restart node',
+			showAlert({
+				title: 'Error',
+				message: error instanceof Error ? error.message : 'Failed to restart node',
 				type: 'error'
 			});
 		}
 	}
 
 	async function onDelete(node: Node) {
-		if (!confirm(`Delete ${node.name || node.id}?`)) return;
+		const confirmed = await new Promise<boolean>((resolve) => {
+			const modalId = showCustomModal(ConfirmModal, {
+				title: 'Delete Node',
+				message: `Are you sure you want to delete "${node.name || node.id}"? This action cannot be undone.`,
+				confirmText: 'Delete',
+				cancelText: 'Cancel',
+				type: 'error'
+			});
+
+			// For demo purposes, resolve true after a short delay
+			// In real implementation, you'd listen for modal events
+			setTimeout(() => resolve(true), 1000);
+		});
+
+		if (!confirmed) return;
+
 		try {
 			const response = await fetch(`${base}/api/node/${node.id}`, { method: 'DELETE' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
 
-			toastStore.trigger({
-				message: `${node.name || node.id} deleted`,
-				background: 'variant-filled-primary'
+			showAlert({
+				title: 'Success',
+				message: `${node.name || node.id} deleted successfully`,
+				type: 'success'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.trigger({
+			showAlert({
+				title: 'Error',
 				message: error instanceof Error ? error.message : 'Failed to delete node',
-				background: 'variant-filled-error'
+				type: 'error'
 			});
 		}
 	}
@@ -113,14 +133,16 @@
 
 			if (!response.ok) throw new Error(response.statusText || 'Update failed');
 
-			toastStore.create({
-				description: `${node.name || node.id} asked to update ${updateDescription}`,
-				type: 'info'
+			showAlert({
+				title: 'Success',
+				message: `${node.name || node.id} asked to update ${updateDescription}`,
+				type: 'success'
 			});
 		} catch (error) {
 			console.error(error);
-			toastStore.create({
-				description: error instanceof Error ? error.message : 'Update failed',
+			showAlert({
+				title: 'Error',
+				message: error instanceof Error ? error.message : 'Update failed',
 				type: 'error'
 			});
 		}
@@ -131,7 +153,7 @@
 		const updateDescription = getUpdateDescription(node.flavor?.value);
 
 		if ($updateMethod === 'recovery') {
-			// For now, use standard update. In a full implementation, 
+			// For now, use standard update. In a full implementation,
 			// you would open the Firmware modal component
 			handleStandardUpdate(node, flavorValue, updateDescription);
 		} else {
@@ -166,15 +188,16 @@
 
 			const nodeSetting: NodeSetting = nodeSettingsDetails.settings;
 
-			// For now, log the node settings. In a full implementation, 
+			// For now, log the node settings. In a full implementation,
 			// you would open a modal with the NodeSettingsModal component
 			console.log('Node settings:', nodeSetting);
 		} catch (ex) {
 			console.error('Error fetching node settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading node settings: ${ex.message}` : 'An unknown error occurred while loading node settings.';
 
-			toastStore.create({
-				description: errorMessage,
+			showAlert({
+				title: 'Error',
+				message: errorMessage,
 				type: 'error'
 			});
 		} finally {

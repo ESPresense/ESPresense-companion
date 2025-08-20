@@ -1,14 +1,14 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import type { NodeSetting } from '$lib/types';
-  import { getModalStore, getToastStore, type ToastSettings } from '$lib/utils/skeleton';
+  import { getToastStore } from '$lib/utils/skeleton';
+  import { showAlert } from '$lib/modalUtils';
   import NodeSettings from './NodeSettings.svelte'; // Import the fields component
 
   // Props
   export let parent: any; // The Svelte parent component that triggered the modal
   export let nodeSetting: NodeSetting; // Passed in from trigger
 
-  const modalStore = getModalStore();
   const toastStore = getToastStore();
 
   // Create a local copy to avoid directly mutating the prop
@@ -29,7 +29,7 @@
 
       if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
-      toastStore.create({ description: 'Node settings saved successfully!', type: 'success' });
+      showAlert({ title: 'Success', message: 'Node settings saved successfully!', type: 'success' });
 
       // Optionally, update the parent component or state if needed
       if (parent && parent.onSettingsSaved) {
@@ -42,7 +42,7 @@
       if (e instanceof Error) {
         errorMessage = `Error saving: ${e.message}`;
       }
-      toastStore.create({ description: errorMessage, type: 'error' });
+      showAlert({ title: 'Error', message: errorMessage, type: 'error' });
     }
   }
 
