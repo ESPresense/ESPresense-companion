@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { detail, calibrateDevice } from '$lib/urls';
-	import { getModalStore, getToastStore, type ModalStore, type ToastSettings } from '$lib/utils/skeleton';
+	import { getToastStore } from '$lib/utils/skeleton';
+	import { showCustomModal, showAlert } from '$lib/modalUtils';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
 	import DeviceSettingsModal from './DeviceSettingsModal.svelte';
 
@@ -9,7 +10,6 @@
 	export let row: Device; // Device data for this row
 	var _ = col; // Suppress unused variable warning while preserving the prop
 
-	const modalStore = getModalStore();
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
@@ -29,17 +29,17 @@
 
 			const deviceSetting: DeviceSetting = deviceSettingsDetails.settings;
 
-			modalStore.trigger({
-				type: 'component',
-				component: { ref: DeviceSettingsModal, props: { deviceSetting } },
-				title: `Edit Settings for ${deviceSetting.name || deviceSetting.id}`
+			showCustomModal(DeviceSettingsModal, {
+				deviceSetting,
+				parent: null // Remove parent reference as it's not needed in new system
 			});
 		} catch (ex) {
 			console.error('Error fetching device settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading settings: ${ex.message}` : 'An unknown error occurred while loading settings.';
 
-			toastStore.create({
-				description: errorMessage,
+			showAlert({
+				title: 'Error',
+				message: errorMessage,
 				type: 'error'
 			});
 		} finally {

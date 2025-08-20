@@ -16,27 +16,8 @@ export function getToastStore() {
 	return toastStore;
 }
 
-/**
- * Helper function to create a simple modal store interface
- * For full modal functionality, use the Modal component directly
- */
-export function getModalStore() {
-	return {
-		trigger: (settings: any) => {
-			// For now, use browser confirm for simple confirmations
-			// In a full implementation, you'd want to use the Modal component
-			if (settings.type === 'confirm') {
-				const result = confirm(settings.body);
-				if (settings.response) {
-					settings.response(result);
-				}
-				return result;
-			}
-			console.warn('getModalStore is deprecated. Use Modal component directly.');
-			return Promise.resolve(false);
-		}
-	};
-}
+// Modal functionality has been moved to the new modal system
+// Use: import { modalStore, showAlert, showConfirm } from '$lib/modalUtils'
 
 /**
  * Simple popup action for basic tooltip functionality
@@ -48,14 +29,14 @@ export function popup(node: HTMLElement, params: any) {
 		const showTooltip = () => {
 			node.title = params.target || '';
 		};
-		
+
 		const hideTooltip = () => {
 			node.title = '';
 		};
-		
+
 		node.addEventListener('mouseenter', showTooltip);
 		node.addEventListener('mouseleave', hideTooltip);
-		
+
 		return {
 			destroy() {
 				node.removeEventListener('mouseenter', showTooltip);
@@ -63,7 +44,7 @@ export function popup(node: HTMLElement, params: any) {
 			}
 		};
 	}
-	
+
 	return {
 		destroy() {}
 	};
@@ -79,4 +60,4 @@ export type ToastSettings = {
 	duration?: number;
 };
 
-export type ModalStore = ReturnType<typeof getModalStore>;
+// ModalStore type has been moved to modalStore.ts

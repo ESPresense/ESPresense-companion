@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import type { DeviceSetting } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '$lib/utils/skeleton';
+	import { getToastStore } from '$lib/utils/skeleton';
+	import { showAlert } from '$lib/modalUtils';
 	import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
 
 	// Props
@@ -9,7 +10,6 @@
 	export let parent: any; // The Svelte parent component that triggered the modal
 	export let deviceSetting: DeviceSetting; // Passed in from trigger
 
-	const modalStore = getModalStore();
 	const toastStore = getToastStore();
 
 	// Create a local copy to avoid directly mutating the prop
@@ -34,8 +34,9 @@
 
 			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
-			toastStore.create({
-				description: 'Settings saved successfully!',
+			showAlert({
+				title: 'Success',
+				message: 'Settings saved successfully!',
 				type: 'success'
 			});
 
@@ -53,8 +54,9 @@
 				errorMessage = `Error saving: ${error.message}`;
 			}
 
-			toastStore.create({
-				description: errorMessage,
+			showAlert({
+				title: 'Error',
+				message: errorMessage,
 				type: 'error'
 			});
 		} finally {
@@ -63,7 +65,7 @@
 	}
 
 	function handleCancel() {
-		modalStore.close(); // Close the modal on cancel
+		if (parent && parent.onClose) parent.onClose(); // Close the modal on cancel
 	}
 </script>
 

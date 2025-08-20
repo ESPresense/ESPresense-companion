@@ -16,6 +16,7 @@
 		"@eslint/js": "^9.23.0",
 		"@floating-ui/dom": "^1.6.13",
 		"@playwright/test": "^1.51.1",
+		"@skeletonlabs/floating-ui-svelte": "^0.3.9",
 		"@skeletonlabs/skeleton": "^3.1.1",
 		"@skeletonlabs/skeleton-svelte": "^1.0.0",
 		"@sveltejs/adapter-static": "^3.0.8",

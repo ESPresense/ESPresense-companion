@@ -17,6 +17,9 @@ importers:
       '@playwright/test':
         specifier: ^1.51.1
         version: 1.54.2
+      '@skeletonlabs/floating-ui-svelte':
+        specifier: ^0.3.9
+        version: 0.3.9(svelte@5.38.1)
       '@skeletonlabs/skeleton':
         specifier: ^3.1.1
         version: 3.2.0(tailwindcss@4.1.12)
@@ -502,6 +505,11 @@ packages:
     resolution: {integrity: sha512-Wq2zpapRYLfi4aKxf2Xff0tN+7slj2d4R87WEzqw7ZLsVvO5zwYCIuEGSZYiK41+GlwUo1HiR+GdkLEJnCKTCw==}
     cpu: [x64]
     os: [win32]
+
+  '@skeletonlabs/floating-ui-svelte@0.3.9':
+    resolution: {integrity: sha512-YjGAqVVD54v2biXgbVeZKTj40Zc1I7hS62NTpF72UBFzKsFrYN8+odexBaHNZ/4ScPYLF1ChA0vp3NClo8To1Q==}
+    peerDependencies:
+      svelte: ^5.0.0
 
   '@skeletonlabs/skeleton-svelte@1.5.0':
     resolution: {integrity: sha512-EOt3GLXjjZxKG1iOW6nMu/5NHZScp3G/EkD5OsmYgjYVKkAm4Fecsf2CudOXIAKILa+bBUkyCKlGkKoDpZ7tlg==}
@@ -2460,6 +2468,12 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.41.1':
     optional: true
+
+  '@skeletonlabs/floating-ui-svelte@0.3.9(svelte@5.38.1)':
+    dependencies:
+      '@floating-ui/dom': 1.7.3
+      '@floating-ui/utils': 0.2.10
+      svelte: 5.38.1
 
   '@skeletonlabs/skeleton-svelte@1.5.0(svelte@5.38.1)':
     dependencies:
