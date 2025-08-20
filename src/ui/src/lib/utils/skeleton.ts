@@ -1,18 +1,17 @@
 import { getContext } from 'svelte';
-import type { ToastContext } from '@skeletonlabs/skeleton-svelte';
 
 /**
  * Get the toast store from context
  */
-export function getToastStore(): ToastContext {
-	const toastStore = getContext<ToastContext>('toast');
+export function getToastStore() {
+	const toastStore = getContext('toast');
 	if (!toastStore) {
 		// Return a mock toast store if not found to prevent errors
 		return {
 			create: (settings: any) => {
 				console.warn('ToastStore not properly initialized. Toast message:', settings);
 			}
-		} as ToastContext;
+		};
 	}
 	return toastStore;
 }
