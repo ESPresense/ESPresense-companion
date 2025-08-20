@@ -25,6 +25,7 @@
 	let displayMode: 'current' | 'history' = 'current'; // Control what's shown
 	let showNodes = true; // Separate control for nodes on this page
 	let zRotationSpeed = 0.002; // Separate control for rotation
+	let historyDurationControl: any; // Reference to the GUI control
 
 	// Reactive controller for GUI
 	const effectController = {
@@ -49,6 +50,11 @@
 	// Refetch history when relevant parameters change
 	$: if (deviceId && displayMode === 'history') fetchDeviceHistory();
 	$: if (historyDurationMinutes && displayMode === 'history') fetchDeviceHistory();
+	
+	// Show/Hide duration control based on mode
+	$: if (historyDurationControl) {
+		historyDurationControl.domElement.style.display = (displayMode === 'history') ? '' : 'none';
+	}
 
 	// --- Data Fetching ---
 	async function fetchDeviceHistory() {
@@ -93,15 +99,12 @@
 			});
 
 		// History Duration (only relevant when displayMode is 'history')
-		const historyDurationControl = guiInstance.add(effectController, 'historyDurationMinutes', 5, 1440, 5)
+		historyDurationControl = guiInstance.add(effectController, 'historyDurationMinutes', 5, 1440, 5)
 			.name('History (min)')
 			.onChange((value: number) => {
 				historyDurationMinutes = value;
 				// No need to fetch here, reactive statement handles it
 			});
-
-		// Show/Hide duration control based on mode
-		$: historyDurationControl.domElement.style.display = (displayMode === 'history') ? '' : 'none';
 
 
 		// General Visualization
