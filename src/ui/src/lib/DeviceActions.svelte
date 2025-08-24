@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { detail, calibrateDevice } from '$lib/urls';
-	import { getModalStore, getToastStore, type ModalStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getModalStore, getToastStore, type ModalStore, type ToastSettings } from '$lib/utils/skeleton';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
 	import DeviceSettingsModal from './DeviceSettingsModal.svelte';
 
@@ -17,7 +17,9 @@
 		loadingEdit = true;
 		try {
 			const response = await fetch(`${base}/api/device/${row.id}`);
-			if (!response.ok) throw new Error(`Failed to fetch settings details: ${response.statusText}`);
+			if (!response.ok) {
+				throw new Error(`Failed to fetch settings details: ${response.statusText}`);
+			}
 
 			const deviceSettingsDetails: DeviceSettingsDetails = await response.json();
 
@@ -36,9 +38,9 @@
 			console.error('Error fetching device settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading settings: ${ex.message}` : 'An unknown error occurred while loading settings.';
 
-			toastStore.trigger({
-				message: errorMessage,
-				background: 'variant-filled-error'
+			toastStore.create({
+				description: errorMessage,
+				type: 'error'
 			});
 		} finally {
 			loadingEdit = false;
@@ -47,13 +49,13 @@
 </script>
 
 <div class="flex gap-1">
-	<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
+	<button class="btn btn-sm bg-primary-500 hover:bg-primary-600 text-white" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
 		{#if loadingEdit}
 			<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 		{:else}
 			Edit
 		{/if}
 	</button>
-	<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
-	<button class="btn btn-sm variant-filled-tertiary" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
+	<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
+	<button class="btn btn-sm preset-filled-tertiary-500" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
 </div>
