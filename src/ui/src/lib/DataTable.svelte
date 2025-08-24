@@ -5,6 +5,7 @@
 		key: string;
 		title: string;
 		value?: (row: any) => any;
+		sortValue?: (row: any) => any;
 		sortable?: boolean;
 		defaultSort?: boolean;
 		renderComponent?: {
@@ -28,7 +29,7 @@
 
 	function handleSort(column: Column) {
 		if (!column.sortable) return;
-		
+
 		if (sortColumn === column.key) {
 			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
 		} else {
@@ -39,26 +40,26 @@
 
 	function getSortedRows() {
 		if (!sortColumn) return rows;
-		
+
 		const column = columns.find(c => c.key === sortColumn);
 		if (!column) return rows;
 
 		return [...rows].sort((a, b) => {
-			let aVal = column.value ? column.value(a) : a[column.key];
-			let bVal = column.value ? column.value(b) : b[column.key];
-			
+			let aVal = column.sortValue ? column.sortValue(a) : (column.value ? column.value(a) : a[column.key]);
+			let bVal = column.sortValue ? column.sortValue(b) : (column.value ? column.value(b) : b[column.key]);
+
 			if (aVal === null || aVal === undefined) aVal = '';
 			if (bVal === null || bVal === undefined) bVal = '';
-			
+
 			if (typeof aVal === 'string' && typeof bVal === 'string') {
 				aVal = aVal.toLowerCase();
 				bVal = bVal.toLowerCase();
 			}
-			
+
 			let result = 0;
 			if (aVal < bVal) result = -1;
 			else if (aVal > bVal) result = 1;
-			
+
 			return sortDirection === 'desc' ? -result : result;
 		});
 	}
@@ -78,7 +79,7 @@
 	<thead>
 		<tr>
 			{#each columns as column}
-				<th 
+				<th
 					class:cursor-pointer={column.sortable}
 					onclick={() => handleSort(column)}
 				>
