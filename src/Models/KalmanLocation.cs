@@ -85,9 +85,8 @@ public class KalmanLocation
     /// Updates the filtered location with a new measurement
     /// </summary>
     /// <param name="newLocation">The new measured location</param>
-    /// <param name="confidence">Confidence in the measurement (0-100, higher values mean more trusted)</param>
     /// <returns>The filtered location after applying the update</returns>
-    public Point3D Update(Point3D newLocation, int confidence)
+    public Point3D Update(Point3D newLocation)
     {
         // Initialize Kalman filter if this is the first update
         if (_kalmanStateEstimate == null || _kalmanErrorCovariance == null)
@@ -122,12 +121,9 @@ public class KalmanLocation
             dynamicMeasurementNoise *= excessFactor * excessFactor; // Square it for more aggressive rejection
         }
 
-        // Lower process noise for higher confidence measurements
-        double adjustedProcessNoise = _processNoise * (100.0 / Math.Max(1, confidence));
-
         // Update state transition matrix based on dt
         var F = CreateStateTransitionMatrix(dt);
-        var Q = CreateProcessNoiseMatrix(dt, adjustedProcessNoise);
+        var Q = CreateProcessNoiseMatrix(dt, _processNoise);
 
         // Predict step
         _kalmanStateEstimate = F * _kalmanStateEstimate;
