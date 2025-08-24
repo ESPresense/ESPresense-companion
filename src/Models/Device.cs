@@ -98,9 +98,9 @@ public class Device
     /// </summary>
     /// <param name="newLocation">The new location from the best scenario</param>
     /// <param name="confidence">The confidence level of the new location</param>
-    public void UpdateLocation(Point3D newLocation, int confidence)
+    public void UpdateLocation(Point3D newLocation)
     {
-        _kalmanLocation.Update(newLocation, confidence);
+        _kalmanLocation.Update(newLocation);
     }
 
     public IEnumerable<KeyValuePair<string, string>> GetDetails()

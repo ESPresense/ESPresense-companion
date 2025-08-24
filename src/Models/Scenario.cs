@@ -47,7 +47,6 @@ public class Scenario(Config? config, ILocate locator, string? name)
         LastLocation = Location;
 
         // Use the KalmanLocation to get a filtered position
-        // Use confidence or default to 50 if not set
-        _kalmanLocation.Update(newLocation, Confidence ?? 50);
+        _kalmanLocation.Update(newLocation);
     }
 }

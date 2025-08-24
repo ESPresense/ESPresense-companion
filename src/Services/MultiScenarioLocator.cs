@@ -46,7 +46,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
             if (kalmanSource != null)
             {
-                device.UpdateLocation(kalmanSource.Location, kalmanSource.Confidence ?? 0);
+                device.UpdateLocation(kalmanSource.Location);
             }
 
             // Predicted location from the updated Kalman filter (x̂ₖ|ₖ⁻¹)
