@@ -5,6 +5,8 @@ import { computePosition, offset, flip, shift, autoUpdate } from '@floating-ui/d
 export const tooltip: Action<HTMLElement, string> = (node, content) => {
 	let tooltipEl: HTMLDivElement | null = null;
 	let cleanupAutoUpdate: (() => void) | null = null;
+	// Generate a unique, stable ID for this tooltip instance
+	const tooltipId = `tooltip-${crypto.randomUUID()}`;
 
 	function ensureTooltip() {
 		if (tooltipEl) return;
@@ -14,6 +16,10 @@ export const tooltip: Action<HTMLElement, string> = (node, content) => {
 		tooltipEl.style.zIndex = '1000';
 		tooltipEl.style.pointerEvents = 'none';
 		tooltipEl.textContent = content ?? '';
+		// Set ARIA attributes for accessibility
+		tooltipEl.setAttribute('role', 'tooltip');
+		tooltipEl.setAttribute('aria-hidden', 'true');
+		tooltipEl.id = tooltipId;
 	}
 
 	async function position() {
@@ -30,6 +36,9 @@ export const tooltip: Action<HTMLElement, string> = (node, content) => {
 		ensureTooltip();
 		if (!tooltipEl) return;
 		if (!tooltipEl.parentNode) document.body.appendChild(tooltipEl);
+		// Update ARIA attributes for accessibility
+		tooltipEl.setAttribute('aria-hidden', 'false');
+		node.setAttribute('aria-describedby', tooltipId);
 		// autoUpdate repositions on scroll/resize/layout changes
 		cleanupAutoUpdate = autoUpdate(node, tooltipEl, position);
 		void position();
@@ -41,6 +50,9 @@ export const tooltip: Action<HTMLElement, string> = (node, content) => {
 			cleanupAutoUpdate = null;
 		}
 		if (tooltipEl && tooltipEl.parentNode) {
+			// Update ARIA attributes for accessibility
+			tooltipEl.setAttribute('aria-hidden', 'true');
+			node.removeAttribute('aria-describedby');
 			tooltipEl.remove();
 		}
 	}
