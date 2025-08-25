@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-	import { popup } from '@skeletonlabs/skeleton';
 	import { getToastStore } from '@skeletonlabs/skeleton';
 	import { getModalStore } from '@skeletonlabs/skeleton';
+	import { tooltip } from '$lib/tooltip';
 	import { base } from '$app/paths';
 
 	enum DataPoint {
@@ -105,21 +105,6 @@
 	}
 </script>
 
-{#if $calibration?.matrix}
-	{#each Object.entries($calibration?.matrix) as [id1, n1] (id1)}
-		{#each rxColumns as id2 (id2)}
-			<div class="card variant-filled-secondary p-4" data-popup={'popup-' + id1 + '-' + id2}>
-				{#if n1[id2]}
-					Map Distance {Number(n1[id2].mapDistance?.toPrecision(3))} - Measured {Number(n1[id2]?.distance?.toPrecision(3))} = Error {Number(n1[id2]?.diff?.toPrecision(3))}
-				{:else}
-					No beacon Received in last 30 seconds
-				{/if}
-				<div class="arrow variant-filled-secondary"></div>
-			</div>
-		{/each}
-	{/each}
-{/if}
-
 <div class="card p-2">
 	{#if $calibration?.matrix}
 		<header>
@@ -158,7 +143,7 @@
 							<td>Tx: {id1}</td>
 							{#each rxColumns as id2 (id2)}
 								{#if n1[id2]}
-									<td use:popup={{ event: 'hover', target: 'popup-' + id1 + '-' + id2, placement: 'top' }} style={coloring(n1[id2]?.percent)}>{value(n1[id2], data_point)}</td>
+									<td use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'} style={coloring(n1[id2]?.percent)}>{value(n1[id2], data_point)}</td>
 								{:else}
 									<td></td>
 								{/if}
