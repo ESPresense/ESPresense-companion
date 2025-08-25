@@ -24,7 +24,7 @@
 		{ key: 'fixes', title: 'Fixes', value: (d) => d.fixes ?? 'n/a', sortable: true },
 		{ key: 'scale', title: 'Scale', value: (d) => d.scale?.toFixed(3) ?? 'n/a', sortable: true },
 		{ key: 'confidence', title: 'Confidence', value: (d) => d.confidence ?? 'n/a', sortable: true },
-		{ key: 'lastSeen', title: 'Last Seen', value: (d) => ((d.lastSeen ?? '') == '' ? 'n/a' : (ago(new Date(d.lastSeen)) ?? 'n/a')), sortable: true },
+		{ key: 'lastSeen', title: 'Last Seen', value: (d) => ((d.lastSeen ?? '') == '' ? 'n/a' : (ago(new Date(d.lastSeen)) ?? 'n/a')), sortValue: (d: Device) => d.lastSeen ? new Date(d.lastSeen) : new Date(0), sortable: true },
 		{ key: 'actions', title: '', renderComponent: { component: DeviceActions } }
 	];
 
