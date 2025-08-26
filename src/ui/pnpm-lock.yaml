@@ -81,8 +81,8 @@ importers:
         specifier: ^16.3.0
         version: 16.3.0
       layercake:
-        specifier: ^10.0.0
-        version: 10.0.0(svelte@5.38.1)(typescript@5.8.3)
+        specifier: ^10.0.1
+        version: 10.0.1(svelte@5.38.1)(typescript@5.8.3)
       ol:
         specifier: ^10.6.1
         version: 10.6.1
@@ -1431,11 +1431,11 @@ packages:
   known-css-properties@0.37.0:
     resolution: {integrity: sha512-JCDrsP4Z1Sb9JwG0aJ8Eo2r7k4Ou5MwmThS/6lcIe1ICyb7UBJKGRIUUdqc2ASdE/42lgz6zFUnzAIhtXnBVrQ==}
 
-  layercake@10.0.0:
-    resolution: {integrity: sha512-Og93KpI+SA9zWAPobWnJOWNshderKEVB3S9pQkrXmGexkEGQfE1uwd7T14szsTtpkzve/2ELwLqza05k+JQs+g==}
+  layercake@10.0.1:
+    resolution: {integrity: sha512-jWSNkVOdCnc/GLjdi7pwigbgs1ItAwbw9WK4a2SWUZdxDG3qUnR5r6+glRVzWMW6M6dPIROfn5FY7X44S14goA==}
     engines: {node: ^20.17.0 || >=22.9.0, npm: '>=11.0.0'}
     peerDependencies:
-      svelte: 3 - 5 || >=5.0.0-next.120
+      svelte: '>=5'
       typescript: ^5.0.2
 
   lerc@3.0.0:
@@ -3422,7 +3422,7 @@ snapshots:
 
   known-css-properties@0.37.0: {}
 
-  layercake@10.0.0(svelte@5.38.1)(typescript@5.8.3):
+  layercake@10.0.1(svelte@5.38.1)(typescript@5.8.3):
     dependencies:
       d3-array: 3.2.4
       d3-color: 3.1.0
