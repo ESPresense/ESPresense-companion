@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import type { DeviceSetting } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { createEventDispatcher } from 'svelte';
 	import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
 
 	// Props
-	/** Exposes component props */
-	export let parent: any; // The Svelte parent component that triggered the modal
+	export let parent: any = undefined; // The Svelte parent component that triggered the modal (for backward compatibility)
 	export let deviceSetting: DeviceSetting; // Passed in from trigger
 
-	const modalStore = getModalStore();
+	const dispatch = createEventDispatcher();
 	const toastStore = getToastStore();
 
 	// Create a local copy to avoid directly mutating the prop
@@ -45,7 +45,12 @@
 				parent.onSettingsSaved(localSettings);
 			}
 
-			modalStore.close(); // Close modal on successful save
+			// Close modal - either via parent.onClose or dispatch close event
+			if (parent && parent.onClose) {
+				parent.onClose();
+			} else {
+				dispatch('close');
+			}
 		} catch (error) {
 			console.error('Error saving settings:', error);
 			let errorMessage = 'An unknown error occurred while saving.';
@@ -65,12 +70,21 @@
 	}
 
 	function handleCancel() {
-		modalStore.close(); // Close the modal on cancel
+		// Close modal - either via parent.onClose or dispatch close event
+		if (parent && parent.onClose) {
+			parent.onClose();
+		} else {
+			dispatch('close');
+		}
 	}
 </script>
 
 <!-- Added card class for background and padding -->
 <div class="card p-4 space-y-4">
+	<header class="text-xl font-bold mb-4">
+		Edit Settings for {deviceSetting.name || deviceSetting.id}
+	</header>
+
 	<!-- Use the DeviceSettings component, passing the local state -->
 	<DeviceSettings settings={localSettings} />
 

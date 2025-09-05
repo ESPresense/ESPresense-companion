@@ -3,7 +3,8 @@
 	import { detail } from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { showComponent, showConfirm } from '$lib/modal/modalStore';
 	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from './NodeSettingsModal.svelte';
@@ -12,7 +13,6 @@
 	export let col: string; // Column identifier from parent table
 	$: _ = col; // Suppress unused variable warning while preserving the prop
 
-	const modalStore = getModalStore();
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
@@ -35,7 +35,13 @@
 	}
 
 	async function onDelete(node: Node) {
-		if (!confirm(`Delete ${node.name || node.id}?`)) return;
+		const confirmed = await showConfirm({
+			title: 'Delete Node',
+			body: `Are you sure you want to delete ${node.name || node.id}?`
+		});
+
+		if (!confirmed) return;
+
 		try {
 			const response = await fetch(`${base}/api/node/${node.id}`, { method: 'DELETE' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
@@ -131,21 +137,13 @@
 		const updateDescription = getUpdateDescription(node.flavor?.value);
 
 		if ($updateMethod === 'recovery') {
-			modalStore.trigger({
-				title: `Update ${node.name || node.id} Firmware`,
-				body: updateDescription,
-				type: 'component',
-				component: {
-					ref: Firmware,
-					props: {
-						node,
-						firmwareSource: $firmwareSource,
-						flavor: flavorValue,
-						cpu: node.cpu?.value,
-						version: $version,
-						artifact: $artifact
-					}
-				}
+			showComponent(Firmware, {
+				node,
+				firmwareSource: $firmwareSource,
+				flavor: flavorValue,
+				cpu: node.cpu?.value,
+				version: $version,
+				artifact: $artifact
 			});
 		} else {
 			handleStandardUpdate(node, flavorValue, updateDescription);
@@ -179,11 +177,7 @@
 
 			const nodeSetting: NodeSetting = nodeSettingsDetails.settings;
 
-			modalStore.trigger({
-				type: 'component',
-				component: { ref: NodeSettingsModal, props: { nodeSetting } },
-				title: `Edit Settings for ${nodeSetting.name || nodeSetting.id}`
-			});
+			showComponent(NodeSettingsModal, { nodeSetting });
 		} catch (ex) {
 			console.error('Error fetching node settings for modal:', ex);
 			const errorMessage = ex instanceof Error ? `Error loading node settings: ${ex.message}` : 'An unknown error occurred while loading node settings.';
