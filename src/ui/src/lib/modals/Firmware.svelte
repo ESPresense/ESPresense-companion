@@ -70,68 +70,66 @@
 	const cForm = 'border border-surface-500 p-4 space-y-4 rounded-container-token';
 </script>
 
-{#if $modalStore[0]}
-	{#if progress > Progress.Form}
-		<div class={cBase}>
-			<header class={cHeader}>{$modalStore[0]?.title ?? '(title missing)'}: {percentComplete ?? 0}%...</header>
-			{#each log as item}
-				<p>{item}</p>
-			{/each}
-			<ProgressBar bind:value={percentComplete} max={100} />
-			{#if progress > Progress.Updating}
-				<footer class="modal-footer {parent.regionFooter}">
-					{#if progress == Progress.Success}
-						<button class="btn {parent.buttonPositive}" on:click={parent.onClose}>Close</button>
-					{:else}
-						<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
-						<button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Retry</button>
-					{/if}
-				</footer>
-			{/if}
-		</div>
-	{:else if !$firmwareTypes}
-		<div class={cBase}>
-			<p>Loading...</p>
-		</div>
-	{:else}
-		<div class={cBase}>
-			<header class={cHeader}>{$modalStore[0].title ?? '(title missing)'}</header>
-			<article>{$modalStore[0].body ?? '(body missing)'}</article>
-			<!-- Enable for debugging: -->
-			<form class="modal-form {cForm}">
-				<label class="label">
-					<span>Flavor</span>
-					<select id="flavor" class="flex-grow select" bind:value={flavor}>
-						{#each $firmwareTypes.flavors as item}
-							<option value={item.value}>{item.name}</option>
-						{/each}
-					</select>
-				</label>
-				<label class="label">
-					<span>CPU</span>
-					<select id="cpu" class="flex-grow select" bind:value={cpu}>
-						{#each selectedFlavor?.cpus ?? [] as item}
-							<option value={item}>{$cpuNames?.get(item)}</option>
-						{/each}
-					</select>
-				</label>
-				<label class="label">
-					<span>Firmware</span>
-					<select id="cpu" class="flex-grow select" bind:value={firmware}>
-						{#each possibleFirmware ?? [] as item}
-							<option value={item.name}>{item.name}</option>
-						{/each}
-					</select>
-				</label>
-				<label>
-					<span>URL</span>
-					<input type="text" id="url" class="input" readonly bind:value={url} />
-				</label>
-			</form>
+{#if progress > Progress.Form}
+	<div class={cBase}>
+		<header class={cHeader}>Firmware Update: {percentComplete ?? 0}%...</header>
+		{#each log as item}
+			<p>{item}</p>
+		{/each}
+		<ProgressBar bind:value={percentComplete} max={100} />
+		{#if progress > Progress.Updating}
 			<footer class="modal-footer {parent.regionFooter}">
-				<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
-				<button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Update</button>
+				{#if progress == Progress.Success}
+					<button class="btn {parent.buttonPositive}" on:click={parent.onClose}>Close</button>
+				{:else}
+					<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
+					<button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Retry</button>
+				{/if}
 			</footer>
-		</div>
-	{/if}
+		{/if}
+	</div>
+{:else if !$firmwareTypes}
+	<div class={cBase}>
+		<p>Loading...</p>
+	</div>
+{:else}
+	<div class={cBase}>
+		<header class={cHeader}>Firmware Update</header>
+		<article>Select firmware options and click Update to proceed.</article>
+		<!-- Enable for debugging: -->
+		<form class="modal-form {cForm}">
+			<label class="label">
+				<span>Flavor</span>
+				<select id="flavor" class="flex-grow select" bind:value={flavor}>
+					{#each $firmwareTypes.flavors as item}
+						<option value={item.value}>{item.name}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="label">
+				<span>CPU</span>
+				<select id="cpu" class="flex-grow select" bind:value={cpu}>
+					{#each selectedFlavor?.cpus ?? [] as item}
+						<option value={item}>{$cpuNames?.get(item)}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="label">
+				<span>Firmware</span>
+				<select id="cpu" class="flex-grow select" bind:value={firmware}>
+					{#each possibleFirmware ?? [] as item}
+						<option value={item.name}>{item.name}</option>
+					{/each}
+				</select>
+			</label>
+			<label>
+				<span>URL</span>
+				<input type="text" id="url" class="input" readonly bind:value={url} />
+			</label>
+		</form>
+		<footer class="modal-footer {parent.regionFooter}">
+			<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
+			<button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Update</button>
+		</footer>
+	</div>
 {/if}
