@@ -43,7 +43,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch(`${base}/api/node/${node.id}`, { method: 'DELETE' });
+			const response = await fetch(`${base}/api/node/${encodeURIComponent(node.id)}`, { method: 'DELETE' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
 
 			toastStore.trigger({
