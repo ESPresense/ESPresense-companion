@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import type { DeviceSetting } from '$lib/types';
-	import { getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '$lib/toast/toastStore';
 	import { createEventDispatcher } from 'svelte';
 	import DeviceSettings from './DeviceSettings.svelte'; // Import the refactored component
 

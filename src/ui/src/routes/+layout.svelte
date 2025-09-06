@@ -2,9 +2,10 @@
 	import '../app.postcss';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
-	import { AppShell, AppRail, AppRailAnchor, Drawer, Toast, initializeStores, storePopup } from '@skeletonlabs/skeleton';
+	import { AppShell, AppRail, AppRailAnchor, Drawer, initializeStores, storePopup } from '@skeletonlabs/skeleton';
 	import { computePosition, autoUpdate, offset, shift, flip, arrow } from '@floating-ui/dom';
 	import Modal from '$lib/modal/Modal.svelte';
+	import Toast from '$lib/toast/Toast.svelte';
 
 	import logo from '$lib/images/logo.svg';
 	import github from '$lib/images/github.svg';

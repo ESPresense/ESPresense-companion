@@ -2,7 +2,7 @@
 	import { ProgressBar } from '@skeletonlabs/skeleton';
 	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
 	import type { Node } from '$lib/types';
-	import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
 
 	export let firmwareSource: string;
 	export let node: Node;

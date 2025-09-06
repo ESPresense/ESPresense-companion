@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { detail, calibrateDevice } from '$lib/urls';
-	import { getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '$lib/toast/toastStore';
 	import { showComponent } from '$lib/modal/modalStore';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
 	import DeviceSettingsModal from './DeviceSettingsModal.svelte';

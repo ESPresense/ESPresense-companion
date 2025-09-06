@@ -2,8 +2,7 @@
 	import { base } from '$app/paths';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
-	import type { ToastSettings } from '@skeletonlabs/skeleton';
-	import { getToastStore } from '@skeletonlabs/skeleton';
+	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
 	import type { DeviceSetting, NodeSetting } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';

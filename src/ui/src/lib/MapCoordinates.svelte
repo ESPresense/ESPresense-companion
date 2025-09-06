@@ -2,7 +2,7 @@
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
 	import type { LayerCakeContext } from '$lib/types';
-	import { getToastStore } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '$lib/toast/toastStore';
 
 	const toastStore = getToastStore();
 	export let transform = zoomIdentity;
