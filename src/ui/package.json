@@ -34,7 +34,7 @@
 		"d3-selection": "^3.0.0",
 		"d3-zoom": "^3.0.0",
 		"eslint": "^9.32.0",
-		"eslint-config-prettier": "^10.1.5",
+		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.9.2",
 		"globals": "^16.3.0",
 		"layercake": "^10.0.0",
