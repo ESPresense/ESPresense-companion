@@ -3,7 +3,6 @@
 	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
 	import type { Node } from '$lib/types';
 	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
-	import { getModalStore } from '$lib/modal/modalStore';
 
 	export let firmwareSource: string;
 	export let node: Node;
@@ -20,8 +19,26 @@
 		Success
 	}
 
-	const modalStore = getModalStore();
 	const toastStore = getToastStore();
+
+	function getUpdateDescription(flavorId: string | undefined): string {
+		const selectedFlavorId = flavor === '-' ? flavorId : flavor;
+		const flavorName = selectedFlavorId ? $firmwareTypes?.flavors?.find(f => f.value === selectedFlavorId)?.name : undefined;
+
+		let description = '';
+
+		if (firmwareSource === 'release') {
+			description = `with github version ${version}`;
+		} else if (firmwareSource === 'artifact') {
+			description = `with github artifact ${artifact}`;
+		}
+
+		if (flavorName && flavor !== '-') {
+			description = `${description} ${flavorName}`;
+		}
+
+		return description;
+	}
 
 	function extractNonNumeric(str: string): string {
 		return str.replace(/\d+/g, '');
@@ -36,6 +53,8 @@
 	$: url = getFirmwareUrl(firmwareSource, version, artifact, firmware) ?? '#ERR';
 
 	async function onFormSubmit(): Promise<void> {
+		if (!isValidForm) return;
+		
 		log = [];
 		progress = Progress.Updating;
 		try {
@@ -67,9 +86,9 @@
 	$: isValidForm = $firmwareTypes && flavor && cpu && firmware && url && url !== '#ERR';
 
 	// Base Classes
-	const cBase = 'card p-4 w-modal shadow-xl space-y-4';
+	const cBase = 'w-modal space-y-4';
 	const cHeader = 'text-2xl font-bold';
-	const cForm = 'border border-surface-500 p-4 space-y-4 rounded-container-token';
+	const cForm = 'border border-surface-500 p-4 space-y-4';
 </script>
 
 {#if progress > Progress.Form}
@@ -96,7 +115,8 @@
 	</div>
 {:else}
 	<div class={cBase}>
-		<header class={cHeader}>Firmware Update</header>
+		<header class={cHeader}>Update {node.name} Firmware</header>
+		<p class="text-surface-600-300-token mb-4">{getUpdateDescription(node.flavor?.value)}</p>
 		<article>Select firmware options and click Update to proceed.</article>
 		<!-- Enable for debugging: -->
 		<form class="modal-form {cForm}">

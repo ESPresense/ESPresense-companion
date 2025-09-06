@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import type { NodeSetting } from '$lib/types';
-  import { getToastStore } from '$lib/toast/toastStore';
+  import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
   import { createEventDispatcher } from 'svelte';
   import NodeSettings from './NodeSettings.svelte'; // Import the fields component
 
