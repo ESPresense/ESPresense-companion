@@ -2,8 +2,7 @@
 	import '../app.postcss';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
-	import { AppShell, AppRail, AppRailAnchor, Drawer, initializeStores, storePopup } from '@skeletonlabs/skeleton';
-	import { computePosition, autoUpdate, offset, shift, flip, arrow } from '@floating-ui/dom';
+	import { AppShell, AppRail, AppRailAnchor } from '@skeletonlabs/skeleton';
 	import Modal from '$lib/modal/Modal.svelte';
 	import Toast from '$lib/toast/Toast.svelte';
 
@@ -14,11 +13,6 @@
 	import devices from '$lib/images/devices.svg';
 	import calibration from '$lib/images/calibration.svg';
 	import cube from '$lib/images/cube.svg';
-
-	initializeStores();
-
-	storePopup.set({ computePosition, autoUpdate, offset, shift, flip, arrow });
-
 
 	$: current = $page.url.pathname;
 
@@ -63,7 +57,6 @@
 			</AppRail>
 		</svelte:fragment>
 		<slot />
-		<Drawer width="400px" />
 	</AppShell>
 </div>
 

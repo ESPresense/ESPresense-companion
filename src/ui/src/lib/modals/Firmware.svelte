@@ -3,6 +3,7 @@
 	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
 	import type { Node } from '$lib/types';
 	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
+	import { getModalStore } from '$lib/modal/modalStore';
 
 	export let firmwareSource: string;
 	export let node: Node;
