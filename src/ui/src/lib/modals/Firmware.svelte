@@ -64,6 +64,7 @@
 
 	$: selectedFlavor = $firmwareTypes?.flavors?.find((d) => d.value === flavor);
 	$: possibleFirmware = $firmwareTypes?.firmware?.filter((d) => d.cpu === cpu && d.flavor == flavor);
+	$: isValidForm = $firmwareTypes && flavor && cpu && firmware && url && url !== '#ERR';
 
 	// Base Classes
 	const cBase = 'card p-4 w-modal shadow-xl space-y-4';
@@ -117,7 +118,7 @@
 			</label>
 			<label class="label">
 				<span>Firmware</span>
-				<select id="cpu" class="flex-grow select" bind:value={firmware}>
+				<select id="firmware" class="flex-grow select" bind:value={firmware}>
 					{#each possibleFirmware ?? [] as item}
 						<option value={item.name}>{item.name}</option>
 					{/each}
@@ -130,7 +131,7 @@
 		</form>
 		<footer class="modal-footer {parent.regionFooter}">
 			<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
-			<button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Update</button>
+			<button class="btn {parent.buttonPositive}" on:click={onFormSubmit} disabled={!isValidForm}>Update</button>
 		</footer>
 	</div>
 {/if}
