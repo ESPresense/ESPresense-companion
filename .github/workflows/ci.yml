@@ -24,6 +24,14 @@ jobs:
       with:
         version: 10
         run_install: false
+
+    - name: Setup pnpm cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.pnpm-store
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
   
     - name: Restore dependencies
       run: dotnet restore
