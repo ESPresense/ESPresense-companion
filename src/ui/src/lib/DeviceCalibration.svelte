@@ -2,7 +2,7 @@
 	import { base } from '$app/paths';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
-	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
+	import { getToastStore } from '$lib/toast/toastStore';
 	import type { DeviceSetting, NodeSetting } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
 	import { onMount, onDestroy } from 'svelte';
@@ -23,6 +23,22 @@
 	// Local storage for all device messages (keyed by nodeId)
 	let deviceMessages: Record<string, DeviceMessage[]> = {};
 
+	// Function to fetch device settings based on deviceId
+	async function fetchDeviceSettings() {
+		try {
+			const response = await fetch(`${base}/api/device/${deviceId}`);
+			if (response.ok) {
+				deviceSettings = await response.json();
+				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
+			} else {
+				const errorData = await response.text();
+				toastStore.trigger({ message: `Error fetching device settings: ${errorData || response.statusText}`, background: 'preset-filled-error-500' });
+			}
+		} catch (error) {
+			console.error(`Error fetching settings for device ${deviceId}:`, error);
+			toastStore.trigger({ message: 'Error fetching device settings.', background: 'preset-filled-error-500' });
+		}
+	}
 
 	// Function to fetch node settings
 	async function fetchNodeSettings(nodeId: string) {
@@ -90,8 +106,7 @@
 
 	// Error handling adjusted for fetched settings
 	$: if (deviceSettings?.error) {
-		const t: ToastSettings = { message: deviceSettings.error, background: 'variant-filled-error' };
-		toastStore.trigger(t);
+		toastStore.trigger({ message: deviceSettings.error, background: 'variant-filled-error' });
 	}
 
 	// Reactive device and floor lookup
@@ -150,9 +165,7 @@
 			if (node.id in deviceMessages && deviceMessages[node.id].length > 0) {
 				// Use all messages for this node to calculate average RSSI
 				const messages = deviceMessages[node.id];
-				const validRssiValues = messages
-					.map((msg) => msg.rssi)
-					.filter((rssi) => rssi !== null && rssi !== undefined) as number[];
+				const validRssiValues = messages.map((msg) => msg.rssi).filter((rssi) => rssi !== null && rssi !== undefined) as number[];
 
 				if (validRssiValues.length > 0) {
 					// Calculate the average RSSI from all messages
@@ -184,21 +197,9 @@
 		return Math.sqrt(variance);
 	}
 
-	function calculateNodeDistances(
-		calibrationSpot: { x: number; y: number; z?: number } | null,
-		selectedFloorId: string | null,
-		nodes: any[] | undefined,
-		bounds: any,
-		calibrationSpotHeight: number
-	) {
+	function calculateNodeDistances(calibrationSpot: { x: number; y: number; z: number } | null, selectedFloorId: string | null, nodes: any[] | undefined, bounds: any, calibrationSpotHeight: number) {
 		if (!nodes || !calibrationSpot || !selectedFloorId) {
 			return [];
-		}
-
-		// Ensure z is defined before using it in calculations
-		if (calibrationSpot.z === undefined) {
-			const floorLowerZ = bounds ? bounds[0][2] : 0;
-			calibrationSpot.z = floorLowerZ + calibrationSpotHeight;
 		}
 		return nodes
 			.filter((node: any) => {
@@ -206,11 +207,7 @@
 			})
 			.map((node: any) => {
 				// Use the relative heights for the z-component of the distance calculation
-				const distance = Math.sqrt(
-					Math.pow(node.location.x - calibrationSpot.x, 2) +
-					Math.pow(node.location.y - calibrationSpot.y, 2) +
-					Math.pow(node.location.z - calibrationSpot.z!, 2)
-				);
+				const distance = Math.sqrt(Math.pow(node.location.x - calibrationSpot.x, 2) + Math.pow(node.location.y - calibrationSpot.y, 2) + Math.pow(node.location.z - calibrationSpot.z, 2));
 
 				const floorLowerZ = bounds ? bounds[0][2] : 0;
 				const nodeHeightFromFloor = node.location.z - floorLowerZ;
@@ -238,9 +235,7 @@
 			if (!node || node.distance < 0.1) return;
 
 			// Extract valid RSSI values
-			const validRssiValues = messages
-				.map((msg) => msg.rssi)
-				.filter((rssi) => rssi !== null && rssi !== undefined) as number[];
+			const validRssiValues = messages.map((msg) => msg.rssi).filter((rssi) => rssi !== null && rssi !== undefined) as number[];
 
 			if (validRssiValues.length < 5) return;
 
@@ -279,15 +274,10 @@
 
 	// Get message statistics for display
 	function calculateMessageStats(deviceMessages: Record<string, DeviceMessage[]>) {
-		const stats: Record<
-			string,
-			{ count: number; avgRssi: number | null; minRssi: number | null; maxRssi: number | null; stdDev: number | null }
-		> = {};
+		const stats: Record<string, { count: number; avgRssi: number | null; minRssi: number | null; maxRssi: number | null; stdDev: number | null }> = {};
 
 		Object.entries(deviceMessages).forEach(([nodeId, messages]) => {
-			const validRssiValues = messages
-				.map((msg) => msg.rssi)
-				.filter((rssi) => rssi !== null && rssi !== undefined) as number[];
+			const validRssiValues = messages.map((msg) => msg.rssi).filter((rssi) => rssi !== null && rssi !== undefined) as number[];
 
 			if (validRssiValues.length > 0) {
 				const sum = validRssiValues.reduce((acc, val) => acc + val, 0);
@@ -315,7 +305,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId }`, {
+			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -328,7 +318,7 @@
 			}
 		} catch (e: unknown) {
 			const error = e as Error;
-			toastStore.trigger({ message: error.message, background: 'variant-filled-error' });
+			toastStore.trigger({ message: error.message, background: 'preset-filled-error-500' });
 		}
 	}
 </script>
@@ -340,7 +330,7 @@
 <div class="container mx-auto p-4 max-w-7xl">
 	<h2 class="h2 mb-4">Device Calibration</h2>
 
-	<div class="card p-4 mb-6 variant-soft">
+	<div class="card p-4 mb-6 preset-tonal">
 		<header class="font-semibold mb-2">Instructions</header>
 		<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
 		<ol class="list-decimal pl-6 mb-2">
@@ -354,7 +344,7 @@
 	</div>
 
 	{#if $config?.floors}
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+		<div class="grid grid-cols-1 gap-4 mb-4">
 			<div>
 				<label class="label font-medium mb-1" for="floor-select">Select Floor</label>
 				<select id="floor-select" bind:value={selectedFloorId} class="select w-full">
@@ -368,21 +358,8 @@
 				<div>
 					<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
 					<div class="input-group input-group-divider grid-cols-[1fr_auto]">
-						<input
-							id="height-input"
-							type="number"
-							min="0"
-							max="5"
-							step="0.1"
-							bind:value={calibrationSpotHeight}
-							class="input"
-						/>
-						<button
-							class="variant-filled-primary"
-							on:click={() => (calibrationSpotHeight = calibrationSpotHeight)}
-						>
-							Set
-						</button>
+						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input" />
+						<button class="preset-filled-primary-500" on:click={() => (calibrationSpotHeight = calibrationSpotHeight)}> Set </button>
 					</div>
 				</div>
 			{/if}
@@ -397,7 +374,7 @@
 
 	{#if calibrationSpot}
 		<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-			<div class="card p-4 col-span-1 lg:col-span-8 variant-soft">
+			<div class="card p-4 col-span-1 lg:col-span-8 preset-tonal">
 				<header class="text-xl font-semibold mb-2">Node Distances and RSSI Values</header>
 				<p class="text-sm mb-3">
 					<span class="font-semibold">Map Distance:</span> Calculated from node and calibration spot positions in 3D space (X, Y, and Z).<br />
@@ -405,7 +382,7 @@
 					<span class="font-semibold">Height from Floor:</span> The Z-coordinate (height) of the node from the floor.
 				</p>
 				<div class="table-container">
-					<table class="table table-hover table-compact">
+					<table class="table table-compact">
 						<thead>
 							<tr>
 								<th>Node</th>
@@ -443,12 +420,7 @@
 										{/if}
 									</td>
 									<td>
-										<input
-											type="checkbox"
-											checked={includedNodes[node.id] || false}
-											on:change={() => toggleNodeInclusion(node.id)}
-											class="checkbox"
-										/>
+										<input type="checkbox" checked={includedNodes[node.id] || false} on:change={() => toggleNodeInclusion(node.id)} class="checkbox" />
 									</td>
 								</tr>
 							{/each}
@@ -459,7 +431,7 @@
 				<!-- Device Message Statistics Table -->
 				<header class="text-xl font-semibold mb-2 mt-6">Device Message Statistics</header>
 				<div class="table-container">
-					<table class="table table-hover table-compact">
+					<table class="table table-compact">
 						<thead>
 							<tr>
 								<th>Node</th>
@@ -488,7 +460,7 @@
 			</div>
 
 			<div class="col-span-1 lg:col-span-4 space-y-6">
-				<div class="card p-4 variant-soft">
+				<div class="card p-4 preset-tonal">
 					<header class="font-semibold mb-2">Data Collection Status</header>
 					<div class="mt-4"></div>
 					<div class="mt-4">
@@ -497,24 +469,21 @@
 							<span class="font-medium">{Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0)}</span>
 						</div>
 						<div class="progress h-2">
-							<div
-								class="progress-bar bg-primary-500"
-								style="width: {Math.min(100, Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0) / 2)}%"
-							></div>
+							<div class="progress-bar bg-primary-500" style="width: {Math.min(100, Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0) / 2)}%"></div>
 						</div>
 					</div>
 					<p class="mt-4 text-sm">Keep the device stationary for best results.</p>
 				</div>
-				<div class="card p-4 variant-soft">
+				<div class="card p-4 preset-tonal">
 					<header class="font-semibold mb-4">Calibration Results</header>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-						<div class="card p-4 variant-soft">
+					<div class="grid grid-cols-1 gap-4 mb-4">
+						<div class="card p-4 preset-tonal">
 							<header class="font-semibold mb-2">Current Values</header>
 							<p class="text-xl font-bold">
 								RSSI@1m: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
 							</p>
 						</div>
-						<div class="card p-4 variant-filled-primary">
+						<div class="card p-4 preset-filled-primary-500">
 							<header class="font-semibold mb-2">New Values</header>
 							<p class="text-xl font-bold">
 								RSSI@1m: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
@@ -522,7 +491,7 @@
 						</div>
 					</div>
 					{#if currentRefRssi != null && calculatedRefRssi != null}
-						<div class="card p-4 variant-ghost-warning mb-4">
+						<div class="card p-4 preset-tonal-warning border border-warning-500 mb-4">
 							<p>
 								This is a <span class="font-semibold">{Math.abs(calculatedRefRssi - Math.round(currentRefRssi))} dBm</span>
 								{calculatedRefRssi > currentRefRssi ? 'increase' : 'decrease'}.
@@ -530,13 +499,7 @@
 							<p>This change will affect how distances are calculated for this device.</p>
 						</div>
 					{/if}
-					<button
-						class="btn btn-lg variant-filled-primary w-full"
-						on:click={saveCalibration}
-						disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}
-					>
-						Accept New Calibration
-					</button>
+					<button class="btn btn-lg preset-filled-primary-500 w-full" on:click={saveCalibration} disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}> Accept New Calibration </button>
 				</div>
 			</div>
 		</div>

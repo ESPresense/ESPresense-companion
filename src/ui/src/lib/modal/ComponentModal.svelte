@@ -19,11 +19,6 @@
 
 <div class="card p-6 shadow-xl bg-surface-100-800-token max-w-lg w-full max-h-[90vh] overflow-y-auto">
 	{#if modal.component}
-		<svelte:component
-			this={modal.component}
-			{parent}
-			{...modal.props || {}}
-			on:close={handleClose}
-		/>
+		<svelte:component this={modal.component} {parent} {...modal.props || {}} on:close={handleClose} />
 	{/if}
 </div>

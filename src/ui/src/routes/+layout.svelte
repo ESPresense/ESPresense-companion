@@ -1,8 +1,7 @@
 <script lang="ts">
-	import '../app.postcss';
+	import '../app.css';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
-	import { AppShell, AppRail, AppRailAnchor } from '@skeletonlabs/skeleton';
 	import Modal from '$lib/modal/Modal.svelte';
 	import Toast from '$lib/toast/Toast.svelte';
 
@@ -22,42 +21,39 @@
 		{ href: '/devices', name: 'devices', icon: devices, alt: 'Devices' },
 		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
 		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' },
-		{ href: '/geolocation', name: 'geolocation', icon: map, alt: 'Geolocation' },
+		{ href: '/geolocation', name: 'geolocation', icon: map, alt: 'Geolocation' }
 	];
 </script>
 
 <div class="app h-full">
 	<Modal />
 	<Toast />
-	<AppShell>
-		<svelte:fragment slot="sidebarLeft">
-			<AppRail>
-				<svelte:fragment slot="lead">
-					<AppRailAnchor href="https://espresense.com/companion" target="_blank" group="main">
-						<img src={logo} class="px-6" alt="ESPresense Companion" />
-					</AppRailAnchor>
-				</svelte:fragment>
+	<div class="flex h-full">
+		<!-- Sidebar -->
+		<div class="flex w-20 flex-col items-center space-y-4 bg-surface-800 py-4">
+			<!-- Logo -->
+			<a href="https://espresense.com/companion" target="_blank" class="p-2">
+				<img src={logo} class="h-12 w-12" alt="ESPresense Companion" />
+			</a>
 
-				{#each routes as route}
-					<AppRailAnchor
-						href="{base}{route.href}"
-						name={route.name}
-						selected={current === `${base}${route.href}`}
-					>
-						<img src={route.icon} class="px-6" alt={route.alt} />
-						<span>{route.alt}</span>
-					</AppRailAnchor>
-				{/each}
+			<!-- Navigation Links -->
+			{#each routes as route}
+				<a href="{base}{route.href}" class="rounded-lg p-2 transition-colors {current === `${base}${route.href}` ? 'bg-primary-500 text-white' : 'hover:bg-surface-700'}" title={route.alt}>
+					<img src={route.icon} class="h-8 w-8" alt={route.alt} />
+				</a>
+			{/each}
 
-				<svelte:fragment slot="trail">
-					<AppRailAnchor href="https://github.com/ESPresense/ESPresense-companion" target="_blank">
-						<img src={github} class="px-4" alt="GitHub" />
-					</AppRailAnchor>
-				</svelte:fragment>
-			</AppRail>
-		</svelte:fragment>
-		<slot />
-	</AppShell>
+			<!-- GitHub Link -->
+			<a href="https://github.com/ESPresense/ESPresense-companion" target="_blank" class="mt-auto rounded-lg p-2 hover:bg-surface-700">
+				<img src={github} class="h-6 w-6" alt="GitHub" />
+			</a>
+		</div>
+
+		<!-- Main Content -->
+		<div class="flex-1">
+			<slot />
+		</div>
+	</div>
 </div>
 
 <style>

@@ -34,19 +34,7 @@
 	{/if}
 
 	<footer class="flex justify-end space-x-2">
-		<button
-			type="button"
-			class="btn variant-ghost"
-			on:click={handleCancel}
-		>
-			Cancel
-		</button>
-		<button
-			type="button"
-			class="btn variant-filled-primary"
-			on:click={handleConfirm}
-		>
-			Confirm
-		</button>
+		<button type="button" class="btn variant-ghost" on:click={handleCancel}> Cancel </button>
+		<button type="button" class="btn variant-filled-primary" on:click={handleConfirm}> Confirm </button>
 	</footer>
 </div>

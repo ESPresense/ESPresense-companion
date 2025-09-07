@@ -19,7 +19,7 @@
 	// Map Skeleton background classes to appropriate styles
 	function getToastClasses(background?: string): string {
 		const baseClasses = 'toast-item card p-4 shadow-lg max-w-md w-full flex items-center justify-between';
-		
+
 		switch (background) {
 			case 'variant-filled-success':
 				return `${baseClasses} bg-success-500 text-on-success-token`;
@@ -39,32 +39,19 @@
 
 <div class="toast-container fixed top-4 right-4 z-50 space-y-2">
 	{#each $toastStore as toast (toast.id)}
-		<div
-			class={getToastClasses(toast.background)}
-			in:fly={{ x: 300, duration: 300 }}
-			out:fly={{ x: 300, duration: 200 }}
-		>
+		<div class={getToastClasses(toast.background)} in:fly={{ x: 300, duration: 300 }} out:fly={{ x: 300, duration: 200 }}>
 			<div class="flex-1">
 				{toast.message}
 			</div>
-			
+
 			<div class="flex items-center space-x-2 ml-4">
 				{#if toast.action}
-					<button
-						type="button"
-						class="btn btn-sm variant-ghost-surface"
-						on:click={() => handleAction(toast)}
-					>
+					<button type="button" class="btn btn-sm variant-ghost-surface" on:click={() => handleAction(toast)}>
 						{toast.action.label}
 					</button>
 				{/if}
-				
-				<button
-					type="button"
-					class="btn-icon btn-icon-sm variant-ghost-surface"
-					on:click={() => handleClose(toast.id)}
-					aria-label="Close toast"
-				>
+
+				<button type="button" class="btn-icon btn-icon-sm variant-ghost-surface" on:click={() => handleClose(toast.id)} aria-label="Close toast">
 					<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
 						<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
 					</svg>
@@ -78,7 +65,7 @@
 	.toast-container {
 		pointer-events: none;
 	}
-	
+
 	.toast-item {
 		pointer-events: auto;
 	}

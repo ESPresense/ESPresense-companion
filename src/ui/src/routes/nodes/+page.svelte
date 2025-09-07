@@ -1,7 +1,6 @@
 <script lang="ts">
 	import NodesTable from '$lib/NodesTable.svelte';
-	import { SlideToggle } from '@skeletonlabs/skeleton';
-	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
+	import { getToastStore } from '$lib/toast/toastStore';
 	import { base } from '$app/paths';
 	import type { NodeSettingDetails } from '$lib/types';
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
@@ -34,19 +33,17 @@
 			if (!response.ok) throw new Error('Failed to save settings');
 
 			// Optional: Show success toast
-			const t: ToastSettings = {
+			toastStore.trigger({
 				message: 'Settings saved successfully',
 				background: 'variant-filled-success'
-			};
-			toastStore.trigger(t);
+			});
 		} catch (error) {
 			console.error(error);
 			const message = error instanceof Error ? error.message : 'Unknown error occurred';
-			const t: ToastSettings = {
+			toastStore.trigger({
 				message,
 				background: 'variant-filled-error'
-			};
-			toastStore.trigger(t);
+			});
 		} finally {
 			saving = false;
 		}
@@ -65,11 +62,10 @@
 		} catch (error) {
 			console.error(error);
 			const message = error instanceof Error ? error.message : 'Unknown error occurred';
-			const t: ToastSettings = {
+			toastStore.trigger({
 				message,
 				background: 'variant-filled-error'
-			};
-			toastStore.trigger(t);
+			});
 		} finally {
 			loading = false;
 		}
@@ -92,20 +88,10 @@
 		{:else}
 			<div class="flex items-center space-x-4">
 				<div class="flex items-center space-x-4">
-					<TriStateCheckbox
-						id="autoUpdate"
-						bind:checked={autoUpdate}
-						on:change={saveSettings}
-						disabled={saving}
-					/>
+					<TriStateCheckbox id="autoUpdate" bind:checked={autoUpdate} on:change={saveSettings} disabled={saving} />
 					<span class="pl">Automatically update</span>
 
-					<TriStateCheckbox
-						id="prerelease"
-						bind:checked={prerelease}
-						on:change={saveSettings}
-						disabled={saving}
-					/>
+					<TriStateCheckbox id="prerelease" bind:checked={prerelease} on:change={saveSettings} disabled={saving} />
 					<span class="pl">Include pre-released</span>
 
 					{#if saving}

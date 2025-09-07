@@ -4,7 +4,7 @@
 	import { readable, derived } from 'svelte/store';
 	import { page } from '$app/stores';
 	import type { DeviceSetting } from '$lib/types';
-	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
+	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
 	import Map from '$lib/Map.svelte';
 	import DeviceDetailTabs from '$lib/DeviceDetailTabs.svelte';
@@ -14,13 +14,16 @@
 	// Define type for the details array items
 	type DeviceDetailItem = { key: string; value: string };
 
-	export let data: { settings?: DeviceSetting } = {};
+	let { data = {} }: { data: { settings?: DeviceSetting } } = $props();
 
 	// Get tab from URL query parameter or default to 'map'
-	$: tab = $page.url.searchParams.get('tab') || 'map';
-	$: device = $devices?.find((d) => d.id === data.settings?.id);
+	let currentTab = $state($page.url.searchParams.get('tab') || 'map');
+	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
+	
+	// Accordion state using $state for Skeleton v3
+	let accordionValue = $state(['details']);
 
-	export const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
+	const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
 		const deviceId = data.settings?.id;
 		if (!deviceId) return () => {};
 
@@ -47,13 +50,13 @@
 	<title>ESPresense Companion: Device Detail</title>
 </svelte:head>
 
-<DeviceDetailTabs deviceId={data.settings?.id} floorId={device?.floor?.id} bind:tab />
+<DeviceDetailTabs deviceId={data.settings?.id} floorId={device?.floor?.id} bind:tab={currentTab} />
 
 <div class="flex h-full">
 	<div class="flex-grow h-full overflow-clip">
-		{#if tab === 'map'}
+		{#if currentTab === 'map'}
 			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
-		{:else if tab === 'calibration'}
+		{:else if currentTab === 'calibration'}
 			{#if data.settings?.id}
 				<DeviceCalibration deviceSettings={data.settings} />
 			{:else}
@@ -62,26 +65,28 @@
 		{/if}
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
-		<Accordion>
-			<AccordionItem spacing="space-y-4" open>
-				<svelte:fragment slot="summary">
+		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>
+			<Accordion.Item value="details">
+				{#snippet control()}
 					<h3 class="h3">Details</h3>
-				</svelte:fragment>
-				<svelte:fragment slot="content">
-					{#if $deviceDetails && $deviceDetails.length > 0}
-						{#each $deviceDetails as d}
-							<label class="flex flex-col gap-1">
-								<span>{d.key}</span>
-								<input class="input" type="text" disabled value={d.value} />
-							</label>
+				{/snippet}
+				{#snippet panel()}
+					<div class="space-y-4 p-4">
+						{#if $deviceDetails && $deviceDetails.length > 0}
+							{#each $deviceDetails as d}
+								<label class="flex flex-col gap-1">
+									<span class="text-sm font-medium">{d.key}</span>
+									<input class="input" type="text" disabled value={d.value} />
+								</label>
+							{:else}
+								<p class="text-sm italic">No details available</p>
+							{/each}
 						{:else}
-							<p class="text-sm italic">No details available</p>
-						{/each}
-					{:else}
-						<p class="text-sm italic">Loading details...</p>
-					{/if}
-				</svelte:fragment>
-			</AccordionItem>
+							<p class="text-sm italic">Loading details...</p>
+						{/if}
+					</div>
+				{/snippet}
+			</Accordion.Item>
 		</Accordion>
 	</div>
 </div>

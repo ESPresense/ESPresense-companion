@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
-	import type { LayerCakeContext } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
-
+	import type { LayerCakeContext } from '$lib/types';
 	const toastStore = getToastStore();
 	export let transform = zoomIdentity;
 	$: cursorX = 0;

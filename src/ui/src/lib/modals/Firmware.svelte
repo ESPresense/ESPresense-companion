@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { ProgressBar } from '@skeletonlabs/skeleton';
+	import { Progress as ProgressBar } from '@skeletonlabs/skeleton-svelte';
 	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
 	import type { Node } from '$lib/types';
-	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
+	import { getToastStore } from '$lib/toast/toastStore';
 
 	export let firmwareSource: string;
 	export let node: Node;
@@ -23,7 +23,7 @@
 
 	function getUpdateDescription(flavorId: string | undefined): string {
 		const selectedFlavorId = flavor === '-' ? flavorId : flavor;
-		const flavorName = selectedFlavorId ? $firmwareTypes?.flavors?.find(f => f.value === selectedFlavorId)?.name : undefined;
+		const flavorName = selectedFlavorId ? $firmwareTypes?.flavors?.find((f) => f.value === selectedFlavorId)?.name : undefined;
 
 		let description = '';
 
@@ -54,7 +54,7 @@
 
 	async function onFormSubmit(): Promise<void> {
 		if (!isValidForm) return;
-		
+
 		log = [];
 		progress = Progress.Updating;
 		try {
@@ -73,8 +73,7 @@
 		} catch (e) {
 			if (e instanceof Error) {
 				console.log(e);
-				const t: ToastSettings = { message: e.message, background: 'variant-filled-error' };
-				toastStore.trigger(t);
+				toastStore.trigger({ message: e.message, background: 'variant-filled-error' });
 			}
 		} finally {
 			if (progress == Progress.Updating) progress = Progress.Success;
@@ -97,7 +96,7 @@
 		{#each log as item}
 			<p>{item}</p>
 		{/each}
-		<ProgressBar bind:value={percentComplete} max={100} />
+		<ProgressBar value={percentComplete} max={100} />
 		{#if progress > Progress.Updating}
 			<footer class="modal-footer {parent.regionFooter}">
 				{#if progress == Progress.Success}
