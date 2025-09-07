@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
 	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-	import { getToastStore } from '@skeletonlabs/skeleton';
-	import { getModalStore } from '@skeletonlabs/skeleton';
+	import { getToastStore } from '$lib/toast/toastStore';
+	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
 	import { base } from '$app/paths';
 
@@ -70,16 +70,11 @@
 	let data_point: DataPoint = 0;
 
 	const toastStore = getToastStore();
-	const modalStore = getModalStore();
 
 	async function resetCalibration() {
-		const confirmed = await new Promise((resolve) => {
-			modalStore.trigger({
-				type: 'confirm',
-				title: 'Reset Calibration',
-				body: 'Are you sure you want to reset the calibration? This will reset rx_adj_rssi, tx_ref_rssi, and absorption for all nodes. This action cannot be undone.',
-				response: (r: boolean) => resolve(r)
-			});
+		const confirmed = await showConfirm({
+			title: 'Reset Calibration',
+			body: 'Are you sure you want to reset the calibration? This will reset rx_adj_rssi, tx_ref_rssi, and absorption for all nodes. This action cannot be undone.'
 		});
 
 		if (!confirmed) return;

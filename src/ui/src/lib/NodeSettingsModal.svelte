@@ -1,14 +1,15 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import type { NodeSetting } from '$lib/types';
-  import { getModalStore, getToastStore, type ToastSettings } from '@skeletonlabs/skeleton';
+  import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';
+  import { createEventDispatcher } from 'svelte';
   import NodeSettings from './NodeSettings.svelte'; // Import the fields component
 
   // Props
-  export let parent: any; // The Svelte parent component that triggered the modal
+  export let parent: any = undefined; // The Svelte parent component that triggered the modal (for backward compatibility)
   export let nodeSetting: NodeSetting; // Passed in from trigger
 
-  const modalStore = getModalStore();
+  const dispatch = createEventDispatcher();
   const toastStore = getToastStore();
 
   // Create a local copy to avoid directly mutating the prop
@@ -36,7 +37,13 @@
       if (parent && parent.onSettingsSaved) {
         parent.onSettingsSaved(localSettings);
       }
-      modalStore.close(); // Close modal on successful save
+
+      // Close modal - either via parent.onClose or dispatch close event
+      if (parent && parent.onClose) {
+        parent.onClose();
+      } else {
+        dispatch('close');
+      }
     } catch (e) {
       console.error('Error saving node settings:', e);
       let errorMessage = 'An unknown error occurred while saving.';
@@ -49,12 +56,21 @@
   }
 
   function handleCancel() {
-    modalStore.close(); // Close the modal on cancel
+    // Close modal - either via parent.onClose or dispatch close event
+    if (parent && parent.onClose) {
+      parent.onClose();
+    } else {
+      dispatch('close');
+    }
   }
 </script>
 
 <!-- Reusing structure from DeviceSettingsModal -->
 <div class="card p-4 space-y-4">
+  <header class="text-xl font-bold mb-4">
+    Edit Settings for {nodeSetting.name || nodeSetting.id}
+  </header>
+
   <!-- Use the NodeSettings component, passing the local state -->
   <NodeSettings settings={localSettings} />
 
