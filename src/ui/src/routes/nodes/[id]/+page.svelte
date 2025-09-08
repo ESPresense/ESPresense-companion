@@ -3,7 +3,7 @@
 	import { nodes } from '$lib/stores';
 	import { readable } from 'svelte/store';
 	import type { NodeSettingDetails } from '$lib/types';
-	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
+	import { Accordion, AccordionItem } from '$lib/skeleton-v3';
 
 	import Map from '$lib/Map.svelte';
 	import NodeDetailTabs from '$lib/NodeDetailTabs.svelte';

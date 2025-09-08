@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { config } from '$lib/stores';
 
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
+	import { RadioGroup, RadioItem } from '$lib/skeleton-v3';
 	import Filter from './Filter.svelte';
 
 	export let floorId: string | null = null;

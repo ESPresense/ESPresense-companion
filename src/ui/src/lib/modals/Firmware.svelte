@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ProgressBar } from '@skeletonlabs/skeleton';
+	import { ProgressBar } from '$lib/skeleton-v3';
 	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
 	import type { Node } from '$lib/types';
 	import { getToastStore, type ToastSettings } from '$lib/toast/toastStore';

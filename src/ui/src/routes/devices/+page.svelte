@@ -1,7 +1,7 @@
 <script lang="ts">
 	import DevicesTable from '$lib/DevicesTable.svelte';
 	import { detail } from '$lib/urls';
-	import { SlideToggle } from '@skeletonlabs/skeleton';
+	import { SlideToggle } from '$lib/skeleton-v3';
 	import { showAll } from '$lib/stores';
 </script>
 

@@ -4,7 +4,7 @@
 	import { readable, derived } from 'svelte/store';
 	import { page } from '$app/stores';
 	import type { DeviceSetting } from '$lib/types';
-	import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
+	import { Accordion, AccordionItem } from '$lib/skeleton-v3';
 
 	import Map from '$lib/Map.svelte';
 	import DeviceDetailTabs from '$lib/DeviceDetailTabs.svelte';

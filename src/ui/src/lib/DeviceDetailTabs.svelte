@@ -2,7 +2,7 @@
 	import { config, devices } from './stores';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
+	import { RadioGroup, RadioItem } from '$lib/skeleton-v3';
 
 	export let floorId: string | null = null;
 	export let deviceId: string | null = null;

@@ -2,7 +2,7 @@
 	import '../app.postcss';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
-	import { AppShell, AppRail, AppRailAnchor } from '@skeletonlabs/skeleton';
+	import { AppShell, AppRail, AppRailAnchor } from '$lib/skeleton-v3';
 	import Modal from '$lib/modal/Modal.svelte';
 	import Toast from '$lib/toast/Toast.svelte';
 
