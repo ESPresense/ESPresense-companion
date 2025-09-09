@@ -35,7 +35,7 @@
 
 <div class="p-2">
 	{#if $devices}
-		<SvelteTable {columns} classNameTable="table  table-compact" rows={$devices} on:clickRow={onRowClick} sortBy="id" />
+		<DataTable {columns} classNameTable="table  table-compact" rows={$devices} on:clickRow={onRowClick} sortBy="id" />
 	{/if}
 </div>
 
