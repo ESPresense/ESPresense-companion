@@ -11,7 +11,7 @@ export const tooltip: Action<HTMLElement, string> = (node, content) => {
 	function ensureTooltip() {
 		if (tooltipEl) return;
 		tooltipEl = document.createElement('div');
-		tooltipEl.className = 'card variant-filled-secondary p-4';
+		tooltipEl.className = 'card preset-filled-secondary-500 p-4';
 		tooltipEl.style.position = 'absolute';
 		tooltipEl.style.zIndex = '1000';
 		tooltipEl.style.pointerEvents = 'none';

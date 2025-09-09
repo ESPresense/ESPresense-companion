@@ -48,7 +48,7 @@
 		<span class={thumbClasses}></span>
 	</button>
 	{#if children}
-		<span id="{name}-label" class="text-sm font-medium text-surface-700-200-token">
+		<span id="{name}-label" class="text-sm font-medium text-surface-800-200">
 			{@render children()}
 		</span>
 	{/if}

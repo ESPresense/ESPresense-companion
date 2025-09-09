@@ -23,13 +23,13 @@
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to reboot`,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Failed to restart node',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -48,13 +48,13 @@
 
 			toastStore.trigger({
 				message: `${node.name || node.id} deleted`,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Failed to delete node',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -121,13 +121,13 @@
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to update ${updateDescription}`,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Update failed',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -184,7 +184,7 @@
 
 			toastStore.trigger({
 				message: errorMessage,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			loadingEdit = false;

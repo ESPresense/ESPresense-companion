@@ -17,6 +17,19 @@
 		showDevices: true
 	};
 
+	// --- Reactive synchronization ---
+	$: if (effectController && effectController.zRotationSpeed !== zRotationSpeed) {
+		effectController.zRotationSpeed = zRotationSpeed;
+	}
+
+	$: if (effectController && effectController.showNodes !== showNodes) {
+		effectController.showNodes = showNodes;
+	}
+
+	$: if (effectController && effectController.showDevices !== showDevices) {
+		effectController.showDevices = showDevices;
+	}
+
 	// --- Lifecycle ---
 	onMount(() => {
 		doGuiSetup();

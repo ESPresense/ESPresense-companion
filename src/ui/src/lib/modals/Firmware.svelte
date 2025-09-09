@@ -73,7 +73,7 @@
 		} catch (e) {
 			if (e instanceof Error) {
 				console.log(e);
-				toastStore.trigger({ message: e.message, background: 'variant-filled-error' });
+				toastStore.trigger({ message: e.message, background: 'preset-filled-error-500' });
 			}
 		} finally {
 			if (progress == Progress.Updating) progress = Progress.Success;
@@ -115,7 +115,7 @@
 {:else}
 	<div class={cBase}>
 		<header class={cHeader}>Update {node.name} Firmware</header>
-		<p class="text-surface-600-300-token mb-4">{getUpdateDescription(node.flavor?.value)}</p>
+		<p class="text-surface-700-300 mb-4">{getUpdateDescription(node.flavor?.value)}</p>
 		<article>Select firmware options and click Update to proceed.</article>
 		<!-- Enable for debugging: -->
 		<form class="modal-form {cForm}">

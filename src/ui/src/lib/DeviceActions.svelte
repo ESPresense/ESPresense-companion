@@ -36,7 +36,7 @@
 
 			toastStore.trigger({
 				message: errorMessage,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			loadingEdit = false;

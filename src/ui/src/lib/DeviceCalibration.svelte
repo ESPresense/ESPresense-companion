@@ -106,7 +106,7 @@
 
 	// Error handling adjusted for fetched settings
 	$: if (deviceSettings?.error) {
-		toastStore.trigger({ message: deviceSettings.error, background: 'variant-filled-error' });
+		toastStore.trigger({ message: deviceSettings.error, background: 'preset-filled-error-500' });
 	}
 
 	// Reactive device and floor lookup

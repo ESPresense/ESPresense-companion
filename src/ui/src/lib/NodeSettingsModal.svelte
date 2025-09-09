@@ -31,7 +31,7 @@
 
 			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
-			toastStore.trigger({ message: 'Node settings saved successfully!', background: 'variant-filled-success' });
+			toastStore.trigger({ message: 'Node settings saved successfully!', background: 'preset-filled-success-500' });
 
 			// Optionally, update the parent component or state if needed
 			if (parent && parent.onSettingsSaved) {
@@ -50,7 +50,7 @@
 			if (e instanceof Error) {
 				errorMessage = `Error saving: ${e.message}`;
 			}
-			toastStore.trigger({ message: errorMessage, background: 'variant-filled-error' });
+			toastStore.trigger({ message: errorMessage, background: 'preset-filled-error-500' });
 		}
 	}
 
@@ -64,8 +64,8 @@
 	}
 </script>
 
-<!-- Reusing structure from DeviceSettingsModal -->
-<div class="card p-4 space-y-4">
+<!-- Modal content - styling handled by ComponentModal wrapper -->
+<div class="space-y-4">
 	<header class="text-xl font-bold mb-4">
 		Edit Settings for {nodeSetting.name || nodeSetting.id}
 	</header>

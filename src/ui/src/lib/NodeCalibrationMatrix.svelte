@@ -84,7 +84,7 @@
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',
-					background: 'variant-filled-success'
+					background: 'preset-filled-success-500'
 				});
 			} else {
 				const errorText = await response.text();
@@ -94,7 +94,7 @@
 			console.error('Error resetting calibration:', error);
 			toastStore.trigger({
 				message: `Failed to reset calibration: ${error.message}`,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -104,7 +104,7 @@
 	{#if $calibration?.matrix}
 		<header>
 			<div class="flex justify-between items-center p-2">
-				<div class="btn-group">
+				<div class="">
 					<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 0)}>Error %</button>
 					<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 1)}>Error (m)</button>
 					<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 2)}>Absorption</button>

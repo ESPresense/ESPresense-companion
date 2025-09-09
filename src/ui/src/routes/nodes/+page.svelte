@@ -35,14 +35,14 @@
 			// Optional: Show success toast
 			toastStore.trigger({
 				message: 'Settings saved successfully',
-				background: 'variant-filled-success'
+				background: 'preset-filled-success-500'
 			});
 		} catch (error) {
 			console.error(error);
 			const message = error instanceof Error ? error.message : 'Unknown error occurred';
 			toastStore.trigger({
 				message,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			saving = false;
@@ -64,7 +64,7 @@
 			const message = error instanceof Error ? error.message : 'Unknown error occurred';
 			toastStore.trigger({
 				message,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			loading = false;

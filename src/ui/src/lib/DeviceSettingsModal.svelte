@@ -36,7 +36,7 @@
 
 			toastStore.trigger({
 				message: 'Settings saved successfully!',
-				background: 'variant-filled-success'
+				background: 'preset-filled-success-500'
 			});
 
 			// Optionally, update the parent component or state if needed
@@ -60,7 +60,7 @@
 
 			toastStore.trigger({
 				message: errorMessage,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			isSaving = false;
@@ -77,8 +77,8 @@
 	}
 </script>
 
-<!-- Added card class for background and padding -->
-<div class="card p-4 space-y-4">
+<!-- Modal content - styling handled by ComponentModal wrapper -->
+<div class="space-y-4">
 	<header class="text-xl font-bold mb-4">
 		Edit Settings for {deviceSetting.name || deviceSetting.id}
 	</header>
