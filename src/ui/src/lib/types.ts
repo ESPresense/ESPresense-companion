@@ -68,11 +68,11 @@ export interface MapConfig {
 }
 
 export interface ConfigGps {
-        latitude?: number | null;
-        longitude?: number | null;
-        elevation?: number | null;
-        rotation?: number | null; // Degrees clockwise from North
-        report?: boolean; // Include GPS coordinates when reporting to Home Assistant
+	latitude?: number | null;
+	longitude?: number | null;
+	elevation?: number | null;
+	rotation?: number | null; // Degrees clockwise from North
+	report?: boolean; // Include GPS coordinates when reporting to Home Assistant
 }
 
 export interface Config {
@@ -213,7 +213,6 @@ export interface OptimizerState {
 	bestRMSE?: number;
 	bestR?: number;
 }
-
 
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;

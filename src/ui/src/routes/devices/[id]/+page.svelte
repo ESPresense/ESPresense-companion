@@ -19,7 +19,7 @@
 	// Get tab from URL query parameter or default to 'map'
 	let currentTab = $state($page.url.searchParams.get('tab') || 'map');
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
-	
+
 	// Accordion state using $state for Skeleton v3
 	let accordionValue = $state(['details']);
 

@@ -1,21 +1,21 @@
 <script lang="ts">
-    import { getContext } from 'svelte';
-    import { polygonCentroid } from 'd3';
-    import type { LayerCakeContext, Room } from '$lib/types';
-    import { config } from '$lib/stores';
-    import { getRoomColor } from '$lib/colors';
+	import { getContext } from 'svelte';
+	import { polygonCentroid } from 'd3';
+	import type { LayerCakeContext, Room } from '$lib/types';
+	import { config } from '$lib/stores';
+	import { getRoomColor } from '$lib/colors';
 
 	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
 
 	export let room: Room;
-    // Use shared color util so 2D/3D match and config overrides apply
+	// Use shared color util so 2D/3D match and config overrides apply
 
 	// Calculate the scaled stroke width based on the wall thickness
 	$: scaledStrokeWidth = wallThickness == 0 ? 1 : Math.abs($xScale(wallThickness) - $xScale(0));
 	$: centroid = polygonCentroid(room.points);
 	$: scaledRoom = room.points.map((p) => [$xScale(p[0]), $yScale(p[1])]);
-    $: baseColor = getRoomColor($config, room.id);
-    $: wallColor = $config?.map?.wallColor ?? baseColor;
+	$: baseColor = getRoomColor($config, room.id);
+	$: wallColor = $config?.map?.wallColor ?? baseColor;
 	$: wallOpacity = $config?.map?.wallOpacity ?? 0.35;
 	$: wallThickness = $config?.map?.wallThickness ?? 0;
 </script>

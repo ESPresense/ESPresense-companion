@@ -5,13 +5,13 @@ import { isNode, type Device, type Node } from '$lib/types';
 export function detail(d: Device | Node | null) {
 	if (isNode(d)) goto(`${base}/nodes/${d?.id}`);
 	else goto(`${base}/devices/${d?.id}`);
-};
+}
 
 export function detail3d(deviceId: string | null) {
 	goto(`${base}/3d/${deviceId}`);
-};
+}
 
 export function calibrateDevice(d: Device | null) {
 	// Navigate to the device detail page with the calibration tab selected
 	goto(`${base}/devices/${d?.id}?tab=calibration`);
-};
+}

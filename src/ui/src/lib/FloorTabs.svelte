@@ -17,16 +17,13 @@
 			<div class="flex bg-slate-600 rounded-full p-1">
 				{#if $config?.floors}
 					{#each $config?.floors as { id, name }, index}
-						<button
-							class="px-6 py-2 rounded-full text-sm font-medium transition-colors {floorId === id ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}"
-							on:click={() => floorId = id}
-						>
+						<button class="px-6 py-2 rounded-full text-sm font-medium transition-colors {floorId === id ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" on:click={() => (floorId = id)}>
 							{name}
 						</button>
 					{/each}
 				{/if}
 			</div>
-			
+
 			<!-- Filter Switch -->
 			<div class="pt-2">
 				<Filter />

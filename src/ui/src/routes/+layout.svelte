@@ -41,18 +41,14 @@
 			<!-- Navigation Rail -->
 			<nav class="flex flex-col flex-1 items-center space-y-2 px-2">
 				{#each routes as route}
-					<a 
-						href="{base}{route.href}" 
-						class="flex flex-col items-center justify-center w-12 h-12 rounded-lg transition-all duration-200 group relative {current === `${base}${route.href}` ? 'bg-primary-500 text-white shadow-lg' : 'text-surface-600-300-token hover:bg-surface-200-700-token hover:text-surface-900-50-token'}"
-						title={route.alt}
-					>
+					<a href="{base}{route.href}" class="flex flex-col items-center justify-center w-12 h-12 rounded-lg transition-all duration-200 group relative {current === `${base}${route.href}` ? 'bg-primary-500 text-white shadow-lg' : 'text-surface-600-300-token hover:bg-surface-200-700-token hover:text-surface-900-50-token'}" title={route.alt}>
 						<img src={route.icon} class="w-6 h-6 transition-transform group-hover:scale-110" alt={route.alt} />
-						
+
 						<!-- Active indicator -->
 						{#if current === `${base}${route.href}`}
 							<div class="absolute -right-2 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-primary-500 rounded-l-full"></div>
 						{/if}
-						
+
 						<!-- Tooltip on hover -->
 						<div class="absolute left-full ml-2 px-2 py-1 bg-surface-900-50-token text-surface-50-900-token text-sm rounded opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
 							{route.alt}

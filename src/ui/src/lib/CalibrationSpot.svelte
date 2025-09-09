@@ -14,7 +14,10 @@
 	// The calibration spot's logical (data) position.
 	export let position = { x: 0, y: 0 };
 	// Data-space bounds.
-	export let bounds: number[][] = [[0, 0], [500, 500]];
+	export let bounds: number[][] = [
+		[0, 0],
+		[500, 500]
+	];
 
 	let isDragging = false;
 	// Offset (in screen space) from the pointer to the marker's center.
@@ -121,29 +124,10 @@
 <g transform={transform.toString()}>
 	<g transform="translate({$xScale(position.x)}, {$yScale(position.y)})" style="cursor: move">
 		<!-- Outer ring -->
-		<circle
-			r="10"
-			fill="none"
-			stroke="#4CAF50"
-			stroke-width="2"
-			opacity="0.8"
-		/>
+		<circle r="10" fill="none" stroke="#4CAF50" stroke-width="2" opacity="0.8" />
 		<!-- Inner dot -->
-		<circle
-			r="3"
-			fill="#4CAF50"
-			opacity="0.8"
-		/>
+		<circle r="3" fill="#4CAF50" opacity="0.8" />
 		<!-- Invisible circle for easier interaction -->
-		<circle
-			class="no-zoom"
-			r="15"
-			role="button"
-			tabindex="0"
-			fill="transparent"
-			on:mousedown|capture={handlePointerDown}
-			on:touchstart|capture={handlePointerDown}
-			style="cursor: move"
-		/>
+		<circle class="no-zoom" r="15" role="button" tabindex="0" fill="transparent" on:mousedown|capture={handlePointerDown} on:touchstart|capture={handlePointerDown} style="cursor: move" />
 	</g>
 </g>

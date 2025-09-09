@@ -84,7 +84,11 @@ export const releases = readable<Map<string, Release[]>>(new Map(), function sta
 				.filter((i) => i.assets.length > 5)
 				.reduce((p: Map<string, Release[]>, c) => {
 					const key = c.prerelease ? 'Beta' : 'Release';
-					p.get(key) ? p.get(key)?.push(c) : p.set(key, [c]);
+					if (p.get(key)) {
+						p.get(key)?.push(c);
+					} else {
+						p.set(key, [c]);
+					}
 					return p;
 				}, new Map<string, Release[]>());
 

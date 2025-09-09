@@ -3,10 +3,14 @@
 	import { goto, afterNavigate } from '$app/navigation';
 	import { base } from '$app/paths';
 
-	let { floorId = null, deviceId = null, tab = $bindable('map') }: { 
-		floorId: string | null; 
-		deviceId: string | null; 
-		tab: string; 
+	let {
+		floorId = null,
+		deviceId = null,
+		tab = $bindable('map')
+	}: {
+		floorId: string | null;
+		deviceId: string | null;
+		tab: string;
 	} = $props();
 
 	let device = $derived($devices?.find((d) => d.id === deviceId));
@@ -38,18 +42,8 @@
 			</div>
 		{/if}
 		<div class="flex bg-slate-600 rounded-full p-1">
-			<button
-				class="px-6 py-2 rounded-full text-sm font-medium transition-colors {tab === 'map' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}"
-				onclick={() => tab = 'map'}
-			>
-				Map
-			</button>
-			<button
-				class="px-6 py-2 rounded-full text-sm font-medium transition-colors {tab === 'calibration' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}"
-				onclick={() => tab = 'calibration'}
-			>
-				Calibration
-			</button>
+			<button class="px-6 py-2 rounded-full text-sm font-medium transition-colors {tab === 'map' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (tab = 'map')}> Map </button>
+			<button class="px-6 py-2 rounded-full text-sm font-medium transition-colors {tab === 'calibration' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (tab = 'calibration')}> Calibration </button>
 		</div>
 	</nav>
 	<svg viewBox="0 0 2 3" aria-hidden="true">

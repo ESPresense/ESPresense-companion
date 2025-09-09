@@ -70,14 +70,14 @@
 		})
 	});
 
-
 	let initialViewFit = false; // Flag to fit view only once initially
 
 	onMount(() => {
 		map = new Map({
 			target: mapElement,
 			layers: [
-				new TileLayer({ // Use ESRI World Imagery
+				new TileLayer({
+					// Use ESRI World Imagery
 					source: new XYZ({
 						url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', // Consider externalizing this URL
 						maxZoom: 19, // Optional: Set max zoom level supported by the source
@@ -138,8 +138,8 @@
 	function updateFloorplanFeatures(floors: Floor[], gpsConfig: ConfigGps) {
 		floorplanSource.clear();
 		const features: Feature[] = [];
-		floors.forEach(floor => {
-			floor.rooms?.forEach(room => {
+		floors.forEach((floor) => {
+			floor.rooms?.forEach((room) => {
 				const coordinates: number[][] = [];
 				let validPolygon = true;
 				room.points?.forEach(([x, y]) => {
@@ -174,7 +174,7 @@
 	function updateDeviceFeatures(deviceList: Device[], gpsConfig: ConfigGps) {
 		deviceSource.clear();
 		const features: Feature[] = [];
-		deviceList.forEach(device => {
+		deviceList.forEach((device) => {
 			if (device.location?.x != null && device.location?.y != null) {
 				const gpsCoords = internalToGps(device.location.x, device.location.y, gpsConfig);
 				if (gpsCoords) {
@@ -196,7 +196,7 @@
 	function updateNodeFeatures(nodeList: Node[], gpsConfig: ConfigGps) {
 		nodeSource.clear();
 		const features: Feature[] = [];
-		nodeList.forEach(node => {
+		nodeList.forEach((node) => {
 			if (node.location?.x != null && node.location?.y != null) {
 				const gpsCoords = internalToGps(node.location.x, node.location.y, gpsConfig);
 				if (gpsCoords) {
@@ -220,33 +220,33 @@
 		if (!map || initialViewFit) return; // Only fit once initially or if forced
 
 		const extent = source.getExtent();
-		if (extent && extent[0] !== Infinity) { // Check if extent is valid
+		if (extent && extent[0] !== Infinity) {
+			// Check if extent is valid
 			map.getView().fit(extent, {
 				padding: [50, 50, 50, 50], // Add some padding
 				duration: 500 // Animation duration
 			});
 		} else if (source.getFeatures().length > 0) {
-            // Fallback if extent calculation fails but features exist
-            const firstGeometry = source.getFeatures()[0].getGeometry();
-            if (firstGeometry instanceof Polygon) {
-                const firstPolygonCoords = firstGeometry.getCoordinates();
-                // For polygons, get the first coordinate of the first (outer) ring
-                if (firstPolygonCoords && firstPolygonCoords[0] && firstPolygonCoords[0][0]) {
-                    const centerCoord = firstPolygonCoords[0][0]; // Use the first vertex as a fallback center
-                    map.getView().animate({ center: centerCoord, zoom: 17, duration: 500 });
-                    initialViewFit = true; // Set flag after initial fit
-                }
-            } else if (firstGeometry instanceof Point) {
-                 // Handle case where source might contain points (though unlikely for initial fit)
-                 const pointCoords = firstGeometry.getCoordinates();
-                 if (pointCoords) {
-                     map.getView().animate({ center: pointCoords, zoom: 17, duration: 500 });
-                     initialViewFit = true; // Set flag after initial fit
-                 }
-            }
-        }
+			// Fallback if extent calculation fails but features exist
+			const firstGeometry = source.getFeatures()[0].getGeometry();
+			if (firstGeometry instanceof Polygon) {
+				const firstPolygonCoords = firstGeometry.getCoordinates();
+				// For polygons, get the first coordinate of the first (outer) ring
+				if (firstPolygonCoords && firstPolygonCoords[0] && firstPolygonCoords[0][0]) {
+					const centerCoord = firstPolygonCoords[0][0]; // Use the first vertex as a fallback center
+					map.getView().animate({ center: centerCoord, zoom: 17, duration: 500 });
+					initialViewFit = true; // Set flag after initial fit
+				}
+			} else if (firstGeometry instanceof Point) {
+				// Handle case where source might contain points (though unlikely for initial fit)
+				const pointCoords = firstGeometry.getCoordinates();
+				if (pointCoords) {
+					map.getView().animate({ center: pointCoords, zoom: 17, duration: 500 });
+					initialViewFit = true; // Set flag after initial fit
+				}
+			}
+		}
 	}
-
 </script>
 
 <svelte:head>
