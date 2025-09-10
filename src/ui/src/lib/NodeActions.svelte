@@ -23,13 +23,13 @@
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to reboot`,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Failed to restart node',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -48,13 +48,13 @@
 
 			toastStore.trigger({
 				message: `${node.name || node.id} deleted`,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Failed to delete node',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -121,13 +121,13 @@
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to update ${updateDescription}`,
-				background: 'variant-filled-primary'
+				background: 'preset-filled-primary-500'
 			});
 		} catch (error) {
 			console.error(error);
 			toastStore.trigger({
 				message: error instanceof Error ? error.message : 'Update failed',
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -184,7 +184,7 @@
 
 			toastStore.trigger({
 				message: errorMessage,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			loadingEdit = false;
@@ -194,7 +194,7 @@
 
 <div class="flex gap-1">
 	{#if row.online}
-		<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
+		<button class="btn btn-sm preset-filled-primary-500" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
 			{#if loadingEdit}
 				<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 			{:else}
@@ -202,23 +202,23 @@
 			{/if}
 		</button>
 
-		<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
+		<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
 
 		{#if row.telemetry?.version}
-			<button on:click={() => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm variant-filled-tertiary" aria-label="Update node firmware"> Update </button>
+			<button on:click={() => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm preset-filled-tertiary-500" aria-label="Update node firmware"> Update </button>
 		{/if}
 
 		{#if row.telemetry}
-			<button on:click={() => onRestart(row)} class="btn btn-sm variant-filled-warning" aria-label="Restart node"> Restart </button>
+			<button on:click={() => onRestart(row)} class="btn btn-sm preset-filled-warning-500" aria-label="Restart node"> Restart </button>
 		{/if}
 
 		{#if row.telemetry?.ip}
-			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm variant-filled" aria-label="Open node web interface">
+			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm preset-filled-surface-500" aria-label="Open node web interface">
 				<span>Visit</span>
 				<span><img class="w-4" src={link} alt="External Link" /></span>
 			</a>
 		{/if}
 	{:else}
-		<button on:click={() => onDelete(row)} class="btn btn-sm variant-filled-error" aria-label="Delete node">Delete</button>
+		<button on:click={() => onDelete(row)} class="btn btn-sm preset-filled-error-500" aria-label="Delete node">Delete</button>
 	{/if}
 </div>

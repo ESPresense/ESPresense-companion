@@ -11,18 +11,9 @@ const R = 6378137; // Earth's mean radius in meters
  * @param gpsConfig GPS configuration containing origin lat/lon and rotation.
  * @returns An object with { latitude, longitude } or null if input is invalid.
  */
-export function internalToGps(
-	x: number | null | undefined,
-	y: number | null | undefined,
-	gpsConfig: ConfigGps | null | undefined
-): { latitude: number; longitude: number } | null {
+export function internalToGps(x: number | null | undefined, y: number | null | undefined, gpsConfig: ConfigGps | null | undefined): { latitude: number; longitude: number } | null {
 	// Check for null or undefined inputs
-	if (
-		x == null ||
-		y == null ||
-		gpsConfig?.latitude == null ||
-		gpsConfig?.longitude == null
-	) {
+	if (x == null || y == null || gpsConfig?.latitude == null || gpsConfig?.longitude == null) {
 		return null;
 	}
 
@@ -48,8 +39,9 @@ export function internalToGps(
 	// Calculate longitude change (East/West) based on rotated X, adjusted for latitude
 	// Ensure latitude is not near the poles for the cosine calculation
 	const cosLat = Math.cos((Math.PI * lat) / 180.0);
-	if (Math.abs(cosLat) < 1e-9) { // Avoid division by zero near poles
-		console.warn("Cannot calculate longitude change near poles.");
+	if (Math.abs(cosLat) < 1e-9) {
+		// Avoid division by zero near poles
+		console.warn('Cannot calculate longitude change near poles.');
 		return null;
 	}
 	const dLon = xRotated / (R * cosLat);
@@ -60,7 +52,7 @@ export function internalToGps(
 
 	// Basic validation for calculated coordinates
 	if (isNaN(newLat) || isNaN(newLon) || newLat < -90 || newLat > 90 || newLon < -180 || newLon > 180) {
-		console.warn("Calculated invalid GPS coordinates:", { newLat, newLon });
+		console.warn('Calculated invalid GPS coordinates:', { newLat, newLon });
 		return null;
 	}
 

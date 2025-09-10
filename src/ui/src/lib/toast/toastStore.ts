@@ -71,7 +71,7 @@ export function showSuccess(message: string, options?: Omit<ToastSettings, 'mess
 	return toastStore.trigger({
 		...options,
 		message,
-		background: 'variant-filled-success'
+		background: 'preset-filled-success-500'
 	});
 }
 
@@ -79,7 +79,7 @@ export function showError(message: string, options?: Omit<ToastSettings, 'messag
 	return toastStore.trigger({
 		...options,
 		message,
-		background: 'variant-filled-error'
+		background: 'preset-filled-error-500'
 	});
 }
 
@@ -87,7 +87,7 @@ export function showInfo(message: string, options?: Omit<ToastSettings, 'message
 	return toastStore.trigger({
 		...options,
 		message,
-		background: 'variant-filled-primary'
+		background: 'preset-filled-primary-500'
 	});
 }
 
@@ -95,7 +95,7 @@ export function showWarning(message: string, options?: Omit<ToastSettings, 'mess
 	return toastStore.trigger({
 		...options,
 		message,
-		background: 'variant-filled-warning'
+		background: 'preset-filled-warning-500'
 	});
 }
 

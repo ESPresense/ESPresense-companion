@@ -34,11 +34,10 @@
 
 			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
-			const t: ToastSettings = {
+			toastStore.trigger({
 				message: 'Settings saved successfully!',
-				background: 'variant-filled-success'
-			};
-			toastStore.trigger(t);
+				background: 'preset-filled-success-500'
+			});
 
 			// Optionally, update the parent component or state if needed
 			if (parent && parent.onSettingsSaved) {
@@ -59,11 +58,10 @@
 				errorMessage = `Error saving: ${error.message}`;
 			}
 
-			const t: ToastSettings = {
+			toastStore.trigger({
 				message: errorMessage,
-				background: 'variant-filled-error'
-			};
-			toastStore.trigger(t);
+				background: 'preset-filled-error-500'
+			});
 		} finally {
 			isSaving = false;
 		}
@@ -79,8 +77,8 @@
 	}
 </script>
 
-<!-- Added card class for background and padding -->
-<div class="card p-4 space-y-4">
+<!-- Modal content - styling handled by ComponentModal wrapper -->
+<div class="space-y-4">
 	<header class="text-xl font-bold mb-4">
 		Edit Settings for {deviceSetting.name || deviceSetting.id}
 	</header>
@@ -91,7 +89,7 @@
 	<!-- Modal Actions -->
 	<footer class="modal-footer flex justify-end space-x-2 pt-4">
 		<button class="btn" on:click={handleCancel} disabled={isSaving}>Cancel</button>
-		<button class="btn variant-filled-primary" on:click={save} disabled={isSaving}>
+		<button class="btn preset-filled-primary-500" on:click={save} disabled={isSaving}>
 			{#if isSaving}
 				Saving...
 			{:else}

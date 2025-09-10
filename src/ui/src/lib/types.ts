@@ -68,13 +68,12 @@ export interface MapConfig {
 }
 
 export interface ConfigGps {
-        latitude?: number | null;
-        longitude?: number | null;
-        elevation?: number | null;
-        rotation?: number | null; // Degrees clockwise from North
-        report?: boolean; // Include GPS coordinates when reporting to Home Assistant
+	latitude?: number | null;
+	longitude?: number | null;
+	elevation?: number | null;
+	rotation?: number | null; // Degrees clockwise from North
+	report?: boolean; // Include GPS coordinates when reporting to Home Assistant
 }
-
 
 export interface Config {
 	timeout: number;
@@ -137,10 +136,10 @@ export type DeviceSettingsDetails = {
 export interface DeviceMessage {
 	distance: number;
 	rssi: number;
-	"rssi@1m": number;
+	'rssi@1m': number;
 	name?: string;
 	var?: number;
-};
+}
 
 export type Firmware = {
 	name: string;
@@ -215,7 +214,6 @@ export interface OptimizerState {
 	bestR?: number;
 }
 
-
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
 	rmse?: number;
@@ -235,7 +233,6 @@ export interface CalibrationResponse {
 export function isNode(d: Device | Node | null): d is Node {
 	return (d as Node)?.telemetry !== undefined;
 }
-
 
 export interface DeviceHistory {
 	id: string;

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { config } from '$lib/stores';
 
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
 	import Filter from './Filter.svelte';
 
 	export let floorId: string | null = null;
@@ -13,15 +12,22 @@
 		<path d="M0,0 L1,2 C1.5,3 1.5,3 2,3 L2,0 Z" />
 	</svg>
 	<nav class="h-50 text-black">
-		<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
-			{#if $config?.floors}
-				{#each $config?.floors as { id, name }}
-					<RadioItem bind:group={floorId} {name} value={id}>{name}</RadioItem>
-				{/each}
-			{/if}
-		</RadioGroup>
-		<div class="pl-4 pt-2">
-			<Filter />
+		<div class="flex items-center space-x-4">
+			<!-- Floor Tabs -->
+			<div class="flex bg-slate-600 rounded-full p-1">
+				{#if $config?.floors}
+					{#each $config?.floors as { id, name }, index}
+						<button class="px-6 py-2 rounded-full text-sm font-medium transition-colors {floorId === id ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" on:click={() => (floorId = id)}>
+							{name}
+						</button>
+					{/each}
+				{/if}
+			</div>
+
+			<!-- Filter Switch -->
+			<div class="pt-2">
+				<Filter />
+			</div>
 		</div>
 	</nav>
 	<svg viewBox="0 0 2 3" aria-hidden="true">

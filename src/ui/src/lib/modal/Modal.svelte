@@ -25,7 +25,6 @@
 			}
 		}
 	}
-
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -64,12 +63,7 @@
 		<div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
 		<!-- Modal Content -->
-		<div
-			class="relative z-10 max-w-lg w-full"
-			on:click|stopPropagation
-			aria-hidden="false"
-			role="region"
-		>
+		<div class="relative z-10 max-w-lg w-full" on:click|stopPropagation aria-hidden="false" role="region">
 			{#if modal.type === 'alert'}
 				<AlertModal {modal} />
 			{:else if modal.type === 'confirm'}

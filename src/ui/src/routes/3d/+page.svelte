@@ -17,6 +17,19 @@
 		showDevices: true
 	};
 
+	// --- Reactive synchronization ---
+	$: if (effectController && effectController.zRotationSpeed !== zRotationSpeed) {
+		effectController.zRotationSpeed = zRotationSpeed;
+	}
+
+	$: if (effectController && effectController.showNodes !== showNodes) {
+		effectController.showNodes = showNodes;
+	}
+
+	$: if (effectController && effectController.showDevices !== showDevices) {
+		effectController.showDevices = showDevices;
+	}
+
 	// --- Lifecycle ---
 	onMount(() => {
 		doGuiSetup();
@@ -31,19 +44,22 @@
 		guiInstance?.destroy(); // Ensure previous instance is removed
 		guiInstance = new GUI({ title: 'Visualization Settings' });
 
-		guiInstance.add(effectController, 'zRotationSpeed', 0, Math.PI / 2, 0.01)
+		guiInstance
+			.add(effectController, 'zRotationSpeed', 0, Math.PI / 2, 0.01)
 			.name('Rotation Speed')
 			.onChange((value: number) => {
 				zRotationSpeed = value; // Update the reactive variable passed as prop
 			});
 
-		guiInstance.add(effectController, 'showNodes')
+		guiInstance
+			.add(effectController, 'showNodes')
 			.name('Show Nodes')
 			.onChange((value: boolean) => {
 				showNodes = value; // Update the reactive variable passed as prop
 			});
 
-		guiInstance.add(effectController, 'showDevices')
+		guiInstance
+			.add(effectController, 'showDevices')
 			.name('Show Devices')
 			.onChange((value: boolean) => {
 				showDevices = value; // Update the reactive variable passed as prop
@@ -51,35 +67,16 @@
 
 		guiInstance.close(); // Start closed
 	}
-
 </script>
 
 <svelte:head>
 	<title>ESPresense Companion: 3D Map (All Devices)</title>
 </svelte:head>
 
-<div class="w-full h-full relative">
+<div class="w-full h-full relative bg-surface-50-950">
 	{#if $config && $devices && $nodes}
-		<Map3D
-			devicesToShow={$devices}
-			nodesToShow={$nodes}
-			config={$config}
-			bind:showNodes={showNodes}
-			bind:showDevices={showDevices}
-			bind:zRotationSpeed={zRotationSpeed}
-			showHistoryPath={false}
-			historyData={[]}
-		/>
+		<Map3D devicesToShow={$devices} nodesToShow={$nodes} config={$config} bind:showNodes bind:showDevices bind:zRotationSpeed showHistoryPath={false} historyData={[]} />
 	{:else}
-		<div class="absolute inset-0 flex items-center justify-center text-white">
-			Loading map data...
-		</div>
+		<div class="absolute inset-0 flex items-center justify-center text-white">Loading map data...</div>
 	{/if}
 </div>
-
-<style>
-	/* Ensure container fills space */
-	div {
-		background-color: rgb(30, 41, 59); /* Match Tailwind slate-800 */
-	}
-</style>

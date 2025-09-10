@@ -5,12 +5,21 @@
 	import type { Node } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
 	import NodeActions from './NodeActions.svelte';
-	import NodeOnline from './NodeOnline.svelte';
+	import NodeActiveId from './NodeActiveId.svelte';
 	import VersionPicker from './VersionPicker.svelte';
 
 	let columns = [
-		{ key: 'id', title: 'ID', value: (d: Node) => d.id, sortable: true },
-		{ key: 'active', title: 'Active', renderComponent: { component: NodeOnline } },
+		{
+			key: 'activeId',
+			title: 'Id',
+			renderComponent: { component: NodeActiveId },
+			sortable: true,
+			defaultSort: true,
+			sortValue: (d: Node) => {
+				// Sort by active status first (online=0, offline=1), then by id descending
+				return `${d.online ? '0' : '1'}_${d.id}`;
+			}
+		},
 		{ key: 'name', title: 'Name', value: (d: Node) => d.name ?? '', sortable: true },
 		{ key: 'telemetry.version', title: 'Version', value: (d: Node) => d.telemetry?.version ?? 'n/a', sortable: true },
 		{ key: 'cpu.name', title: 'CPU', value: (d: Node) => d.cpu?.name ?? 'n/a', sortable: true },
@@ -32,10 +41,10 @@
 	}
 </script>
 
-<div class="p-2">
+<div>
 	{#if $nodes}
 		<VersionPicker bind:updateMethod={$updateMethod} bind:firmwareSource={$firmwareSource} bind:flavor={$flavor} bind:version={$version} bind:artifact={$artifact} />
-		<DataTable {columns} rows={$nodes} classNameTable="table table-hover table-compact" on:clickRow={onRowClick} sortBy="id" />
+		<DataTable {columns} rows={$nodes} classNameTable="table  table-compact" on:clickRow={onRowClick} />
 	{/if}
 </div>
 

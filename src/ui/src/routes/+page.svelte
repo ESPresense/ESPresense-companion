@@ -11,7 +11,7 @@
 	<title>ESPresense Companion: Map</title>
 </svelte:head>
 
-<div class="w-full h-full bg-slate-900">
+<div class="w-full h-full bg-surface-50-950">
 	<FloorTabs bind:floorId />
 	<BackgroundUpload />
 	<Map on:selected={(d) => detail(d.detail)} bind:floorId />

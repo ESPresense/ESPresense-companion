@@ -437,7 +437,6 @@
 				const label = createLabelForRoom(room.name, pointsFloor);
 				label.position.z = floor_base; // Position label slightly above floor
 				newRoomGroup.add(label);
-
 			});
 		});
 

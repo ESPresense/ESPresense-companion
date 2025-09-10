@@ -13,11 +13,16 @@
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
+	// Determine if device is active based on lastSeen and timeout
+	$: isActive = row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000);
+
 	async function handleEdit() {
 		loadingEdit = true;
 		try {
 			const response = await fetch(`${base}/api/device/${row.id}`);
-			if (!response.ok) throw new Error(`Failed to fetch settings details: ${response.statusText}`);
+			if (!response.ok) {
+				throw new Error(`Failed to fetch settings details: ${response.statusText}`);
+			}
 
 			const deviceSettingsDetails: DeviceSettingsDetails = await response.json();
 
@@ -34,7 +39,7 @@
 
 			toastStore.trigger({
 				message: errorMessage,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		} finally {
 			loadingEdit = false;
@@ -43,13 +48,15 @@
 </script>
 
 <div class="flex gap-1">
-	<button class="btn btn-sm variant-filled-primary" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
+	<button class="btn btn-sm bg-primary-500 hover:bg-primary-600 text-white" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
 		{#if loadingEdit}
 			<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 		{:else}
 			Edit
 		{/if}
 	</button>
-	<button class="btn btn-sm variant-filled-secondary" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
-	<button class="btn btn-sm variant-filled-tertiary" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
+	{#if isActive}
+		<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
+		<button class="btn btn-sm preset-filled-tertiary-500" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
+	{/if}
 </div>

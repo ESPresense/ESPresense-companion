@@ -2,7 +2,7 @@
 	import type { Node } from '$lib/types';
 	export let row: Node;
 	export let col: string;
-	$: _ = col
+	$: _ = col;
 </script>
 
 <div class="flex justify-center">

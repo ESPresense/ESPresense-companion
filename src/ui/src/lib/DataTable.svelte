@@ -8,6 +8,7 @@
 		sortValue?: (row: any) => any;
 		sortable?: boolean;
 		defaultSort?: boolean;
+		defaultSortDirection?: 'asc' | 'desc';
 		renderComponent?: {
 			component: any;
 		};
@@ -22,8 +23,15 @@
 
 	let { columns, rows, classNameTable = '', sortBy = '' }: Props = $props();
 
-	let sortColumn = $state(sortBy || columns.find(c => c.defaultSort)?.key || '');
+	let sortColumn = $state('');
 	let sortDirection = $state<'asc' | 'desc'>('asc');
+	
+	// Initialize sort from props or defaultSort column
+	$effect(() => {
+		const defaultColumn = columns.find((c) => c.defaultSort);
+		sortColumn = sortBy || defaultColumn?.key || '';
+		sortDirection = defaultColumn?.defaultSortDirection || 'asc';
+	});
 
 	const dispatch = createEventDispatcher();
 
@@ -41,12 +49,12 @@
 	function getSortedRows() {
 		if (!sortColumn) return rows;
 
-		const column = columns.find(c => c.key === sortColumn);
+		const column = columns.find((c) => c.key === sortColumn);
 		if (!column) return rows;
 
 		return [...rows].sort((a, b) => {
-			let aVal = column.sortValue ? column.sortValue(a) : (column.value ? column.value(a) : a[column.key]);
-			let bVal = column.sortValue ? column.sortValue(b) : (column.value ? column.value(b) : b[column.key]);
+			let aVal = column.sortValue ? column.sortValue(a) : column.value ? column.value(a) : a[column.key];
+			let bVal = column.sortValue ? column.sortValue(b) : column.value ? column.value(b) : b[column.key];
 
 			if (aVal === null || aVal === undefined) aVal = '';
 			if (bVal === null || bVal === undefined) bVal = '';
@@ -79,10 +87,7 @@
 	<thead>
 		<tr>
 			{#each columns as column}
-				<th
-					class:cursor-pointer={column.sortable}
-					onclick={() => handleSort(column)}
-				>
+				<th class:cursor-pointer={column.sortable} onclick={() => handleSort(column)}>
 					{column.title}
 					{#if column.sortable && sortColumn === column.key}
 						<span class="ml-1">

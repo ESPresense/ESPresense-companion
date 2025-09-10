@@ -15,7 +15,7 @@
 	// --- Data Stores & Derived State ---
 	// Find the specific device based on the route ID
 	const currentDevice = derived([devices, page], ([$devices, $page]) => {
-		return $devices.find(d => d.id === $page.params.id) || null;
+		return $devices.find((d) => d.id === $page.params.id) || null;
 	});
 
 	// --- State for this page ---
@@ -25,6 +25,7 @@
 	let displayMode: 'current' | 'history' = 'current'; // Control what's shown
 	let showNodes = true; // Separate control for nodes on this page
 	let zRotationSpeed = 0.002; // Separate control for rotation
+	let historyDurationControl: any; // Reference to the GUI control
 
 	// Reactive controller for GUI
 	const effectController = {
@@ -50,6 +51,11 @@
 	$: if (deviceId && displayMode === 'history') fetchDeviceHistory();
 	$: if (historyDurationMinutes && displayMode === 'history') fetchDeviceHistory();
 
+	// Show/Hide duration control based on mode
+	$: if (historyDurationControl) {
+		historyDurationControl.domElement.style.display = displayMode === 'history' ? '' : 'none';
+	}
+
 	// --- Data Fetching ---
 	async function fetchDeviceHistory() {
 		if (!deviceId || historyDurationMinutes <= 0) {
@@ -62,9 +68,7 @@
 
 		try {
 			console.log(`Fetching history for ${deviceId} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
-			const response = await fetch(
-				`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`
-			);
+			const response = await fetch(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
 			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
 			const data: { history: DeviceHistory[] } = await response.json();
@@ -82,7 +86,8 @@
 		guiInstance = new GUI({ title: 'Device View Settings' });
 
 		// Display Mode (Current vs. History)
-		guiInstance.add(effectController, 'displayMode', ['current', 'history'])
+		guiInstance
+			.add(effectController, 'displayMode', ['current', 'history'])
 			.name('Display')
 			.onChange((value: string) => {
 				// Assert the type before assigning, as lil-gui provides string
@@ -93,26 +98,25 @@
 			});
 
 		// History Duration (only relevant when displayMode is 'history')
-		const historyDurationControl = guiInstance.add(effectController, 'historyDurationMinutes', 5, 1440, 5)
+		historyDurationControl = guiInstance
+			.add(effectController, 'historyDurationMinutes', 5, 1440, 5)
 			.name('History (min)')
 			.onChange((value: number) => {
 				historyDurationMinutes = value;
 				// No need to fetch here, reactive statement handles it
 			});
 
-		// Show/Hide duration control based on mode
-		$: historyDurationControl.domElement.style.display = (displayMode === 'history') ? '' : 'none';
-
-
 		// General Visualization
 		const vizFolder = guiInstance.addFolder('Visualization');
-		vizFolder.add(effectController, 'zRotationSpeed', 0, Math.PI / 2, 0.01)
+		vizFolder
+			.add(effectController, 'zRotationSpeed', 0, Math.PI / 2, 0.01)
 			.name('Rotation Speed')
 			.onChange((value: number) => {
 				zRotationSpeed = value;
 			});
 
-		vizFolder.add(effectController, 'showNodes')
+		vizFolder
+			.add(effectController, 'showNodes')
 			.name('Show Nodes')
 			.onChange((value: boolean) => {
 				showNodes = value;
@@ -120,7 +124,6 @@
 
 		guiInstance.close();
 	}
-
 </script>
 
 <svelte:head>
@@ -129,24 +132,13 @@
 
 <div class="w-full h-full relative">
 	{#if $config && $currentDevice && $nodes}
-		<Map3D
-			devicesToShow={displayMode === 'current' ? [$currentDevice] : []}
-			nodesToShow={$nodes}
-			config={$config}
-			historyData={displayMode === 'history' ? deviceHistoryData : []}
-			showDevices={displayMode === 'current'}
-			showHistoryPath={displayMode === 'history'}
-			bind:showNodes={showNodes}
-			bind:zRotationSpeed={zRotationSpeed}
-		/>
+		<Map3D devicesToShow={displayMode === 'current' ? [$currentDevice] : []} nodesToShow={$nodes} config={$config} historyData={displayMode === 'history' ? deviceHistoryData : []} showDevices={displayMode === 'current'} showHistoryPath={displayMode === 'history'} bind:showNodes bind:zRotationSpeed />
 	{:else if !$currentDevice && $devices}
 		<div class="absolute inset-0 flex items-center justify-center text-white">
 			Device with ID '{deviceId}' not found.
 		</div>
 	{:else}
-		<div class="absolute inset-0 flex items-center justify-center text-white">
-			Loading map and device data...
-		</div>
+		<div class="absolute inset-0 flex items-center justify-center text-white">Loading map and device data...</div>
 	{/if}
 </div>
 

@@ -20,7 +20,7 @@
 	}
 </script>
 
-<div class="card p-6 shadow-xl bg-surface-100-800-token max-w-md w-full">
+<div class="card p-6 shadow-xl bg-surface-100-900 max-w-md w-full">
 	{#if modal.title}
 		<header id="modal-title-{modal.id}" class="text-xl font-bold mb-4">
 			{modal.title}
@@ -34,19 +34,7 @@
 	{/if}
 
 	<footer class="flex justify-end space-x-2">
-		<button
-			type="button"
-			class="btn variant-ghost"
-			on:click={handleCancel}
-		>
-			Cancel
-		</button>
-		<button
-			type="button"
-			class="btn variant-filled-primary"
-			on:click={handleConfirm}
-		>
-			Confirm
-		</button>
+		<button type="button" class="btn preset-tonal border border-surface-500" on:click={handleCancel}> Cancel </button>
+		<button type="button" class="btn preset-filled-primary-500" on:click={handleConfirm}> Confirm </button>
 	</footer>
 </div>

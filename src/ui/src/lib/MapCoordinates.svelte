@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
-	import type { LayerCakeContext } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
-
+	import type { LayerCakeContext } from '$lib/types';
 	const toastStore = getToastStore();
 	export let transform = zoomIdentity;
 	$: cursorX = 0;
@@ -61,14 +60,14 @@
 				.then(() => {
 					toastStore.trigger({
 						message: `Copied ${copiedCoords.length} coordinate${copiedCoords.length > 1 ? 's' : ''} to clipboard!`,
-						background: 'variant-filled-success',
+						background: 'preset-filled-success-500',
 						timeout: 1000
 					});
 				})
 				.catch((error) => {
 					toastStore.trigger({
 						message: `Failed to copy to clipboard: ${error}`,
-						background: 'variant-filled-error'
+						background: 'preset-filled-error-500'
 					});
 				});
 		}
@@ -80,7 +79,7 @@
 			copiedCoords = [];
 			toastStore.trigger({
 				message: 'Coordinate collection reset',
-				background: 'variant-filled-primary',
+				background: 'preset-filled-primary-500',
 				timeout: 1000
 			});
 		}

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
+	import { base } from '$app/paths';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
-	import { base } from '$app/paths';
 
 	enum DataPoint {
 		ErrorPercent = 0,
@@ -84,7 +84,7 @@
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',
-					background: 'variant-filled-success'
+					background: 'preset-filled-success-500'
 				});
 			} else {
 				const errorText = await response.text();
@@ -94,7 +94,7 @@
 			console.error('Error resetting calibration:', error);
 			toastStore.trigger({
 				message: `Failed to reset calibration: ${error.message}`,
-				background: 'variant-filled-error'
+				background: 'preset-filled-error-500'
 			});
 		}
 	}
@@ -104,15 +104,15 @@
 	{#if $calibration?.matrix}
 		<header>
 			<div class="flex justify-between items-center p-2">
-				<RadioGroup active="variant-filled-primary" hover="hover:variant-soft-primary">
-					<RadioItem bind:group={data_point} name="justify" value={0}>Error %</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={1}>Error (m)</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={2}>Absorption</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={3}>Rx Rssi Adj</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={4}>Tx Rssi Ref</RadioItem>
-					<RadioItem bind:group={data_point} name="justify" value={5}>Variance (m)</RadioItem>
-				</RadioGroup>
-				<button class="btn variant-filled-warning" on:click={resetCalibration}> Reset Calibration </button>
+				<div class="">
+					<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 0)}>Error %</button>
+					<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 1)}>Error (m)</button>
+					<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 2)}>Absorption</button>
+					<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 3)}>Rx Rssi Adj</button>
+					<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 4)}>Tx Rssi Ref</button>
+					<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 5)}>Variance (m)</button>
+				</div>
+				<button class="btn preset-filled-warning-500" on:click={resetCalibration}> Reset Calibration </button>
 			</div>
 			<div class="flex gap-8 items-center m-4 mt-2">
 				<span class="font-semibold">RMSE:</span> <span>{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</span>
@@ -123,7 +123,7 @@
 			</div>
 		</header>
 		<section class="p-4 pt-0">
-			<table class="table table-hover">
+			<table class="table">
 				<thead>
 					<tr>
 						<th>Name</th>
@@ -137,11 +137,9 @@
 						<tr>
 							<td>Tx: {id1}</td>
 							{#each rxColumns as id2 (id2)}
-								{#if n1[id2]}
-									<td use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'} style={coloring(n1[id2]?.percent)}>{value(n1[id2], data_point)}</td>
-								{:else}
-									<td></td>
-								{/if}
+								<td use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'} style={coloring(n1[id2]?.percent)}
+									>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
+								>
 							{/each}
 						</tr>
 					{/each}
