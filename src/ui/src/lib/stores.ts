@@ -40,7 +40,11 @@ export const wsManager = new WSManager();
 // Device message events and subscriptions
 export const history = writable<string[]>(['/']);
 
-// Load config initially
+/**
+ * Fetches configuration from the backend and updates the `config` store.
+ *
+ * Retrieves JSON from `${base}/api/state/config` and sets the exported writable `config` store with the response.
+ */
 async function getConfig() {
 	const response = await fetch(`${base}/api/state/config`);
 	config.set(await response.json());

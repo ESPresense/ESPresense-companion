@@ -8,6 +8,17 @@ export const tooltip: Action<HTMLElement, string> = (node, content) => {
 	// Generate a unique, stable ID for this tooltip instance
 	const tooltipId = `tooltip-${crypto.randomUUID()}`;
 
+	/**
+	 * Ensure the tooltip DOM element exists, creating and initializing it if needed.
+	 *
+	 * If a tooltip element has already been created this is a no-op. When created,
+	 * the element is configured with presentational classes, absolute positioning,
+	 * non-interactive pointer behavior, initial text from `content`, ARIA attributes
+	 * (`role="tooltip"`, `aria-hidden="true"`), and assigned the stable `tooltipId`.
+	 *
+	 * This function mutates the module-scoped `tooltipEl` (and indirectly relies on
+	 * `content` and `tooltipId`) and has no return value.
+	 */
 	function ensureTooltip() {
 		if (tooltipEl) return;
 		tooltipEl = document.createElement('div');
