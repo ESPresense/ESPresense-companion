@@ -35,6 +35,6 @@ export default [
 		}
 	},
 	{
-		ignores: ['.svelte-kit', 'build', 'package', 'coverage', 'node_modules', 'playwright.config.js', '**/*.svelte']
+		ignores: ['.svelte-kit', 'build', 'package', 'coverage', 'node_modules', 'playwright.config.js']
 	}
 ];
