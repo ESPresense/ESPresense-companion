@@ -18,10 +18,10 @@
 	const routes = [
 		{ href: '/', name: 'map', icon: map, alt: 'Map' },
 		{ href: '/3d', name: '3d', icon: cube, alt: '3D View' },
+		{ href: '/geolocation', name: 'geolocation', icon: map, alt: 'Geolocation' },
 		{ href: '/devices', name: 'devices', icon: devices, alt: 'Devices' },
 		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
-		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' },
-		{ href: '/geolocation', name: 'geolocation', icon: map, alt: 'Geolocation' }
+		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' }
 	];
 </script>
 
