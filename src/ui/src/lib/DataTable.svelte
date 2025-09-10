@@ -8,6 +8,7 @@
 		sortValue?: (row: any) => any;
 		sortable?: boolean;
 		defaultSort?: boolean;
+		defaultSortDirection?: 'asc' | 'desc';
 		renderComponent?: {
 			component: any;
 		};
@@ -22,8 +23,15 @@
 
 	let { columns, rows, classNameTable = '', sortBy = '' }: Props = $props();
 
-	let sortColumn = $state(sortBy || columns.find((c) => c.defaultSort)?.key || '');
+	let sortColumn = $state('');
 	let sortDirection = $state<'asc' | 'desc'>('asc');
+	
+	// Initialize sort from props or defaultSort column
+	$effect(() => {
+		const defaultColumn = columns.find((c) => c.defaultSort);
+		sortColumn = sortBy || defaultColumn?.key || '';
+		sortDirection = defaultColumn?.defaultSortDirection || 'asc';
+	});
 
 	const dispatch = createEventDispatcher();
 

@@ -50,33 +50,35 @@
 	<title>ESPresense Companion: Device Detail</title>
 </svelte:head>
 
-<DeviceDetailTabs deviceId={data.settings?.id} floorId={device?.floor?.id} bind:tab={currentTab} />
-
-<div class="flex h-full">
-	<div class="flex-grow h-full overflow-clip">
-		{#if currentTab === 'map'}
-			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
-		{:else if currentTab === 'calibration'}
-			{#if data.settings?.id}
-				<DeviceCalibration deviceSettings={data.settings} />
-			{:else}
-				<p class="p-4">Device ID not found.</p>
-			{/if}
-		{/if}
+<div class="flex flex-col h-full">
+	<div class="flex-shrink-0">
+		<DeviceDetailTabs deviceId={data.settings?.id} floorId={device?.floor?.id} bind:tab={currentTab} />
 	</div>
-	<div class="w-64 z-1 max-h-screen overflow-auto">
+	<div class="flex flex-1 min-h-0">
+		<div class="flex-grow overflow-auto">
+			{#if currentTab === 'map'}
+				<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
+			{:else if currentTab === 'calibration'}
+				{#if data.settings?.id}
+					<DeviceCalibration deviceSettings={data.settings} />
+				{:else}
+					<p class="p-4">Device ID not found.</p>
+				{/if}
+			{/if}
+		</div>
+		<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
 		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>
 			<Accordion.Item value="details">
 				{#snippet control()}
-					<h3 class="h3">Details</h3>
+					<h3 class="text-lg font-semibold">Details</h3>
 				{/snippet}
 				{#snippet panel()}
-					<div class="space-y-4 p-4">
+					<div class="space-y-3 p-1">
 						{#if $deviceDetails && $deviceDetails.length > 0}
 							{#each $deviceDetails as d}
 								<label class="flex flex-col gap-1">
 									<span class="text-sm font-medium">{d.key}</span>
-									<input class="input" type="text" disabled value={d.value} />
+									<input class="input rounded-full" type="text" disabled value={d.value} />
 								</label>
 							{:else}
 								<p class="text-sm italic">No details available</p>
@@ -88,5 +90,6 @@
 				{/snippet}
 			</Accordion.Item>
 		</Accordion>
+		</div>
 	</div>
 </div>

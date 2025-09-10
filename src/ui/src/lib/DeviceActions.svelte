@@ -13,6 +13,9 @@
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
+	// Determine if device is active based on lastSeen and timeout
+	$: isActive = row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000);
+
 	async function handleEdit() {
 		loadingEdit = true;
 		try {
@@ -52,6 +55,8 @@
 			Edit
 		{/if}
 	</button>
-	<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
-	<button class="btn btn-sm preset-filled-tertiary-500" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
+	{#if isActive}
+		<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
+		<button class="btn btn-sm preset-filled-tertiary-500" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
+	{/if}
 </div>

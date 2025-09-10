@@ -17,6 +17,19 @@
 	let floor = $derived($config?.floors.find((f) => f.id === floorId));
 	let previousPage: string | undefined = undefined;
 
+	// Helper function to shorten very long device IDs
+	function getDisplayName(device: any) {
+		if (device?.name) return device.name;
+		if (!device?.id) return 'Unknown Device';
+		
+		const id = device.id;
+		// If it's a very long ID (like iBeacon), show first part + "..." + last part
+		if (id.length > 30) {
+			return `${id.substring(0, 15)}...${id.substring(id.length - 8)}`;
+		}
+		return id;
+	}
+
 	afterNavigate(({ from }) => {
 		previousPage = from?.url?.pathname;
 	});
@@ -38,7 +51,7 @@
 		</button>
 		{#if device}
 			<div class="pl-4 px-4 py-1">
-				<h4 class="h4">{device?.name || device?.id} on {floor?.name ?? 'Unknown'}</h4>
+				<h4 class="text-lg font-semibold truncate" title="{device?.name || device?.id} on {floor?.name ?? 'Unknown'}">{getDisplayName(device)} on {floor?.name ?? 'Unknown'}</h4>
 			</div>
 		{/if}
 		<div class="flex bg-slate-600 rounded-full p-1">

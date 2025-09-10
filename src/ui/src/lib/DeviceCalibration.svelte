@@ -327,10 +327,10 @@
 	<title>ESPresense Companion: Device Calibration</title>
 </svelte:head>
 
-<div class="container mx-auto p-4 max-w-7xl">
-	<h2 class="h2 mb-4">Device Calibration</h2>
+<div class="w-full px-4 py-2">
+	<h2 class="text-xl font-bold mb-4">Device Calibration</h2>
 
-	<div class="card p-4 mb-6 preset-tonal">
+	<div class="card p-4 mb-4 preset-tonal">
 		<header class="font-semibold mb-2">Instructions</header>
 		<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
 		<ol class="list-decimal pl-6 mb-2">
@@ -367,14 +367,14 @@
 	{/if}
 
 	{#if selectedFloorId}
-		<div class="card h-[500px] mb-6 relative overflow-hidden">
+		<div class="card h-[400px] mb-4 relative overflow-hidden">
 			<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
 		</div>
 	{/if}
 
 	{#if calibrationSpot}
-		<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-			<div class="card p-4 col-span-1 lg:col-span-8 preset-tonal">
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			<div class="card p-4 lg:col-span-2 preset-tonal">
 				<header class="text-xl font-semibold mb-2">Node Distances and RSSI Values</header>
 				<p class="text-sm mb-3">
 					<span class="font-semibold">Map Distance:</span> Calculated from node and calibration spot positions in 3D space (X, Y, and Z).<br />
@@ -459,7 +459,7 @@
 				</div>
 			</div>
 
-			<div class="col-span-1 lg:col-span-4 space-y-6">
+			<div class="col-span-1 space-y-4">
 				<div class="card p-4 preset-tonal">
 					<header class="font-semibold mb-2">Data Collection Status</header>
 					<div class="mt-4"></div>

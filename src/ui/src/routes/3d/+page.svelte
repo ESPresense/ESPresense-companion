@@ -73,17 +73,10 @@
 	<title>ESPresense Companion: 3D Map (All Devices)</title>
 </svelte:head>
 
-<div class="w-full h-full relative">
+<div class="w-full h-full relative bg-surface-50-950">
 	{#if $config && $devices && $nodes}
 		<Map3D devicesToShow={$devices} nodesToShow={$nodes} config={$config} bind:showNodes bind:showDevices bind:zRotationSpeed showHistoryPath={false} historyData={[]} />
 	{:else}
 		<div class="absolute inset-0 flex items-center justify-center text-white">Loading map data...</div>
 	{/if}
 </div>
-
-<style>
-	/* Ensure container fills space */
-	div {
-		background-color: rgb(30, 41, 59); /* Match Tailwind slate-800 */
-	}
-</style>

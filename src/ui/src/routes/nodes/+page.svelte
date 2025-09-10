@@ -80,27 +80,29 @@
 	<title>ESPresense Companion: Nodes</title>
 </svelte:head>
 
-<div class="container mx-auto p-2">
-	<div class="flex justify-between items-center my-2 px-2">
-		<h1 class="text-3xl font-bold">Nodes</h1>
-		{#if loading}
-			<div>Loading settings...</div>
-		{:else}
-			<div class="flex items-center space-x-4">
+<div class="h-full overflow-y-auto">
+	<div class="w-full px-4 py-2">
+		<div class="flex justify-between items-center mb-4">
+			<h1 class="text-2xl font-bold">Nodes</h1>
+			{#if loading}
+				<div>Loading settings...</div>
+			{:else}
 				<div class="flex items-center space-x-4">
-					<TriStateCheckbox id="autoUpdate" bind:checked={autoUpdate} on:change={saveSettings} disabled={saving} />
-					<span class="pl">Automatically update</span>
+					<div class="flex items-center space-x-4">
+						<TriStateCheckbox id="autoUpdate" bind:checked={autoUpdate} on:change={saveSettings} disabled={saving} />
+						<span class="pl">Automatically update</span>
 
-					<TriStateCheckbox id="prerelease" bind:checked={prerelease} on:change={saveSettings} disabled={saving} />
-					<span class="pl">Include pre-released</span>
+						<TriStateCheckbox id="prerelease" bind:checked={prerelease} on:change={saveSettings} disabled={saving} />
+						<span class="pl">Include pre-released</span>
 
-					{#if saving}
-						<span class="text-sm italic">Saving...</span>
-					{/if}
+						{#if saving}
+							<span class="text-sm italic">Saving...</span>
+						{/if}
+					</div>
 				</div>
-			</div>
-		{/if}
-	</div>
+			{/if}
+		</div>
 
-	<NodesTable />
+		<NodesTable />
+	</div>
 </div>
