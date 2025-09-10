@@ -15,6 +15,10 @@ export class WSManager {
 	private listeners: Listeners;
 	private socket: WebSocket | null = null;
 	private pendingSubscriptions: Set<string> = new Set();
+	private reconnectAttempts: number = 0;
+	private reconnectTimer: number | null = null;
+	private readonly baseReconnectDelayMs: number = 1000; // 1 second
+	private readonly maxReconnectDelayMs: number = 30000; // 30 seconds
 
 	constructor() {
 		this.listeners = {
@@ -27,6 +31,30 @@ export class WSManager {
 		this.connect();
 	}
 
+	private scheduleReconnect() {
+		// Prevent duplicate timers
+		if (this.reconnectTimer !== null) {
+			return;
+		}
+
+		// Calculate exponential backoff delay with jitter
+		const exponentialDelay = Math.min(
+			this.baseReconnectDelayMs * Math.pow(2, this.reconnectAttempts),
+			this.maxReconnectDelayMs
+		);
+		
+		// Add jitter (±25% of the delay)
+		const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1);
+		const delay = Math.max(0, exponentialDelay + jitter);
+
+		console.log(`Scheduling WebSocket reconnection in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts + 1})`);
+
+		this.reconnectTimer = window.setTimeout(() => {
+			this.reconnectTimer = null;
+			this.connect();
+		}, delay);
+	}
+
 	private connect() {
 		const loc = new URL(`${base}/ws`, window.location.href);
 		const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -35,6 +63,11 @@ export class WSManager {
 		this.socket = new WebSocket(newUri);
 
 		this.socket.addEventListener('open', () => {
+			console.log('WebSocket connected successfully');
+			
+			// Reset reconnection attempts on successful connection
+			this.reconnectAttempts = 0;
+			
 			// Flush any pending device message subscriptions
 			this.pendingSubscriptions.forEach((deviceId) => {
 				this.socket!.send(
@@ -80,12 +113,24 @@ export class WSManager {
 		});
 
 		this.socket.addEventListener('close', () => {
-			console.warn('WebSocket closed. Consider implementing reconnection logic if needed.');
-			// Optionally, implement reconnection logic here.
+			console.warn('WebSocket closed, cleaning up and scheduling reconnection');
+			
+			// Clear stale socket reference
+			this.socket = null;
+			
+			// Increment reconnection attempts and schedule reconnection
+			this.reconnectAttempts++;
+			this.scheduleReconnect();
 		});
 
 		this.socket.addEventListener('error', (error) => {
 			console.error('WebSocket encountered error:', error);
+			
+			// Close and cleanup the socket to avoid stale references
+			if (this.socket) {
+				this.socket.close();
+				this.socket = null;
+			}
 		});
 	}
 
@@ -123,5 +168,24 @@ export class WSManager {
 		} else {
 			console.warn('Cannot send message, socket is not connected.');
 		}
+	}
+
+	public disconnect() {
+		console.log('Manually disconnecting WebSocket');
+		
+		// Clear any pending reconnection timer
+		if (this.reconnectTimer !== null) {
+			window.clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = null;
+		}
+		
+		// Close and null the socket to stop auto-reconnect
+		if (this.socket) {
+			this.socket.close();
+			this.socket = null;
+		}
+		
+		// Reset reconnection attempts
+		this.reconnectAttempts = 0;
 	}
 }
