@@ -10,7 +10,7 @@ public class AutoDiscovery
 {
     private bool _sent;
 
-    public DiscoveryRecord Message { get; set; }
+    public DiscoveryRecord? Message { get; set; }
     public string DiscoveryId { get; internal set; }
     public string Component { get; internal set; }
 
@@ -23,7 +23,6 @@ public class AutoDiscovery
         {
             Name = dev.Name,
             UniqueId = $"espresense-companion-{dev.Id}",
-            StateTopic = $"espresense/companion/{dev.Id}",
             JsonAttributesTopic = $"espresense/companion/{dev.Id}/attributes",
             EntityStatusTopic = "espresense/companion/status",
             Device = new DeviceRecord()
@@ -39,7 +38,7 @@ public class AutoDiscovery
         };
     }
 
-    public AutoDiscovery(string component, string discoveryId, DiscoveryRecord message)
+    public AutoDiscovery(string component, string discoveryId, DiscoveryRecord? message)
     {
         DiscoveryId = discoveryId;
         Component = component;
@@ -62,7 +61,7 @@ public class AutoDiscovery
         await mqtt.EnqueueAsync($"homeassistant/{Component}/{DiscoveryId}/config", null, true);
     }
 
-    internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg)
+    internal static bool TryDeserialize(string topic, string? payload, out AutoDiscovery? msg)
     {
         var parts = topic.Split("/");
         if (parts.Length != 4 || parts[0] != "homeassistant" || parts[3] != "config")
@@ -74,8 +73,8 @@ public class AutoDiscovery
 
         if (string.IsNullOrWhiteSpace(payload))
         {
-            msg = null;
-            return false;
+            msg = new AutoDiscovery(parts[1], parts[2], null);
+            return true;
         }
 
         try
