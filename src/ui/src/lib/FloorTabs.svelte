@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { config } from '$lib/stores';
-
-	import Filter from './Filter.svelte';
+	import { config, showAllFloors } from '$lib/stores';
+	import SlideToggle from './SlideToggle.svelte';
 
 	export let floorId: string | null = null;
 	$: if (floorId == null) floorId = $config?.floors[0].id;
@@ -17,7 +16,7 @@
 			<div class="flex bg-slate-600 rounded-full p-1">
 				{#if $config?.floors}
 					{#each $config?.floors as { id, name }, index}
-						<button class="px-6 py-2 rounded-full text-sm font-medium transition-colors {floorId === id ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" on:click={() => (floorId = id)}>
+						<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {floorId === id ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" on:click={() => (floorId = id)}>
 							{name}
 						</button>
 					{/each}
@@ -25,8 +24,10 @@
 			</div>
 
 			<!-- Filter Switch -->
-			<div class="pt-2">
-				<Filter />
+			<div>
+				<SlideToggle name="show-all-floors" bind:checked={$showAllFloors}>
+					<span class="text-black">Show All Floors</span>
+				</SlideToggle>
 			</div>
 		</div>
 	</nav>
