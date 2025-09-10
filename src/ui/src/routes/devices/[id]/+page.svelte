@@ -74,15 +74,17 @@
 				{/snippet}
 				{#snippet panel()}
 					<div class="space-y-3 p-1">
-						{#if $deviceDetails && $deviceDetails.length > 0}
-							{#each $deviceDetails as d}
-								<label class="flex flex-col gap-1">
-									<span class="text-sm font-medium">{d.key}</span>
-									<input class="input rounded-full" type="text" disabled value={d.value} />
-								</label>
+						{#if $deviceDetails}
+							{#if $deviceDetails.length > 0}
+								{#each $deviceDetails as d}
+									<label class="flex flex-col gap-1">
+										<span class="text-sm font-medium">{d.key}</span>
+										<input class="input rounded-full" type="text" disabled value={d.value} />
+									</label>
+								{/each}
 							{:else}
 								<p class="text-sm italic">No details available</p>
-							{/each}
+							{/if}
 						{:else}
 							<p class="text-sm italic">Loading details...</p>
 						{/if}
