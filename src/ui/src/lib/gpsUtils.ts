@@ -3,13 +3,16 @@ import type { ConfigGps } from './types'; // Assuming ConfigGps is defined in ty
 const R = 6378137; // Earth's mean radius in meters
 
 /**
- * Converts internal X, Y coordinates to GPS Latitude and Longitude,
- * applying rotation based on the provided GPS configuration.
+ * Convert local internal X/Y coordinates into GPS latitude and longitude using a GPS origin and rotation.
  *
- * @param x Internal X coordinate (East/West axis before rotation).
- * @param y Internal Y coordinate (North/South axis before rotation).
- * @param gpsConfig GPS configuration containing origin lat/lon and rotation.
- * @returns An object with { latitude, longitude } or null if input is invalid.
+ * The function treats `x` as the East/West axis and `y` as the North/South axis before applying the
+ * configured rotation (in degrees) from `gpsConfig`. Rotation defaults to 0° when not provided.
+ *
+ * @param x - Internal X coordinate (east positive) relative to the GPS origin.
+ * @param y - Internal Y coordinate (north positive) relative to the GPS origin.
+ * @param gpsConfig - GPS origin and options; must include `latitude` and `longitude`, and may include `rotation` (degrees).
+ * @returns An object { latitude, longitude } on success, or `null` if inputs are missing, the longitude cannot be computed
+ *          near the poles, or the resulting coordinates are NaN/out of valid ranges.
  */
 export function internalToGps(x: number | null | undefined, y: number | null | undefined, gpsConfig: ConfigGps | null | undefined): { latitude: number; longitude: number } | null {
 	// Check for null or undefined inputs
