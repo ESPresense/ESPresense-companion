@@ -75,6 +75,14 @@ export const releases = readable<Map<string, Release[]>>(new Map(), function sta
 	let errors = 0;
 	let outstanding = false;
 
+	/**
+	 * Fetches releases from the ESPresense GitHub repository, filters and groups them, and updates the releases store.
+	 *
+	 * Fetches https://api.github.com/repos/ESPresense/ESPresense/releases, keeps only releases with more than 5 assets,
+	 * groups them into a Map keyed by "Beta" (prerelease) or "Release" (non-prerelease), and calls `set` with that Map.
+	 * On success resets the local `errors` counter and clears `outstanding`. On failure increments `errors`, logs the
+	 * exception, clears `outstanding`, and if errors exceed 5 replaces the store with an empty Map.
+	 */
 	async function fetchData() {
 		try {
 			const res = await fetch('https://api.github.com/repos/ESPresense/ESPresense/releases', { credentials: 'same-origin' });
