@@ -5,12 +5,12 @@ namespace ESPresense.Services;
 
 public class NodeTelemetryStore : BackgroundService
 {
-    private readonly MqttCoordinator _mqttCoordinator;
+    private readonly IMqttCoordinator _mqttCoordinator;
 
     private readonly ConcurrentDictionary<string, NodeTelemetry> _storeById = new();
     private readonly ConcurrentDictionary<string, bool> _onlineById = new();
 
-    public NodeTelemetryStore(MqttCoordinator mqttCoordinator)
+    public NodeTelemetryStore(IMqttCoordinator mqttCoordinator)
     {
         _mqttCoordinator = mqttCoordinator;
     }
