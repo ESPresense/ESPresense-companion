@@ -130,7 +130,7 @@ public class Device
         _kalmanLocation.Update(newLocation);
     }
 
-    public IEnumerable<KeyValuePair<string, string>> GetDetails()
+    public virtual IEnumerable<KeyValuePair<string, string>> GetDetails()
     {
         yield return new KeyValuePair<string, string>("Best Scenario", $"{BestScenario?.Name}");
 
