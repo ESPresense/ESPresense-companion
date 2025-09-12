@@ -93,6 +93,33 @@ public class Device
     [JsonConverter(typeof(TimeSpanMillisConverter))]
     public TimeSpan Timeout { get; set; }
 
+    [JsonIgnore]
+    public int? ConfiguredRefRssi { get; set; }
+
+    [JsonPropertyName("rssi@1m")]
+    public double? RefRssi
+    {
+        get
+        {
+            // Only return configured values for calibration status
+            // Use HasValue to distinguish between null (unconfigured) and 0 (valid 0 dBm)
+            return ConfiguredRefRssi.HasValue ? ConfiguredRefRssi.Value : null;
+        }
+    }
+
+    [JsonPropertyName("measuredRssi@1m")]
+    public double? MeasuredRefRssi
+    {
+        get
+        {
+            var currentNodes = Nodes.Values.Where(dn => dn.Current).ToList();
+            if (currentNodes.Count == 0) return null;
+            
+            var refRssiValues = currentNodes.Where(dn => dn.RefRssi != 0).Select(dn => dn.RefRssi).ToList();
+            return refRssiValues.Count > 0 ? refRssiValues.Average() : null;
+        }
+    }
+
     /// <summary>
     /// Updates the device's location using Kalman filtering for smooth transitions
     /// </summary>

@@ -57,6 +57,8 @@ export interface Device {
 	fixes: number;
 	timeout: number;
 	lastSeen: Date;
+	'rssi@1m': number | null;
+	'measuredRssi@1m': number | null;
 }
 
 export interface MapConfig {

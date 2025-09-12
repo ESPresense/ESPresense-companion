@@ -2,6 +2,7 @@
 	import { devices } from '$lib/stores';
 	import { calibrateDevice } from '$lib/urls';
 	import DataTable from '$lib/DataTable.svelte';
+	import DeviceActions from '$lib/DeviceActions.svelte';
 	import SlideToggle from '$lib/SlideToggle.svelte';
 	import type { Device } from '$lib/types';
 	import ago from 's-ago';
@@ -19,16 +20,16 @@
 	// Calculate calibration statistics
 	$: calibrationStats = {
 		total: filteredDevices.length,
-		calibrated: filteredDevices.filter(d => d['rssi@1m'] != null && d['rssi@1m'] !== 0).length,
-		needsCalibration: filteredDevices.filter(d => d['rssi@1m'] == null || d['rssi@1m'] === 0).length
+		calibrated: filteredDevices.filter(d => d['rssi@1m'] != null).length,
+		needsCalibration: filteredDevices.filter(d => d['rssi@1m'] == null).length
 	};
 
 	// Determine calibration status for a device
 	function getCalibrationStatus(device: Device): { status: string; color: string } {
-		if (device['rssi@1m'] == null || device['rssi@1m'] === 0) {
+		if (device['rssi@1m'] == null) {
 			return { status: 'Not Calibrated', color: 'text-error-500' };
 		}
-		// Could add more sophisticated logic here (e.g., last calibrated date)
+		// 0 dBm is a valid calibration value, so device is calibrated
 		return { status: 'Calibrated', color: 'text-success-500' };
 	}
 
@@ -39,7 +40,7 @@
 
 	// Format RSSI@1m value
 	function formatRssi(value: number | null): string {
-		if (value == null || value === 0) return 'n/a';
+		if (value == null) return 'n/a';
 		return `${value} dBm`;
 	}
 
@@ -73,10 +74,31 @@
 		},
 		{
 			key: 'rssi@1m',
-			title: 'RSSI@1m',
+			title: 'Configured RSSI@1m',
 			value: (d: Device) => formatRssi(d['rssi@1m']),
 			sortValue: (d: Device) => d['rssi@1m'] || -999,
 			sortable: true
+		},
+		{
+			key: 'measuredRssi@1m',
+			title: 'Measured RSSI@1m',
+			value: (d: Device) => formatRssi(d['measuredRssi@1m']),
+			sortValue: (d: Device) => d['measuredRssi@1m'] || -999,
+			sortable: true,
+			renderHtml: (d: Device) => {
+				const measured = d['measuredRssi@1m'];
+				const configured = d['rssi@1m'];
+				let color = 'text-surface-600-300';
+				let text = formatRssi(measured);
+				
+				// Add visual indication if values differ significantly
+				if (measured && configured && Math.abs(measured - configured) > 5) {
+					color = 'text-warning-500';
+					text += ' ⚠️';
+				}
+				
+				return `<span class="${color}">${text}</span>`;
+			}
 		},
 		{
 			key: 'calibrationStatus',
@@ -105,14 +127,7 @@
 		{
 			key: 'actions',
 			title: 'Actions',
-			value: (d: Device) => isDeviceActive(d) ? 'Calibrate' : 'Inactive',
-			sortable: false,
-			renderHtml: (d: Device) => {
-				const active = isDeviceActive(d);
-				const color = active ? 'text-tertiary-500' : 'text-surface-500';
-				const text = active ? 'Click to Calibrate' : 'Device Inactive';
-				return `<span class="${color} text-sm">${text}</span>`;
-			}
+			renderComponent: { component: DeviceActions }
 		}
 	];
 
@@ -122,6 +137,7 @@
 			calibrateDevice(device);
 		}
 	}
+
 </script>
 
 <div class="h-full overflow-y-auto">
@@ -173,7 +189,9 @@
 			<header class="font-semibold mb-2">Instructions</header>
 			<ul class="list-disc pl-6 space-y-1 text-sm">
 				<li>Click "Calibrate" or click on an active device row to start calibration</li>
-				<li>RSSI@1m is the key calibration parameter for accurate positioning</li>
+				<li><strong>Configured RSSI@1m</strong>: Manually set calibration values that determine calibration status</li>
+				<li><strong>Measured RSSI@1m</strong>: Real-time averages from active nodes (for reference/validation)</li>
+				<li>⚠️ indicates significant difference between configured and measured values</li>
 				<li>Devices marked "Not Calibrated" should be calibrated for optimal accuracy</li>
 				<li>Only active devices (recently seen) can be calibrated</li>
 			</ul>

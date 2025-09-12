@@ -22,15 +22,17 @@ public class StateController : ControllerBase
     private readonly State _state;
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
+    private readonly DeviceSettingsStore _dss;
     private readonly IMapper _mapper;
     private readonly GlobalEventDispatcher _eventDispatcher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, IMapper mapper, GlobalEventDispatcher eventDispatcher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, IMapper mapper, GlobalEventDispatcher eventDispatcher)
     {
         _logger = logger;
         _state = state;
         _config = config;
         _nsd = nsd;
+        _dss = dss;
         _mapper = mapper;
         _eventDispatcher = eventDispatcher;
     }
@@ -48,6 +50,14 @@ public class StateController : ControllerBase
     {
         IEnumerable<Device> d = _state.Devices.Values;
         if (!showAll) d = d.Where(a => a is { Track: true });
+        
+        // Populate configured RefRssi from DeviceSettings
+        foreach (var device in d)
+        {
+            var deviceSettings = _dss.Get(device.Id);
+            device.ConfiguredRefRssi = deviceSettings?.RefRssi;
+        }
+        
         return d;
     }
 
