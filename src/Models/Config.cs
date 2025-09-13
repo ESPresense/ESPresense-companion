@@ -45,6 +45,13 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "optimization")]
         public ConfigOptimization Optimization { get; set; } = new();
+
+        // Retention policy for inactive devices (duration string, e.g., "30d", "720h")
+        [YamlMember(Alias = "device_retention")]
+        public string DeviceRetention { get; set; } = "30d";
+
+        [YamlIgnore]
+        public TimeSpan DeviceRetentionTimeSpan => DeviceRetention.TryParseDurationString(out var ts) ? ts : TimeSpan.FromDays(30);
     }
 
     public partial class ConfigLocators

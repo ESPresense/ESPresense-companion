@@ -203,6 +203,7 @@ public class StateController : ControllerBase
         _eventDispatcher.NodeStateChanged += OnNodeStateChanged;
         _eventDispatcher.DeviceStateChanged += OnDeviceChanged;
         _eventDispatcher.DeviceMessageReceived += OnDeviceMessageReceived;
+        _eventDispatcher.DeviceRemoved += (_, e) => EnqueueAndSignal(new { type = "deviceRemoved", deviceId = e.DeviceId });
 
         try
         {
