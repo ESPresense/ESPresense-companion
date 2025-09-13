@@ -34,6 +34,21 @@ namespace ESPresense.Controllers
         {
             await _deviceSettingsStore.Set(id, value);
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(string id)
+        {
+            if (!_state.Devices.TryRemove(id, out var device))
+                return NotFound();
+
+            // Delete auto-discovery so HA cleans up entities/topics
+            foreach (var ad in device.HassAutoDiscovery)
+                await ad.Delete(HttpContext.RequestServices.GetRequiredService<MqttCoordinator>());
+
+            // Notify clients to remove immediately
+            HttpContext.RequestServices.GetRequiredService<GlobalEventDispatcher>().OnDeviceRemoved(id);
+            return NoContent();
+        }
     }
 
     public readonly record struct DeviceSettingsDetails(DeviceSettings? settings, IList<KeyValuePair<string, string>> details);
