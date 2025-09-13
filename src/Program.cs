@@ -75,6 +75,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Device
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
+builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {

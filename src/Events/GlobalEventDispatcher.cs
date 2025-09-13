@@ -9,6 +9,7 @@ public class GlobalEventDispatcher()
     public event EventHandler<NodeStateEventArgs>? NodeStateChanged;
     public event EventHandler<DeviceEventArgs>? DeviceStateChanged;
     public event EventHandler<CalibrationEventArgs>? CalibrationChanged;
+    public event EventHandler<DeviceRemovedEventArgs>? DeviceRemoved;
 
     public void OnNodeStateChanged(NodeState state)
     {
@@ -29,6 +30,11 @@ public class GlobalEventDispatcher()
     {
         DeviceMessageReceived?.Invoke(this, e);
     }
+
+    public void OnDeviceRemoved(string deviceId)
+    {
+        DeviceRemoved?.Invoke(this, new DeviceRemovedEventArgs(deviceId));
+    }
 }
 
 public class NodeStateEventArgs(NodeState state) : EventArgs
@@ -45,4 +51,9 @@ public class DeviceEventArgs(Device device, bool trackChanged) : EventArgs
 public class CalibrationEventArgs(Calibration calibration) : EventArgs
 {
     public Calibration Calibration { get; } = calibration;
+}
+
+public class DeviceRemovedEventArgs(string deviceId) : EventArgs
+{
+    public string DeviceId { get; } = deviceId;
 }
