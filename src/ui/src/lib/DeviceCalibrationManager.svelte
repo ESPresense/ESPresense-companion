@@ -14,7 +14,9 @@
 		if (showInactiveDevices) return true;
 		
 		// Check if device is active based on lastSeen and timeout
-		return device.lastSeen && new Date().getTime() - new Date(device.lastSeen).getTime() < (device.timeout || 30000);
+		if (device.lastSeen == null) return false;
+		const timeout = device.timeout !== null && device.timeout !== undefined ? device.timeout : 30000;
+		return new Date().getTime() - new Date(device.lastSeen).getTime() < timeout;
 	}) || [];
 
 	// Calculate calibration statistics
@@ -35,7 +37,9 @@
 
 	// Check if device is active
 	function isDeviceActive(device: Device): boolean {
-		return device.lastSeen && new Date().getTime() - new Date(device.lastSeen).getTime() < (device.timeout || 30000);
+		if (device.lastSeen == null) return false;
+		const timeout = device.timeout !== null && device.timeout !== undefined ? device.timeout : 30000;
+		return new Date().getTime() - new Date(device.lastSeen).getTime() < timeout;
 	}
 
 	// Format RSSI@1m value
@@ -76,14 +80,14 @@
 			key: 'rssi@1m',
 			title: 'Configured RSSI@1m',
 			value: (d: Device) => formatRssi(d['rssi@1m']),
-			sortValue: (d: Device) => d['rssi@1m'] || -999,
+			sortValue: (d: Device) => d['rssi@1m'] !== null && d['rssi@1m'] !== undefined ? d['rssi@1m'] : -999,
 			sortable: true
 		},
 		{
 			key: 'measuredRssi@1m',
 			title: 'Measured RSSI@1m',
 			value: (d: Device) => formatRssi(d['measuredRssi@1m']),
-			sortValue: (d: Device) => d['measuredRssi@1m'] || -999,
+			sortValue: (d: Device) => d['measuredRssi@1m'] !== null && d['measuredRssi@1m'] !== undefined ? d['measuredRssi@1m'] : -999,
 			sortable: true,
 			renderHtml: (d: Device) => {
 				const measured = d['measuredRssi@1m'];
@@ -92,7 +96,9 @@
 				let text = formatRssi(measured);
 				
 				// Add visual indication if values differ significantly
-				if (measured && configured && Math.abs(measured - configured) > 5) {
+				if (measured !== null && measured !== undefined && 
+					configured !== null && configured !== undefined && 
+					Math.abs(measured - configured) > 5) {
 					color = 'text-warning-500';
 					text += ' ⚠️';
 				}
@@ -120,8 +126,8 @@
 		{
 			key: 'lastSeen',
 			title: 'Last Seen',
-			value: (d: Device) => d.lastSeen ? ago(new Date(d.lastSeen)) : 'n/a',
-			sortValue: (d: Device) => d.lastSeen ? new Date(d.lastSeen) : new Date(0),
+			value: (d: Device) => d.lastSeen != null ? ago(new Date(d.lastSeen)) : 'n/a',
+			sortValue: (d: Device) => d.lastSeen != null ? new Date(d.lastSeen) : new Date(0),
 			sortable: true
 		},
 		{

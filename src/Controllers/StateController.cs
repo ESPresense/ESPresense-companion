@@ -37,6 +37,28 @@ public class StateController : ControllerBase
         _eventDispatcher = eventDispatcher;
     }
 
+    /// <summary>
+    /// Enriches a single device with ConfiguredRefRssi from DeviceSettings.
+    /// </summary>
+    /// <param name="device">The device to enrich</param>
+    private void EnrichConfiguredRefRssi(Device device)
+    {
+        var deviceSettings = _dss.Get(device.Id);
+        device.ConfiguredRefRssi = deviceSettings?.RefRssi;
+    }
+
+    /// <summary>
+    /// Enriches multiple devices with ConfiguredRefRssi from DeviceSettings.
+    /// </summary>
+    /// <param name="devices">The devices to enrich</param>
+    private void EnrichDevices(IEnumerable<Device> devices)
+    {
+        foreach (var device in devices)
+        {
+            EnrichConfiguredRefRssi(device);
+        }
+    }
+
     // GET: api/rooms
     [HttpGet("api/state/nodes")]
     public IEnumerable<NodeState> GetNodes(bool includeTele = true)
@@ -52,11 +74,7 @@ public class StateController : ControllerBase
         if (!showAll) d = d.Where(a => a is { Track: true });
         
         // Populate configured RefRssi from DeviceSettings
-        foreach (var device in d)
-        {
-            var deviceSettings = _dss.Get(device.Id);
-            device.ConfiguredRefRssi = deviceSettings?.RefRssi;
-        }
+        EnrichDevices(d);
         
         return d;
     }
@@ -158,7 +176,12 @@ public class StateController : ControllerBase
         void OnDeviceChanged(object? sender, DeviceEventArgs e)
         {
             if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
+            {
+                // Enrich device with ConfiguredRefRssi before sending
+                if (e.Device != null)
+                    EnrichConfiguredRefRssi(e.Device);
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
+            }
         }
 
         void OnDeviceMessageReceived(object? sender, DeviceMessageEventArgs args)
