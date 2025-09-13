@@ -22,17 +22,41 @@ public class StateController : ControllerBase
     private readonly State _state;
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
+    private readonly DeviceSettingsStore _dss;
     private readonly IMapper _mapper;
     private readonly GlobalEventDispatcher _eventDispatcher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, NodeTelemetryStore nts, IMapper mapper, GlobalEventDispatcher eventDispatcher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, IMapper mapper, GlobalEventDispatcher eventDispatcher)
     {
         _logger = logger;
         _state = state;
         _config = config;
         _nsd = nsd;
+        _dss = dss;
         _mapper = mapper;
         _eventDispatcher = eventDispatcher;
+    }
+
+    /// <summary>
+    /// Enriches a single device with ConfiguredRefRssi from DeviceSettings.
+    /// </summary>
+    /// <param name="device">The device to enrich</param>
+    private void EnrichConfiguredRefRssi(Device device)
+    {
+        var deviceSettings = _dss.Get(device.Id);
+        device.ConfiguredRefRssi = deviceSettings?.RefRssi;
+    }
+
+    /// <summary>
+    /// Enriches multiple devices with ConfiguredRefRssi from DeviceSettings.
+    /// </summary>
+    /// <param name="devices">The devices to enrich</param>
+    private void EnrichDevices(IEnumerable<Device> devices)
+    {
+        foreach (var device in devices)
+        {
+            EnrichConfiguredRefRssi(device);
+        }
     }
 
     // GET: api/rooms
@@ -48,6 +72,10 @@ public class StateController : ControllerBase
     {
         IEnumerable<Device> d = _state.Devices.Values;
         if (!showAll) d = d.Where(a => a is { Track: true });
+        
+        // Populate configured RefRssi from DeviceSettings
+        EnrichDevices(d);
+        
         return d;
     }
 
@@ -148,7 +176,12 @@ public class StateController : ControllerBase
         void OnDeviceChanged(object? sender, DeviceEventArgs e)
         {
             if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
+            {
+                // Enrich device with ConfiguredRefRssi before sending
+                if (e.Device != null)
+                    EnrichConfiguredRefRssi(e.Device);
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
+            }
         }
 
         void OnDeviceMessageReceived(object? sender, DeviceMessageEventArgs args)

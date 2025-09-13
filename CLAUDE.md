@@ -22,7 +22,7 @@ dotnet watch --project src
 dotnet test
 
 # Build the project
-dotnet build
+dotnet build --project src
 
 # Restore dependencies
 dotnet restore
@@ -111,6 +111,23 @@ pnpm check
 - WebSocket automatically syncs changes after API calls
 - Error handling and loading states in UI components
 
+### Device Data Architecture
+- **Device Model**: Operational device data with location, confidence, node connections
+  - `RefRssi` (`"rssi@1m"`): Only shows manually configured calibration values
+  - `MeasuredRefRssi` (`"measuredRssi@1m"`): Real-time average from active node measurements
+  - `ConfiguredRefRssi`: Internal storage for manual calibration settings
+- **DeviceSettings Model**: Configuration and calibration data stored persistently
+  - Used for manual RSSI@1m calibration values
+  - Separate from operational device state
+- **StateController**: Populates Device.ConfiguredRefRssi from DeviceSettings during API calls
+- **Calibration Status**: Determined only by configured values, not measured values
+
+### Event-Driven Architecture
+- `GlobalEventDispatcher` coordinates events between services
+- Event types: `DeviceStateChanged`, `NodeStateChanged`, `CalibrationChanged`
+- WebSocket clients automatically receive relevant events
+- Services subscribe to events for reactive updates
+
 ## Testing
 
 ### Backend Tests (NUnit)
@@ -167,3 +184,15 @@ pnpm test:unit
 - **Add new UI component**: Create in `lib/` directory, subscribe to stores, handle WebSocket updates
 - **Modify optimization**: Update relevant optimizer in `Optimizers/` directory
 - **Add new API endpoint**: Create controller action, update frontend API calls
+- **Working with device calibration**:
+  - Configured values: Use `DeviceSettings` model and `ConfiguredRefRssi` property
+  - Measured values: Access `MeasuredRefRssi` for operational/debugging data
+  - Calibration UI: Should only show "Calibrated" status based on configured values
+
+## Important Architecture Notes
+
+- **Device vs DeviceSettings**: Device is operational state, DeviceSettings is persistent configuration
+- **RSSI@1m Separation**: Configured values determine calibration status, measured values provide operational data
+- **Store Updates**: Frontend stores combine polling + WebSocket for reliability and real-time updates
+- **Service Injection**: StateController requires DeviceSettingsStore to populate calibration data
+- **Event Propagation**: Changes trigger GlobalEventDispatcher events → WebSocket messages → Frontend updates

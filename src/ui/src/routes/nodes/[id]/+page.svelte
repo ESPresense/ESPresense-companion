@@ -6,12 +6,16 @@
 	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
 	import Map from '$lib/Map.svelte';
-	import NodeDetailTabs from '$lib/NodeDetailTabs.svelte';
-	import NodeSettings from '$lib/NodeSettings.svelte';
+	import NodeBreadcrumb from '$lib/NodeBreadcrumb.svelte';
 
 	export let floorId: string | null = null;
 	export let data: NodeSettingDetails = {};
 	$: node = $nodes.find((d) => d.id === data.settings?.id);
+	
+	// Initialize floorId to the first floor the node is actually on
+	$: if (!floorId && node?.floors?.length > 0) {
+		floorId = node.floors[0];
+	}
 
 	export const nodeDetails = readable([], (set) => {
 		async function fetchAndSet() {
@@ -39,16 +43,18 @@
 	<title>ESPresense Companion: Node Detail</title>
 </svelte:head>
 
-<NodeDetailTabs nodeId={data.settings?.id} bind:floorId />
-
 <div class="flex h-full">
-	<div class="flex-grow h-full overflow-clip">
-		{#if floorId !== 'settings'}
+	<div class="flex-grow overflow-auto">
+		<!-- Breadcrumb Navigation -->
+		<NodeBreadcrumb 
+			nodeName={node?.name || node?.id || 'Unknown Node'} 
+			bind:currentFloorId={floorId}
+			{node}
+		/>
+		
+		<div class="h-full">
 			<Map deviceId="none" nodeId={data.settings?.id} bind:floorId exclusive={true} />
-		{/if}
-		{#if floorId === 'settings'}
-			<NodeSettings settings={data.settings} />
-		{/if}
+		</div>
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
 		<Accordion value={['details']} collapsible>

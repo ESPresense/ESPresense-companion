@@ -126,18 +126,20 @@
 			<table class="table">
 				<thead>
 					<tr>
-						<th>Name</th>
+						<th style="text-align: center; color: oklch(1 0 none);">Name</th>
 						{#each rxColumns as id}
-							<th>Rx: {id}</th>
+							<th class="h-32 whitespace-nowrap px-2 py-1 min-w-10" style="position: relative;">
+								<div style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); position: absolute; bottom: 8px; left: 50%; transform-origin: center; transform: translateX(-50%) rotate(180deg); white-space: nowrap; color: oklch(1 0 none);">Rx: {id}</div>
+							</th>
 						{/each}
 					</tr>
 				</thead>
 				<tbody>
 					{#each Object.entries($calibration.matrix) as [id1, n1] (id1)}
 						<tr>
-							<td>Tx: {id1}</td>
+							<td style="text-align: right; white-space: nowrap;">Tx: {id1}</td>
 							{#each rxColumns as id2 (id2)}
-								<td use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'} style={coloring(n1[id2]?.percent)}
+								<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'}
 									>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
 								>
 							{/each}
