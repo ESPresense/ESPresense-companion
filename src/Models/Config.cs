@@ -51,7 +51,7 @@ namespace ESPresense.Models
         public string DeviceRetention { get; set; } = "30d";
 
         [YamlIgnore]
-        public TimeSpan DeviceRetentionTimeSpan => DeviceRetention.TryParseDurationString(out var ts) ? ts : TimeSpan.FromDays(30);
+        public TimeSpan DeviceRetentionTimeSpan => DeviceRetention.TryParseDurationString(out var ts, DurationUnit.Days) ? ts : TimeSpan.FromDays(30);
     }
 
     public partial class ConfigLocators
