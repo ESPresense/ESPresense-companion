@@ -65,7 +65,7 @@ test.describe('Devices Table Sorting', () => {
 		const initialRows = await page.$$eval('tbody tr', (rows) =>
 			rows.map((row) => ({
 				id: row.querySelector('td:first-child')?.textContent?.trim(),
-				lastSeenText: row.querySelector('td:nth-child(9)')?.textContent?.trim()
+				lastSeenText: row.querySelector('td:nth-child(7)')?.textContent?.trim()
 			}))
 		);
 
@@ -80,14 +80,14 @@ test.describe('Devices Table Sorting', () => {
 		const sortedAscRows = await page.$$eval('tbody tr', (rows) =>
 			rows.map((row) => ({
 				id: row.querySelector('td:first-child')?.textContent?.trim(),
-				lastSeenText: row.querySelector('td:nth-child(9)')?.textContent?.trim()
+				lastSeenText: row.querySelector('td:nth-child(7)')?.textContent?.trim()
 			}))
 		);
 
 		// Verify the order is chronological (oldest to newest)
-		expect(sortedAscRows[0].id).toBe('dev-1'); // Oldest (1 hour ago)
-		expect(sortedAscRows[1].id).toBe('dev-3'); // Middle (30 minutes ago)
-		expect(sortedAscRows[2].id).toBe('dev-2'); // Newest (1 minute ago)
+		expect(sortedAscRows[0].id).toBe('Oldest Device'); // Oldest (1 hour ago)
+		expect(sortedAscRows[1].id).toBe('Middle Device'); // Middle (30 minutes ago)
+		expect(sortedAscRows[2].id).toBe('Newest Device'); // Newest (1 minute ago)
 
 		// Click again to sort descending (newest first)
 		await lastSeenHeader.click();
@@ -99,14 +99,14 @@ test.describe('Devices Table Sorting', () => {
 		const sortedDescRows = await page.$$eval('tbody tr', (rows) =>
 			rows.map((row) => ({
 				id: row.querySelector('td:first-child')?.textContent?.trim(),
-				lastSeenText: row.querySelector('td:nth-child(9)')?.textContent?.trim()
+				lastSeenText: row.querySelector('td:nth-child(7)')?.textContent?.trim()
 			}))
 		);
 
 		// Verify the order is reverse chronological (newest to oldest)
-		expect(sortedDescRows[0].id).toBe('dev-2'); // Newest (1 minute ago)
-		expect(sortedDescRows[1].id).toBe('dev-3'); // Middle (30 minutes ago)
-		expect(sortedDescRows[2].id).toBe('dev-1'); // Oldest (1 hour ago)
+		expect(sortedDescRows[0].id).toBe('Newest Device'); // Newest (1 minute ago)
+		expect(sortedDescRows[1].id).toBe('Middle Device'); // Middle (30 minutes ago)
+		expect(sortedDescRows[2].id).toBe('Oldest Device'); // Oldest (1 hour ago)
 	});
 
 	test('lastSeen column shows human-readable time but sorts by date', async ({ page }) => {
@@ -162,8 +162,8 @@ test.describe('Devices Table Sorting', () => {
 		await page.waitForTimeout(100);
 
 		// Get the lastSeen cell text to verify it's displaying human-readable format
-		const firstRowLastSeen = await page.$eval('tbody tr:first-child td:nth-child(9)', (cell) => cell.textContent?.trim());
-		const secondRowLastSeen = await page.$eval('tbody tr:nth-child(2) td:nth-child(9)', (cell) => cell.textContent?.trim());
+		const firstRowLastSeen = await page.$eval('tbody tr:first-child td:nth-child(7)', (cell) => cell.textContent?.trim());
+		const secondRowLastSeen = await page.$eval('tbody tr:nth-child(2) td:nth-child(7)', (cell) => cell.textContent?.trim());
 
 		// Note: The ago library may not work properly in test environment
 		// The important thing is that the sorting works by date, not by string
