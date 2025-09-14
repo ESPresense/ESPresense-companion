@@ -66,7 +66,14 @@ function createToastStore() {
 
 export const toastStore = createToastStore();
 
-// Helper functions for common toast types
+/**
+ * Display a success toast and return its id.
+ *
+ * Triggers a toast with the provided `message` and a success background token (`preset-filled-success-500`).
+ *
+ * @param options - Optional toast settings other than `message` and `background` (e.g., `timeout`, `autohide`, `action`, `id`).
+ * @returns The id of the created toast.
+ */
 export function showSuccess(message: string, options?: Omit<ToastSettings, 'message' | 'background'>): string {
 	return toastStore.trigger({
 		...options,
@@ -75,6 +82,15 @@ export function showSuccess(message: string, options?: Omit<ToastSettings, 'mess
 	});
 }
 
+/**
+ * Show an error toast with a preset error background and return its id.
+ *
+ * The toast's `background` is set to the token `'preset-filled-error-500'`.
+ *
+ * @param message - Text to display in the toast
+ * @param options - Optional additional toast settings (e.g., `id`, `timeout`, `autohide`, `action`)
+ * @returns The toast id
+ */
 export function showError(message: string, options?: Omit<ToastSettings, 'message' | 'background'>): string {
 	return toastStore.trigger({
 		...options,
@@ -83,6 +99,15 @@ export function showError(message: string, options?: Omit<ToastSettings, 'messag
 	});
 }
 
+/**
+ * Show an informational toast and return its id.
+ *
+ * Triggers a toast with the given `message` and a primary info background token (`preset-filled-primary-500`).
+ *
+ * @param message - Text to display in the toast.
+ * @param options - Optional toast settings (e.g., `timeout`, `autohide`, `action`, `id`). `message` and `background` are not accepted here.
+ * @returns The id of the created toast.
+ */
 export function showInfo(message: string, options?: Omit<ToastSettings, 'message' | 'background'>): string {
 	return toastStore.trigger({
 		...options,
@@ -91,6 +116,15 @@ export function showInfo(message: string, options?: Omit<ToastSettings, 'message
 	});
 }
 
+/**
+ * Show a warning toast with the given message.
+ *
+ * The toast's background is set to the warning token `preset-filled-warning-500`.
+ *
+ * @param message - Text to display in the toast.
+ * @param options - Additional ToastSettings (excluding `message` and `background`) to apply.
+ * @returns The id of the created toast.
+ */
 export function showWarning(message: string, options?: Omit<ToastSettings, 'message' | 'background'>): string {
 	return toastStore.trigger({
 		...options,
@@ -99,7 +133,13 @@ export function showWarning(message: string, options?: Omit<ToastSettings, 'mess
 	});
 }
 
-// Compatibility function for migration from Skeleton
+/**
+ * Returns the module's toast store instance.
+ *
+ * Provided for migration compatibility (returns the same `toastStore` exported by this module).
+ *
+ * @returns The toast store instance used for subscribing and managing toasts.
+ */
 export function getToastStore() {
 	return toastStore;
 }

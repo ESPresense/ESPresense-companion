@@ -5,6 +5,25 @@ type MockApiOptions = {
 	stubWebSocket?: boolean;
 };
 
+/**
+ * Installs deterministic mock API routes on a Playwright Page and optionally stubs WebSocket in the page context.
+ *
+ * Installs handlers for:
+ * - /**/api/state/config -> returns a demo configuration object
+ * - /**/api/state/devices -> returns a demo devices array
+ * - /**/api/state/nodes -> returns []
+ * - /**/api/state/calibration -> returns { matrix: {} }
+ * - any other /**/api/state/** path -> returns []
+ * Also registers /**/api/devices -> returns [].
+ *
+ * When `options.stubWebSocket` is true, a lightweight MockWebSocket implementation replaces window.WebSocket in the browser,
+ * which opens immediately, no-ops on send, and fires close when closed — useful to keep the app's websocket logic inactive during tests.
+ *
+ * Note: This function mutates the provided Playwright Page by adding route handlers and/or an initialization script.
+ *
+ * @param options - Optional behavior flags. Recognized property:
+ *   - stubWebSocket: when true, injects a MockWebSocket into the page to prevent real WebSocket activity.
+ */
 export async function mockApi(page: Page, options: MockApiOptions = {}) {
 	// Demo data used across routes
 	const demoConfig = {
