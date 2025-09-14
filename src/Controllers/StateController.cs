@@ -303,6 +303,7 @@ public class StateController : ControllerBase
             _eventDispatcher.NodeStateChanged -= OnNodeStateChanged;
             _eventDispatcher.DeviceStateChanged -= OnDeviceChanged;
             _eventDispatcher.DeviceMessageReceived -= OnDeviceMessageReceived;
+            _eventDispatcher.DeviceRemoved -= OnDeviceRemoved;
         }
     }
 
