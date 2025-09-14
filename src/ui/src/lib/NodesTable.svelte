@@ -11,16 +11,15 @@
 	let columns = [
 		{
 			key: 'activeId',
-			title: 'Id',
+			title: 'Name',
 			renderComponent: { component: NodeActiveId },
 			sortable: true,
 			defaultSort: true,
 			sortValue: (d: Node) => {
-				// Sort by active status first (online=0, offline=1), then by id descending
-				return `${d.online ? '0' : '1'}_${d.id}`;
+				// Sort by active status first (online=0, offline=1), then by name/id
+				return `${d.online ? '0' : '1'}_${d.name || d.id}`;
 			}
 		},
-		{ key: 'name', title: 'Name', value: (d: Node) => d.name ?? '', sortable: true },
 		{ key: 'telemetry.version', title: 'Version', value: (d: Node) => d.telemetry?.version ?? 'n/a', sortable: true },
 		{ key: 'cpu.name', title: 'CPU', value: (d: Node) => d.cpu?.name ?? 'n/a', sortable: true },
 		{ key: 'flavor.name', title: 'Flavor', value: (d: Node) => d.flavor?.name ?? 'n/a', sortable: true },
@@ -36,7 +35,7 @@
 		dispatcher('selected', n);
 	}
 
-	function onRowClick(e) {
+	function onRowClick(e: any) {
 		select(e.detail.row);
 	}
 </script>

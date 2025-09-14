@@ -2,6 +2,7 @@
 	import NodesTable from '$lib/NodesTable.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { base } from '$app/paths';
+	import { detail } from '$lib/urls';
 	import type { NodeSettingDetails } from '$lib/types';
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
 	import { onMount } from 'svelte';
@@ -103,6 +104,6 @@
 			{/if}
 		</div>
 
-		<NodesTable />
+		<NodesTable on:selected={(e) => detail(e.detail)} />
 	</div>
 </div>

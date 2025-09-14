@@ -7,9 +7,9 @@
 	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
 	import Map from '$lib/Map.svelte';
-	import DeviceDetailTabs from '$lib/DeviceDetailTabs.svelte';
 	import DeviceCalibration from '$lib/DeviceCalibration.svelte';
 	import DeviceSettings from '$lib/DeviceSettings.svelte';
+	import DeviceBreadcrumb from '$lib/DeviceBreadcrumb.svelte';
 
 	// Define type for the details array items
 	type DeviceDetailItem = { key: string; value: string };
@@ -50,23 +50,27 @@
 	<title>ESPresense Companion: Device Detail</title>
 </svelte:head>
 
-<div class="flex flex-col h-full">
-	<div class="flex-shrink-0">
-		<DeviceDetailTabs deviceId={data.settings?.id} floorId={device?.floor?.id} bind:tab={currentTab} />
-	</div>
-	<div class="flex flex-1 min-h-0">
-		<div class="flex-grow overflow-auto">
-			{#if currentTab === 'map'}
+<div class="flex h-full">
+	<div class="flex-grow overflow-auto">
+		<!-- Breadcrumb Navigation -->
+		<DeviceBreadcrumb 
+			deviceName={device?.name || device?.id || 'Unknown Device'} 
+			currentView={currentTab === 'calibration' ? 'calibration' : 'map'} 
+		/>
+		
+		{#if currentTab === 'map'}
+			<div class="h-full">
 				<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
-			{:else if currentTab === 'calibration'}
-				{#if data.settings?.id}
-					<DeviceCalibration deviceSettings={data.settings} />
-				{:else}
-					<p class="p-4">Device ID not found.</p>
-				{/if}
+			</div>
+		{:else if currentTab === 'calibration'}
+			{#if data.settings?.id}
+				<DeviceCalibration deviceSettings={data.settings} />
+			{:else}
+				<p class="p-4">Device ID not found.</p>
 			{/if}
-		</div>
-		<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
+		{/if}
+	</div>
+	<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
 		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>
 			<Accordion.Item value="details">
 				{#snippet control()}
@@ -92,6 +96,5 @@
 				{/snippet}
 			</Accordion.Item>
 		</Accordion>
-		</div>
 	</div>
 </div>
