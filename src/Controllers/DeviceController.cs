@@ -10,12 +10,14 @@ namespace ESPresense.Controllers
     {
         private readonly ILogger<DeviceController> _logger;
         private readonly DeviceSettingsStore _deviceSettingsStore;
+        private readonly DeviceService _deviceService;
         private readonly State _state;
 
-        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, State state)
+        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, DeviceService deviceService, State state)
         {
             _logger = logger;
             _deviceSettingsStore = deviceSettingsStore;
+            _deviceService = deviceService;
             _state = state;
         }
 
@@ -38,16 +40,8 @@ namespace ESPresense.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            if (!_state.Devices.TryRemove(id, out var device))
-                return NotFound();
-
-            // Delete auto-discovery so HA cleans up entities/topics
-            foreach (var ad in device.HassAutoDiscovery)
-                await ad.Delete(HttpContext.RequestServices.GetRequiredService<MqttCoordinator>());
-
-            // Notify clients to remove immediately
-            HttpContext.RequestServices.GetRequiredService<GlobalEventDispatcher>().OnDeviceRemoved(id);
-            return NoContent();
+            var deleted = await _deviceService.DeleteAsync(id, "manual");
+            return deleted ? NoContent() : NotFound();
         }
     }
 

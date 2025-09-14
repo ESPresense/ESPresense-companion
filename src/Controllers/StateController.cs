@@ -173,6 +173,7 @@ public class StateController : ControllerBase
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
         void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => EnqueueAndSignal(new { type = "calibrationChanged", data = e.Calibration });
         void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => EnqueueAndSignal(new { type = "nodeStateChanged", data = e.NodeState });
+        void OnDeviceRemoved(object? sender, DeviceRemovedEventArgs e) => EnqueueAndSignal(new { type = "deviceRemoved", deviceId = e.DeviceId });
         void OnDeviceChanged(object? sender, DeviceEventArgs e)
         {
             if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
@@ -203,7 +204,7 @@ public class StateController : ControllerBase
         _eventDispatcher.NodeStateChanged += OnNodeStateChanged;
         _eventDispatcher.DeviceStateChanged += OnDeviceChanged;
         _eventDispatcher.DeviceMessageReceived += OnDeviceMessageReceived;
-        _eventDispatcher.DeviceRemoved += (_, e) => EnqueueAndSignal(new { type = "deviceRemoved", deviceId = e.DeviceId });
+        _eventDispatcher.DeviceRemoved += OnDeviceRemoved;
 
         try
         {
