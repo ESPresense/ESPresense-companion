@@ -6,8 +6,11 @@ const config: PlaywrightTestConfig = {
 	},
 	webServer: {
 		command: 'pnpm run build && pnpm run preview -- --port 4173',
-		url: 'http://localhost:4173'
-	}
+		url: 'http://localhost:4173',
+		timeout: 60000
+	},
+	testDir: './tests',
+	testMatch: '**/*.spec.ts'
 };
 
 export default config;

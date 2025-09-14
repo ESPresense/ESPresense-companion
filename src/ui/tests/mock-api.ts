@@ -9,12 +9,12 @@ type MockApiOptions = {
  * Installs deterministic mock API routes on a Playwright Page and optionally stubs WebSocket in the page context.
  *
  * Installs handlers for:
- * - /**/api/state/config -> returns a demo configuration object
- * - /**/api/state/devices -> returns a demo devices array
- * - /**/api/state/nodes -> returns []
- * - /**/api/state/calibration -> returns { matrix: {} }
- * - any other /**/api/state/** path -> returns []
- * Also registers /**/api/devices -> returns [].
+ * - API state config endpoint returns a demo configuration object
+ * - API state devices endpoint returns a demo devices array
+ * - API state nodes endpoint returns []
+ * - API state calibration endpoint returns { matrix: {} }
+ * - any other API state paths return []
+ * Also registers API devices endpoint returns [].
  *
  * When `options.stubWebSocket` is true, a lightweight MockWebSocket implementation replaces window.WebSocket in the browser,
  * which opens immediately, no-ops on send, and fires close when closed — useful to keep the app's websocket logic inactive during tests.
