@@ -10,12 +10,14 @@ namespace ESPresense.Controllers
     {
         private readonly ILogger<DeviceController> _logger;
         private readonly DeviceSettingsStore _deviceSettingsStore;
+        private readonly DeviceService _deviceService;
         private readonly State _state;
 
-        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, State state)
+        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, DeviceService deviceService, State state)
         {
             _logger = logger;
             _deviceSettingsStore = deviceSettingsStore;
+            _deviceService = deviceService;
             _state = state;
         }
 
@@ -33,6 +35,13 @@ namespace ESPresense.Controllers
         public async Task Set(string id, [FromBody] DeviceSettings value)
         {
             await _deviceSettingsStore.Set(id, value);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(string id)
+        {
+            var deleted = await _deviceService.DeleteAsync(id, "manual");
+            return deleted ? NoContent() : NotFound();
         }
     }
 

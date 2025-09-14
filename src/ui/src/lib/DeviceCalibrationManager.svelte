@@ -12,7 +12,7 @@
 	// Filter devices based on activity status
 	$: filteredDevices = $devices?.filter(device => {
 		if (showInactiveDevices) return true;
-		
+
 		// Check if device is active based on lastSeen and timeout
 		if (device.lastSeen == null) return false;
 		const timeout = device.timeout !== null && device.timeout !== undefined ? device.timeout : 30000;
@@ -94,15 +94,6 @@
 				const configured = d['rssi@1m'];
 				let color = 'text-surface-600-300';
 				let text = formatRssi(measured);
-				
-				// Add visual indication if values differ significantly
-				if (measured !== null && measured !== undefined && 
-					configured !== null && configured !== undefined && 
-					Math.abs(measured - configured) > 5) {
-					color = 'text-warning-500';
-					text += ' ⚠️';
-				}
-				
 				return `<span class="${color}">${text}</span>`;
 			}
 		},
@@ -177,9 +168,9 @@
 		<div class="card p-4">
 			<header class="text-lg font-semibold mb-4">Device Calibration Status</header>
 			{#if filteredDevices.length > 0}
-				<DataTable 
-					{columns} 
-					rows={filteredDevices} 
+				<DataTable
+					{columns}
+					rows={filteredDevices}
 					classNameTable="table table-compact"
 					on:clickRow={onRowClick}
 				/>
@@ -195,9 +186,6 @@
 			<header class="font-semibold mb-2">Instructions</header>
 			<ul class="list-disc pl-6 space-y-1 text-sm">
 				<li>Click "Calibrate" or click on an active device row to start calibration</li>
-				<li><strong>Configured RSSI@1m</strong>: Manually set calibration values that determine calibration status</li>
-				<li><strong>Measured RSSI@1m</strong>: Real-time averages from active nodes (for reference/validation)</li>
-				<li>⚠️ indicates significant difference between configured and measured values</li>
 				<li>Devices marked "Not Calibrated" should be calibrated for optimal accuracy</li>
 				<li>Only active devices (recently seen) can be calibrated</li>
 			</ul>

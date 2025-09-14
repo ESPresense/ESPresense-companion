@@ -26,6 +26,10 @@ timeout: 30
 # How long before device is considered away
 away_timeout: 120
 
+# Retain devices for this long since last seen (duration string)
+# Examples: "30d", "720h", "2592000s"
+device_retention: 30d
+
 optimization:
   enabled: true
   interval_secs: 3600
@@ -251,8 +255,7 @@ devices:
   - id: "iBeacon:*"
   - id: "car:*"
   - id: "laptop:*"
-  - id: "itag:f0f010303080"
-    name: "Piper's Backpack"
+  - id: "backpack:*"
 
 # Devices to NOT track
 exclude_devices:

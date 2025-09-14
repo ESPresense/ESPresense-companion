@@ -67,6 +67,7 @@ builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();
+builder.Services.AddSingleton<DeviceService>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
@@ -75,6 +76,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Device
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
+builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
