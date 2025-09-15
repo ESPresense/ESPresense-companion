@@ -50,25 +50,24 @@
 	<title>ESPresense Companion: Device Detail</title>
 </svelte:head>
 
-<div class="flex h-full">
-	<div class="flex-grow overflow-auto">
+<div class="flex h-full min-h-0">
+	<div class="flex flex-col flex-grow min-h-0">
 		<!-- Breadcrumb Navigation -->
-		<DeviceBreadcrumb 
-			deviceName={device?.name || device?.id || 'Unknown Device'} 
-			currentView={currentTab === 'calibration' ? 'calibration' : 'map'} 
-		/>
-		
-		{#if currentTab === 'map'}
-			<div class="h-full">
+		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView={currentTab === 'calibration' ? 'calibration' : 'map'} />
+
+		<div class="flex-1 min-h-0 overflow-hidden">
+			{#if currentTab === 'map'}
 				<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
-			</div>
-		{:else if currentTab === 'calibration'}
-			{#if data.settings?.id}
-				<DeviceCalibration deviceSettings={data.settings} />
-			{:else}
-				<p class="p-4">Device ID not found.</p>
+			{:else if currentTab === 'calibration'}
+				{#if data.settings?.id}
+					<div class="h-full overflow-auto">
+						<DeviceCalibration deviceSettings={data.settings} />
+					</div>
+				{:else}
+					<p class="p-4">Device ID not found.</p>
+				{/if}
 			{/if}
-		{/if}
+		</div>
 	</div>
 	<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
 		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>

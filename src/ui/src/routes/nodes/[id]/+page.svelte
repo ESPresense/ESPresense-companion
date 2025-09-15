@@ -43,16 +43,16 @@
 	<title>ESPresense Companion: Node Detail</title>
 </svelte:head>
 
-<div class="flex h-full">
-	<div class="flex-grow overflow-auto">
+<div class="flex h-full min-h-0">
+	<div class="flex flex-col flex-grow min-h-0">
 		<!-- Breadcrumb Navigation -->
-		<NodeBreadcrumb 
-			nodeName={node?.name || node?.id || 'Unknown Node'} 
+		<NodeBreadcrumb
+			nodeName={node?.name || node?.id || 'Unknown Node'}
 			bind:currentFloorId={floorId}
 			{node}
 		/>
-		
-		<div class="h-full">
+
+		<div class="flex-1 min-h-0 overflow-hidden">
 			<Map deviceId="none" nodeId={data.settings?.id} bind:floorId exclusive={true} />
 		</div>
 	</div>
