@@ -194,6 +194,7 @@ public class MqttCoordinator
     public event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
     public event Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceivedAsync;
     public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
+    public event Func<NodeStatusRemovedEventArgs, Task>? NodeStatusRemovedAsync;
     public event EventHandler? MqttMessageMalformed;
     public event EventHandler<PreviousDeviceDiscoveredEventArgs>? PreviousDeviceDiscovered;
     public event Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceivedAsync;
@@ -294,14 +295,22 @@ public class MqttCoordinator
             return Task.CompletedTask;
         }
 
-        client.ApplicationMessageReceivedAsync += handler;
-        await client.SubscribeAsync(topicFilter);
-        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-        await client.UnsubscribeAsync(topicFilter);
-        client.ApplicationMessageReceivedAsync -= handler;
+        try
+        {
+            client.ApplicationMessageReceivedAsync += handler;
+            await client.SubscribeAsync(topicFilter);
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await client.UnsubscribeAsync(topicFilter);
 
-        foreach (var topic in topics)
-            await EnqueueAsync(topic, null, true);
+            foreach (var topic in topics)
+                await EnqueueAsync(topic, null, true);
+                
+            _logger.LogDebug("Cleared {Count} retained messages for pattern {Pattern}", topics.Count, topicFilter);
+        }
+        finally
+        {
+            client.ApplicationMessageReceivedAsync -= handler;
+        }
     }
     
     private async Task ProcessTelemetryMessage(string nodeId, string? payload)
@@ -338,15 +347,30 @@ public class MqttCoordinator
 
     private async Task ProcessStatusMessage(string nodeId, string? payload)
     {
-        if (NodeStatusReceivedAsync == null || string.IsNullOrEmpty(payload))
-            return;
-
-        var online = payload == "online";
-        await NodeStatusReceivedAsync(new NodeStatusReceivedEventArgs
+        if (string.IsNullOrEmpty(payload))
         {
-            NodeId = nodeId,
-            Online = online
-        });
+            // Retained message cleared - node removed
+            if (NodeStatusRemovedAsync != null)
+            {
+                await NodeStatusRemovedAsync(new NodeStatusRemovedEventArgs
+                {
+                    NodeId = nodeId
+                });
+            }
+        }
+        else
+        {
+            // Normal status update
+            if (NodeStatusReceivedAsync != null)
+            {
+                var online = payload == "online";
+                await NodeStatusReceivedAsync(new NodeStatusReceivedEventArgs
+                {
+                    NodeId = nodeId,
+                    Online = online
+                });
+            }
+        }
     }
 
     private async Task ProcessDeviceMessage(string deviceId, string nodeId, string? payload)

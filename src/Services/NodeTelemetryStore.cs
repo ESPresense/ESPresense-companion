@@ -19,13 +19,26 @@ public class NodeTelemetryStore : BackgroundService
     {
         _mqttCoordinator.NodeTelemetryReceivedAsync += arg =>
         {
-            _storeById.AddOrUpdate(arg.NodeId, _ => arg.Payload, (_, _) => arg.Payload);
+            if (arg.Payload == null)
+            {
+                _storeById.TryRemove(arg.NodeId, out _);
+            }
+            else
+            {
+                _storeById.AddOrUpdate(arg.NodeId, _ => arg.Payload, (_, _) => arg.Payload);
+            }
             return Task.CompletedTask;
         };
 
         _mqttCoordinator.NodeStatusReceivedAsync += arg =>
         {
             _onlineById.AddOrUpdate(arg.NodeId, _ => arg.Online, (_, _) => arg.Online);
+            return Task.CompletedTask;
+        };
+
+        _mqttCoordinator.NodeStatusRemovedAsync += arg =>
+        {
+            _onlineById.TryRemove(arg.NodeId, out _);
             return Task.CompletedTask;
         };
 
@@ -45,12 +58,7 @@ public class NodeTelemetryStore : BackgroundService
 
     public async Task Delete(string id)
     {
-        _storeById.TryRemove(id, out _);
-        _onlineById.TryRemove(id, out _);
-
         await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/telemetry", null, true);
         await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/status", null, true);
-
-        await _mqttCoordinator.ClearRetainedAsync($"espresense/rooms/{id}/#");
     }
 }
