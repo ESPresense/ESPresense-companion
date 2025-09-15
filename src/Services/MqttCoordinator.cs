@@ -193,6 +193,7 @@ public class MqttCoordinator
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
     public event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
     public event Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceivedAsync;
+    public event Func<NodeTelemetryRemovedEventArgs, Task>? NodeTelemetryRemovedAsync;
     public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
     public event Func<NodeStatusRemovedEventArgs, Task>? NodeStatusRemovedAsync;
     public event EventHandler? MqttMessageMalformed;
@@ -304,7 +305,7 @@ public class MqttCoordinator
 
             foreach (var topic in topics)
                 await EnqueueAsync(topic, null, true);
-                
+
             _logger.LogDebug("Cleared {Count} retained messages for pattern {Pattern}", topics.Count, topicFilter);
         }
         finally
@@ -312,10 +313,22 @@ public class MqttCoordinator
             client.ApplicationMessageReceivedAsync -= handler;
         }
     }
-    
+
     private async Task ProcessTelemetryMessage(string nodeId, string? payload)
     {
-        if (NodeTelemetryReceivedAsync == null || string.IsNullOrEmpty(payload))
+        if (string.IsNullOrEmpty(payload))
+        {
+            if (NodeTelemetryRemovedAsync != null)
+            {
+                await NodeTelemetryRemovedAsync(new NodeTelemetryRemovedEventArgs
+                {
+                    NodeId = nodeId
+                });
+            }
+            return;
+        }
+
+        if (NodeTelemetryReceivedAsync == null)
             return;
 
         try

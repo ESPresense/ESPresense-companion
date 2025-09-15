@@ -7,7 +7,7 @@ public class NodeTelemetryStore : BackgroundService
 {
     private readonly MqttCoordinator _mqttCoordinator;
 
-    private readonly ConcurrentDictionary<string, NodeTelemetry> _storeById = new();
+    private readonly ConcurrentDictionary<string, NodeTelemetry> _teleById = new();
     private readonly ConcurrentDictionary<string, bool> _onlineById = new();
 
     public NodeTelemetryStore(MqttCoordinator mqttCoordinator)
@@ -19,14 +19,13 @@ public class NodeTelemetryStore : BackgroundService
     {
         _mqttCoordinator.NodeTelemetryReceivedAsync += arg =>
         {
-            if (arg.Payload == null)
-            {
-                _storeById.TryRemove(arg.NodeId, out _);
-            }
-            else
-            {
-                _storeById.AddOrUpdate(arg.NodeId, _ => arg.Payload, (_, _) => arg.Payload);
-            }
+            _teleById.AddOrUpdate(arg.NodeId, _ => arg.Payload, (_, _) => arg.Payload);
+            return Task.CompletedTask;
+        };
+
+        _mqttCoordinator.NodeTelemetryRemovedAsync += arg =>
+        {
+            _teleById.TryRemove(arg.NodeId, out _);
             return Task.CompletedTask;
         };
 
@@ -47,7 +46,7 @@ public class NodeTelemetryStore : BackgroundService
 
     public NodeTelemetry? Get(string id)
     {
-        _storeById.TryGetValue(id, out var ds);
+        _teleById.TryGetValue(id, out var ds);
         return ds;
     }
 

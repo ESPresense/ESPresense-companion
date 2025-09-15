@@ -21,7 +21,7 @@ public class MappingServiceTests
 
     private static Node MakeNode(string id, string name, IEnumerable<Floor> floors)
     {
-        var n = new Node(id);
+        var n = new Node(id, NodeSourceType.Config);
         n.Update(new Config(), new ConfigNode { Id = id, Name = name, Point = new[] { 1.0, 2.0, 3.0 }, Floors = floors.Select(f => f.Id!).ToArray(), Stationary = true }, floors);
         return n;
     }

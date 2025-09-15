@@ -61,12 +61,12 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
         {
             bool isNode = arg.DeviceId.StartsWith("node:");
 
-            if (!state.Nodes.TryGetValue(arg.NodeId, out var rx))
+            var rx = state.Nodes.GetOrAdd(arg.NodeId, id =>
             {
-                state.Nodes[arg.NodeId] = rx = new Node(arg.NodeId);
-                if (tele.AddUnknownNode(arg.NodeId))
-                    Log.Warning("Unknown node {nodeId}", arg.NodeId);
-            }
+                if (tele.AddUnknownNode(id))
+                    Log.Warning("Unknown node {nodeId}", id);
+                return new Node(id, NodeSourceType.Discovered);
+            });
 
             if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
             {

@@ -7,13 +7,15 @@ using ESPresense.Extensions;
 
 namespace ESPresense.Models;
 
-public class Node(string id)
+public class Node(string id, NodeSourceType sourceType)
 {
     [JsonIgnore]
     public Config? Config { get; private set; }
 
     [PrimaryKey]
     public string Id { get; } = id;
+
+    public NodeSourceType SourceType { get; } = sourceType;
 
     public string? Name { get; private set; }
 
