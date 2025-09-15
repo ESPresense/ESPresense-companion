@@ -20,15 +20,23 @@ public class DeviceControllerTests
         
         // Create mocks with interface
         var mockConfigLoader = new Mock<ConfigLoader>("test-config-dir");
-        var mockMqttCoordinator = new Mock<IMqttCoordinator>();
+        var mockMqttCoordinatorInterface = new Mock<IMqttCoordinator>();
         
-        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(mockMqttCoordinator.Object);
-        var mockNodeTelemetryStore = new Mock<NodeTelemetryStore>(mockMqttCoordinator.Object);
+        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(mockMqttCoordinatorInterface.Object);
+        var mockNodeTelemetryStore = new Mock<NodeTelemetryStore>(mockMqttCoordinatorInterface.Object);
         _mockState = new Mock<State>(mockConfigLoader.Object, mockNodeTelemetryStore.Object);
+        
+        // Create dependencies for DeviceService
+        var mockMqttCoordinatorConcrete = CreateMockMqttCoordinator();
+        var globalEventDispatcher = new GlobalEventDispatcher();
+        var mockDeviceServiceLogger = new Mock<ILogger<DeviceService>>();
+        
+        var deviceService = new DeviceService(_mockState.Object, mockMqttCoordinatorConcrete, globalEventDispatcher, mockDeviceServiceLogger.Object);
         
         _deviceController = new DeviceController(
             _mockLogger.Object,
             _mockDeviceSettingsStore.Object,
+            deviceService,
             _mockState.Object
         );
     }
@@ -210,5 +218,22 @@ public class DeviceControllerTests
 
         // Assert
         _mockDeviceSettingsStore.Verify(x => x.Set(deviceId, deviceSettings), Times.Once);
+    }
+
+    private MqttCoordinator CreateMockMqttCoordinator()
+    {
+        // Create all required dependencies for MqttCoordinator
+        var mockConfigLoader = new Mock<ConfigLoader>("test-config-dir");
+        var mockLogger = new Mock<ILogger<MqttCoordinator>>();
+        var mockMqttNetLogger = new Mock<MQTTnet.Diagnostics.IMqttNetLogger>();
+        var mockSupervisorLogger = new Mock<ILogger<SupervisorConfigLoader>>();
+        var supervisorConfigLoader = new SupervisorConfigLoader(mockSupervisorLogger.Object);
+        
+        return new MqttCoordinator(
+            mockConfigLoader.Object,
+            mockLogger.Object,
+            mockMqttNetLogger.Object,
+            supervisorConfigLoader
+        );
     }
 }
