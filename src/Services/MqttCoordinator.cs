@@ -306,7 +306,8 @@ public class MqttCoordinator
             foreach (var topic in topics)
                 await EnqueueAsync(topic, null, true);
 
-            _logger.LogDebug("Cleared {Count} retained messages for pattern {Pattern}", topics.Count, topicFilter);
+            var sanitizedPattern = topicFilter.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+            _logger.LogDebug("Cleared {Count} retained messages for pattern {Pattern}", topics.Count, sanitizedPattern);
         }
         finally
         {

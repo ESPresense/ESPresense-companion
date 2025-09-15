@@ -15,7 +15,7 @@ public class Node(string id, NodeSourceType sourceType)
     [PrimaryKey]
     public string Id { get; } = id;
 
-    public NodeSourceType SourceType { get; } = sourceType;
+    public NodeSourceType SourceType { get; private set; } = sourceType;
 
     public string? Name { get; private set; }
 
@@ -49,6 +49,7 @@ public class Node(string id, NodeSourceType sourceType)
         double[]? point = cn.Point?.EnsureLength(3);
         Location = new Point3D(point?[0] ?? 0, point?[1] ?? 0, point?[2] ?? 0);
         Stationary = cn.Stationary;
+        SourceType = NodeSourceType.Config;
     }
 
     public Floor[]? Floors { get; private set; }
