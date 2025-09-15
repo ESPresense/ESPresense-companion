@@ -43,6 +43,7 @@ export interface Node {
 	location: { x: number; y: number; z: number };
 	floors: string[];
 	nodes: { [index: string]: { dist: number; var: number; lh: number } };
+	sourceType: 'Config' | 'Discovered';
 }
 
 export interface Device {

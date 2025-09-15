@@ -205,31 +205,14 @@ namespace ESPresense.Services
             await mqtt.EnqueueAsync($"espresense/rooms/{id}/restart/set", "PRESS");
         }
 
+        /// <summary>
+        /// Removes a node's retained MQTT settings and clears its in-memory NodeSettings entry.
+        /// </summary>
+        /// <param name="id">The node/room identifier whose retained settings and in-memory entry should be removed.</param>
+        /// <returns>A task that completes when the retained MQTT messages have been cleared and the in-memory entry removed.</returns>
         public async Task Delete(string id)
         {
-            string[] settings = new[]
-            {
-                "name",
-                "auto_update",
-                "prerelease",
-                "forget_after_ms",
-                "count_ids",
-                "count_min_dist",
-                "count_max_dist",
-                "count_ms",
-                "include",
-                "exclude",
-                "max_distance",
-                "skip_distance",
-                "skip_ms",
-                "absorption",
-                "rx_adj_rssi",
-                "tx_ref_rssi",
-                "ref_rssi"
-            };
-
-            foreach (var setting in settings)
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/{setting}", null, true);
+            await mqtt.ClearRetainedAsync($"espresense/rooms/{id}/#");
 
             _storeById.TryRemove(id, out _);
         }

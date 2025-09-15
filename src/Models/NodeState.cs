@@ -14,6 +14,12 @@ public class NodeState
     public Point3D Location { get; set; }
     public string[]? Floors { get; set; }
 
+    /// <summary>
+    /// Source of this node (Config or Discovered)
+    /// </summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+    public NodeSourceType SourceType { get; set; }
+
     [System.Text.Json.Serialization.JsonConverter(typeof(NodeToNodeConverter))]
     public ConcurrentDictionary<string, NodeToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 }

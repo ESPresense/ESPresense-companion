@@ -219,6 +219,10 @@
 			</a>
 		{/if}
 	{:else}
-		<button on:click={() => onDelete(row)} class="btn btn-sm preset-filled-error-500" aria-label="Delete node">Delete</button>
+		{#if row.sourceType === 'Config'}
+			<button disabled class="btn btn-sm preset-filled-surface-500 disabled:pointer-events-none disabled:cursor-not-allowed" aria-label="Config-defined node cannot be deleted" title="This node is defined in config.yaml and cannot be deleted from the UI">Delete</button>
+		{:else}
+			<button on:click={() => onDelete(row)} class="btn btn-sm preset-filled-error-500" aria-label="Delete node">Delete</button>
+		{/if}
 	{/if}
 </div>

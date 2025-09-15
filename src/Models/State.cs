@@ -13,6 +13,14 @@ public class State
 {
     private readonly NodeTelemetryStore _nts;
 
+    /// <summary>
+    /// Initializes a new State, wiring telemetry and configuration handling.
+    /// </summary>
+    /// <remarks>
+    /// Subscribes to the provided ConfigLoader's ConfigChanged event and loads the current configuration if present.
+    /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
+    /// selects the locators' weighting strategy, and marks existing Devices for checking.
+    /// </remarks>
     public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
         _nts = nts;
@@ -20,7 +28,7 @@ public class State
         {
             Config = c;
             foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
-            foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId())).Update(c, cn, GetFloorsByIds(cn.Floors));
+            foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
 
             var idsToTrack = new List<Glob>();
             var configDeviceById = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);

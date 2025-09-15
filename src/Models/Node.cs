@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using ESPresense.Converters;
 using MathNet.Spatial.Euclidean;
@@ -7,13 +7,15 @@ using ESPresense.Extensions;
 
 namespace ESPresense.Models;
 
-public class Node(string id)
+public class Node(string id, NodeSourceType sourceType)
 {
     [JsonIgnore]
     public Config? Config { get; private set; }
 
     [PrimaryKey]
     public string Id { get; } = id;
+
+    public NodeSourceType SourceType { get; private set; } = sourceType;
 
     public string? Name { get; private set; }
 
@@ -39,6 +41,15 @@ public class Node(string id)
     }
 
 
+    /// <summary>
+    /// Update this Node's metadata and state from the provided configuration data.
+    /// </summary>
+    /// <remarks>
+    /// Sets the Node's Config, Name, Floors, Location (X/Y/Z), Stationary flag, and marks SourceType as <see cref="NodeSourceType.Config"/>.
+    /// </remarks>
+    /// <param name="c">The root configuration object containing broader context for the node.</param>
+    /// <param name="cn">The node-specific configuration used to populate name, point, and stationary state.</param>
+    /// <param name="floors">Collection of floors the node belongs to; stored as an array on the Node.</param>
     public void Update(Config c, ConfigNode cn, IEnumerable<Floor> floors)
     {
         Config = c;
@@ -47,6 +58,7 @@ public class Node(string id)
         double[]? point = cn.Point?.EnsureLength(3);
         Location = new Point3D(point?[0] ?? 0, point?[1] ?? 0, point?[2] ?? 0);
         Stationary = cn.Stationary;
+        SourceType = NodeSourceType.Config;
     }
 
     public Floor[]? Floors { get; private set; }
