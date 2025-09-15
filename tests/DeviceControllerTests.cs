@@ -13,6 +13,22 @@ public class DeviceControllerTests
     private Mock<State> _mockState;
     private DeviceController _deviceController;
 
+    // Test device that returns predictable GetDetails data
+    private class TestDevice : Device
+    {
+        public TestDevice(string id, string? discoveryId, TimeSpan timeout) : base(id, discoveryId, timeout)
+        {
+        }
+
+        public override IEnumerable<KeyValuePair<string, string>> GetDetails()
+        {
+            yield return new KeyValuePair<string, string>("Best Scenario", "Test Scenario");
+            yield return new KeyValuePair<string, string>("Test Key 1", "Test Value 1");
+            yield return new KeyValuePair<string, string>("Test Key 2", "Test Value 2");
+            yield return new KeyValuePair<string, string>("Confidence", "95");
+        }
+    }
+
     [SetUp]
     public void Setup()
     {
@@ -94,7 +110,6 @@ public class DeviceControllerTests
     }
 
     [Test]
-    [Ignore("Needs to be updated for real instances")]
     public void Get_Should_Return_Details_From_State_When_Device_Exists()
     {
         // Arrange
@@ -106,19 +121,15 @@ public class DeviceControllerTests
             RefRssi = -58
         };
 
-        // Create a real Device instance since GetDetails() is not virtual
-        var testDevice = new Device("keys:darrell", null, TimeSpan.FromMinutes(5));
+        // Create a TestDevice instance with predictable GetDetails data
+        var testDevice = new TestDevice("keys:darrell", null, TimeSpan.FromMinutes(5));
         
-        var stateDevices = new System.Collections.Concurrent.ConcurrentDictionary<string, Device>();
-        stateDevices.TryAdd("keys:darrell", testDevice);
+        // Add the TestDevice directly to the real State instance
+        _mockState.Object.Devices.TryAdd("keys:darrell", testDevice);
 
         _mockDeviceSettingsStore
             .Setup(x => x.Get("keys:darrell"))
             .Returns(deviceSettings);
-
-        _mockState
-            .Setup(x => x.Devices)
-            .Returns(stateDevices);
 
         // Act
         var result = _deviceController.Get("keys:darrell");
@@ -126,8 +137,13 @@ public class DeviceControllerTests
         // Assert
         Assert.That(result.settings, Is.Not.Null);
         Assert.That(result.details, Is.Not.Null);
-        Assert.That(result.details.Count, Is.GreaterThan(0));
-        Assert.That(result.details.Any(d => d.Key == "Best Scenario"), Is.True);
+        Assert.That(result.details.Count, Is.EqualTo(4));
+        
+        // Test specific details returned by TestDevice
+        Assert.That(result.details.Any(d => d.Key == "Best Scenario" && d.Value == "Test Scenario"), Is.True);
+        Assert.That(result.details.Any(d => d.Key == "Test Key 1" && d.Value == "Test Value 1"), Is.True);
+        Assert.That(result.details.Any(d => d.Key == "Test Key 2" && d.Value == "Test Value 2"), Is.True);
+        Assert.That(result.details.Any(d => d.Key == "Confidence" && d.Value == "95"), Is.True);
     }
 
     [Test]
@@ -154,7 +170,6 @@ public class DeviceControllerTests
     }
 
     [Test]
-    [Ignore("Needs to be updated for real instances")]
     public void Get_Should_Handle_Aliased_Device_With_State_Data()
     {
         // Arrange - This tests the key scenario where calibration data 
@@ -167,20 +182,15 @@ public class DeviceControllerTests
             RefRssi = -62
         };
 
-        // Create a real Device instance since GetDetails() is not virtual
-        var testDevice = new Device("keys:dt-spare", null, TimeSpan.FromMinutes(5));
+        // Create a TestDevice instance with predictable GetDetails data
+        var testDevice = new TestDevice("keys:dt-spare", null, TimeSpan.FromMinutes(5));
 
-        // State data should be indexed by the aliased ID
-        var stateDevices = new System.Collections.Concurrent.ConcurrentDictionary<string, Device>();
-        stateDevices.TryAdd("keys:dt-spare", testDevice);
+        // Add the TestDevice directly to the real State instance (indexed by aliased ID)
+        _mockState.Object.Devices.TryAdd("keys:dt-spare", testDevice);
 
         _mockDeviceSettingsStore
             .Setup(x => x.Get("keys:dt-spare"))
             .Returns(deviceSettings);
-
-        _mockState
-            .Setup(x => x.Devices)
-            .Returns(stateDevices);
 
         // Act
         var result = _deviceController.Get("keys:dt-spare");
@@ -190,10 +200,10 @@ public class DeviceControllerTests
         Assert.That(result.settings.Id, Is.EqualTo("keys:dt-spare"));
         Assert.That(result.settings.OriginalId, Is.EqualTo("keys:dt-spar"));
         
-        // Device details should be available
+        // Device details should be available from TestDevice
         Assert.That(result.details, Is.Not.Null);
-        Assert.That(result.details.Count, Is.GreaterThan(0));
-        Assert.That(result.details.Any(d => d.Key == "Best Scenario"), Is.True);
+        Assert.That(result.details.Count, Is.EqualTo(4));
+        Assert.That(result.details.Any(d => d.Key == "Best Scenario" && d.Value == "Test Scenario"), Is.True);
     }
 
     [Test]
