@@ -1,4 +1,4 @@
-﻿using ESPresense.Models;
+using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
@@ -9,6 +9,14 @@ namespace ESPresense.Controllers;
 [ApiController]
 public class NodeController(NodeSettingsStore nodeSettingsStore, NodeTelemetryStore nodeTelemetryStore, State state) : ControllerBase
 {
+    /// <summary>
+    /// Retrieve the saved settings for a node and any runtime details available from in-memory state.
+    /// </summary>
+    /// <param name="id">The node identifier.</param>
+    /// <returns>
+    /// A <see cref="NodeSettingsDetails"/> containing the stored <see cref="NodeSettings"/> (or a new default with <paramref name="id"/> if none exist)
+    /// and a list of key/value detail pairs supplied by the active node in memory (empty if the node is not present or has no details).
+    /// </returns>
     [HttpGet("{id}")]
     public NodeSettingsDetails Get(string id)
     {
@@ -39,6 +47,14 @@ public class NodeController(NodeSettingsStore nodeSettingsStore, NodeTelemetrySt
         await nodeSettingsStore.Restart(id);
     }
 
+    /// <summary>
+    /// Deletes a node and its associated data.
+    /// </summary>
+    /// <remarks>
+    /// Removes persisted node settings and telemetry for the given node id and removes the node from in-memory state.
+    /// </remarks>
+    /// <param name="id">Identifier of the node to delete.</param>
+    /// <returns>HTTP 204 No Content on success.</returns>
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)
     {

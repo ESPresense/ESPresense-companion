@@ -261,6 +261,14 @@ public class MqttCoordinator
 
     private bool ReadOnly => _mqttClient?.Options.ClientOptions.ClientId.ToLower().Contains("read") ?? false;
 
+    /// <summary>
+    /// Enqueues an MQTT message for delivery (or logs intent when coordinator is in read-only mode).
+    /// </summary>
+    /// <param name="topic">MQTT topic to publish to.</param>
+    /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
+    /// <param name="retain">If true, the broker will retain the message.</param>
+    /// <returns>A task that completes when the message has been enqueued or the intent has been logged.</returns>
+    /// <exception cref="Exception">Propagates exceptions thrown by the underlying MQTT client when publishing fails.</exception>
     public virtual async Task EnqueueAsync(string topic, string? payload, bool retain = false)
     {
         var client = await GetClient();
@@ -285,6 +293,15 @@ public class MqttCoordinator
         }
     }
 
+    /// <summary>
+    /// Clears retained MQTT messages that match a topic filter by subscribing to the filter, collecting the exact topics seen, and republishing each topic with a null payload and retain=true.
+    /// </summary>
+    /// <remarks>
+    /// The method temporarily subscribes to <paramref name="topicFilter"/>, waits briefly to receive retained messages (1 second, cancellable), unsubscribes, and then republishes a null retained message for each distinct topic observed to clear the retained state on the broker.
+    /// </remarks>
+    /// <param name="topicFilter">An MQTT topic filter (may include wildcards) used to discover retained topics to clear.</param>
+    /// <param name="cancellationToken">A token to cancel the waiting period for incoming retained messages.</param>
+    /// <returns>A task that completes when all discovered retained topics have been cleared.</returns>
     public async Task ClearRetainedAsync(string topicFilter, CancellationToken cancellationToken = default)
     {
         var client = await GetClient();
@@ -315,6 +332,19 @@ public class MqttCoordinator
         }
     }
 
+    /// <summary>
+    /// Process a telemetry MQTT message for a given node.
+    /// </summary>
+    /// <remarks>
+    /// If <paramref name="payload"/> is null or empty, raises <see cref="NodeTelemetryRemovedAsync"/> (if subscribed) and returns.
+    /// Otherwise deserializes the JSON payload into a <see cref="NodeTelemetry"/> and invokes <see cref="NodeTelemetryReceivedAsync"/> (if subscribed).
+    /// </remarks>
+    /// <param name="nodeId">The identifier of the node the telemetry came from.</param>
+    /// <param name="payload">The telemetry JSON payload; may be null or empty to indicate removal.</param>
+    /// <returns>A task that completes when processing is finished.</returns>
+    /// <exception cref="MqttMessageProcessingException">
+    /// Thrown when deserialization produces null or when JSON parsing fails; includes topic, payload, and message type context.
+    /// </exception>
     private async Task ProcessTelemetryMessage(string nodeId, string? payload)
     {
         if (string.IsNullOrEmpty(payload))
@@ -359,6 +389,20 @@ public class MqttCoordinator
         }
     }
 
+    /// <summary>
+    /// Handles an incoming node status MQTT message by raising the appropriate event.
+    /// </summary>
+    /// <remarks>
+    /// If <paramref name="payload"/> is null or empty the method treats this as a cleared retained message and invokes
+    /// <see cref="NodeStatusRemovedAsync"/> (if any handlers are attached) with the node identifier. Otherwise it interprets
+    /// the payload value "online" as an online state and invokes <see cref="NodeStatusReceivedAsync"/> with the resulting state.
+    /// </remarks>
+    /// <param name="nodeId">The identifier of the node the status message pertains to.</param>
+    /// <param name="payload">
+    /// The message payload; null or empty means the retained status was cleared (node removed). A non-empty value is
+    /// interpreted as the node's status (the string "online" maps to true).
+    /// </param>
+    /// <returns>A task representing the asynchronous event dispatch operations.</returns>
     private async Task ProcessStatusMessage(string nodeId, string? payload)
     {
         if (string.IsNullOrEmpty(payload))
@@ -387,6 +431,19 @@ public class MqttCoordinator
         }
     }
 
+    /// <summary>
+    /// Processes an incoming device message payload and invokes the DeviceMessageReceivedAsync handler.
+    /// </summary>
+    /// <remarks>
+    /// If <paramref name="payload"/> is null or empty, or there is no subscriber to <see cref="DeviceMessageReceivedAsync"/>, the method returns without action.
+    /// On successful JSON deserialization the <see cref="DeviceMessageReceivedAsync"/> event is invoked with a <see cref="DeviceMessageEventArgs"/> containing the device and node IDs and the parsed payload.
+    /// </remarks>
+    /// <param name="deviceId">MQTT device identifier from the topic (e.g. the {device} segment).</param>
+    /// <param name="nodeId">MQTT node identifier from the topic (e.g. the {node} segment).</param>
+    /// <param name="payload">JSON payload to deserialize into a <see cref="DeviceMessage"/>; may be null.</param>
+    /// <exception cref="MqttMessageProcessingException">
+    /// Thrown when JSON deserialization fails or results in a null <see cref="DeviceMessage"/>; the exception includes topic, payload and message type context.
+    /// </exception>
     private async Task ProcessDeviceMessage(string deviceId, string nodeId, string? payload)
     {
         if (DeviceMessageReceivedAsync == null || string.IsNullOrEmpty(payload))

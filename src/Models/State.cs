@@ -13,6 +13,14 @@ public class State
 {
     private readonly NodeTelemetryStore _nts;
 
+    /// <summary>
+    /// Initializes a new State, wiring telemetry and configuration handling.
+    /// </summary>
+    /// <remarks>
+    /// Subscribes to the provided ConfigLoader's ConfigChanged event and loads the current configuration if present.
+    /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
+    /// selects the locators' weighting strategy, and marks existing Devices for checking.
+    /// </remarks>
     public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
         _nts = nts;
