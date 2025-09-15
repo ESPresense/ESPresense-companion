@@ -1,4 +1,4 @@
-﻿﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using ESPresense.Controllers;
 using ESPresense.Models;
 using Serilog;
@@ -10,6 +10,19 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
     private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
     private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
 
+    /// <summary>
+    /// Attaches MQTT event handlers to manage device discovery, messages and attributes, then runs background processing loops.
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token that stops the background processing tasks.</param>
+    /// <remarks>
+    /// - Subscribes handlers to MQTT events to:
+    ///   - Forward raw device messages to the global event dispatcher.
+    ///   - Count malformed messages in telemetry.
+    ///   - Handle discovery and deletion of device_tracker autodiscovery entries (creates Device entries for discovered trackers).
+    ///   - Process incoming device messages: update node and device state, telemetry counters, and enqueue devices for processing or locating.
+    ///   - Restore a device's LastSeen from attributes when available.
+    /// - Starts and awaits two long-running background tasks: ProcessDevicesAsync and CheckIdleDevicesAsync, which consume internal channels to evaluate and locate devices.
+    /// </remarks>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         mqtt.DeviceMessageReceivedAsync += (e) =>
