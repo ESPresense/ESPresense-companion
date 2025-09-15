@@ -25,13 +25,13 @@
 
 	function getCurrentViewLabel() {
 		// Find the floor name
-		const floor = $config?.floors.find(f => f.id === currentFloorId);
+		const floor = $config?.floors?.find(f => f.id === currentFloorId);
 		return floor ? `Floor: ${floor.name}` : 'Map';
 	}
 
 	// Get floors that this node is actually on
 	$: nodeFloors = node?.floors || [];
-	$: availableFloors = $config?.floors.filter(f => nodeFloors.includes(f.id)) || [];
+	$: availableFloors = $config?.floors?.filter(f => nodeFloors.includes(f.id)) || [];
 	$: showFloorSelection = availableFloors.length > 1;
 </script>
 

@@ -23,9 +23,11 @@ public class DeviceSettingsStoreTests
         _deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object);
         
         // Start the background service so it subscribes to events
-        _deviceSettingsStore.StartAsync(CancellationToken.None).Wait();
-        // Give it a moment to set up the event handlers
-        Task.Delay(10).Wait();
+        // Start the background service so it subscribes to events
+        var startTask = _deviceSettingsStore.StartAsync(CancellationToken.None);
+        // Ensure the service has started
+        startTask.Wait(TimeSpan.FromSeconds(1));
+        Assert.That(startTask.IsCompleted, Is.True, "Service should start within 1 second");
     }
 
     [TearDown]
