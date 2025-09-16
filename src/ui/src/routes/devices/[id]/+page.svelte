@@ -55,19 +55,21 @@
 		<!-- Breadcrumb Navigation -->
 		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView={currentTab === 'calibration' ? 'calibration' : 'map'} />
 
-		<div class="flex-1 min-h-0 overflow-hidden">
-			{#if currentTab === 'map'}
+		{#if currentTab === 'map'}
+			<div class="grid flex-1 min-h-0">
 				<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
-			{:else if currentTab === 'calibration'}
-				{#if data.settings?.id}
-					<div class="h-full overflow-auto">
-						<DeviceCalibration deviceSettings={data.settings} />
-					</div>
-				{:else}
+			</div>
+		{:else if currentTab === 'calibration'}
+			{#if data.settings?.id}
+				<div class="flex-1 min-h-0 overflow-auto">
+					<DeviceCalibration deviceSettings={data.settings} />
+				</div>
+			{:else}
+				<div class="flex-1 min-h-0">
 					<p class="p-4">Device ID not found.</p>
-				{/if}
+				</div>
 			{/if}
-		</div>
+		{/if}
 	</div>
 	<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
 		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>
