@@ -7,7 +7,7 @@
 	import { showComponent, showConfirm } from '$lib/modal/modalStore';
 	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
-	import NodeSettingsModal from './NodeSettingsModal.svelte';
+	import NodeSettingsModal from '$lib/modals/NodeSettingsModal.svelte';
 
 	export let row: Node; // Node data for this row
 	export let col: string; // Column identifier from parent table

@@ -4,7 +4,7 @@
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showComponent, showConfirm } from '$lib/modal/modalStore';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
-	import DeviceSettingsModal from './DeviceSettingsModal.svelte';
+	import DeviceSettingsModal from '$lib/modals/DeviceSettingsModal.svelte';
 
 	export let col: string; // Column identifier from parent table
 	export let row: Device; // Device data for this row

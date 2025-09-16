@@ -1,37 +1,43 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import type { NodeSetting } from '$lib/types';
+	import type { DeviceSetting } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { createEventDispatcher } from 'svelte';
-	import NodeSettings from './NodeSettings.svelte'; // Import the fields component
+	import DeviceSettings from '../DeviceSettings.svelte'; // Import the refactored component
 
 	// Props
 	export let parent: any = undefined; // The Svelte parent component that triggered the modal (for backward compatibility)
-	export let nodeSetting: NodeSetting; // Passed in from trigger
+	export let deviceSetting: DeviceSetting; // Passed in from trigger
 
 	const dispatch = createEventDispatcher();
 	const toastStore = getToastStore();
 
 	// Create a local copy to avoid directly mutating the prop
-	// Ensure all nested objects are copied as well if they exist
-	let localSettings = JSON.parse(JSON.stringify(nodeSetting));
+	let localSettings = { ...deviceSetting };
+	let isSaving = false; // Track saving state
 
 	async function save() {
-		// Add any necessary validation or data transformation here if needed
-
 		try {
-			const response = await fetch(`${base}/api/node/${nodeSetting.id}`, {
-				// Use original nodeSetting.id for the PUT request URL
+			isSaving = true;
+
+			// Ensure rssi@1m is a number or null
+			const rssiRef = Math.floor(parseFloat(localSettings['rssi@1m'] + ''));
+			localSettings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
+
+			const response = await fetch(`${base}/api/device/${deviceSetting.id}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(localSettings) // Send the local copy
+				body: JSON.stringify(localSettings)
 			});
 
 			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
-			toastStore.trigger({ message: 'Node settings saved successfully!', background: 'preset-filled-success-500' });
+			toastStore.trigger({
+				message: 'Settings saved successfully!',
+				background: 'preset-filled-success-500'
+			});
 
 			// Optionally, update the parent component or state if needed
 			if (parent && parent.onSettingsSaved) {
@@ -44,13 +50,20 @@
 			} else {
 				dispatch('close');
 			}
-		} catch (e) {
-			console.error('Error saving node settings:', e);
+		} catch (error) {
+			console.error('Error saving settings:', error);
 			let errorMessage = 'An unknown error occurred while saving.';
-			if (e instanceof Error) {
-				errorMessage = `Error saving: ${e.message}`;
+
+			if (error instanceof Error) {
+				errorMessage = `Error saving: ${error.message}`;
 			}
-			toastStore.trigger({ message: errorMessage, background: 'preset-filled-error-500' });
+
+			toastStore.trigger({
+				message: errorMessage,
+				background: 'preset-filled-error-500'
+			});
+		} finally {
+			isSaving = false;
 		}
 	}
 
@@ -67,15 +80,21 @@
 <!-- Modal content - styling handled by ComponentModal wrapper -->
 <div class="space-y-4">
 	<header class="text-xl font-bold mb-4">
-		Edit Settings for {nodeSetting.name || nodeSetting.id}
+		Edit Settings for {deviceSetting.name || deviceSetting.id}
 	</header>
 
-	<!-- Use the NodeSettings component, passing the local state -->
-	<NodeSettings settings={localSettings} />
+	<!-- Use the DeviceSettings component, passing the local state -->
+	<DeviceSettings settings={localSettings} />
 
 	<!-- Modal Actions -->
 	<footer class="modal-footer flex justify-end space-x-2 pt-4">
-		<button class="btn" onclick={handleCancel}>Cancel</button>
-		<button class="btn preset-filled-primary-500" onclick={save}>Save</button>
+		<button class="btn" onclick={handleCancel} disabled={isSaving}>Cancel</button>
+		<button class="btn preset-filled-primary-500" onclick={save} disabled={isSaving}>
+			{#if isSaving}
+				Saving...
+			{:else}
+				Save
+			{/if}
+		</button>
 	</footer>
 </div>
