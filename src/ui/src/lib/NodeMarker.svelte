@@ -76,6 +76,9 @@
 	d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
 	fill={colors(n.id)}
 	role="figure"
+	onclick={() => {
+		select(n);
+	}}
 	onmouseover={() => {
 		hover(n);
 	}}
