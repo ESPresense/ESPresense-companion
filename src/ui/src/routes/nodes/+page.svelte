@@ -90,10 +90,10 @@
 			{:else}
 				<div class="flex items-center space-x-4">
 					<div class="flex items-center space-x-4">
-						<TriStateCheckbox id="autoUpdate" bind:checked={autoUpdate} on:change={saveSettings} disabled={saving} />
+						<TriStateCheckbox id="autoUpdate" bind:checked={autoUpdate} onchange={saveSettings} disabled={saving} />
 						<span class="pl">Automatically update</span>
 
-						<TriStateCheckbox id="prerelease" bind:checked={prerelease} on:change={saveSettings} disabled={saving} />
+						<TriStateCheckbox id="prerelease" bind:checked={prerelease} onchange={saveSettings} disabled={saving} />
 						<span class="pl">Include pre-released</span>
 
 						{#if saving}
@@ -104,6 +104,6 @@
 			{/if}
 		</div>
 
-		<NodesTable on:selected={(e) => detail(e.detail)} />
+		<NodesTable onselected={(node) => detail(node)} />
 	</div>
 </div>

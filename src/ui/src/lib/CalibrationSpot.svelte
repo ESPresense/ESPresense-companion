@@ -128,6 +128,6 @@
 		<!-- Inner dot -->
 		<circle r="3" fill="#4CAF50" opacity="0.8" />
 		<!-- Invisible circle for easier interaction -->
-		<circle class="no-zoom" r="15" role="button" tabindex="0" fill="transparent" on:mousedown|capture={handlePointerDown} on:touchstart|capture={handlePointerDown} style="cursor: move" />
+		<circle class="no-zoom" r="15" role="button" tabindex="0" fill="transparent" onmousedowncapture={handlePointerDown} ontouchstartcapture={handlePointerDown} style="cursor: move" />
 	</g>
 </g>

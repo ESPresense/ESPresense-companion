@@ -14,5 +14,5 @@
 <div class="w-full h-full bg-surface-50-950">
 	<FloorTabs bind:floorId />
 	<BackgroundUpload />
-	<Map on:selected={(d) => detail(d.detail)} bind:floorId />
+	<Map onselected={(item) => detail(item)} bind:floorId />
 </div>

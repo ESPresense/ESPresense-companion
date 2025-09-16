@@ -194,7 +194,7 @@
 
 <div class="flex gap-1">
 	{#if row.online}
-		<button class="btn btn-sm preset-filled-primary-500" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit node settings">
+		<button class="btn btn-sm preset-filled-primary-500" onclick={(e) => { e.stopPropagation(); handleEdit(); }} disabled={loadingEdit} aria-label="Edit node settings">
 			{#if loadingEdit}
 				<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 			{:else}
@@ -202,14 +202,14 @@
 			{/if}
 		</button>
 
-		<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View node on map"> Map </button>
+		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); detail(row); }} aria-label="View node on map"> Map </button>
 
 		{#if row.telemetry?.version}
-			<button on:click={() => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm preset-filled-tertiary-500" aria-label="Update node firmware"> Update </button>
+			<button onclick={e => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm preset-filled-tertiary-500" aria-label="Update node firmware"> Update </button>
 		{/if}
 
 		{#if row.telemetry}
-			<button on:click={() => onRestart(row)} class="btn btn-sm preset-filled-warning-500" aria-label="Restart node"> Restart </button>
+			<button onclick={e => onRestart(row)} class="btn btn-sm preset-filled-warning-500" aria-label="Restart node"> Restart </button>
 		{/if}
 
 		{#if row.telemetry?.ip}
@@ -222,7 +222,7 @@
 		{#if row.sourceType === 'Config'}
 			<button disabled class="btn btn-sm preset-filled-surface-500 disabled:pointer-events-none disabled:cursor-not-allowed" aria-label="Config-defined node cannot be deleted" title="This node is defined in config.yaml and cannot be deleted from the UI">Delete</button>
 		{:else}
-			<button on:click={() => onDelete(row)} class="btn btn-sm preset-filled-error-500" aria-label="Delete node">Delete</button>
+			<button onclick={e => { e.preventDefault(); onDelete(row) }} class="btn btn-sm preset-filled-error-500" aria-label="Delete node">Delete</button>
 		{/if}
 	{/if}
 </div>

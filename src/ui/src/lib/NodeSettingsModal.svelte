@@ -75,7 +75,7 @@
 
 	<!-- Modal Actions -->
 	<footer class="modal-footer flex justify-end space-x-2 pt-4">
-		<button class="btn" on:click={handleCancel}>Cancel</button>
-		<button class="btn preset-filled-primary-500" on:click={save}>Save</button>
+		<button class="btn" onclick={handleCancel}>Cancel</button>
+		<button class="btn preset-filled-primary-500" onclick={save}>Save</button>
 	</footer>
 </div>

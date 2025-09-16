@@ -26,6 +26,6 @@
 	{/if}
 
 	<footer class="flex justify-end">
-		<button type="button" class="btn preset-filled-primary-500" on:click={handleConfirm}> OK </button>
+		<button type="button" class="btn preset-filled-primary-500" onclick={handleConfirm}> OK </button>
 	</footer>
 </div>

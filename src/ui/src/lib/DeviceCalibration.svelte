@@ -359,7 +359,7 @@
 					<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
 					<div class="input-group input-group-divider grid-cols-[1fr_auto]">
 						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input" />
-						<button class="preset-filled-primary-500" on:click={() => (calibrationSpotHeight = calibrationSpotHeight)}> Set </button>
+						<button class="preset-filled-primary-500" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}> Set </button>
 					</div>
 				</div>
 			{/if}
@@ -420,7 +420,7 @@
 										{/if}
 									</td>
 									<td>
-										<input type="checkbox" checked={includedNodes[node.id] || false} on:change={() => toggleNodeInclusion(node.id)} class="checkbox" />
+										<input type="checkbox" checked={includedNodes[node.id] || false} onchange={() => toggleNodeInclusion(node.id)} class="checkbox" />
 									</td>
 								</tr>
 							{/each}
@@ -499,7 +499,7 @@
 							<p>This change will affect how distances are calculated for this device.</p>
 						</div>
 					{/if}
-					<button class="btn btn-lg preset-filled-primary-500 w-full" on:click={saveCalibration} disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}> Accept New Calibration </button>
+					<button class="btn btn-lg preset-filled-primary-500 w-full" onclick={saveCalibration} disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}> Accept New Calibration </button>
 				</div>
 			</div>
 		</div>

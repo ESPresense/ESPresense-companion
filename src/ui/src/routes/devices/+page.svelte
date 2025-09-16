@@ -17,6 +17,6 @@
 				<SlideToggle name="show-all" bind:checked={$showAll}>Show All</SlideToggle>
 			</div>
 		</div>
-		<DevicesTable on:selected={(d) => detail(d.detail)} />
+		<DevicesTable onselected={(device) => detail(device)} />
 	</div>
 </div>

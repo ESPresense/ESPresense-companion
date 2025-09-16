@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext, createEventDispatcher } from 'svelte';
+	import { getContext } from 'svelte';
 	import { spring, tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 	import { interpolateLab } from 'd3-interpolate';
@@ -12,6 +12,8 @@
 	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
 	export let d: Device;
 	export let visible: boolean;
+	export let onhovered: ((device: Device | null) => void) | undefined = undefined;
+	export let onselected: ((device: Device) => void) | undefined = undefined;
 
 	const r = spring(5, { stiffness: 0.15, damping: 0.3 });
 	const s = tweened(1, { duration: 500, easing: cubicOut });
@@ -25,19 +27,17 @@
 
 	let hovered = '';
 
-	let dispatcher = createEventDispatcher();
-
 	function hover(d: Device | null) {
 		r.set(d == null ? 5 : 10);
 		s.set(d == null ? 1 : 2);
 		hovered = d?.id ?? '';
-		dispatcher('hovered', d);
+		onhovered?.(d);
 	}
 
 	function unselect() {}
 
 	function select(d: Device) {
-		dispatcher('selected', d);
+		onselected?.(d);
 	}
 </script>
 
@@ -51,16 +51,16 @@
 			stroke={d.id == hovered ? 'black' : 'white'}
 			stroke-width={$s}
 			r={$r}
-			on:mouseover={() => {
+			onmouseover={() => {
 				hover(d);
 			}}
-			on:focus={() => {
+			onfocus={() => {
 				select(d);
 			}}
-			on:mouseout={() => {
+			onmouseout={() => {
 				hover(null);
 			}}
-			on:blur={() => {
+			onblur={() => {
 				unselect();
 			}}
 		/>

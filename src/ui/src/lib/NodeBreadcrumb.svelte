@@ -40,7 +40,7 @@
 	<div class="flex items-center space-x-2 text-sm text-surface-600-400">
 		<button 
 			class="hover:text-primary-500 transition-colors" 
-			on:click={navigateToNodes}
+			onclick={navigateToNodes}
 			aria-label="Go to nodes list"
 		>
 			Nodes
@@ -67,7 +67,7 @@
 				{#each availableFloors as floor}
 					<button 
 						class="px-4 py-1 rounded-full text-sm font-medium transition-colors {currentFloorId === floor.id ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}"
-						on:click={() => currentFloorId = floor.id}
+						onclick={() => currentFloorId = floor.id}
 					>
 						{floor.name}
 					</button>

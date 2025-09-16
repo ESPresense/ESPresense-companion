@@ -24,6 +24,7 @@
 	export let exclusive: boolean = false;
 	export let calibrate: boolean = false;
 	export let calibrationSpot: { x: number; y: number } | null = null;
+	export let onselected: ((item: Device | Node) => void) | undefined = undefined;
 
 	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
@@ -51,14 +52,22 @@
 			transform = e.transform;
 		});
 
-	function hoveredDevice(e: CustomEvent<Device>) {
+	function hoveredDevice(device: Device | null) {
 		if (exclusive) return;
-		deviceId = e.detail?.id;
+		deviceId = device?.id ?? null;
 	}
 
-	function hoveredNode(e: CustomEvent<Node>) {
+	function hoveredNode(node: Node | null) {
 		if (exclusive) return;
-		nodeId = e.detail?.id;
+		nodeId = node?.id ?? null;
+	}
+
+	function selectedDevice(device: Device) {
+		onselected?.(device);
+	}
+
+	function selectedNode(node: Node) {
+		onselected?.(node);
 	}
 
 	function handleKeyboard(event: KeyboardEvent) {
@@ -123,7 +132,7 @@
 	}
 </script>
 
-<svelte:window on:keydown={handleKeyboard} />
+<svelte:window onkeydown={handleKeyboard} />
 
 {#if bounds}
 	<LayerCake x="0" y="1" xRange={getXRange} yRange={getYRange} flatData={squareBounds} padding={{ top: 16, left: 16, bottom: 16, right: 16 }}>
@@ -132,8 +141,8 @@
 			<AxisX {transform} />
 			<AxisY {transform} />
 			<Rooms {transform} {floorId} />
-			<Nodes {transform} {floorId} {deviceId} {nodeId} on:selected on:hovered={hoveredNode} />
-			<Devices {transform} {floorId} {deviceId} {exclusive} on:selected on:hovered={hoveredDevice} />
+			<Nodes {transform} {floorId} {deviceId} {nodeId} onselected={selectedNode} onhovered={hoveredNode} />
+			<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
 			{#if calibrate && calibrationSpot}
 				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} />
 			{/if}

@@ -50,12 +50,12 @@
 	}
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#each $modalStore as modal (modal.id)}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center p-4"
-		on:click={async () => {
+		onclick={async () => {
 			if (modal.onCancel) {
 				await modal.onCancel();
 			} else if (modal.onConfirm) {
@@ -72,7 +72,7 @@
 		<div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
 		<!-- Modal Content -->
-		<div class="relative z-10 max-w-lg w-full" on:click|stopPropagation aria-hidden="false" role="region">
+		<div class="relative z-10 max-w-lg w-full" onclick={(e) => e.stopPropagation()} aria-hidden="false" role="region">
 			{#if modal.type === 'alert'}
 				<AlertModal {modal} />
 			{:else if modal.type === 'confirm'}

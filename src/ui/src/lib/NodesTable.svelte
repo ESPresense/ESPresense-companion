@@ -3,10 +3,11 @@
 	import { nodes } from '$lib/stores';
 	import { updateMethod, firmwareSource, flavor, version, artifact } from '$lib/firmware';
 	import type { Node } from '$lib/types';
-	import { createEventDispatcher } from 'svelte';
 	import NodeActions from './NodeActions.svelte';
 	import NodeActiveId from './NodeActiveId.svelte';
 	import VersionPicker from './VersionPicker.svelte';
+
+	export let onselected: ((node: Node) => void) | undefined = undefined;
 
 	let columns = [
 		{
@@ -27,23 +28,22 @@
 		{ key: 'actions', title: '', renderComponent: { component: NodeActions } }
 	];
 
-	let dispatcher = createEventDispatcher();
 	let selected = '';
 
 	function select(n: Node) {
 		selected = n?.id ?? '';
-		dispatcher('selected', n);
+		onselected?.(n);
 	}
 
 	function onRowClick(e: any) {
-		select(e.detail.row);
+		select(e.row);
 	}
 </script>
 
 <div>
 	{#if $nodes}
 		<VersionPicker bind:updateMethod={$updateMethod} bind:firmwareSource={$firmwareSource} bind:flavor={$flavor} bind:version={$version} bind:artifact={$artifact} />
-		<DataTable {columns} rows={$nodes} classNameTable="table  table-compact" on:clickRow={onRowClick} />
+		<DataTable {columns} rows={$nodes} classNameTable="table  table-compact" onclickRow={onRowClick} />
 	{/if}
 </div>
 

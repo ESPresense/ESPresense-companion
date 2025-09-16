@@ -10,10 +10,10 @@
 		<div class="flex items-center space-x-4">
 			<!-- Calibration Type Tabs -->
 			<div class="flex bg-slate-600 rounded-full p-1">
-				<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {calibrationType === 'node' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" on:click={() => (calibrationType = 'node')}>
+				<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {calibrationType === 'node' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (calibrationType = 'node')}>
 					Node Calibration
 				</button>
-				<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {calibrationType === 'device' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" on:click={() => (calibrationType = 'device')}>
+				<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {calibrationType === 'device' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (calibrationType = 'device')}>
 					Device Calibration
 				</button>
 			</div>
