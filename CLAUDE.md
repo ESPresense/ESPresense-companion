@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ESPresense-companion is a Home Assistant Add-on / Docker container that processes indoor position data from ESPresense BLE nodes. It's a full-stack application with:
 
 - **Backend**: ASP.NET Core (.NET 8.0) with C# providing REST APIs, WebSocket communication, and MQTT integration
-- **Frontend**: SvelteKit with TypeScript providing a reactive web interface for device visualization and management
+- **Frontend**: SvelteKit 5 with TypeScript providing a reactive web interface for device visualization and management
 - **Database**: SQLite for storing historical data and device settings
 - **Communication**: MQTT for node communication, WebSockets for real-time UI updates
 
@@ -28,7 +28,7 @@ dotnet build --project src
 dotnet restore
 ```
 
-### Frontend (Svelte)
+### Frontend (Svelte 5)
 ```bash
 # Navigate to UI directory
 cd src/ui
@@ -82,6 +82,11 @@ pnpm check
 - **lib/stores.ts**: Reactive state management using Svelte stores
 - **lib/types.ts**: TypeScript type definitions
 - **lib/wsManager.ts**: WebSocket management utilities
+
+### Svelte 5 Event Handling
+- **DOM Events**: Use camelCase syntax (e.g., `onclick`, `onchange`, `onmouseover`)
+- **Custom Events**: Use function props instead of events (e.g., `onselected`, `onhovered`, `onclose`)
+- **Component Communication**: Pass functions as props rather than dispatching custom events
 
 ### Data Flow
 1. **MQTT**: ESPresense nodes → Backend via MQTT

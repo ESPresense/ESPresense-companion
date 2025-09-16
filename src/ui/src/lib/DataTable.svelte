@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 
 	interface Column {
 		key: string;
@@ -19,21 +18,20 @@
 		rows: any[];
 		classNameTable?: string;
 		sortBy?: string;
+		onclickRow?: (event: { row: any }) => void;
 	}
 
-	let { columns, rows, classNameTable = '', sortBy = '' }: Props = $props();
+	let { columns, rows, classNameTable = '', sortBy = '', onclickRow }: Props = $props();
 
 	let sortColumn = $state('');
 	let sortDirection = $state<'asc' | 'desc'>('asc');
-	
+
 	// Initialize sort from props or defaultSort column
 	$effect(() => {
 		const defaultColumn = columns.find((c) => c.defaultSort);
 		sortColumn = sortBy || defaultColumn?.key || '';
 		sortDirection = defaultColumn?.defaultSortDirection || 'asc';
 	});
-
-	const dispatch = createEventDispatcher();
 
 	function handleSort(column: Column) {
 		if (!column.sortable) return;
@@ -72,8 +70,22 @@
 		});
 	}
 
-	function handleRowClick(row: any) {
-		dispatch('clickRow', { row });
+	function isInteractiveTarget(target: EventTarget | null) {
+		if (!(target instanceof Element)) return false;
+
+		return (
+			target.closest(
+				'button, a[href], input, select, textarea, [role="button"], [data-prevent-row-click]'
+			) !== null
+		);
+	}
+
+	function handleRowClick(event: MouseEvent, row: any) {
+		if (event.defaultPrevented) return;
+
+		if (isInteractiveTarget(event.target)) return;
+
+		onclickRow?.({ row });
 	}
 
 	function getCellValue(row: any, column: Column) {
@@ -100,7 +112,7 @@
 	</thead>
 	<tbody>
 		{#each sortedRows as row}
-			<tr onclick={() => handleRowClick(row)} class="cursor-pointer">
+             <tr onclick={(event) => handleRowClick(event, row)} class="cursor-pointer">
 				{#each columns as column}
 					<td>
 						{#if column.renderComponent}

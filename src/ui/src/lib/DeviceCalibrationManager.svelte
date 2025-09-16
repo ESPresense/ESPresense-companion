@@ -167,7 +167,7 @@
 					{columns}
 					rows={filteredDevices}
 					classNameTable="table table-compact"
-					on:clickRow={onRowClick}
+					onclickRow={onRowClick}
 				/>
 			{:else}
 				<div class="text-center py-8 text-surface-600-400">

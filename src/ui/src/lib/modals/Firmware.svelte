@@ -100,10 +100,10 @@
 		{#if progress > Progress.Updating}
 			<footer class="modal-footer {parent.regionFooter}">
 				{#if progress == Progress.Success}
-					<button class="btn {parent.buttonPositive}" on:click={parent.onClose}>Close</button>
+					<button class="btn {parent.buttonPositive}" onclick={parent.onClose}>Close</button>
 				{:else}
-					<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
-					<button class="btn {parent.buttonPositive}" on:click={onFormSubmit}>Retry</button>
+					<button class="btn {parent.buttonNeutral}" onclick={parent.onClose}>{parent.buttonTextCancel}</button>
+					<button class="btn {parent.buttonPositive}" onclick={onFormSubmit}>Retry</button>
 				{/if}
 			</footer>
 		{/if}
@@ -149,8 +149,8 @@
 			</label>
 		</form>
 		<footer class="modal-footer {parent.regionFooter}">
-			<button class="btn {parent.buttonNeutral}" on:click={parent.onClose}>{parent.buttonTextCancel}</button>
-			<button class="btn {parent.buttonPositive}" on:click={onFormSubmit} disabled={!isValidForm}>Update</button>
+			<button class="btn {parent.buttonNeutral}" onclick={parent.onClose}>{parent.buttonTextCancel}</button>
+			<button class="btn {parent.buttonPositive}" onclick={onFormSubmit} disabled={!isValidForm}>Update</button>
 		</footer>
 	</div>
 {/if}

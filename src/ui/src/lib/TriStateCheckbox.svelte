@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-
 	export let checked: boolean | null = false;
 	export let id: string;
-	const dispatch = createEventDispatcher();
+	export let onchange: ((event: { checked: boolean | null }) => void) | undefined = undefined;
 
 	function handleClick(event: Event) {
 		const cb = event.target as HTMLInputElement;
@@ -18,13 +16,13 @@
 		} else {
 			checked = true;
 		}
-		dispatch('change', { checked });
+		onchange?.({ checked });
 	}
 
 	$: ariaChecked = checked === null ? 'mixed' : checked;
 </script>
 
-<input type="checkbox" class="checkbox" {id} on:click={handleClick} checked={checked === true} indeterminate={checked === null} readOnly={checked === null} aria-checked={ariaChecked} />
+<input type="checkbox" class="checkbox" {id} onclick={handleClick} checked={checked === true} indeterminate={checked === null} readOnly={checked === null} aria-checked={ariaChecked} />
 
 <style>
 	input[type='checkbox']:indeterminate {

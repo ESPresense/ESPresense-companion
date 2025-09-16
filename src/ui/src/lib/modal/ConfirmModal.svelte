@@ -34,7 +34,7 @@
 	{/if}
 
 	<footer class="flex justify-end space-x-2">
-		<button type="button" class="btn preset-tonal border border-surface-500" on:click={handleCancel}> Cancel </button>
-		<button type="button" class="btn preset-filled-primary-500" on:click={handleConfirm}> Confirm </button>
+		<button type="button" class="btn preset-tonal border border-surface-500" onclick={handleCancel}> Cancel </button>
+		<button type="button" class="btn preset-filled-primary-500" onclick={handleConfirm}> Confirm </button>
 	</footer>
 </div>

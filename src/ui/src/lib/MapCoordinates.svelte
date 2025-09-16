@@ -86,7 +86,7 @@
 	}
 </script>
 
-<svelte:window on:mousemove={updateCoordinates} on:keydown={handleKeydown} on:blur={handleFocusOut} />
+<svelte:window onmousemove={updateCoordinates} onkeydown={handleKeydown} onblur={handleFocusOut} />
 
 <g transform="translate({$width - 120}, {$height - 40})">
 	<rect width="110" height="30" rx="4" fill="#2563eb" class="shadow-lg" />

@@ -3,16 +3,15 @@
 	import DeviceActiveId from '$lib/DeviceActiveId.svelte';
 	import { devices } from '$lib/stores';
 	import type { Device } from '$lib/types';
-	import { createEventDispatcher } from 'svelte';
 	import DataTable from '$lib/DataTable.svelte';
 	import ago from 's-ago';
 
-	let dispatcher = createEventDispatcher();
+	export let onselected: ((device: Device) => void) | undefined = undefined;
 	let selected = '';
 
 	function select(d: Device) {
 		selected = d?.id ?? '';
-		dispatcher('selected', d);
+		onselected?.(d);
 	}
 
 	// Format location coordinates in compact format
@@ -47,13 +46,13 @@
 	];
 
 	function onRowClick(e: any) {
-		select(e.detail.row);
+		select(e.row);
 	}
 </script>
 
 <div>
 	{#if $devices}
-		<DataTable {columns} classNameTable="table  table-compact" rows={$devices} on:clickRow={onRowClick} />
+		<DataTable {columns} classNameTable="table  table-compact" rows={$devices} onclickRow={onRowClick} />
 	{/if}
 </div>
 

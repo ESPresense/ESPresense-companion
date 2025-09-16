@@ -105,14 +105,14 @@
 		<header>
 			<div class="flex justify-between items-center p-2">
 				<div class="">
-					<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 0)}>Error %</button>
-					<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 1)}>Error (m)</button>
-					<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 2)}>Absorption</button>
-					<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 3)}>Rx Rssi Adj</button>
-					<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 4)}>Tx Rssi Ref</button>
-					<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" on:click={() => (data_point = 5)}>Variance (m)</button>
+					<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 0)}>Error %</button>
+					<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 1)}>Error (m)</button>
+					<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 2)}>Absorption</button>
+					<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
+					<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
+					<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
 				</div>
-				<button class="btn preset-filled-warning-500" on:click={resetCalibration}> Reset Calibration </button>
+				<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
 			</div>
 			<div class="flex gap-8 items-center m-4 mt-2">
 				<span class="font-semibold">RMSE:</span> <span>{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</span>

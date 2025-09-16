@@ -73,7 +73,7 @@
 </script>
 
 <div class="flex gap-1">
-	<button class="btn btn-sm bg-primary-500 hover:bg-primary-600 text-white" on:click|stopPropagation={handleEdit} disabled={loadingEdit} aria-label="Edit device settings">
+	<button class="btn btn-sm bg-primary-500 hover:bg-primary-600 text-white" onclick={(e) => { e.stopPropagation(); handleEdit(); }} disabled={loadingEdit} aria-label="Edit device settings">
 		{#if loadingEdit}
 			<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 		{:else}
@@ -81,10 +81,10 @@
 		{/if}
 	</button>
 	{#if isActive}
-		<button class="btn btn-sm preset-filled-secondary-500" on:click|stopPropagation={() => detail(row)} aria-label="View device on map"> Map </button>
-		<button class="btn btn-sm preset-filled-tertiary-500" on:click|stopPropagation={() => calibrateDevice(row)} aria-label="Calibrate device"> Calibrate </button>
+		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); detail(row); }} aria-label="View device on map"> Map </button>
+		<button class="btn btn-sm preset-filled-tertiary-500" onclick={(e) => { e.stopPropagation(); calibrateDevice(row); }} aria-label="Calibrate device"> Calibrate </button>
 	{/if}
-    <button class="btn btn-sm bg-error-500 hover:bg-error-600 text-white" on:click|stopPropagation={handleDelete} disabled={loadingDelete} aria-label="Delete device">
+    <button class="btn btn-sm bg-error-500 hover:bg-error-600 text-white" onclick={(e) => { e.stopPropagation(); handleDelete(); }} disabled={loadingDelete} aria-label="Delete device">
         {#if loadingDelete}
             <span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
         {:else}

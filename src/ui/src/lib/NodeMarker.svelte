@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher, getContext } from 'svelte';
+	import { getContext } from 'svelte';
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 
@@ -18,6 +18,8 @@
 	export let nodeId: string | null = null;
 	export let floor: Floor | undefined = undefined;
 	export let n: Node;
+	export let onhovered: ((node: Node | null) => void) | undefined = undefined;
+	export let onselected: ((node: Node) => void) | undefined = undefined;
 
 	$: radarDevice = $devices?.find((d) => d.id === deviceId);
 	$: radarNode = $nodes?.find((d) => d.id === nodeId);
@@ -27,8 +29,6 @@
 	$: radarTimeout = radarDevice?.timeout || 30000;
 	$: v.set(fixRadiusFromHeight(Math.sqrt(radarVar ?? 0)));
 	$: r.set(fixRadiusFromHeight(radarDist));
-
-	let dispatcher = createEventDispatcher();
 
 	let innerStop: number = 0;
 	let outerStop: number = 1;
@@ -50,13 +50,13 @@
 	}
 
 	function hover(n: Node | null) {
-		dispatcher('hovered', n);
+		onhovered?.(n);
 	}
 
 	function unselect() {}
 
 	function select(n: Node) {
-		dispatcher('selected', n);
+		onselected?.(n);
 	}
 </script>
 
@@ -76,16 +76,16 @@
 	d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
 	fill={colors(n.id)}
 	role="figure"
-	on:mouseover={() => {
+	onmouseover={() => {
 		hover(n);
 	}}
-	on:mouseout={() => {
+	onmouseout={() => {
 		hover(null);
 	}}
-	on:focus={() => {
+	onfocus={() => {
 		select(n);
 	}}
-	on:blur={() => {
+	onblur={() => {
 		unselect();
 	}}
 />
