@@ -19,7 +19,16 @@ namespace ESPresense.Services
 
         public virtual async Task Set(string id, DeviceSettings ds)
         {
-            ds.OriginalId = null;
+            var existing = Get(id);
+
+            // If we found an existing entry and the id being written to is different from the OriginalId,
+            // then 'id' is an alias and we should reject writes to aliases to prevent duplicate entries
+            if (existing?.OriginalId != null && existing.OriginalId != id)
+            {
+                throw new InvalidOperationException($"Cannot write to alias '{id}'. Please write to the original ID '{existing.OriginalId}' instead.");
+            }
+
+            ds.OriginalId = null; // Clear OriginalId before storing/publishing
             await mqtt.EnqueueAsync($"espresense/settings/{id}/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), true);
         }
 

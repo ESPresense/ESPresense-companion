@@ -32,9 +32,17 @@ namespace ESPresense.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task Set(string id, [FromBody] DeviceSettings value)
+        public async Task<IActionResult> Set(string id, [FromBody] DeviceSettings value)
         {
-            await _deviceSettingsStore.Set(id, value);
+            try
+            {
+                await _deviceSettingsStore.Set(id, value);
+                return Ok();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpDelete("{id}")]
