@@ -11,7 +11,7 @@
 	export let floorId: string | null = null;
 	export let data: NodeSettingDetails = {};
 	$: node = $nodes.find((d) => d.id === data.settings?.id);
-	
+
 	// Initialize floorId to the first floor the node is actually on
 	$: if (!floorId && node?.floors?.length > 0) {
 		floorId = node.floors[0];
@@ -43,16 +43,12 @@
 	<title>ESPresense Companion: Node Detail</title>
 </svelte:head>
 
-<div class="flex h-full">
-	<div class="flex-grow overflow-auto">
+<div class="flex h-full min-h-0">
+	<div class="flex flex-col flex-grow min-h-0">
 		<!-- Breadcrumb Navigation -->
-		<NodeBreadcrumb 
-			nodeName={node?.name || node?.id || 'Unknown Node'} 
-			bind:currentFloorId={floorId}
-			{node}
-		/>
-		
-		<div class="h-full">
+		<NodeBreadcrumb nodeName={node?.name || node?.id || 'Unknown Node'} bind:currentFloorId={floorId} {node} />
+
+		<div class="grid flex-1 min-h-0">
 			<Map deviceId="none" nodeId={data.settings?.id} bind:floorId exclusive={true} />
 		</div>
 	</div>

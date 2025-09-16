@@ -50,23 +50,24 @@
 	<title>ESPresense Companion: Device Detail</title>
 </svelte:head>
 
-<div class="flex h-full">
-	<div class="flex-grow overflow-auto">
+<div class="flex h-full min-h-0">
+	<div class="flex flex-col flex-grow min-h-0">
 		<!-- Breadcrumb Navigation -->
-		<DeviceBreadcrumb 
-			deviceName={device?.name || device?.id || 'Unknown Device'} 
-			currentView={currentTab === 'calibration' ? 'calibration' : 'map'} 
-		/>
-		
+		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView={currentTab === 'calibration' ? 'calibration' : 'map'} />
+
 		{#if currentTab === 'map'}
-			<div class="h-full">
+			<div class="grid flex-1 min-h-0">
 				<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
 			</div>
 		{:else if currentTab === 'calibration'}
 			{#if data.settings?.id}
-				<DeviceCalibration deviceSettings={data.settings} />
+				<div class="flex-1 min-h-0 overflow-auto">
+					<DeviceCalibration deviceSettings={data.settings} />
+				</div>
 			{:else}
-				<p class="p-4">Device ID not found.</p>
+				<div class="flex-1 min-h-0">
+					<p class="p-4">Device ID not found.</p>
+				</div>
 			{/if}
 		{/if}
 	</div>
