@@ -19,14 +19,12 @@
 		return new Date().getTime() - new Date(device.lastSeen).getTime() < timeout;
 	}) || [];
 
-	// Calculate calibration statistics
 	$: calibrationStats = {
 		total: filteredDevices.length,
 		calibrated: filteredDevices.filter(d => d['rssi@1m'] != null).length,
 		needsCalibration: filteredDevices.filter(d => d['rssi@1m'] == null).length
 	};
 
-	// Determine calibration status for a device
 	function getCalibrationStatus(device: Device): { status: string; color: string } {
 		if (device['rssi@1m'] == null) {
 			return { status: 'Not Calibrated', color: 'text-error-500' };
@@ -35,20 +33,17 @@
 		return { status: 'Calibrated', color: 'text-success-500' };
 	}
 
-	// Check if device is active
 	function isDeviceActive(device: Device): boolean {
 		if (device.lastSeen == null) return false;
 		const timeout = device.timeout !== null && device.timeout !== undefined ? device.timeout : 30000;
 		return new Date().getTime() - new Date(device.lastSeen).getTime() < timeout;
 	}
 
-	// Format RSSI@1m value
-	function formatRssi(value: number | null): string {
-		if (value == null) return 'n/a';
+	function formatRssi(value: number | undefined | null): string {
+		if (value == null || value === undefined) return 'n/a';
 		return `${value} dBm`;
 	}
 
-	// Format location coordinates
 	function formatLocation(device: Device): string {
 		if (device.location?.x != null && device.location?.y != null) {
 			const z = device.location?.z != null ? `, ${device.location.z.toFixed(1)}` : '';

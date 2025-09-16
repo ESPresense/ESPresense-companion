@@ -25,7 +25,7 @@ public class MqttMessageProcessingException : Exception
     }
 }
 
-public class MqttCoordinator
+public class MqttCoordinator : IMqttCoordinator
 {
     private readonly ConfigLoader _cfg;
     private readonly ILogger<MqttCoordinator> _logger;
@@ -189,6 +189,7 @@ public class MqttCoordinator
     }
 
     public event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
+    
     public event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
     public event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
@@ -468,10 +469,9 @@ public class MqttCoordinator
         }
     }
 
+
     private async Task ProcessDeviceConfigMessage(string deviceId, string? payload)
     {
-        if (DeviceConfigReceivedAsync == null) return;
-
         try
         {
             var deviceSettings = JsonConvert.DeserializeObject<DeviceSettings>(payload ?? "");
@@ -479,11 +479,12 @@ public class MqttCoordinator
                 throw new MqttMessageProcessingException("Device settings were null after deserialization", $"espresense/settings/{deviceId}/config", payload, "DeviceConfig");
 
             deviceSettings.OriginalId = deviceId;
-            await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs
-            {
-                DeviceId = deviceId,
-                Payload = deviceSettings
-            });
+            if (DeviceConfigReceivedAsync != null)
+                await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs
+                {
+                    DeviceId = deviceId,
+                    Payload = deviceSettings
+                });
         }
         catch (JsonException ex)
         {
