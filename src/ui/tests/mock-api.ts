@@ -5,6 +5,15 @@ type MockApiOptions = {
 	stubWebSocket?: boolean;
 };
 
+/**
+ * Install mock API handlers for Playwright tests.
+ *
+ * Handlers:
+ * - `/api/state/config` => returns a demo configuration object
+ * - `/api/state/devices` => returns a demo devices array
+ * - `/api/state/nodes` => returns []
+ * - `/api/state/calibration` => returns { matrix: {} }
+ */
 export async function mockApi(page: Page, options: MockApiOptions = {}) {
 	// Demo data used across routes
 	const demoConfig = {
