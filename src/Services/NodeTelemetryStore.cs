@@ -16,7 +16,7 @@ public class NodeTelemetryStore : BackgroundService
     /// <remarks>
     /// The coordinator is retained for subscribing to node telemetry and status events and for publishing deletion messages.
     /// </remarks>
-    public NodeTelemetryStore(MqttCoordinator mqttCoordinator)
+    public NodeTelemetryStore(IMqttCoordinator mqttCoordinator)
     {
         _mqttCoordinator = mqttCoordinator;
     }
@@ -65,7 +65,7 @@ public class NodeTelemetryStore : BackgroundService
     /// </summary>
     /// <param name="id">The node identifier.</param>
     /// <returns>The cached <see cref="NodeTelemetry"/> for the node, or <c>null</c> if none is available.</returns>
-    public NodeTelemetry? Get(string id)
+    public virtual NodeTelemetry? Get(string id)
     {
         _teleById.TryGetValue(id, out var ds);
         return ds;
@@ -76,7 +76,7 @@ public class NodeTelemetryStore : BackgroundService
     /// </summary>
     /// <param name="id">The node identifier.</param>
     /// <returns>True if the node is known and marked online; otherwise false.</returns>
-    public bool Online(string id)
+    public virtual bool Online(string id)
     {
         return _onlineById.TryGetValue(id, out var online) && online;
     }
@@ -86,7 +86,7 @@ public class NodeTelemetryStore : BackgroundService
     /// </summary>
     /// <param name="id">The node/room identifier used to construct the MQTT topics.</param>
     /// <returns>A task that completes when both purge messages have been enqueued.</returns>
-    public async Task Delete(string id)
+    public virtual async Task Delete(string id)
     {
         await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/telemetry", null, true);
         await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/status", null, true);
