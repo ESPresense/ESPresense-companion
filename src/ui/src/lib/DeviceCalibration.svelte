@@ -305,7 +305,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId}`, {
+			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -313,6 +313,9 @@
 			if (response.ok) {
 				currentRefRssi = calculatedRefRssi;
 				toastStore.trigger({ message: 'Calibration saved successfully!' });
+			} else if (response.status === 400) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Bad request. Please check your input.');
 			} else {
 				throw new Error('Error saving calibration. Please try again.');
 			}
