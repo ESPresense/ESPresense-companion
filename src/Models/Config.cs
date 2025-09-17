@@ -205,6 +205,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
 
+        [YamlMember(Alias = "point")]
+        public double[]? Point { get; set; }
+
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
