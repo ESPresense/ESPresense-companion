@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { devices } from '$lib/stores';
-	import { calibrateDevice } from '$lib/urls';
+	import * as urls from '$lib/urls';
 	import DataTable from '$lib/DataTable.svelte';
 	import DeviceActions from '$lib/DeviceActions.svelte';
 	import SlideToggle from '$lib/SlideToggle.svelte';
@@ -126,7 +126,7 @@
 	function onRowClick(e: any) {
 		const device = e.detail.row;
 		if (isDeviceActive(device)) {
-			calibrateDevice(device);
+			urls.gotoCalibrateDevice(device);
 		}
 	}
 

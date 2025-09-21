@@ -2,7 +2,7 @@
 	import Map from '$lib/Map.svelte';
 	import FloorTabs from '$lib/FloorTabs.svelte';
 	import BackgroundUpload from '$lib/BackgroundUpload.svelte';
-	import { detail } from '$lib/urls';
+	import * as urls from '$lib/urls';
 
 	export let floorId: string | null = null;
 </script>
@@ -14,5 +14,5 @@
 <div class="w-full h-full bg-surface-50-950">
 	<FloorTabs bind:floorId />
 	<BackgroundUpload />
-	<Map onselected={(item) => detail(item)} bind:floorId />
+	<Map onselected={(item) => urls.gotoDetail(item)} bind:floorId />
 </div>

@@ -127,6 +127,14 @@
 		}
 	}
 
+	// Initialize calibration spot when floor is selected (fallback if device location unavailable)
+	$: if (selectedFloorId && !calibrationSpot && bounds) {
+		// Set default position to center of floor bounds
+		const centerX = (bounds[0][0] + bounds[1][0]) / 2;
+		const centerY = (bounds[0][1] + bounds[1][1]) / 2;
+		calibrationSpot = { x: centerX, y: centerY };
+	}
+
 	// Reset data on floor change
 	$: if (selectedFloorId && calibrationSpot) {
 		rssiValues = {};
@@ -312,7 +320,7 @@
 			});
 			if (response.ok) {
 				currentRefRssi = calculatedRefRssi;
-				toastStore.trigger({ message: 'Calibration saved successfully!' });
+				toastStore.trigger({ message: 'Calibration saved successfully!', background: 'preset-filled-success-500' });
 			} else if (response.status === 400) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Bad request. Please check your input.');
@@ -339,7 +347,7 @@
 				})
 			});
 			if (response.ok) {
-				toastStore.trigger({ message: 'Device anchored successfully!' });
+				toastStore.trigger({ message: 'Device anchored successfully!', background: 'preset-filled-success-500' });
 			} else {
 				throw new Error('Error anchoring device. Please try again.');
 			}
@@ -396,7 +404,7 @@
 
 	{#if selectedFloorId}
 		<div class="card h-[400px] mb-4 relative overflow-hidden">
-			<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
+			<Map floorId={selectedFloorId} deviceId={deviceSettings.id} exclusive={true} calibrate={true} bind:calibrationSpot />
 		</div>
 	{/if}
 

@@ -11,7 +11,7 @@
 	import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import type { Group } from 'three';
-	import { detail3d } from '$lib/urls';
+	import * as urls from '$lib/urls';
 	import logoSvg from '$lib/images/logo.svg?raw';
 
 	// --- Props ---
@@ -694,7 +694,7 @@
 				if (selectedDeviceId === deviceId) {
 					// Clicking same device again - hide spheres and navigate
 					hideMeasuredSpheres();
-					detail3d(deviceId);
+					urls.gotoDetail3d(deviceId);
 				} else {
 					// Show measured spheres for clicked device
 					const device = devicesToShow.find((d) => d.id === deviceId);
