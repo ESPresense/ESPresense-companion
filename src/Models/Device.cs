@@ -73,6 +73,12 @@ public class Device
     [JsonIgnore] public Scenario? BestScenario { get; set; }
     [JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
 
+    [JsonIgnore]
+    public ConcurrentDictionary<string, double> BayesianProbabilities { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    [JsonIgnore]
+    public ConcurrentDictionary<string, AutoDiscovery> BayesianDiscoveries { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     [JsonConverter(typeof(Point3DConverter))]
     public Point3D? Location
     {
@@ -128,6 +134,17 @@ public class Device
     public void UpdateLocation(Point3D newLocation)
     {
         _kalmanLocation.Update(newLocation);
+    }
+
+    public void ResetBayesianState()
+    {
+        foreach (var discovery in BayesianDiscoveries.Values.ToList())
+        {
+            HassAutoDiscovery.Remove(discovery);
+        }
+
+        BayesianDiscoveries.Clear();
+        BayesianProbabilities.Clear();
     }
 
     public virtual IEnumerable<KeyValuePair<string, string>> GetDetails()
