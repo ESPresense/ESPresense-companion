@@ -24,7 +24,8 @@ namespace ESPresense.Models
                 ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
                 History = History.Clone(),
                 Locators = Locators.Clone(),
-                Optimization = Optimization.Clone()
+                Optimization = Optimization.Clone(),
+                BayesianProbabilities = BayesianProbabilities.Clone()
             };
         }
     }
@@ -112,6 +113,19 @@ namespace ESPresense.Models
                 IntervalSecs = IntervalSecs,
                 KeepSnapshotMins = KeepSnapshotMins,
                 Limits = new Dictionary<string, double>(Limits)
+            };
+        }
+    }
+
+    public partial class ConfigBayesianProbabilities
+    {
+        public ConfigBayesianProbabilities Clone()
+        {
+            return new ConfigBayesianProbabilities
+            {
+                Enabled = Enabled,
+                DiscoveryThreshold = DiscoveryThreshold,
+                Retain = Retain
             };
         }
     }
