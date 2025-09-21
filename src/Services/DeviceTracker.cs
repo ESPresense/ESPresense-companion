@@ -243,6 +243,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 Log.Information("[-] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
                     await ad.Delete(mqtt);
+                device.ResetBayesianState();
             }
             return true;
         }

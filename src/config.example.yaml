@@ -50,6 +50,11 @@ optimization:
     rmse: 0.5
 
 
+bayesian_probabilities:
+  enabled: false          # Publish per-room probability vectors (default disabled)
+  discovery_threshold: 0.1 # Minimum probability before creating Home Assistant sensor
+  retain: true             # Retain MQTT probability topics so sensors restore on restart
+
 locators:
   nadaraya_watson:
     enabled: true
