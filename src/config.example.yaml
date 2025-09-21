@@ -52,6 +52,11 @@ history:
   enabled: false # Enable to log history to db (Beta)
   expire_after: 24h # Expire after 24 hours
 
+bayesian_probabilities:
+  enabled: false          # Publish per-room probability vectors (default disabled)
+  discovery_threshold: 0.1 # Minimum probability before creating Home Assistant sensor
+  retain: true             # Retain MQTT probability topics so sensors restore on restart
+
 locators:
   nadaraya_watson:
     enabled: true
