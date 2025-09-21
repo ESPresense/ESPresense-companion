@@ -66,7 +66,7 @@ public class Device
     {
         get
         {
-            var lastSeen =  BestScenario?.LastHit ?? Nodes.Values.Max(a => a.LastHit);
+            var lastSeen = BestScenario?.LastHit ?? Nodes.Values.Max(a => a.LastHit);
             if (_lastSeen == null || lastSeen > _lastSeen) _lastSeen = lastSeen;
             return _lastSeen;
         }
@@ -81,6 +81,12 @@ public class Device
 
     [STJ.JsonIgnore] public Scenario? BestScenario { get; set; }
     [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
+
+    [STJ.JsonIgnore]
+    public ConcurrentDictionary<string, double> BayesianProbabilities { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    [STJ.JsonIgnore]
+    public ConcurrentDictionary<string, AutoDiscovery> BayesianDiscoveries { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     [STJ.JsonConverter(typeof(Point3DConverter))]
     public Point3D? Location => Anchor?.Location ?? (BestScenario == null ? null : _kalmanLocation.Location);
@@ -113,7 +119,7 @@ public class Device
         {
             var currentNodes = Nodes.Values.Where(dn => dn.Current).ToList();
             if (currentNodes.Count == 0) return null;
-            
+
             var refRssiValues = currentNodes.Where(dn => dn.RefRssi != 0).Select(dn => dn.RefRssi).ToList();
             return refRssiValues.Count > 0 ? refRssiValues.Average() : null;
         }
@@ -141,6 +147,17 @@ public class Device
         {
             Check = true;
         }
+    }
+
+    public void ResetBayesianState()
+    {
+        foreach (var discovery in BayesianDiscoveries.Values.ToList())
+        {
+            HassAutoDiscovery.Remove(discovery);
+        }
+
+        BayesianDiscoveries.Clear();
+        BayesianProbabilities.Clear();
     }
 
     public virtual IEnumerable<KeyValuePair<string, string>> GetDetails()

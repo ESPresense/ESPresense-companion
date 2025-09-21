@@ -41,6 +41,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "history")]
         public ConfigHistory History { get; set; } = new();
 
+        [YamlMember(Alias = "bayesian_probabilities")]
+        public ConfigBayesianProbabilities BayesianProbabilities { get; set; } = new();
+
         [YamlMember(Alias = "bounds")]
         public double[][] Bounds { get; set; } = [];
 
@@ -141,6 +144,18 @@ namespace ESPresense.Models
 
         [YamlIgnore] public double CorrelationWeight => Weights.TryGetValue("correlation", out var val) ? val : 0.5;
         [YamlIgnore] public double RmseWeight => Weights.TryGetValue("rmse", out var val) ? val : 0.5;
+    }
+
+    public partial class ConfigBayesianProbabilities
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; } = false;
+
+        [YamlMember(Alias = "discovery_threshold")]
+        public double DiscoveryThreshold { get; set; } = 0.1;
+
+        [YamlMember(Alias = "retain")]
+        public bool Retain { get; set; } = true;
     }
 
     public partial class ConfigHistory
