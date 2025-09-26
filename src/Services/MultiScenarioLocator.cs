@@ -169,9 +169,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     latitude      = includeLocation ? lat : null,
                     longitude     = includeLocation ? lon : null,
                     elevation     = includeLocation ? elevation : null,
-                    x             = includeLocation ? (double?)location.X : null,
-                    y             = includeLocation ? (double?)location.Y : null,
-                    z             = includeLocation ? (double?)location.Z : null,
+                    x             = includeLocation ? (double?)Math.Round(location.X, 3) : null,
+                    y             = includeLocation ? (double?)Math.Round(location.Y, 3) : null,
+                    z             = includeLocation ? (double?)Math.Round(location.Z, 3) : null,
                     confidence    = bestScenario?.Confidence,
                     fixes         = bestScenario?.Fixes,
                     best_scenario = bestScenario?.Name,
@@ -292,7 +292,11 @@ public class MultiScenarioLocator(DeviceTracker dl,
         // Publish single JSON message if probabilities changed
         if (probabilitiesChanged)
         {
-            var payload = JsonConvert.SerializeObject(probabilities, SerializerSettings.NullIgnore);
+            // Round probabilities to 2 decimal places for MQTT
+            var roundedProbabilities = probabilities.ToDictionary(
+                kvp => kvp.Key,
+                kvp => Math.Round(kvp.Value, 2));
+            var payload = JsonConvert.SerializeObject(roundedProbabilities, SerializerSettings.NullIgnore);
             await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/probabilities", payload, retain: config.Retain);
             changed = true;
         }
