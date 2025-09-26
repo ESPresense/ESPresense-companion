@@ -151,17 +151,31 @@ public class MultiScenarioLocatorTests
 
         await locator.ProcessDevice(device);
 
-        var probabilityTopic = $"espresense/companion/{device.Id}/probabilities/kitchen";
-        Assert.That(published.Any(p => p.topic == probabilityTopic && !string.IsNullOrWhiteSpace(p.payload)), Is.True);
+        // Verify single JSON probability topic is published
+        var probabilityTopic = $"espresense/companion/{device.Id}/probabilities";
+        var probabilityMessage = published.FirstOrDefault(p => p.topic == probabilityTopic && !string.IsNullOrWhiteSpace(p.payload));
+        Assert.That(probabilityMessage.payload, Is.Not.Null);
 
+        // Parse and validate the JSON probability payload
+        var probabilityJson = JObject.Parse(probabilityMessage.payload!);
+        Assert.That(probabilityJson.Properties().Count(), Is.GreaterThan(0), "Expected at least one room probability");
+
+        // Verify individual room probabilities (room names are lowercase due to sanitization)
+        var kitchenValue = probabilityJson["kitchen"]?.Value<double>() ?? 0;
+        var hallValue = probabilityJson["hall"]?.Value<double>() ?? 0;
+
+        Assert.That(kitchenValue, Is.GreaterThan(0));
+        Assert.That(hallValue, Is.GreaterThan(0));
+
+        // Verify probabilities are also included in attributes payload
         var attributesMessage = published.LastOrDefault(p => p.topic == $"espresense/companion/{device.Id}/attributes");
         Assert.That(attributesMessage.payload, Is.Not.Null);
 
         var attributes = JObject.Parse(attributesMessage.payload!);
         var probabilities = attributes["probabilities"] as JObject;
         Assert.That(probabilities, Is.Not.Null);
-        Assert.That(probabilities!["Kitchen"]?.Value<double>(), Is.GreaterThan(0));
-        Assert.That(probabilities!["Hall"]?.Value<double>(), Is.GreaterThan(0));
+        Assert.That(probabilities!["kitchen"]?.Value<double>() ?? 0, Is.GreaterThan(0));
+        Assert.That(probabilities!["hall"]?.Value<double>() ?? 0, Is.GreaterThan(0));
     }
 }
 

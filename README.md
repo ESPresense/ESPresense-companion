@@ -34,9 +34,18 @@ bayesian_probabilities:
 
 When enabled the companion:
 
-- Publishes `espresense/companion/<device_id>/probabilities/<room>` topics containing a `0.0-1.0` float for each room.
+- Publishes `espresense/companion/<device_id>/probabilities` topic containing a JSON object with room probabilities (`{"kitchen": 0.45, "living_room": 0.32}`).
 - Adds a `probabilities` object to the device attribute payload (`espresense/companion/<device_id>/attributes`).
 - Auto-discovers Home Assistant `sensor` entities for any room whose probability crosses the configured threshold.
+
+The auto-discovered sensors use `value_template` to extract individual room probabilities from the JSON:
+
+```json
+{
+  "state_topic": "espresense/companion/device1/probabilities",
+  "value_template": "{{ value_json.kitchen | default(0) }}"
+}
+```
 
 You can fuse multiple device probabilities into a person-level Bayesian sensor in Home Assistant:
 

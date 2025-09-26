@@ -169,9 +169,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     latitude      = includeLocation ? lat : null,
                     longitude     = includeLocation ? lon : null,
                     elevation     = includeLocation ? elevation : null,
-                    x             = includeLocation ? location.X : null,
-                    y             = includeLocation ? location.Y : null,
-                    z             = includeLocation ? location.Z : null,
+                    x             = includeLocation ? (double?)location.X : null,
+                    y             = includeLocation ? (double?)location.Y : null,
+                    z             = includeLocation ? (double?)location.Z : null,
                     confidence    = bestScenario?.Confidence,
                     fixes         = bestScenario?.Fixes,
                     best_scenario = bestScenario?.Name,
@@ -268,17 +268,38 @@ public class MultiScenarioLocator(DeviceTracker dl,
         var changed = false;
         var activeKeys = new HashSet<string>(probabilities.Keys, StringComparer.OrdinalIgnoreCase);
 
+        // Check if probabilities have changed significantly
+        var probabilitiesChanged = false;
         foreach (var (roomName, probability) in probabilities)
         {
-            var payloadChanged = !device.BayesianProbabilities.TryGetValue(roomName, out var existing) || Math.Abs(existing - probability) > ProbabilityEpsilon;
-            if (payloadChanged)
+            if (!device.BayesianProbabilities.TryGetValue(roomName, out var existing) || Math.Abs(existing - probability) > ProbabilityEpsilon)
             {
-                var payload = probability.ToString("0.####", CultureInfo.InvariantCulture);
-                await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, roomName), payload, retain: config.Retain);
+                probabilitiesChanged = true;
                 device.BayesianProbabilities[roomName] = probability;
-                changed = true;
             }
+        }
 
+        // Check if any rooms were removed
+        foreach (var key in device.BayesianProbabilities.Keys.ToArray())
+        {
+            if (!activeKeys.Contains(key))
+            {
+                probabilitiesChanged = true;
+                device.BayesianProbabilities.TryRemove(key, out _);
+            }
+        }
+
+        // Publish single JSON message if probabilities changed
+        if (probabilitiesChanged)
+        {
+            var payload = JsonConvert.SerializeObject(probabilities, SerializerSettings.NullIgnore);
+            await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/probabilities", payload, retain: config.Retain);
+            changed = true;
+        }
+
+        // Manage auto-discovery for individual room sensors
+        foreach (var (roomName, probability) in probabilities)
+        {
             if (!IsSyntheticRoom(roomName) && probability >= config.DiscoveryThreshold)
             {
                 var discovery = device.BayesianDiscoveries.GetOrAdd(roomName, key => CreateProbabilityDiscovery(device, key));
@@ -294,20 +315,18 @@ public class MultiScenarioLocator(DeviceTracker dl,
             }
         }
 
-        foreach (var key in device.BayesianProbabilities.Keys.ToArray())
+        // Clean up discoveries for removed rooms
+        foreach (var key in device.BayesianDiscoveries.Keys.ToArray())
         {
-            if (activeKeys.Contains(key)) continue;
-
-            await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: config.Retain);
-            device.BayesianProbabilities.TryRemove(key, out _);
-
-            if (device.BayesianDiscoveries.TryRemove(key, out var discovery))
+            if (!activeKeys.Contains(key))
             {
-                device.HassAutoDiscovery.Remove(discovery);
-                await discovery.Delete(mqtt);
+                if (device.BayesianDiscoveries.TryRemove(key, out var discovery))
+                {
+                    device.HassAutoDiscovery.Remove(discovery);
+                    await discovery.Delete(mqtt);
+                    changed = true;
+                }
             }
-
-            changed = true;
         }
 
         return changed;
@@ -317,13 +336,15 @@ public class MultiScenarioLocator(DeviceTracker dl,
     {
         var changed = false;
 
-        foreach (var key in device.BayesianProbabilities.Keys.ToArray())
+        // Clear the single probabilities topic if there were any probabilities
+        if (device.BayesianProbabilities.Count > 0)
         {
-            await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: true);
-            device.BayesianProbabilities.TryRemove(key, out _);
+            await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/probabilities", null, retain: true);
+            device.BayesianProbabilities.Clear();
             changed = true;
         }
 
+        // Clean up auto-discovery entities
         foreach (var entry in device.BayesianDiscoveries.ToArray())
         {
             device.HassAutoDiscovery.Remove(entry.Value);
@@ -344,7 +365,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
         {
             Name = $"{device.Name ?? device.Id} {roomName} Probability",
             UniqueId = $"espresense-companion-{device.Id}-{sanitizedRoom}",
-            StateTopic = BuildProbabilityTopic(device.Id, roomName),
+            StateTopic = $"espresense/companion/{device.Id}/probabilities",
+            ValueTemplate = $"{{{{ value_json.{sanitizedRoom} | default(0) }}}}",
             EntityStatusTopic = "espresense/companion/status",
             Device = new AutoDiscovery.DeviceRecord
             {
@@ -362,11 +384,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
         return new AutoDiscovery("sensor", discoveryId, record);
     }
 
-    private static string BuildProbabilityTopic(string deviceId, string roomName)
-    {
-        var segment = SanitizeSegment(roomName);
-        return $"espresense/companion/{deviceId}/probabilities/{segment}";
-    }
 
     private static string SanitizeSegment(string value)
     {
