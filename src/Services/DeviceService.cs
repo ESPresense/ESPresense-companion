@@ -73,11 +73,6 @@ public class DeviceService
             await PerformDeviceCleanup(device, source);
         }
 
-        if (deletedCount > 0)
-        {
-            _logger.LogInformation("Bulk deleted {Count} devices via {Source}", deletedCount, source);
-        }
-
         return deletedCount;
     }
 
@@ -142,10 +137,10 @@ public class DeviceService
         // Notify connected clients to remove device immediately
         _events.OnDeviceRemoved(device.Id);
 
-        _logger.LogInformation("Device {DeviceId} ({DeviceName}) deleted via {Source}, last seen: {LastSeen}", 
-            device.Id, 
-            device.Name ?? "unnamed", 
-            source, 
+        _logger.LogInformation("Device {DeviceId} ({DeviceName}) deleted via {Source}, last seen: {LastSeen}",
+            device.Id,
+            device.Name ?? "unnamed",
+            source,
             device.LastSeen?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "never");
     }
 
