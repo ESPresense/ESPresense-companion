@@ -38,13 +38,17 @@ public class StateController : ControllerBase
     }
 
     /// <summary>
-    /// Enriches a single device with ConfiguredRefRssi from DeviceSettings.
+    /// Enriches a single device with persisted settings like configured RSSI and friendly name.
     /// </summary>
     /// <param name="device">The device to enrich</param>
     private void EnrichConfiguredRefRssi(Device device)
     {
         var deviceSettings = _dss.Get(device.Id);
         device.ConfiguredRefRssi = deviceSettings?.RefRssi;
+        if (!string.IsNullOrWhiteSpace(deviceSettings?.Name))
+        {
+            device.Name = deviceSettings.Name;
+        }
     }
 
     /// <summary>
