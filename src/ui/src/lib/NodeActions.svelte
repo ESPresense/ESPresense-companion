@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { detail } from '$lib/urls';
+	import * as urls from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
@@ -202,7 +202,7 @@
 			{/if}
 		</button>
 
-		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); detail(row); }} aria-label="View node on map"> Map </button>
+		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); urls.gotoDetail(row); }} aria-label="View node on map"> Map </button>
 
 		{#if row.telemetry?.version}
 			<button onclick={e => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm preset-filled-tertiary-500" aria-label="Update node firmware"> Update </button>

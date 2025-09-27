@@ -127,6 +127,14 @@
 		}
 	}
 
+	// Initialize calibration spot when floor is selected (fallback if device location unavailable)
+	$: if (selectedFloorId && !calibrationSpot && bounds) {
+		// Set default position to center of floor bounds
+		const centerX = (bounds[0][0] + bounds[1][0]) / 2;
+		const centerY = (bounds[0][1] + bounds[1][1]) / 2;
+		calibrationSpot = { x: centerX, y: centerY };
+	}
+
 	// Reset data on floor change
 	$: if (selectedFloorId && calibrationSpot) {
 		rssiValues = {};
@@ -312,12 +320,36 @@
 			});
 			if (response.ok) {
 				currentRefRssi = calculatedRefRssi;
-				toastStore.trigger({ message: 'Calibration saved successfully!' });
+				toastStore.trigger({ message: 'Calibration saved successfully!', background: 'preset-filled-success-500' });
 			} else if (response.status === 400) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Bad request. Please check your input.');
 			} else {
 				throw new Error('Error saving calibration. Please try again.');
+			}
+		} catch (e: unknown) {
+			const error = e as Error;
+			toastStore.trigger({ message: error.message, background: 'preset-filled-error-500' });
+		}
+	}
+
+	async function anchorDevice() {
+		if (!calibrationSpot) return;
+		try {
+			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId }`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ 
+					...deviceSettings, 
+					x: calibrationSpot.x, 
+					y: calibrationSpot.y, 
+					z: calibrationSpot.z 
+				})
+			});
+			if (response.ok) {
+				toastStore.trigger({ message: 'Device anchored successfully!', background: 'preset-filled-success-500' });
+			} else {
+				throw new Error('Error anchoring device. Please try again.');
 			}
 		} catch (e: unknown) {
 			const error = e as Error;
@@ -335,15 +367,16 @@
 
 	<div class="card p-4 mb-4 preset-tonal">
 		<header class="font-semibold mb-2">Instructions</header>
-		<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
+		<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy, or anchor the device at a fixed location.</p>
 		<ol class="list-decimal pl-6 mb-2">
 			<li>Select a floor from the dropdown</li>
 			<li>Place the marker where your device is physically located (drag to position)</li>
 			<li>Data is automatically collected as you keep the device stationary</li>
 			<li>Compare Map Distance (actual) with Est. Distance (calculated from RSSI)</li>
 			<li>When stability is good, review and save the calculated value</li>
+			<li><strong>Optional:</strong> Click "Anchor Device" to fix the device at this location permanently</li>
 		</ol>
-		<p class="text-sm font-medium mt-2">The closer Map Distance matches Est. Distance for all nodes, the more accurate your positioning will be.</p>
+		<p class="text-sm font-medium mt-2">The closer Map Distance matches Est. Distance for all nodes, the more accurate your positioning will be. Anchored devices will always appear at their fixed location and help improve optimization for other devices.</p>
 	</div>
 
 	{#if $config?.floors}
@@ -371,7 +404,7 @@
 
 	{#if selectedFloorId}
 		<div class="card h-[400px] mb-4 relative overflow-hidden">
-			<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
+			<Map floorId={selectedFloorId} deviceId={deviceSettings.id} exclusive={true} calibrate={true} bind:calibrationSpot />
 		</div>
 	{/if}
 
@@ -478,6 +511,23 @@
 					<p class="mt-4 text-sm">Keep the device stationary for best results.</p>
 				</div>
 				<div class="card p-4 preset-tonal">
+					<header class="font-semibold mb-4">Device Status</header>
+					{#if device?.anchor}
+						<div class="card p-4 preset-filled-success-500 mb-4">
+							<header class="font-semibold mb-2">Anchored Device</header>
+							<p class="text-sm">
+								This device is anchored at:<br />
+								X: {device.anchor.x?.toFixed(2)}m, Y: {device.anchor.y?.toFixed(2)}m, Z: {device.anchor.z?.toFixed(2)}m
+							</p>
+						</div>
+					{:else}
+						<div class="card p-4 preset-tonal mb-4">
+							<header class="font-semibold mb-2">Tracking Device</header>
+							<p class="text-sm">This device location is calculated using trilateration.</p>
+						</div>
+					{/if}
+				</div>
+				<div class="card p-4 preset-tonal">
 					<header class="font-semibold mb-4">Calibration Results</header>
 					<div class="grid grid-cols-1 gap-4 mb-4">
 						<div class="card p-4 preset-tonal">
@@ -502,7 +552,20 @@
 							<p>This change will affect how distances are calculated for this device.</p>
 						</div>
 					{/if}
-					<button class="btn btn-lg preset-filled-primary-500 w-full" onclick={saveCalibration} disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}> Accept New Calibration </button>
+					<button
+						class="btn btn-lg preset-filled-primary-500 w-full mb-3"
+						onclick={saveCalibration}
+						disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}
+					>
+						Accept New Calibration
+					</button>
+					<button
+						class="btn btn-lg preset-filled-secondary-500 w-full"
+						onclick={anchorDevice}
+						disabled={!calibrationSpot}
+					>
+						Anchor Device at This Location
+					</button>
 				</div>
 			</div>
 		</div>

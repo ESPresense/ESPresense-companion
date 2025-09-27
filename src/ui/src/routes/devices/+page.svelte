@@ -1,7 +1,7 @@
 <script lang="ts">
 	import DevicesTable from '$lib/DevicesTable.svelte';
 	import SlideToggle from '$lib/SlideToggle.svelte';
-	import { detail } from '$lib/urls';
+	import * as urls from '$lib/urls';
 	import { showAll } from '$lib/stores';
 </script>
 
@@ -17,6 +17,6 @@
 				<SlideToggle name="show-all" bind:checked={$showAll}>Show All</SlideToggle>
 			</div>
 		</div>
-		<DevicesTable onselected={(device) => detail(device)} />
+		<DevicesTable onselected={(device) => urls.gotoDetail(device)} />
 	</div>
 </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { detail, calibrateDevice } from '$lib/urls';
+	import * as urls from '$lib/urls';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showComponent, showConfirm } from '$lib/modal/modalStore';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
@@ -81,8 +81,8 @@
 		{/if}
 	</button>
 	{#if isActive}
-		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); detail(row); }} aria-label="View device on map"> Map </button>
-		<button class="btn btn-sm preset-filled-tertiary-500" onclick={(e) => { e.stopPropagation(); calibrateDevice(row); }} aria-label="Calibrate device"> Calibrate </button>
+		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); urls.gotoDetail(row); }} aria-label="View device on map"> Map </button>
+		<button class="btn btn-sm preset-filled-tertiary-500" onclick={(e) => { e.stopPropagation(); urls.gotoCalibrateDevice(row); }} aria-label="Calibrate device"> Calibrate </button>
 	{/if}
     <button class="btn btn-sm bg-error-500 hover:bg-error-600 text-white" onclick={(e) => { e.stopPropagation(); handleDelete(); }} disabled={loadingDelete} aria-label="Delete device">
         {#if loadingDelete}

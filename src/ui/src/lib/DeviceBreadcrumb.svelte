@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { goto } from '$app/navigation';
+	import * as urls from '$lib/urls';
 
 	export let deviceName: string = 'Unknown Device';
-	export let currentView: 'map' | 'calibration' = 'map';
 
 	// Helper function to shorten very long device IDs
 	function getDisplayName(name: string) {
@@ -17,12 +15,9 @@
 	}
 
 	function navigateToDevices() {
-		goto(`${base}/devices`);
+		urls.gotoDevices();
 	}
 
-	function getCurrentViewLabel() {
-		return currentView === 'calibration' ? 'Calibration' : 'Map';
-	}
 </script>
 
 <div class="flex items-center space-x-2 text-sm text-surface-600-400 mb-4 px-4 py-2">
@@ -38,11 +33,5 @@
 	
 	<span class="text-surface-900-100 font-medium" title={deviceName}>
 		{getDisplayName(deviceName)}
-	</span>
-	
-	<span>→</span>
-	
-	<span class="text-surface-900-100 font-medium">
-		{getCurrentViewLabel()}
 	</span>
 </div>

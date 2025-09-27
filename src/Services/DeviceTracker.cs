@@ -63,6 +63,7 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
             var device = state.Devices.GetOrAdd(deviceId, id =>
             {
                 var d = new Device(id, arg.AutoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = arg.AutoDiscover.Message.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
+                state.ShouldTrack(d); // sets anchor if configured
                 foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                 Log.Information("[+] Track: {Device} (disc)", d);
                 return d;
@@ -101,6 +102,7 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
                     var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
                     {
                         var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
+                        state.ShouldTrack(d);
                         foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
                         return d;
                     });
