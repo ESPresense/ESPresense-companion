@@ -75,17 +75,10 @@
 <path
 	d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
 	fill={colors(n.id)}
-	role="button"
-	tabindex="0"
+	role="figure"
 	aria-label={`Select node ${n.name}`}
 	onclick={() => {
 		select(n);
-	}}
-	onkeydown={(event) => {
-		if (event.key === 'Enter' || event.key === ' ') {
-			event.preventDefault();
-			select(n);
-		}
 	}}
 	onmouseover={() => {
 		hover(n);

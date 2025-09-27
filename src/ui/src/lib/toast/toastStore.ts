@@ -31,6 +31,7 @@ function createToastStore() {
 		const toast: Toast = {
 			...settings,
 			id,
+			background: settings.background ?? 'preset-filled-primary-500',
 			timestamp: Date.now(),
 			timeout: settings.timeout ?? 5000,
 			autohide: settings.autohide ?? true

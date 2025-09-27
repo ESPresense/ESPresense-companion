@@ -80,7 +80,7 @@
 		if (!confirmed) return;
 
 		try {
-		const response = await fetch(resolve('/api/state/calibration/reset'), { method: 'POST' });
+			const response = await fetch(resolve('/api/state/calibration/reset'), { method: 'POST' });
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',
@@ -100,55 +100,88 @@
 	}
 </script>
 
-<div class="card p-2">
-	{#if $calibration?.matrix}
-		<header>
-			<div class="flex justify-between items-center p-2">
-				<div class="">
-					<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 0)}>Error %</button>
-					<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 1)}>Error (m)</button>
-					<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 2)}>Absorption</button>
-					<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
-					<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
-					<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
+<div class="h-full overflow-y-auto">
+	<div class="w-full px-4 py-2">
+		<!-- Active Optimizers -->
+		{#if $calibration?.optimizerState?.optimizers}
+		<div class="mb-4">
+			<span class="text-sm font-semibold text-surface-600-400">Active Optimizers:</span>
+			<span class="text-surface-900-100 ml-2">{$calibration.optimizerState.optimizers}</span>
+		</div>
+		{/if}
+
+		<!-- Calibration Statistics -->
+		{#if $calibration?.optimizerState}
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+			<div class="card p-4 preset-tonal">
+				<div class="text-2xl font-bold text-primary-500">{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</div>
+				<div class="text-sm text-surface-600-400">RMSE</div>
+			</div>
+			<div class="card p-4 preset-tonal">
+				<div class="text-2xl font-bold text-primary-500">{$calibration?.r?.toFixed(3) ?? 'n/a'}</div>
+				<div class="text-sm text-surface-600-400">R</div>
+			</div>
+			<div class="card p-4 preset-tonal">
+				<div class="text-2xl font-bold text-success-500">{$calibration?.optimizerState?.bestRMSE?.toFixed(3) ?? 'n/a'}</div>
+				<div class="text-sm text-surface-600-400">Best RMSE</div>
+			</div>
+			<div class="card p-4 preset-tonal">
+				<div class="text-2xl font-bold text-success-500">{$calibration?.optimizerState?.bestR?.toFixed(3) ?? 'n/a'}</div>
+				<div class="text-sm text-surface-600-400">Best R</div>
+			</div>
+		</div>
+		{/if}
+
+		{#if $calibration?.matrix}
+		<div class="card">
+			<header class="text-lg font-semibold mb-4">Node Calibration</header>
+			<div class="space-y-4">
+				<div class="flex flex-col gap-6 rounded-lg border border-surface-300-700 bg-surface-50-950 p-4 shadow-sm">
+					<div class="flex flex-wrap items-center justify-between gap-3">
+						<div class="flex flex-wrap items-center gap-2">
+							<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 0)}>Error %</button>
+							<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 1)}>Error (m)</button>
+							<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 2)}>Absorption</button>
+							<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
+							<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
+							<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
+						</div>
+						<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
+					</div>
 				</div>
-				<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
-			</div>
-			<div class="flex gap-8 items-center m-4 mt-2">
-				<span class="font-semibold">RMSE:</span> <span>{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</span>
-				<span class="font-semibold">R:</span> <span>{$calibration?.r?.toFixed(3) ?? 'n/a'}</span>
-				<span class="font-semibold">Best RMSE:</span> <span>{$calibration?.optimizerState?.bestRMSE?.toFixed(3) ?? 'n/a'}</span>
-				<span class="font-semibold">Best R:</span> <span>{$calibration?.optimizerState?.bestR?.toFixed(3) ?? 'n/a'}</span>
-				<span class="font-semibold ml-4">Active Optimizers:</span> <span>{$calibration?.optimizerState?.optimizers ?? 'n/a'}</span>
-			</div>
-		</header>
-		<section class="p-4 pt-0">
-			<table class="table">
-				<thead>
-					<tr>
-						<th style="text-align: center; color: oklch(1 0 none);">Name</th>
-						{#each rxColumns as id}
-							<th class="h-32 whitespace-nowrap px-2 py-1 min-w-10" style="position: relative;">
-								<div style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); position: absolute; bottom: 8px; left: 50%; transform-origin: center; transform: translateX(-50%) rotate(180deg); white-space: nowrap; color: oklch(1 0 none);">Rx: {id}</div>
-							</th>
-						{/each}
-					</tr>
-				</thead>
-				<tbody>
-					{#each Object.entries($calibration.matrix) as [id1, n1] (id1)}
-						<tr>
-							<td style="text-align: right; white-space: nowrap;">Tx: {id1}</td>
-							{#each rxColumns as id2 (id2)}
-								<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'}
-									>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
-								>
+				<div class="overflow-x-auto">
+					<table class="table">
+						<thead>
+							<tr>
+								<th style="text-align: center; color: oklch(1 0 none);">Name</th>
+								{#each rxColumns as id}
+									<th class="h-32 whitespace-nowrap px-2 py-1 min-w-10" style="position: relative;">
+										<div style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); position: absolute; bottom: 8px; left: 50%; transform-origin: center; transform: translateX(-50%) rotate(180deg); white-space: nowrap; color: oklch(1 0 none);">Rx: {id}</div>
+									</th>
+								{/each}
+							</tr>
+						</thead>
+						<tbody>
+							{#each Object.entries($calibration.matrix) as [id1, n1] (id1)}
+								<tr>
+									<td style="text-align: right; white-space: nowrap;">Tx: {id1}</td>
+									{#each rxColumns as id2 (id2)}
+										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'}
+											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
+										>
+									{/each}
+								</tr>
 							{/each}
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</section>
-	{:else}
-		<p>Loading...</p>
-	{/if}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+		{:else}
+		<div class="text-center py-8 text-surface-600-400">
+			Loading calibration data...
+		</div>
+		{/if}
+	</div>
 </div>
+

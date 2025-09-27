@@ -10,20 +10,20 @@
 	<title>ESPresense Companion: Calibration</title>
 </svelte:head>
 
-<div class="flex flex-col h-full">
-	<div class="flex-shrink-0">
-		<CalibrationTabs bind:calibrationType />
+<div class="h-full overflow-y-auto">
+	<div class="w-full px-4 py-4 space-y-6">
+		<header class="flex flex-wrap items-center justify-between gap-4">
+			<h1 class="text-2xl font-bold text-surface-900-100">Calibration</h1>
+			<CalibrationTabs bind:calibrationType />
+		</header>
 	</div>
-	<div class="flex-1 min-h-0">
-		{#if calibrationType === 'node'}
-			<div class="h-full overflow-y-auto">
-				<div class="w-full px-4 py-2">
-					<h1 class="text-2xl font-bold mb-4">Node Calibration</h1>
-					<NodeCalibrationMatrix />
-				</div>
-			</div>
-		{:else if calibrationType === 'device'}
+	{#if calibrationType === 'node'}
+		<section>
+			<NodeCalibrationMatrix />
+		</section>
+	{:else if calibrationType === 'device'}
+		<section>
 			<DeviceCalibrationManager />
-		{/if}
-	</div>
+		</section>
+	{/if}
 </div>

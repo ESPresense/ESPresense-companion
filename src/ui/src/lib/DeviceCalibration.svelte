@@ -312,7 +312,10 @@
 			});
 			if (response.ok) {
 				currentRefRssi = calculatedRefRssi;
-				toastStore.trigger({ message: 'Calibration saved successfully!' });
+				toastStore.trigger({
+					message: 'Calibration saved successfully!',
+					background: 'preset-filled-success-500'
+				});
 			} else if (response.status === 400) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || 'Bad request. Please check your input.');
@@ -330,181 +333,185 @@
 	<title>ESPresense Companion: Device Calibration</title>
 </svelte:head>
 
-<div class="w-full px-4 py-2">
-	<h2 class="text-xl font-bold mb-4">Device Calibration</h2>
 
-	<div class="card p-4 mb-4 preset-tonal">
-		<header class="font-semibold mb-2">Instructions</header>
-		<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
-		<ol class="list-decimal pl-6 mb-2">
-			<li>Select a floor from the dropdown</li>
-			<li>Place the marker where your device is physically located (drag to position)</li>
-			<li>Data is automatically collected as you keep the device stationary</li>
-			<li>Compare Map Distance (actual) with Est. Distance (calculated from RSSI)</li>
-			<li>When stability is good, review and save the calculated value</li>
-		</ol>
-		<p class="text-sm font-medium mt-2">The closer Map Distance matches Est. Distance for all nodes, the more accurate your positioning will be.</p>
-	</div>
+<div class="h-full overflow-y-auto">
+	<div class="w-full px-4 py-4 space-y-6">
+		<header class="flex items-center justify-between">
+			<h1 class="text-2xl font-bold text-surface-900-100">Device Calibration</h1>
+		</header>
 
-	{#if $config?.floors}
-		<div class="grid grid-cols-1 gap-4 mb-4">
-			<div>
-				<label class="label font-medium mb-1" for="floor-select">Select Floor</label>
-				<select id="floor-select" bind:value={selectedFloorId} class="select w-full">
-					{#each $config?.floors as { id, name }}
-						<option value={id}>{name}</option>
-					{/each}
-				</select>
-			</div>
+		<div class="card p-4 preset-tonal">
+			<header class="font-semibold mb-2">Instructions</header>
+			<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
+			<ol class="list-decimal pl-6 mb-2">
+				<li>Select a floor from the dropdown</li>
+				<li>Place the marker where your device is physically located (drag to position)</li>
+				<li>Data is automatically collected as you keep the device stationary</li>
+				<li>Compare Map Distance (actual) with Est. Distance (calculated from RSSI)</li>
+				<li>When stability is good, review and save the calculated value</li>
+			</ol>
+			<p class="text-sm font-medium mt-2">The closer Map Distance matches Est. Distance for all nodes, the more accurate your positioning will be.</p>
+		</div>
 
-			{#if calibrationSpot}
+		{#if $config?.floors}
+			<div class="grid grid-cols-1 gap-4">
 				<div>
-					<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
-					<div class="input-group input-group-divider grid-cols-[1fr_auto]">
-						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input rounded-r-none" />
-						<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}>Set</button>
-					</div>
+					<label class="label font-medium mb-1" for="floor-select">Select Floor</label>
+					<select id="floor-select" bind:value={selectedFloorId} class="select w-full">
+						{#each $config?.floors as { id, name }}
+							<option value={id}>{name}</option>
+						{/each}
+					</select>
 				</div>
-			{/if}
-		</div>
-	{/if}
 
-	{#if selectedFloorId}
-		<div class="card h-[400px] mb-4 relative overflow-hidden">
-			<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
-		</div>
-	{/if}
+				{#if calibrationSpot}
+					<div>
+						<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
+						<div class="input-group input-group-divider grid-cols-[1fr_auto]">
+							<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input rounded-r-none" />
+							<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}>Set</button>
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
-	{#if calibrationSpot}
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-			<div class="card p-4 lg:col-span-2 preset-tonal">
-				<header class="text-xl font-semibold mb-2">Node Distances and RSSI Values</header>
-				<p class="text-sm mb-3">
-					<span class="font-semibold">Map Distance:</span> Calculated from node and calibration spot positions in 3D space (X, Y, and Z).<br />
-					<span class="font-semibold">Est. Distance:</span> Estimated from RSSI using current calibration settings.<br />
-					<span class="font-semibold">Height from Floor:</span> The Z-coordinate (height) of the node from the floor.
-				</p>
-				<div class="table-container">
-					<table class="table table-compact">
-						<thead>
-							<tr>
-								<th>Node</th>
-								<th>Height from Floor (m)</th>
-								<th>Map Distance (m)</th>
-								<th>Est. Distance (m)</th>
-								<th>RSSI (dBm)</th>
-								<th>Est. RSSI@1m</th>
-								<th>Include</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each nodeDistances as node}
+		{#if selectedFloorId}
+			<div class="card h-[400px] relative overflow-hidden">
+				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
+			</div>
+		{/if}
+
+		{#if calibrationSpot}
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+				<div class="card p-4 preset-tonal lg:col-span-2">
+					<header class="text-xl font-semibold mb-2">Node Distances and RSSI Values</header>
+					<p class="text-sm mb-3">
+						<span class="font-semibold">Map Distance:</span> Calculated from node and calibration spot positions in 3D space (X, Y, and Z).<br />
+						<span class="font-semibold">Est. Distance:</span> Estimated from RSSI using current calibration settings.<br />
+						<span class="font-semibold">Height from Floor:</span> The Z-coordinate (height) of the node from the floor.
+					</p>
+					<div class="table-container">
+						<table class="table table-compact">
+							<thead>
 								<tr>
-									<td>{node.name}</td>
-									<td>{node.nodeZ?.toFixed(2) || 'n/a'}</td>
-									<td>{node.distance?.toFixed(2) || 'n/a'}</td>
-									<td>
-										{#if rssiValues[node.id] != null && currentRefRssi != null}
-											{#if nodeSettings[node.id]?.calibration?.absorption != null}
-												{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / (10 * (nodeSettings[node.id]?.calibration?.absorption || 2))).toFixed(2)}
+									<th>Node</th>
+									<th>Height from Floor (m)</th>
+									<th>Map Distance (m)</th>
+									<th>Est. Distance (m)</th>
+									<th>RSSI (dBm)</th>
+									<th>Est. RSSI@1m</th>
+									<th>Include</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each nodeDistances as node}
+									<tr>
+										<td>{node.name}</td>
+										<td>{node.nodeZ?.toFixed(2) || 'n/a'}</td>
+										<td>{node.distance?.toFixed(2) || 'n/a'}</td>
+										<td>
+											{#if rssiValues[node.id] != null && currentRefRssi != null}
+												{#if nodeSettings[node.id]?.calibration?.absorption != null}
+													{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / (10 * (nodeSettings[node.id]?.calibration?.absorption || 2))).toFixed(2)}
+												{:else}
+													{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / 20).toFixed(2)}
+												{/if}
 											{:else}
-												{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / 20).toFixed(2)}
+												n/a
 											{/if}
-										{:else}
-											n/a
-										{/if}
-									</td>
-									<td>{rssiValues[node.id] != null ? rssiValues[node.id]?.toFixed(1) : 'n/a'}</td>
-									<td>
-										{#if rssiValues[node.id] != null && node.distance != null && node.distance > 0.1}
-											{Math.round((rssiValues[node.id] || 0) + 10 * (nodeSettings[node.id]?.calibration?.absorption || 2) * Math.log10(node.distance))}
-										{:else}
-											n/a
-										{/if}
-									</td>
-									<td>
-										<input type="checkbox" checked={includedNodes[node.id] || false} onchange={() => toggleNodeInclusion(node.id)} class="checkbox" />
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
+										</td>
+										<td>{rssiValues[node.id] != null ? rssiValues[node.id]?.toFixed(1) : 'n/a'}</td>
+										<td>
+											{#if rssiValues[node.id] != null && node.distance != null && node.distance > 0.1}
+												{Math.round((rssiValues[node.id] || 0) + 10 * (nodeSettings[node.id]?.calibration?.absorption || 2) * Math.log10(node.distance))}
+											{:else}
+												n/a
+											{/if}
+										</td>
+										<td>
+											<input type="checkbox" checked={includedNodes[node.id] || false} onchange={() => toggleNodeInclusion(node.id)} class="checkbox" />
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
 
-				<!-- Device Message Statistics Table -->
-				<header class="text-xl font-semibold mb-2 mt-6">Device Message Statistics</header>
-				<div class="table-container">
-					<table class="table table-compact">
-						<thead>
-							<tr>
-								<th>Node</th>
-								<th>Messages Count</th>
-								<th>Avg RSSI (dBm)</th>
-								<th>Min RSSI (dBm)</th>
-								<th>Max RSSI (dBm)</th>
-								<th>Std Deviation</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each Object.entries(messageStats) as [nodeId, stats]}
-								{@const node = nodeDistances.find((n) => n.id === nodeId)}
+					<!-- Device Message Statistics Table -->
+					<header class="text-xl font-semibold mb-2 mt-6">Device Message Statistics</header>
+					<div class="table-container">
+						<table class="table table-compact">
+							<thead>
 								<tr>
-									<td>{node?.name || nodeId}</td>
-									<td>{stats.count}</td>
-									<td>{stats.avgRssi != null ? stats.avgRssi.toFixed(1) : 'n/a'}</td>
-									<td>{stats.minRssi != null ? stats.minRssi.toFixed(1) : 'n/a'}</td>
-									<td>{stats.maxRssi != null ? stats.maxRssi.toFixed(1) : 'n/a'}</td>
-									<td>{stats.stdDev != null ? stats.stdDev.toFixed(2) : 'n/a'}</td>
+									<th>Node</th>
+									<th>Messages Count</th>
+									<th>Avg RSSI (dBm)</th>
+									<th>Min RSSI (dBm)</th>
+									<th>Max RSSI (dBm)</th>
+									<th>Std Deviation</th>
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{#each Object.entries(messageStats) as [nodeId, stats]}
+									{@const node = nodeDistances.find((n) => n.id === nodeId)}
+									<tr>
+										<td>{node?.name || nodeId}</td>
+										<td>{stats.count}</td>
+										<td>{stats.avgRssi != null ? stats.avgRssi.toFixed(1) : 'n/a'}</td>
+										<td>{stats.minRssi != null ? stats.minRssi.toFixed(1) : 'n/a'}</td>
+										<td>{stats.maxRssi != null ? stats.maxRssi.toFixed(1) : 'n/a'}</td>
+										<td>{stats.stdDev != null ? stats.stdDev.toFixed(2) : 'n/a'}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
 				</div>
-			</div>
 
-			<div class="col-span-1 space-y-4">
-				<div class="card p-4 preset-tonal">
-					<header class="font-semibold mb-2">Data Collection Status</header>
-					<div class="mt-4"></div>
-					<div class="mt-4">
-						<div class="flex justify-between mb-1">
-							<span>Total Messages:</span>
-							<span class="font-medium">{Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0)}</span>
+				<div class="col-span-1 space-y-4">
+					<div class="card p-4 preset-tonal">
+						<header class="font-semibold mb-2">Data Collection Status</header>
+						<div class="mt-4">
+							<div class="flex justify-between mb-1">
+								<span>Total Messages:</span>
+								<span class="font-medium">{Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0)}</span>
+							</div>
+							<div class="progress h-2">
+								<div class="progress-bar bg-primary-500" style="width: {Math.min(100, Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0) / 2)}%"></div>
+							</div>
 						</div>
-						<div class="progress h-2">
-							<div class="progress-bar bg-primary-500" style="width: {Math.min(100, Object.values(deviceMessages).reduce((sum, msgs) => sum + msgs.length, 0) / 2)}%"></div>
-						</div>
+						<p class="mt-4 text-sm">Keep the device stationary for best results.</p>
 					</div>
-					<p class="mt-4 text-sm">Keep the device stationary for best results.</p>
-				</div>
-				<div class="card p-4 preset-tonal">
-					<header class="font-semibold mb-4">Calibration Results</header>
-					<div class="grid grid-cols-1 gap-4 mb-4">
-						<div class="card p-4 preset-tonal">
-							<header class="font-semibold mb-2">Current Values</header>
-							<p class="text-xl font-bold">
-								RSSI@1m: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
-							</p>
+					<div class="card p-4 preset-tonal">
+						<header class="font-semibold mb-4">Calibration Results</header>
+						<div class="grid grid-cols-1 gap-4 mb-4">
+							<div class="card p-4 preset-tonal">
+								<header class="font-semibold mb-2">Current Values</header>
+								<p class="text-xl font-bold">
+									RSSI@1m: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
+								</p>
+							</div>
+							<div class="card p-4 preset-filled-primary-500">
+								<header class="font-semibold mb-2">New Values</header>
+								<p class="text-xl font-bold">
+									RSSI@1m: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
+								</p>
+							</div>
 						</div>
-						<div class="card p-4 preset-filled-primary-500">
-							<header class="font-semibold mb-2">New Values</header>
-							<p class="text-xl font-bold">
-								RSSI@1m: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
-							</p>
-						</div>
+						{#if currentRefRssi != null && calculatedRefRssi != null}
+							<div class="card p-4 preset-tonal-warning border border-warning-500 mb-4">
+								<p>
+									This is a <span class="font-semibold">{Math.abs(calculatedRefRssi - Math.round(currentRefRssi))} dBm</span>
+									{calculatedRefRssi > currentRefRssi ? 'increase' : 'decrease'}.
+								</p>
+								<p>This change will affect how distances are calculated for this device.</p>
+							</div>
+						{/if}
+						<button class="btn btn-lg preset-filled-primary-500 w-full" onclick={saveCalibration} disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}> Accept New Calibration </button>
 					</div>
-					{#if currentRefRssi != null && calculatedRefRssi != null}
-						<div class="card p-4 preset-tonal-warning border border-warning-500 mb-4">
-							<p>
-								This is a <span class="font-semibold">{Math.abs(calculatedRefRssi - Math.round(currentRefRssi))} dBm</span>
-								{calculatedRefRssi > currentRefRssi ? 'increase' : 'decrease'}.
-							</p>
-							<p>This change will affect how distances are calculated for this device.</p>
-						</div>
-					{/if}
-					<button class="btn btn-lg preset-filled-primary-500 w-full" onclick={saveCalibration} disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}> Accept New Calibration </button>
 				</div>
 			</div>
-		</div>
 	{/if}
+	</div>
 </div>
