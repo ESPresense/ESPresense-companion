@@ -1,48 +1,42 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { goto } from '$app/navigation';
+	import { gotoCalibration, gotoMap } from '$lib/urls';
 
 	export let deviceName: string = 'Unknown Device';
 	export let currentView: 'map' | 'calibration' = 'map';
 
-	// Helper function to shorten very long device IDs
 	function getDisplayName(name: string) {
 		if (!name || name === 'Unknown Device') return 'Unknown Device';
-		
-		// If it's a very long ID (like iBeacon), show first part + "..." + last part
 		if (name.length > 40) {
 			return `${name.substring(0, 20)}...${name.substring(name.length - 12)}`;
 		}
 		return name;
 	}
 
-	function navigateToDevices() {
-		goto(`${base}/devices`);
+	function navigateToBase() {
+		if (currentView === 'calibration') {
+			gotoCalibration();
+		} else {
+			gotoMap();
+		}
 	}
 
-	function getCurrentViewLabel() {
+	function getBaseLabel() {
 		return currentView === 'calibration' ? 'Calibration' : 'Map';
 	}
 </script>
 
 <div class="flex items-center space-x-2 text-sm text-surface-600-400 mb-4 px-4 py-2">
-	<button 
-		class="hover:text-primary-500 transition-colors" 
-		onclick={navigateToDevices}
-		aria-label="Go to devices list"
+	<button
+		class="hover:text-primary-500 transition-colors"
+		onclick={navigateToBase}
+		aria-label={currentView === 'calibration' ? 'Go to calibration' : 'Go to map'}
 	>
-		Devices
+		{getBaseLabel()}
 	</button>
-	
+
 	<span>→</span>
-	
+
 	<span class="text-surface-900-100 font-medium" title={deviceName}>
 		{getDisplayName(deviceName)}
-	</span>
-	
-	<span>→</span>
-	
-	<span class="text-surface-900-100 font-medium">
-		{getCurrentViewLabel()}
 	</span>
 </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
@@ -26,7 +26,7 @@
 	// Function to fetch device settings based on deviceId
 	async function fetchDeviceSettings() {
 		try {
-			const response = await fetch(`${base}/api/device/${deviceId}`);
+			const response = await fetch(resolve(`/api/device/${deviceId}`));
 			if (response.ok) {
 				deviceSettings = await response.json();
 				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
@@ -43,7 +43,7 @@
 	// Function to fetch node settings
 	async function fetchNodeSettings(nodeId: string) {
 		try {
-			const response = await fetch(`${base}/api/node/${nodeId}`);
+			const response = await fetch(resolve(`/api/node/${nodeId}`));
 			if (response.ok) {
 				const data = await response.json();
 				nodeSettings[nodeId] = data.settings;
@@ -305,7 +305,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(`${base}/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
+			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -361,8 +361,8 @@
 				<div>
 					<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
 					<div class="input-group input-group-divider grid-cols-[1fr_auto]">
-						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input" />
-						<button class="preset-filled-primary-500" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}> Set </button>
+						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input rounded-r-none" />
+						<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}>Set</button>
 					</div>
 				</div>
 			{/if}

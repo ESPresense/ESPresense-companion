@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { goto } from '$app/navigation';
+	import { gotoMap } from '$lib/urls';
 	import { config } from '$lib/stores';
 	import type { Node } from '$lib/types';
 
@@ -19,16 +18,6 @@
 		return name;
 	}
 
-	function navigateToNodes() {
-		goto(`${base}/nodes`);
-	}
-
-	function getCurrentViewLabel() {
-		// Find the floor name
-		const floor = $config?.floors?.find(f => f.id === currentFloorId);
-		return floor ? `Floor: ${floor.name}` : 'Map';
-	}
-
 	// Get floors that this node is actually on
 	$: nodeFloors = node?.floors || [];
 	$: availableFloors = $config?.floors?.filter(f => nodeFloors.includes(f.id)) || [];
@@ -40,10 +29,10 @@
 	<div class="flex items-center space-x-2 text-sm text-surface-600-400">
 		<button 
 			class="hover:text-primary-500 transition-colors" 
-			onclick={navigateToNodes}
-			aria-label="Go to nodes list"
+			onclick={() => gotoMap()}
+			aria-label="Go to map"
 		>
-			Nodes
+			Map
 		</button>
 		
 		<span>→</span>
@@ -52,12 +41,6 @@
 			{getDisplayName(nodeName)}
 		</span>
 		
-		{#if showFloorSelection}
-			<span>→</span>
-			<span class="text-surface-900-100 font-medium">
-				{getCurrentViewLabel()}
-			</span>
-		{/if}
 	</div>
 
 	<!-- Floor Tabs (only show if node is on multiple floors) -->

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { detail } from '$lib/urls';
+	import { resolve } from '$app/paths';
+	import { gotoDetail } from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
@@ -18,7 +18,7 @@
 
 	async function onRestart(node: Node) {
 		try {
-			const response = await fetch(`${base}/api/node/${node.id}/restart`, { method: 'POST' });
+			const response = await fetch(resolve(`/api/node/${node.id}/restart`), { method: 'POST' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
 
 			toastStore.trigger({
@@ -43,7 +43,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch(`${base}/api/node/${encodeURIComponent(node.id)}`, { method: 'DELETE' });
+			const response = await fetch(resolve(`/api/node/${encodeURIComponent(node.id)}`), { method: 'DELETE' });
 			if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
 
 			toastStore.trigger({
@@ -105,7 +105,7 @@
 				}
 			}
 
-			const response = await fetch(`${base}/api/node/${node.id}/update`, {
+			const response = await fetch(resolve(`/api/node/${node.id}/update`), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -155,7 +155,7 @@
 		loadingEdit = true;
 
 		try {
-			const response = await fetch(`${base}/api/node/${row.id}`);
+			const response = await fetch(resolve(`/api/node/${row.id}`));
 			if (!response.ok) throw new Error(`Failed to fetch node settings details: ${response.statusText}`);
 
 			const nodeSettingsDetails: NodeSettingDetails = await response.json();
@@ -202,7 +202,7 @@
 			{/if}
 		</button>
 
-		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); detail(row); }} aria-label="View node on map"> Map </button>
+		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); gotoDetail(row); }} aria-label="View node on map"> Map </button>
 
 		{#if row.telemetry?.version}
 			<button onclick={e => onUpdate(row)} disabled={!$firmwareTypes || !($updateMethod === 'self' || ($firmwareSource === 'release' && $version) || ($firmwareSource === 'artifact' && $artifact))} class="btn btn-sm preset-filled-tertiary-500" aria-label="Update node firmware"> Update </button>

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import NodesTable from '$lib/NodesTable.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import { base } from '$app/paths';
-	import { detail } from '$lib/urls';
+	import { resolve } from '$app/paths';
+	import { gotoDetail } from '$lib/urls';
 	import type { NodeSettingDetails } from '$lib/types';
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
 	import { onMount } from 'svelte';
@@ -23,7 +23,7 @@
 				}
 			};
 
-			const response = await fetch(`${base}/api/node/*`, {
+			const response = await fetch(resolve('/api/node/*'), {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
@@ -53,7 +53,7 @@
 	async function loadSettings() {
 		try {
 			loading = true;
-			const response = await fetch(`${base}/api/node/*`);
+			const response = await fetch(resolve('/api/node/*'));
 
 			if (!response.ok) throw new Error('Failed to load settings');
 
@@ -104,6 +104,6 @@
 			{/if}
 		</div>
 
-		<NodesTable onselected={(node) => detail(node)} />
+		<NodesTable onselected={(node) => gotoDetail(node)} />
 	</div>
 </div>

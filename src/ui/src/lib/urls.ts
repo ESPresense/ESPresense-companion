@@ -1,17 +1,17 @@
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 import { goto } from '$app/navigation';
 import { isNode, type Device, type Node } from '$lib/types';
 
 /**
  * Navigate to the detail page for a Node or Device.
  *
- * If `d` is a Node, navigates to `${base}/nodes/{id}`; otherwise navigates to `${base}/devices/{id}`.
+ * If `d` is a Node, navigates to `/nodes/{id}`; otherwise navigates to `/devices/{id}`.
  *
  * @param d - The target Device or Node. If `d` is `null` or has no `id`, the generated URL will include `undefined`.
  */
-export function detail(d: Device | Node | null) {
-	if (isNode(d)) goto(`${base}/nodes/${d?.id}`);
-	else goto(`${base}/devices/${d?.id}`);
+export function gotoDetail(d: Device | Node | null) {
+	if (isNode(d)) goto(resolve(`/nodes/${d?.id ?? ''}`));
+	else goto(resolve(`/devices/${d?.id ?? ''}`));
 }
 
 /**
@@ -19,18 +19,30 @@ export function detail(d: Device | Node | null) {
  *
  * @param deviceId - The device identifier to include in the path; if `null` the literal `"null"` will be placed in the URL (`.../3d/null`).
  */
-export function detail3d(deviceId: string | null) {
-	goto(`${base}/3d/${deviceId}`);
+export function gotoDetail3d(deviceId: string | null) {
+	goto(resolve(`/3d/${deviceId ?? ''}`));
 }
 
 /**
- * Navigate to a device's detail page with the calibration tab selected.
+ * Navigate to a device's calibration view.
  *
  * If `d` is null or `d.id` is undefined, the generated URL will include `undefined` in place of the device id.
  *
  * @param d - The device to calibrate (may be `null`); navigation occurs as a side effect.
  */
-export function calibrateDevice(d: Device | null) {
-	// Navigate to the device detail page with the calibration tab selected
-	goto(`${base}/devices/${d?.id}?tab=calibration`);
+export function gotoMap() {
+	goto(resolve('/'));
+}
+
+export function gotoDevices() {
+	goto(resolve('/devices'));
+}
+
+export function gotoNodes() {
+	goto(resolve('/nodes'));
+}
+
+export function gotoCalibration(target?: Device | string | null) {
+	const id = typeof target === 'string' ? target : target?.id;
+	goto(resolve(id ? `/calibration/devices/${id}` : '/calibration'));
 }

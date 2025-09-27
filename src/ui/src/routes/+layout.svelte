@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import Modal from '$lib/modal/Modal.svelte';
 	import Toast from '$lib/toast/Toast.svelte';
@@ -23,6 +23,11 @@
 		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
 		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' }
 	];
+
+	$: resolvedRoutes = routes.map((route) => ({
+		...route,
+		resolved: resolve(route.href)
+	}));
 </script>
 
 <div class="app h-full">
@@ -40,12 +45,12 @@
 
 			<!-- Navigation Rail -->
 			<nav class="flex flex-col flex-1 items-center space-y-2 px-2">
-				{#each routes as route}
-					<a href="{base}{route.href}" class="flex flex-col items-center justify-center w-12 h-12 rounded-lg transition-all duration-200 group relative {current === `${base}${route.href}` ? 'bg-primary-500 text-white shadow-lg' : 'text-surface-700-300 hover:bg-surface-200-800 hover:text-surface-950-50'}" title={route.alt}>
+				{#each resolvedRoutes as route}
+					<a href={route.resolved} class="flex flex-col items-center justify-center w-12 h-12 rounded-lg transition-all duration-200 group relative {current === route.resolved ? 'bg-primary-500 text-white shadow-lg' : 'text-surface-700-300 hover:bg-surface-200-800 hover:text-surface-950-50'}" title={route.alt}>
 						<img src={route.icon} class="w-6 h-6 transition-transform group-hover:scale-110" alt={route.alt} />
 
 						<!-- Active indicator -->
-						{#if current === `${base}${route.href}`}
+						{#if current === route.resolved}
 							<div class="absolute -right-2 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-primary-500 rounded-l-full"></div>
 						{/if}
 

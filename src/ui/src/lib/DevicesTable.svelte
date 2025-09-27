@@ -45,16 +45,11 @@
 		{ key: 'actions', title: '', renderComponent: { component: DeviceActions } }
 	];
 
-	function onRowClick(e: any) {
-		select(e.row);
-	}
 </script>
 
 <div>
 	{#if $devices}
-		<DataTable {columns} classNameTable="table  table-compact" rows={$devices} onclickRow={onRowClick} />
+		<DataTable {columns} classNameTable="table  table-compact" rows={$devices} onclickRow={(event) => select(event.row)} />
 	{/if}
 </div>
 
-<style>
-</style>

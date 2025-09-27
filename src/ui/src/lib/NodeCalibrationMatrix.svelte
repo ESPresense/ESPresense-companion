@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
 	import { Segment } from '@skeletonlabs/skeleton-svelte';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
@@ -80,7 +80,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch(`${base}/api/state/calibration/reset`, { method: 'POST' });
+		const response = await fetch(resolve('/api/state/calibration/reset'), { method: 'POST' });
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',

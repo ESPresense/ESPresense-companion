@@ -1,5 +1,5 @@
 import { readable, writable, derived, get } from 'svelte/store';
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 import type { Device, Config, Node, CalibrationResponse, DeviceSetting } from './types';
 import { WSManager } from './wsManager';
 
@@ -43,10 +43,10 @@ export const history = writable<string[]>(['/']);
 /**
  * Fetches configuration from the backend and updates the `config` store.
  *
- * Retrieves JSON from `${base}/api/state/config` and sets the exported writable `config` store with the response.
+ * Retrieves JSON from `/api/state/config` and sets the exported writable `config` store with the response.
  */
 async function getConfig() {
-	const response = await fetch(`${base}/api/state/config`);
+	const response = await fetch(resolve(`/api/state/config`));
 	config.set(await response.json());
 }
 getConfig();
@@ -57,7 +57,7 @@ export const deviceSettings = writable<DeviceSetting[] | null>([], function star
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
-		fetch(`${base}/api/devices`)
+		fetch(resolve(`/api/devices`))
 			.then((d) => d.json())
 			.then((r: DeviceSetting[]) => {
 				outstanding = false;
@@ -89,7 +89,7 @@ export const devices = readable<Device[]>([], function start(set) {
 
 		isPolling = true;
 		try {
-			const response = await fetch(`${base}/api/state/devices?showAll=${get(showAll)}`);
+			const response = await fetch(resolve(`/api/state/devices?showAll=${get(showAll)}`));
 			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
 			const devices: Device[] = await response.json();
@@ -163,7 +163,7 @@ export const nodes = readable<Node[]>([], function start(set) {
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
-		fetch(`${base}/api/state/nodes?includeTele=true`)
+		fetch(resolve(`/api/state/nodes?includeTele=true`))
 			.then((d) => d.json())
 			.then((r) => {
 				outstanding = false;
@@ -186,7 +186,7 @@ export const nodes = readable<Node[]>([], function start(set) {
 // Calibration polling store
 export const calibration = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
 	async function fetchAndSet() {
-		const response = await fetch(`${base}/api/state/calibration`);
+		const response = await fetch(resolve(`/api/state/calibration`));
 		const data = await response.json();
 		set(data);
 	}

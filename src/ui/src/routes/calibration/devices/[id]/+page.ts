@@ -5,11 +5,18 @@ export async function load({ fetch, params }: LoadEvent) {
 	return await fetch(resolve(`/api/device/${params.id}`))
 		.then((response) => {
 			if (!response.ok) throw new Error(response.statusText);
-			var data = response.json();
-			return data;
+			return response.json();
 		})
 		.catch((e: unknown) => {
 			const error = e as Error;
-			return { settings: { originalId: params.id, id: params.id, name: null, 'rssi@1m': null, error: error.message } };
+			return {
+				settings: {
+					originalId: params.id,
+					id: params.id,
+					name: null,
+					'rssi@1m': null,
+					error: error.message
+				}
+			};
 		});
 }
