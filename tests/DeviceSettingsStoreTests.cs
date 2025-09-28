@@ -1,28 +1,33 @@
 using ESPresense.Events;
 using ESPresense.Models;
 using ESPresense.Services;
-using Microsoft.Extensions.Logging;
 using Moq;
-using System.Collections.Concurrent;
 
 namespace ESPresense.Companion.Tests;
 
 public class DeviceSettingsStoreTests
 {
-    private Mock<IMqttCoordinator> _mockMqttCoordinator;
-    private Mock<ILogger<DeviceSettingsStore>> _mockLogger;
-    private DeviceSettingsStore _deviceSettingsStore;
+    private Mock<IMqttCoordinator> _mockMqttCoordinator = null!;
+    private DeviceSettingsStore _deviceSettingsStore = null!;
+    private State _state = null!;
+    private ConfigLoader _configLoader = null!;
+    private NodeTelemetryStore _nodeTelemetryStore = null!;
+    private string _configDir = null!;
 
     [SetUp]
     public void Setup()
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
-        
-        _mockLogger = new Mock<ILogger<DeviceSettingsStore>>();
-        
-        _deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object);
-        
-        // Start the background service so it subscribes to events
+
+        _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(_configDir);
+
+        _configLoader = new ConfigLoader(_configDir);
+        _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore);
+
+        _deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object, _state);
+
         // Start the background service so it subscribes to events
         var startTask = _deviceSettingsStore.StartAsync(CancellationToken.None);
         // Ensure the service has started
@@ -33,8 +38,13 @@ public class DeviceSettingsStoreTests
     [TearDown]
     public void TearDown()
     {
-        _deviceSettingsStore.StopAsync(CancellationToken.None).Wait();
-        _deviceSettingsStore.Dispose();
+        _deviceSettingsStore?.StopAsync(CancellationToken.None).Wait();
+        _deviceSettingsStore?.Dispose();
+
+        if (Directory.Exists(_configDir))
+        {
+            Directory.Delete(_configDir, recursive: true);
+        }
     }
 
     [Test]
@@ -178,11 +188,102 @@ public class DeviceSettingsStoreTests
         // Assert - We should only have one logical device, not conflicting records
         var resultByOriginal = _deviceSettingsStore.Get("keys:dt-spar");
         var resultByAlias = _deviceSettingsStore.Get("keys:dt-spare");
-        
+
         Assert.That(resultByOriginal, Is.Not.Null);
         Assert.That(resultByAlias, Is.Not.Null);
         Assert.That(resultByOriginal.Name, Is.EqualTo("Darrell Spare Keys"));
         Assert.That(resultByAlias.Name, Is.EqualTo("Darrell Spare Keys"));
+    }
+
+    [Test]
+    public void ApplyAnchor_Should_Set_DeviceAnchor_When_DeviceExists()
+    {
+        var device = new Device("keys:anchor", null, TimeSpan.FromSeconds(30));
+        _state.Devices[device.Id] = device;
+
+        var deviceSettings = new DeviceSettings
+        {
+            Id = "keys:anchor",
+            OriginalId = "keys:anchor",
+            Name = "Anchored Keys",
+            RefRssi = -55,
+            X = 1,
+            Y = 2,
+            Z = 3
+        };
+
+        SimulateMqttDeviceConfig("keys:anchor", deviceSettings);
+
+        Assert.That(device.IsAnchored, Is.True);
+        Assert.That(device.Anchor, Is.Not.Null);
+        Assert.That(device.Anchor!.Location.X, Is.EqualTo(1));
+        Assert.That(device.Anchor!.Location.Y, Is.EqualTo(2));
+        Assert.That(device.Anchor!.Location.Z, Is.EqualTo(3));
+        Assert.That(device.ConfiguredRefRssi, Is.EqualTo(-55));
+        Assert.That(device.Track, Is.True);
+    }
+
+    [Test]
+    public void ApplyAnchor_Should_Fallback_To_Alias_Id_When_Device_Not_Found_By_Topic()
+    {
+        var device = new Device("keys:alias", null, TimeSpan.FromSeconds(30));
+        _state.Devices[device.Id] = device;
+
+        var deviceSettings = new DeviceSettings
+        {
+            Id = "keys:alias",
+            OriginalId = "keys:original",
+            Name = "Alias Device",
+            RefRssi = -60,
+            X = 4,
+            Y = 5,
+            Z = 6
+        };
+
+        SimulateMqttDeviceConfig("keys:original", deviceSettings);
+
+        Assert.That(device.IsAnchored, Is.True);
+        Assert.That(device.Anchor, Is.Not.Null);
+        Assert.That(device.Anchor!.Location.X, Is.EqualTo(4));
+        Assert.That(device.Anchor!.Location.Y, Is.EqualTo(5));
+        Assert.That(device.Anchor!.Location.Z, Is.EqualTo(6));
+        Assert.That(device.Track, Is.True);
+    }
+
+    [Test]
+    public void ClearingAnchor_Should_Remove_Anchor_And_Flag_Device_For_Recheck()
+    {
+        var device = new Device("keys:anchor-clear", null, TimeSpan.FromSeconds(30));
+        _state.Devices[device.Id] = device;
+
+        var anchoredSettings = new DeviceSettings
+        {
+            Id = "keys:anchor-clear",
+            OriginalId = "keys:anchor-clear",
+            X = 1,
+            Y = 1,
+            Z = 1
+        };
+
+        SimulateMqttDeviceConfig("keys:anchor-clear", anchoredSettings);
+        Assert.That(device.IsAnchored, Is.True);
+
+        var clearedSettings = new DeviceSettings
+        {
+            Id = "keys:anchor-clear",
+            OriginalId = "keys:anchor-clear",
+            X = null,
+            Y = null,
+            Z = null
+        };
+
+        device.Check = false;
+
+        SimulateMqttDeviceConfig("keys:anchor-clear", clearedSettings);
+
+        Assert.That(device.IsAnchored, Is.False);
+        Assert.That(device.Anchor, Is.Null);
+        Assert.That(device.Check, Is.True);
     }
 
     private void SimulateMqttDeviceConfig(string deviceId, DeviceSettings deviceSettings)
