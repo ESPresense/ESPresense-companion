@@ -99,10 +99,10 @@ public class StateControllerAnchorTests
 
         // Assert
         Assert.That(calibration.Matrix, Is.Not.Empty);
-        Assert.That(calibration.Matrix.ContainsKey("Test Anchor (Anchored)"), Is.True,
+        Assert.That(calibration.Matrix.ContainsKey("Test Anchor"), Is.True,
             "Calibration matrix should include anchored device as transmitter");
 
-        var anchorRow = calibration.Matrix["Test Anchor (Anchored)"];
+        var anchorRow = calibration.Matrix["Test Anchor"];
         Assert.That(anchorRow.ContainsKey("RX Node"), Is.True,
             "Anchored device should have measurement to receiving node");
 
@@ -138,7 +138,7 @@ public class StateControllerAnchorTests
         var calibration = _controller.GetCalibration();
 
         // Assert
-        var anchorRow = calibration.Matrix["Test Anchor (Anchored)"];
+        var anchorRow = calibration.Matrix["Test Anchor"];
         var measurement = anchorRow[rxNode.Name ?? rxNode.Id];
 
         // Anchored devices shouldn't have tx_ref_rssi (they're fixed reference points)
@@ -146,5 +146,58 @@ public class StateControllerAnchorTests
 
         // But receiver should still have its calibration settings
         Assert.That(measurement["rx_adj_rssi"], Is.EqualTo(-10));
+    }
+
+    [Test]
+    public void GetCalibration_AnchoredDevicesCanAppearAsReceivers()
+    {
+        // Arrange
+        // Create a regular transmitter node
+        var txNode = new Node("tx-node", NodeSourceType.Config);
+        var configTxNode = new ConfigNode { Name = "TX Node", Point = new double[] { 0, 0, 0 } };
+        txNode.Update(_configLoader.Config!, configTxNode, Enumerable.Empty<Floor>());
+        _state.Nodes["tx-node"] = txNode;
+
+        // Create an anchored device that might appear as a receiver
+        var anchoredDevice = new Device("anchored-rx", null, TimeSpan.FromSeconds(30));
+        var anchor = new DeviceAnchor(new Point3D(5, 5, 0), null, null);
+        anchoredDevice.SetAnchor(anchor);
+        anchoredDevice.Name = "Anchored RX";
+        _state.Devices["anchored-rx"] = anchoredDevice;
+
+        // Create a node-to-node relationship where the anchored device appears as RX
+        var anchoredNode = _state.Nodes.GetOrAdd("anchored-rx", _ => new Node("anchored-rx", NodeSourceType.Discovered));
+        var configAnchoredNode = new ConfigNode { Name = "Anchored RX", Point = new double[] { 5, 5, 0 } };
+        anchoredNode.Update(_configLoader.Config!, configAnchoredNode, Enumerable.Empty<Floor>());
+
+        var nodeToNode = new RxNode
+        {
+            Tx = txNode,
+            Rx = anchoredNode,
+            Distance = 5.0,
+            Rssi = -70,
+            LastHit = DateTime.UtcNow
+        };
+        txNode.RxNodes["anchored-rx"] = nodeToNode;
+
+        // Setup node settings
+        var txNodeSettings = new NodeSettings { Calibration = new CalibrationSettings { TxRefRssi = -60 } };
+        var anchoredNodeSettings = new NodeSettings { Calibration = new CalibrationSettings() };
+        _mockNodeSettingsStore.Setup(x => x.Get("tx-node")).Returns(txNodeSettings);
+        _mockNodeSettingsStore.Setup(x => x.Get("anchored-rx")).Returns(anchoredNodeSettings);
+
+        // Act
+        var calibration = _controller.GetCalibration();
+
+        // Assert
+        Assert.That(calibration.Matrix.ContainsKey("TX Node"), Is.True, "TX Node should be in matrix as transmitter");
+
+        var txRow = calibration.Matrix["TX Node"];
+        Assert.That(txRow.ContainsKey("Anchored RX"), Is.True, "Anchored device should appear as receiver in data (UI can handle display)");
+        Assert.That(txRow.Count, Is.EqualTo(1), "TX Node should have the anchored device as receiver");
+
+        var anchoredRxMeasurement = txRow["Anchored RX"];
+        Assert.That(anchoredRxMeasurement["distance"], Is.EqualTo(5.0));
+        Assert.That(anchoredRxMeasurement["rssi"], Is.EqualTo(-70));
     }
 }
