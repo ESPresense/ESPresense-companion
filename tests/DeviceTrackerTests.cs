@@ -33,8 +33,10 @@ public class DeviceTrackerTests
 
         // Create the NodeTelemetryStore instance that's now required by State constructor
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt); // Use the existing mqtt instance
+        var state = new State(configLoader, nodeTelemetryStore);
+        var deviceSettingsStore = new DeviceSettingsStore(mqtt, state);
 
-        var locator = new DeviceTracker(new State(configLoader, nodeTelemetryStore), mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher());
+        var locator = new DeviceTracker(state, mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher(), deviceSettingsStore);
         // Use testData to test locator...
         // Assert.That(result, Is.EqualTo(expectedResult));
     }
