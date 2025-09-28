@@ -5,7 +5,7 @@ using ESPresense.Utils;
 
 namespace ESPresense.Services
 {
-    public class NodeSettingsStore(MqttCoordinator mqtt, ILogger<NodeSettingsStore> logger) : BackgroundService
+    public class NodeSettingsStore(IMqttCoordinator mqtt, ILogger<NodeSettingsStore> logger) : BackgroundService
     {
         private static bool ParseBool(string? value)
         {
@@ -23,7 +23,7 @@ namespace ESPresense.Services
 
         private readonly ConcurrentDictionary<string, NodeSettings> _storeById = new();
 
-        public NodeSettings Get(string id)
+        public virtual NodeSettings Get(string id)
         {
             return _storeById.TryGetValue(id, out var ns) ? ns.Clone() : new NodeSettings(id);
         }
@@ -218,4 +218,3 @@ namespace ESPresense.Services
         }
     }
 }
-

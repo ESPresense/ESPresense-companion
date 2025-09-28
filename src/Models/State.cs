@@ -179,6 +179,20 @@ public class State
 
     public IEnumerable<Scenario> GetScenarios(Device device)
     {
+        // Check if device is anchored first - if so, only return the anchor scenario
+        if (device.IsAnchored && device.Anchor != null)
+        {
+            var anchor = device.Anchor;
+            var scenario = new Scenario(Config, new AnchorLocator(anchor.Location), "Anchored")
+            {
+                Floor = anchor.Floor,
+                Room = anchor.Room,
+                Confidence = 100
+            };
+            yield return scenario;
+            yield break;
+        }
+
         var nelderMead = Config?.Locators?.NelderMead;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
@@ -199,8 +213,15 @@ public class State
         else
         {
             Log.Warning("No locators enabled, using default NelderMead");
-            foreach (var floor in Floors.Values)
-                yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+            if (Floors.Values.Any())
+            {
+                foreach (var floor in Floors.Values)
+                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+            }
+            else
+            {
+                yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
+            }
         }
     }
 
