@@ -1,3 +1,4 @@
+using System.Threading;
 using ESPresense.Events;
 using MQTTnet;
 using MQTTnet.Client;
@@ -22,4 +23,5 @@ public interface IMqttCoordinator
 
     // Methods
     Task EnqueueAsync(string topic, string? payload, bool retain = false);
+    Task ClearRetainedAsync(string topicFilter, CancellationToken cancellationToken = default);
 }
