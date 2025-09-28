@@ -6,6 +6,7 @@ using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Weighting;
 using Serilog;
+using System.Linq;
 
 namespace ESPresense.Models;
 
@@ -106,9 +107,8 @@ public class State
         foreach (var (txId, txNode) in Nodes)
             foreach (var (rxId, meas) in txNode.RxNodes)
             {
-                if (meas.Rx == null) continue;
                 var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
-                var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx.Name, Location = meas.Rx.Location });
+                var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx!.Name, Location = meas.Rx.Location });
                 tx.Location = txNode.Location;
                 rx.Location = meas.Rx.Location;
                 if (meas.Current)
@@ -126,6 +126,34 @@ public class State
                     });
                 }
             }
+
+        foreach (var device in Devices.Values.Where(d => d.IsAnchored && d.Anchor != null))
+        {
+            var anchorLocation = device.Anchor!.Location;
+            var anchorNode = nodes.GetOrAdd($"anchor:{device.Id}", _ => new OptNode { Id = $"anchor:{device.Id}", Name = device.Name ?? device.Id, Location = anchorLocation });
+            anchorNode.Location = anchorLocation;
+            anchorNode.Name = device.Name ?? device.Id;
+
+            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current))
+            {
+                var rxNode = deviceNode.Node!;
+                var optRx = nodes.GetOrAdd(rxNode.Id, _ => new OptNode { Id = rxNode.Id, Name = rxNode.Name, Location = rxNode.Location });
+                optRx.Location = rxNode.Location;
+                optRx.Name = rxNode.Name;
+
+                os.Measures.Add(new Measure
+                {
+                    Distance = deviceNode.Distance,
+                    DistVar = deviceNode.DistVar,
+                    Rssi = deviceNode.Rssi,
+                    RssiRxAdj = null,
+                    RssiVar = deviceNode.RssiVar,
+                    RefRssi = deviceNode.RefRssi,
+                    Tx = anchorNode,
+                    Rx = optRx,
+                });
+            }
+        }
 
         // Remove expired snapshots by time
         var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;

@@ -32,6 +32,11 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
     internal async Task ProcessDevice(Device device)
     {
+            if (device.IsAnchored && device.Anchor != null)
+            {
+                await HandleAnchoredDevice(device);
+                return;
+            }
             // -----------------------------------------------------------------
             // 1. Refresh all scenarios -------------------------------------------------
             // -----------------------------------------------------------------
@@ -174,6 +179,71 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     }
                 }
             }
+    }
+
+    private async Task HandleAnchoredDevice(Device device)
+    {
+        device.LastCalculated = DateTime.UtcNow;
+        var anchor = device.Anchor;
+        if (anchor == null)
+            return;
+
+        device.BestScenario = null;
+
+        var location = anchor.Location;
+        var locationChanged = device.ReportedLocation.DistanceTo(location) > 0.01;
+
+        var newState = anchor.Room?.Name ?? anchor.Floor?.Name ?? "not_home";
+        var stateChanged = newState != device.ReportedState;
+        if (stateChanged)
+        {
+            await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", newState);
+            device.ReportedState = newState;
+        }
+
+        if (locationChanged || stateChanged)
+        {
+            device.ReportedLocation = location;
+
+            var gps = state?.Config?.Gps;
+            var (lat, lon) = gps?.Report == true ? gps.Add(location.X, location.Y) : (null, null);
+            var elevation = gps?.Report == true ? location.Z + gps?.Elevation : null;
+
+            var payload = JsonConvert.SerializeObject(new
+            {
+                source_type = "espresense",
+                latitude = lat,
+                longitude = lon,
+                elevation = elevation,
+                x = location.X,
+                y = location.Y,
+                z = location.Z,
+                confidence = 100,
+                fixes = device.Nodes.Values.Count(dn => dn.Current),
+                best_scenario = "Anchored",
+                last_seen = device.LastSeen
+            }, SerializerSettings.NullIgnore);
+
+            await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
+
+            globalEventDispatcher.OnDeviceChanged(device, false);
+
+            if (state?.Config?.History?.Enabled ?? false)
+            {
+                await deviceHistory.Add(new DeviceHistory
+                {
+                    Id = device.Id,
+                    When = DateTime.UtcNow,
+                    X = location.X,
+                    Y = location.Y,
+                    Z = location.Z,
+                    Confidence = 100,
+                    Fixes = device.Nodes.Values.Count(dn => dn.Current),
+                    Scenario = "Anchored",
+                    Best = true
+                });
+            }
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
