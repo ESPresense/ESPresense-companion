@@ -195,6 +195,12 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
         var settings = deviceSettingsStore.Get(device.Id);
         if (settings?.HasAnchor ?? false)
         {
+            // Ensure the anchor is restored from settings if not already set
+            if (!device.IsAnchored)
+            {
+                deviceSettingsStore.ApplyToDevice(device.Id, settings);
+            }
+
             device.Track = true;
             device.Check = false;
             if (!wasTracked)
