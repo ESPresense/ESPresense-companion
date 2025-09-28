@@ -60,9 +60,15 @@
 	$: {
 		const matrix = $calibration?.matrix ?? {};
 		const rxSet = new Set<string>();
-		Object.keys(matrix).forEach((key) => rxSet.add(key));
+
+		// Only include receivers that have actual data from at least one transmitter
 		Object.values(matrix).forEach((n1) => {
-			Object.keys(n1).forEach((key) => rxSet.add(key));
+			Object.keys(n1).forEach((key) => {
+				// Only add receivers that have measurement data (not empty/null)
+				if (n1[key] && Object.keys(n1[key]).length > 0) {
+					rxSet.add(key);
+				}
+			});
 		});
 		rxColumns = Array.from(rxSet);
 	}
