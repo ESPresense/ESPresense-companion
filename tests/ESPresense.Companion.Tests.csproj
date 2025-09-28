@@ -7,6 +7,7 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <SpaRoot>..\src\ui</SpaRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,5 +29,16 @@
   <ItemGroup>
     <ProjectReference Include="..\src\ESPresense.Companion.csproj" />
   </ItemGroup>
+
+  <Target Name="RunFrontendTests" BeforeTargets="VSTest">
+    <Exec Command="node --version" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeErrorCode" />
+    </Exec>
+    <Error Condition="'$(NodeErrorCode)' != '0'" Text="Node.js is required to run frontend tests. Install it from https://nodejs.org/." />
+
+    <Message Importance="high" Text="Running frontend tests using 'pnpm test' in $(SpaRoot)..." />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="pnpm install --frozen-lockfile" ContinueOnError="false" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="pnpm test" ContinueOnError="false" />
+  </Target>
 
 </Project>
