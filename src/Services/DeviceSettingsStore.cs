@@ -45,7 +45,7 @@ namespace ESPresense.Services
             await Task.Delay(-1, stoppingToken);
         }
 
-        private void ApplyToDevice(string deviceId, DeviceSettings settings)
+        public void ApplyToDevice(string deviceId, DeviceSettings settings)
         {
             if (!state.Devices.TryGetValue(deviceId, out var device))
             {
