@@ -128,6 +128,9 @@ export type DeviceSetting = {
 	id: string | null;
 	name: string | null;
 	'rssi@1m': number | null;
+	x?: number | null;
+	y?: number | null;
+	z?: number | null;
 	error?: string;
 };
 
