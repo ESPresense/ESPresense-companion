@@ -1,8 +1,8 @@
 <script lang="ts">
 	import NodesTable from '$lib/NodesTable.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import { base } from '$app/paths';
-	import { detail } from '$lib/urls';
+	import { resolve } from '$app/paths';
+	import { gotoDetail } from '$lib/urls';
 	import type { NodeSettingDetails } from '$lib/types';
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
 	import { onMount } from 'svelte';
@@ -23,7 +23,7 @@
 				}
 			};
 
-			const response = await fetch(`${base}/api/node/*`, {
+			const response = await fetch(resolve('/api/node/*'), {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
@@ -53,7 +53,7 @@
 	async function loadSettings() {
 		try {
 			loading = true;
-			const response = await fetch(`${base}/api/node/*`);
+			const response = await fetch(resolve('/api/node/*'));
 
 			if (!response.ok) throw new Error('Failed to load settings');
 
@@ -82,28 +82,31 @@
 </svelte:head>
 
 <div class="h-full overflow-y-auto">
-	<div class="w-full px-4 py-2">
-		<div class="flex justify-between items-center mb-4">
-			<h1 class="text-2xl font-bold">Nodes</h1>
+	<div class="w-full px-4 py-4 space-y-6">
+		<header class="flex flex-wrap items-center justify-between gap-4">
+			<h1 class="text-2xl font-bold text-surface-900-100">Nodes</h1>
 			{#if loading}
-				<div>Loading settings...</div>
+				<span class="text-sm italic text-surface-600">Loading update preferences...</span>
 			{:else}
-				<div class="flex items-center space-x-4">
-					<div class="flex items-center space-x-4">
+				<fieldset class="flex flex-wrap items-center gap-x-6 gap-y-3" aria-label="Node update preferences">
+					<legend class="sr-only">Node update preferences</legend>
+					<label class="flex items-center gap-2 text-sm text-surface-800-200" for="autoUpdate">
 						<TriStateCheckbox id="autoUpdate" bind:checked={autoUpdate} onchange={saveSettings} disabled={saving} />
-						<span class="pl">Automatically update</span>
-
+						<span>Automatically update</span>
+					</label>
+					<label class="flex items-center gap-2 text-sm text-surface-800-200" for="prerelease">
 						<TriStateCheckbox id="prerelease" bind:checked={prerelease} onchange={saveSettings} disabled={saving} />
-						<span class="pl">Include pre-released</span>
-
-						{#if saving}
-							<span class="text-sm italic">Saving...</span>
-						{/if}
-					</div>
-				</div>
+						<span>Include pre-released</span>
+					</label>
+					{#if saving}
+						<span class="rounded-full border border-surface-400 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-surface-700">Saving...</span>
+					{/if}
+				</fieldset>
 			{/if}
-		</div>
+		</header>
 
-		<NodesTable onselected={(node) => detail(node)} />
+		<section>
+			<NodesTable onselected={(node) => gotoDetail(node)} />
+		</section>
 	</div>
 </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import type { DeviceSetting } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { createEventDispatcher } from 'svelte';
@@ -24,7 +24,7 @@
 			const rssiRef = Math.floor(parseFloat(localSettings['rssi@1m'] + ''));
 			localSettings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
-			const response = await fetch(`${base}/api/device/${deviceSetting.id}`, {
+			const response = await fetch(resolve(`/api/device/${deviceSetting.id}`), {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'

@@ -1,7 +1,7 @@
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 
 export async function load({ fetch, params }) {
-	return await fetch(`${base}/api/node/${params.id}`)
+	return await fetch(resolve(`/api/node/${params.id}`))
 		.then((response) => {
 			if (!response.ok) throw new Error(response.statusText);
 			var data = response.json();

@@ -5,17 +5,14 @@
 	import type { DeviceSetting } from '$lib/types';
 	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
-	import Map from '$lib/Map.svelte';
+	import DeviceCalibration from '$lib/DeviceCalibration.svelte';
 	import DeviceBreadcrumb from '$lib/DeviceBreadcrumb.svelte';
 
-	// Define type for the details array items
 	type DeviceDetailItem = { key: string; value: string };
 
 	let { data = {} }: { data: { settings?: DeviceSetting } } = $props();
-
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
 
-	// Accordion state using $state for Skeleton v3
 	let accordionValue = $state(['details']);
 
 	const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
@@ -42,17 +39,22 @@
 </script>
 
 <svelte:head>
-	<title>ESPresense Companion: Device Detail</title>
+	<title>ESPresense Companion: Device Calibration</title>
 </svelte:head>
 
 <div class="flex h-full min-h-0">
 	<div class="flex flex-col flex-grow min-h-0">
-		<!-- Breadcrumb Navigation -->
-		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView='map' />
+		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView="calibration" />
 
-		<div class="grid flex-1 min-h-0">
-			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
-		</div>
+		{#if data.settings?.id}
+			<div class="flex-1 min-h-0 overflow-auto">
+				<DeviceCalibration deviceSettings={data.settings} />
+			</div>
+		{:else}
+			<div class="flex-1 min-h-0">
+				<p class="p-4">Device ID not found.</p>
+			</div>
+		{/if}
 	</div>
 	<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
 		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>

@@ -1,5 +1,5 @@
 import { readable, writable, derived } from 'svelte/store';
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 import type { FirmwareManifest, Release, WorkflowRun } from '$lib/types';
 
 export const updateMethod: SvelteStore<string> = writable('self');
@@ -9,7 +9,7 @@ export const version: SvelteStore<string> = writable();
 export const artifact: SvelteStore<string> = writable();
 
 export const firmwareTypes = writable<FirmwareManifest | null>(null, function start(set) {
-	fetch(`${base}/api/firmware/types`)
+	fetch(resolve('/api/firmware/types'))
 		.then((r) => r.json())
 		.then((r) => set(r));
 });
@@ -142,7 +142,7 @@ export function getLocalFirmwareUrl(firmwareSource: string, version: string, art
 	const url = getFirmwareUrl(firmwareSource, version, artifact, firmware);
 	if (!url) return null;
 
-	const loc = new URL(`${base}/api/firmware/download`, window.location.href);
+	const loc = new URL(resolve('/api/firmware/download'), window.location.href);
 
 	const params = new URLSearchParams();
 	params.append('url', url);
@@ -154,7 +154,7 @@ export function getLocalFirmwareUrl(firmwareSource: string, version: string, art
 type Callback = (percentComplete: number, message: string) => void;
 
 export async function firmwareUpdate(id: string, url: string, callback: Callback): Promise<void> {
-	var loc = new URL(`${base}/ws/firmware/update/${id}`, window.location.href);
+	var loc = new URL(resolve(`/ws/firmware/update/${id}`), window.location.href);
 	var wsUrl = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + loc.pathname + `?${new URLSearchParams({ url: url })}`;
 	const ws = new WebSocket(wsUrl);
 

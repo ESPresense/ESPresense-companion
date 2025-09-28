@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import type { NodeSetting } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { createEventDispatcher } from 'svelte';
@@ -20,7 +20,7 @@
 		// Add any necessary validation or data transformation here if needed
 
 		try {
-			const response = await fetch(`${base}/api/node/${nodeSetting.id}`, {
+			const response = await fetch(resolve(`/api/node/${nodeSetting.id}`), {
 				// Use original nodeSetting.id for the PUT request URL
 				method: 'PUT',
 				headers: {

@@ -76,6 +76,7 @@
 	d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
 	fill={colors(n.id)}
 	role="figure"
+	aria-label={`Select node ${n.name}`}
 	onclick={() => {
 		select(n);
 	}}

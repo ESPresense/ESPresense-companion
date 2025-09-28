@@ -35,15 +35,12 @@
 		onselected?.(n);
 	}
 
-	function onRowClick(e: any) {
-		select(e.row);
-	}
 </script>
 
 <div>
 	{#if $nodes}
 		<VersionPicker bind:updateMethod={$updateMethod} bind:firmwareSource={$firmwareSource} bind:flavor={$flavor} bind:version={$version} bind:artifact={$artifact} />
-		<DataTable {columns} rows={$nodes} classNameTable="table  table-compact" onclickRow={onRowClick} />
+		<DataTable {columns} rows={$nodes} classNameTable="table  table-compact" onclickRow={(event) => select(event.row)} />
 	{/if}
 </div>
 

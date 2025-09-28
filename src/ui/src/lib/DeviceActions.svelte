@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { detail, calibrateDevice } from '$lib/urls';
+	import { resolve } from '$app/paths';
+	import { gotoDetail, gotoCalibration } from '$lib/urls';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showComponent, showConfirm } from '$lib/modal/modalStore';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
@@ -20,7 +20,7 @@
 	async function handleEdit() {
 		loadingEdit = true;
 		try {
-			const response = await fetch(`${base}/api/device/${row.id}`);
+			const response = await fetch(resolve(`/api/device/${row.id}`));
 			if (!response.ok) {
 				throw new Error(`Failed to fetch settings details: ${response.statusText}`);
 			}
@@ -57,7 +57,7 @@
 
         loadingDelete = true;
         try {
-            const resp = await fetch(`${base}/api/device/${encodeURIComponent(row.id)}`, { method: 'DELETE' });
+            const resp = await fetch(resolve(`/api/device/${encodeURIComponent(row.id)}`), { method: 'DELETE' });
             if (!resp.ok && resp.status !== 204) {
                 throw new Error(`Failed to delete: ${resp.status} ${resp.statusText}`);
             }
@@ -81,8 +81,8 @@
 		{/if}
 	</button>
 	{#if isActive}
-		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); detail(row); }} aria-label="View device on map"> Map </button>
-		<button class="btn btn-sm preset-filled-tertiary-500" onclick={(e) => { e.stopPropagation(); calibrateDevice(row); }} aria-label="Calibrate device"> Calibrate </button>
+		<button class="btn btn-sm preset-filled-secondary-500" onclick={(e) => { e.stopPropagation(); gotoDetail(row); }} aria-label="View device on map"> Map </button>
+		<button class="btn btn-sm preset-filled-tertiary-500" onclick={(e) => { e.stopPropagation(); gotoCalibration(row); }} aria-label="Calibrate device"> Calibrate </button>
 	{/if}
     <button class="btn btn-sm bg-error-500 hover:bg-error-600 text-white" onclick={(e) => { e.stopPropagation(); handleDelete(); }} disabled={loadingDelete} aria-label="Delete device">
         {#if loadingDelete}

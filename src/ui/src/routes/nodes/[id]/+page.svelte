@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { nodes } from '$lib/stores';
 	import { readable } from 'svelte/store';
 	import type { NodeSettingDetails } from '$lib/types';
@@ -20,7 +20,7 @@
 	export const nodeDetails = readable([], (set) => {
 		async function fetchAndSet() {
 			try {
-				const response = await fetch(`${base}/api/node/${node?.id}`);
+				const response = await fetch(resolve(`/api/node/${node?.id}`));
 				const result = await response.json();
 				set(result.details);
 			} catch (ex) {
