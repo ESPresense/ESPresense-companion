@@ -77,10 +77,10 @@ public class StateController : ControllerBase
     {
         IEnumerable<Device> d = _state.Devices.Values;
         if (!showAll) d = d.Where(a => a is { Track: true });
-        
+
         // Populate configured RefRssi from DeviceSettings
         EnrichDevices(d);
-        
+
         return d;
     }
 
@@ -144,7 +144,7 @@ public class StateController : ControllerBase
         foreach (var device in _state.Devices.Values.Where(d => d.IsAnchored && d.Anchor != null && d.Nodes.Values.Any(dn => dn.Current)))
         {
             var anchorName = device.Name ?? device.Id;
-            var txM = c.Matrix.GetOrAdd($"{anchorName} (Anchored)");
+            var txM = c.Matrix.GetOrAdd($"{anchorName}");
 
             foreach (var (rxId, deviceNode) in device.Nodes.Where(dn => dn.Value.Current && dn.Value.Node?.HasLocation == true))
             {
