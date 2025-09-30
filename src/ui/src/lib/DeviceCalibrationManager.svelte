@@ -32,6 +32,15 @@
 		return `${value} dBm`;
 	}
 
+	function baseRoomFloor(d: Device): string {
+		return d.room?.name ?? d.floor?.name ?? 'n/a';
+	}
+
+	function displayRoomFloor(d: Device): string {
+		const base = baseRoomFloor(d);
+		return d.isAnchored ? `${base} 📍` : base;
+	}
+
 	const columns = [
 		{
 			key: 'activeId',
@@ -47,7 +56,8 @@
 		{
 			key: 'room',
 			title: 'Room / Floor',
-			value: (d: Device) => d.room?.name ?? d.floor?.name ?? 'n/a',
+			value: (d: Device) => displayRoomFloor(d),
+			sortValue: (d: Device) => baseRoomFloor(d),
 			sortable: true
 		},
 		{
