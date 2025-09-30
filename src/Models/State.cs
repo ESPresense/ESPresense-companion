@@ -130,7 +130,7 @@ public class State
         foreach (var device in Devices.Values.Where(d => d.IsAnchored && d.Anchor != null))
         {
             var anchorLocation = device.Anchor!.Location;
-            var anchorNode = nodes.GetOrAdd($"anchor:{device.Id}", _ => new OptNode { Id = $"anchor:{device.Id}", Name = device.Name ?? device.Id, Location = anchorLocation });
+            var anchorNode = nodes.GetOrAdd(device.Id, _ => new OptNode { Id = device.Id, Name = device.Name ?? device.Id, Location = anchorLocation });
             anchorNode.Location = anchorLocation;
             anchorNode.Name = device.Name ?? device.Id;
 
