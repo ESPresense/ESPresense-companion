@@ -60,6 +60,7 @@ export interface Device {
 	lastSeen: Date;
 	'rssi@1m'?: number | null;
 	'measuredRssi@1m': number | null;
+	isAnchored?: boolean;
 }
 
 export interface MapConfig {
