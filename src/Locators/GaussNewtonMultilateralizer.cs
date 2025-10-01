@@ -9,61 +9,45 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-public class GaussNewtonMultilateralizer : ILocate
+public class GaussNewtonMultilateralizer : BaseMultilateralizer
 {
-    private readonly Device _device;
-    private readonly Floor _floor;
-    private readonly State _state;
-
     public GaussNewtonMultilateralizer(Device device, Floor floor, State state)
+        : base(device, floor, state)
     {
-        _device = device;
-        _floor = floor;
-        _state = state;
     }
 
-
-    public bool Locate(Scenario scenario)
+    public override bool Locate(Scenario scenario)
     {
         double Error(Point3D pos1, Point3D pos2, double dist) => pos1.DistanceTo(pos2) - dist;
 
-        var confidence = scenario.Confidence;
+        if (!InitializeScenario(scenario, out var nodes, out var guess))
+            return false;
 
-        var nodes = _device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false)).ToArray();
         var (pos, ranges) = SelectNonColinearTransmitters(nodes, 4);
 
         if (pos.Length <= 1)
         {
-            scenario.Room = null;
-            scenario.Confidence = 0;
-            scenario.Error = null;
-            scenario.Floor = null;
+            ResetScenario(scenario);
             return false;
         }
 
         scenario.Minimum = ranges.Min(a => a);
-        scenario.LastHit = nodes.Max(a => a.LastHit);
         scenario.Fixes = pos.Length;
-        scenario.Floor = _floor;
 
-        var guess = confidence < 5
-            ? Point3D.MidPoint(pos[0].ToPoint3D(), pos[1].ToPoint3D())
-            : scenario.Location;
+        int confidence = scenario.Confidence ?? 0;
         try
         {
-            if (pos.Length < 3 || _floor.Bounds == null)
+            if (pos.Length < 3 || Floor.Bounds == null)
             {
                 confidence = 1;
                 scenario.UpdateLocation(guess);
             }
             else
             {
-                var lowerBound = new Vector3((float)_floor.Bounds[0].X, (float)_floor.Bounds[0].Y, (float)_floor.Bounds[0].Z);
-                var upperBound = new Vector3((float)_floor.Bounds[1].X, (float)_floor.Bounds[1].Y, (float)_floor.Bounds[1].Z);
-                var initialGuess = new Vector3(
-                    Math.Max((float)_floor.Bounds[0].X, Math.Min((float)_floor.Bounds[1].X, (float)guess.X)),
-                    Math.Max((float)_floor.Bounds[0].Y, Math.Min((float)_floor.Bounds[1].Y, (float)guess.Y)),
-                    Math.Max((float)_floor.Bounds[0].Z, Math.Min((float)_floor.Bounds[1].Z, (float)guess.Z)));
+                var lowerBound = new Vector3((float)Floor.Bounds[0].X, (float)Floor.Bounds[0].Y, (float)Floor.Bounds[0].Z);
+                var upperBound = new Vector3((float)Floor.Bounds[1].X, (float)Floor.Bounds[1].Y, (float)Floor.Bounds[1].Z);
+                var clampedGuess = ClampToFloorBounds(guess);
+                var initialGuess = new Vector3((float)clampedGuess.X, (float)clampedGuess.Y, (float)clampedGuess.Z);
 
                 var gaussNewton = new GaussNewton(pos, ranges, lowerBound, upperBound);
                 var result = gaussNewton.FindPosition(initialGuess);
@@ -84,38 +68,24 @@ public class GaussNewtonMultilateralizer : ILocate
         }
         catch (Exception ex)
         {
-            confidence = 0;
-            scenario.UpdateLocation(new Point3D());
-            Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
+            confidence = HandleLocatorException(ex, scenario, guess);
         }
 
-        if (nodes.Length >= 2)
-        {
-            var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
-            var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
-            scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
-        }
-        else
-        {
-            scenario.PearsonCorrelation = null; // Not enough data points
-        }
+        CalculateAndSetPearsonCorrelation(scenario, nodes);
 
         // Calculate number of possible nodes for this floor
-        int nodesPossibleOnline = _state.Nodes.Values
-            .Count(n => n.Floors?.Contains(_floor) ?? false);
+        int nodesPossibleOnline = State.Nodes.Values
+            .Count(n => n.Floors?.Contains(Floor) ?? false);
 
         // Use the centralized confidence calculation
-        scenario.Confidence = MathUtils.CalculateConfidence(
+        confidence = MathUtils.CalculateConfidence(
             scenario.Error,
             scenario.PearsonCorrelation,
             nodes.Length,
             nodesPossibleOnline
         );
 
-        if (scenario.Confidence <= 0) return false;
-        if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
-        scenario.Room = _floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
-        return true;
+        return FinalizeScenario(scenario, confidence);
     }
 
     private Tuple<Vector3[], float[]> SelectNonColinearTransmitters(DeviceToNode[] dns, int numberOfTransmitters = 4)
