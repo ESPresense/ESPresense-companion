@@ -111,7 +111,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 if (newState != device.ReportedState)
                 {
                     moved += 1;
-                    await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", newState);
                     device.ReportedState = newState;
                 }
             }
@@ -135,6 +134,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
                 var payload = JsonConvert.SerializeObject(new
                 {
+                    location_name = device.ReportedState,
                     source_type   = "espresense",
                     latitude      = lat,
                     longitude     = lon,
