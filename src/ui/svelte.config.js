@@ -14,6 +14,12 @@ const config = {
 		inspector: true
 	},
 
+	onwarn: (warning, handler) => {
+		// Suppress a11y warnings
+		if (warning.code?.startsWith('a11y')) return;
+		handler(warning);
+	},
+
 	kit: {
 		embedded: true,
 		inlineStyleThreshold: 4096,
