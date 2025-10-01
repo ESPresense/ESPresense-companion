@@ -36,14 +36,37 @@ public class DeviceSettingsStoreTests
     }
 
     [TearDown]
-    public void TearDown()
+    public async Task TearDown()
     {
-        _deviceSettingsStore?.StopAsync(CancellationToken.None).Wait();
-        _deviceSettingsStore?.Dispose();
+        if (_deviceSettingsStore != null)
+        {
+            await _deviceSettingsStore.StopAsync(CancellationToken.None);
+            _deviceSettingsStore.Dispose();
+        }
 
+        if (_configLoader != null)
+        {
+            await _configLoader.StopAsync(CancellationToken.None);
+            _configLoader.Dispose();
+        }
+
+        // Retry directory deletion in case of file locks (Windows-specific issue)
         if (Directory.Exists(_configDir))
         {
-            Directory.Delete(_configDir, recursive: true);
+            for (int i = 0; i < 5; i++)
+            {
+                try
+                {
+                    Directory.Delete(_configDir, recursive: true);
+                    break;
+                }
+                catch (IOException) when (i < 4)
+                {
+                    await Task.Delay(100);
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                }
+            }
         }
     }
 
