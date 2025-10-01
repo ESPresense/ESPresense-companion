@@ -38,9 +38,9 @@ public class DeviceControllerTests
         var mockConfigLoader = new Mock<ConfigLoader>("test-config-dir");
         var mockMqttCoordinatorInterface = new Mock<IMqttCoordinator>();
         
-        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(mockMqttCoordinatorInterface.Object);
         var mockNodeTelemetryStore = new Mock<NodeTelemetryStore>(mockMqttCoordinatorInterface.Object);
         _mockState = new Mock<State>(mockConfigLoader.Object, mockNodeTelemetryStore.Object);
+        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(mockMqttCoordinatorInterface.Object, _mockState.Object);
         
         // Create dependencies for DeviceService
         var mockMqttCoordinatorConcrete = CreateMockMqttCoordinator();
