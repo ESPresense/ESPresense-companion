@@ -38,6 +38,8 @@
 
     <Message Importance="high" Text="Running frontend tests using 'pnpm test' in $(SpaRoot)..." />
     <Exec WorkingDirectory="$(SpaRoot)" Command="pnpm install --frozen-lockfile" ContinueOnError="false" />
+    <Message Importance="high" Text="Installing Playwright browsers..." />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="pnpm playwright install" ContinueOnError="true" />
     <Exec WorkingDirectory="$(SpaRoot)" Command="pnpm test" ContinueOnError="false" />
   </Target>
 
