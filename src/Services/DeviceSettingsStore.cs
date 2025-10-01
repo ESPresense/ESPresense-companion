@@ -82,46 +82,8 @@ namespace ESPresense.Services
                 return null;
 
             var location = new MathNet.Spatial.Euclidean.Point3D(settings.X.Value, settings.Y.Value, settings.Z.Value);
-            var floor = FindFloor(location);
-            var room = FindRoom(floor, location);
+            var (floor, room) = SpatialUtils.FindFloorAndRoom(location, state.Floors.Values);
             return new DeviceAnchor(location, floor, room);
-        }
-
-        private Floor? FindFloor(MathNet.Spatial.Euclidean.Point3D location)
-        {
-            foreach (var floor in state.Floors.Values)
-            {
-                if (floor.Bounds is not { Length: >= 2 })
-                    continue;
-
-                var min = floor.Bounds[0];
-                var max = floor.Bounds[1];
-
-                if (location.X >= min.X && location.X <= max.X &&
-                    location.Y >= min.Y && location.Y <= max.Y &&
-                    location.Z >= min.Z && location.Z <= max.Z)
-                {
-                    return floor;
-                }
-            }
-
-            return null;
-        }
-
-        private Room? FindRoom(Floor? floor, MathNet.Spatial.Euclidean.Point3D location)
-        {
-            if (floor == null)
-                return null;
-
-            foreach (var room in floor.Rooms.Values)
-            {
-                if (room.Polygon?.EnclosesPoint(location.ToPoint2D()) ?? false)
-                {
-                    return room;
-                }
-            }
-
-            return null;
         }
     }
 }
