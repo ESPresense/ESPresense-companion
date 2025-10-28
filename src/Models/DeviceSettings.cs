@@ -25,4 +25,20 @@ public class DeviceSettings
     [JsonProperty("rssi@1m")]
     [Range(-127, 128)]
     public int? RefRssi { get; set; }
+
+    [JsonPropertyName("x")]
+    [JsonProperty("x")]
+    public double? X { get; set; }
+
+    [JsonPropertyName("y")]
+    [JsonProperty("y")]
+    public double? Y { get; set; }
+
+    [JsonPropertyName("z")]
+    [JsonProperty("z")]
+    public double? Z { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
+    public bool HasAnchor => X.HasValue && Y.HasValue && Z.HasValue;
 }
