@@ -18,7 +18,7 @@
 		"@playwright/test": "^1.55.0",
 		"@skeletonlabs/floating-ui-svelte": "^0.3.9",
 		"@skeletonlabs/skeleton": "^3.2.0",
-		"@skeletonlabs/skeleton-svelte": "^1.5.3",
+		"@skeletonlabs/skeleton-svelte": "^4.2.3",
 		"@skeletonlabs/tw-plugin": "^0.4.1",
 		"@sveltejs/adapter-static": "^3.0.9",
 		"@sveltejs/kit": "^2.48.0",
