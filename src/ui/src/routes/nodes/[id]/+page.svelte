@@ -17,6 +17,9 @@
 		floorId = node.floors[0];
 	}
 
+		// Accordion state for Skeleton v4 using the Svelte $state rune
+		let accordionValue = $state(['details']);
+
 	export const nodeDetails = readable([], (set) => {
 		async function fetchAndSet() {
 			try {
@@ -53,12 +56,12 @@
 		</div>
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
-		<Accordion value={['details']} collapsible>
+		<Accordion value={accordionValue} collapsible onValueChange={({ value }) => (accordionValue = value)}>
 			<Accordion.Item value="details">
-				{#snippet control()}
+				<Accordion.ItemTrigger>
 					<h3 class="h3">Details</h3>
-				{/snippet}
-				{#snippet panel()}
+				</Accordion.ItemTrigger>
+				<Accordion.ItemContent>
 					<div class="space-y-4">
 						{#if $nodeDetails}
 							{#each $nodeDetails as d}
@@ -69,7 +72,7 @@
 							{/each}
 						{/if}
 					</div>
-				{/snippet}
+				</Accordion.ItemContent>
 			</Accordion.Item>
 		</Accordion>
 	</div>
