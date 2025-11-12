@@ -15,8 +15,8 @@
 
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
 
-		// Accordion state for Skeleton v4 using the Svelte $state rune
-		let accordionValue = $state(['details']);
+	// Accordion state for Skeleton v4 using the Svelte $state rune
+	let accordionValue = $state(['details']);
 
 	const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
 		const deviceId = data.settings?.id;

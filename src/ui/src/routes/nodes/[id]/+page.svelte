@@ -17,8 +17,8 @@
 		floorId = node.floors[0];
 	}
 
-		// Accordion state for Skeleton v4 using the Svelte $state rune
-		let accordionValue = $state(['details']);
+	// Accordion state for Skeleton v4 using the Svelte $state rune
+	let accordionValue = $state(['details']);
 
 	export const nodeDetails = readable([], (set) => {
 		async function fetchAndSet() {
