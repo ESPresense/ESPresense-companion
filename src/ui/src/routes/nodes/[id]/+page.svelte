@@ -8,8 +8,11 @@
 	import Map from '$lib/Map.svelte';
 	import NodeBreadcrumb from '$lib/NodeBreadcrumb.svelte';
 
-	export let floorId: string | null = null;
-	export let data: NodeSettingDetails = {};
+        const { floorId = $bindable<string | null>(null), data = {} as NodeSettingDetails } =
+                $props<{
+                        floorId?: string | null;
+                        data?: NodeSettingDetails;
+                }>();
 	$: node = $nodes.find((d) => d.id === data.settings?.id);
 
 	// Initialize floorId to the first floor the node is actually on
