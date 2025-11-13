@@ -8,17 +8,21 @@
 	import Map from '$lib/Map.svelte';
 	import NodeBreadcrumb from '$lib/NodeBreadcrumb.svelte';
 
-        const { floorId = $bindable<string | null>(null), data = {} as NodeSettingDetails } =
+        let { floorId = $bindable<string | null>(null), data = {} as NodeSettingDetails } =
                 $props<{
                         floorId?: string | null;
                         data?: NodeSettingDetails;
                 }>();
-	$: node = $nodes.find((d) => d.id === data.settings?.id);
+        const node = $derived($nodes.find((d) => d.id === data.settings?.id));
 
-	// Initialize floorId to the first floor the node is actually on
-	$: if (!floorId && node?.floors?.length > 0) {
-		floorId = node.floors[0];
-	}
+        // Initialize floorId to the first floor the node is actually on
+        $effect(() => {
+                const firstFloor = node?.floors?.[0] ?? null;
+
+                if (!floorId && firstFloor) {
+                        floorId = firstFloor;
+                }
+        });
 
 	let accordionValue = $state(['details']);
 
