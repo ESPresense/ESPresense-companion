@@ -1,5 +1,5 @@
 <script lang="ts">
-        import { Progress as SkeletonProgress } from '@skeletonlabs/skeleton-svelte';
+	import { Progress as SkeletonProgress } from '@skeletonlabs/skeleton-svelte';
 	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
 	import type { Node } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
@@ -96,11 +96,11 @@
 		{#each log as item}
 			<p>{item}</p>
 		{/each}
-                <SkeletonProgress value={percentComplete} max={100}>
-                        <SkeletonProgress.Track class="w-full">
-                                <SkeletonProgress.Range />
-                        </SkeletonProgress.Track>
-                </SkeletonProgress>
+		<SkeletonProgress value={percentComplete} max={100}>
+			<SkeletonProgress.Track class="w-full">
+				<SkeletonProgress.Range />
+			</SkeletonProgress.Track>
+		</SkeletonProgress>
 		{#if progress > Progress.Updating}
 			<footer class="modal-footer {parent.regionFooter}">
 				{#if progress == Progress.Success}

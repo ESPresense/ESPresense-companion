@@ -13,8 +13,6 @@
 	let { data = {} }: { data: { settings?: DeviceSetting } } = $props();
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
 
-	let accordionValue = $state(['details']);
-
 	const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
 		const deviceId = data.settings?.id;
 		if (!deviceId) return () => {};
