@@ -2,7 +2,7 @@ using ESPresense.Extensions;
 using AutoMapper;
 using ESPresense.Models;
 using ESPresense.Services;
-using MQTTnet.Diagnostics;
+using MQTTnet.Diagnostics.Logger;
 using Serilog;
 using Serilog.Events;
 using SQLite;
