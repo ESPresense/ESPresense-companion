@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
-	import { Segment } from '@skeletonlabs/skeleton-svelte';
 	import { resolve } from '$app/paths';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';

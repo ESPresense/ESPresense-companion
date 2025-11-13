@@ -57,12 +57,12 @@
 		{/if}
 	</div>
 	<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
-		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>
+		<Accordion value={accordionValue} onValueChange={({ value }) => (accordionValue = value)}>
 			<Accordion.Item value="details">
-				{#snippet control()}
+				<Accordion.ItemTrigger>
 					<h3 class="text-lg font-semibold">Details</h3>
-				{/snippet}
-				{#snippet panel()}
+				</Accordion.ItemTrigger>
+				<Accordion.ItemContent>
 					<div class="space-y-3 p-1">
 						{#if $deviceDetails}
 							{#if $deviceDetails.length > 0}
@@ -79,7 +79,7 @@
 							<p class="text-sm italic">Loading details...</p>
 						{/if}
 					</div>
-				{/snippet}
+				</Accordion.ItemContent>
 			</Accordion.Item>
 		</Accordion>
 	</div>

@@ -8,14 +8,23 @@
 	import Map from '$lib/Map.svelte';
 	import NodeBreadcrumb from '$lib/NodeBreadcrumb.svelte';
 
-	export let floorId: string | null = null;
-	export let data: NodeSettingDetails = {};
-	$: node = $nodes.find((d) => d.id === data.settings?.id);
+        let { floorId = $bindable<string | null>(null), data = {} as NodeSettingDetails } =
+                $props<{
+                        floorId?: string | null;
+                        data?: NodeSettingDetails;
+                }>();
+        const node = $derived($nodes.find((d) => d.id === data.settings?.id));
 
-	// Initialize floorId to the first floor the node is actually on
-	$: if (!floorId && node?.floors?.length > 0) {
-		floorId = node.floors[0];
-	}
+        // Initialize floorId to the first floor the node is actually on
+        $effect(() => {
+                const firstFloor = node?.floors?.[0] ?? null;
+
+                if (!floorId && firstFloor) {
+                        floorId = firstFloor;
+                }
+        });
+
+	let accordionValue = $state(['details']);
 
 	export const nodeDetails = readable([], (set) => {
 		async function fetchAndSet() {
@@ -53,12 +62,12 @@
 		</div>
 	</div>
 	<div class="w-64 z-1 max-h-screen overflow-auto">
-		<Accordion value={['details']} collapsible>
+		<Accordion value={accordionValue} collapsible onValueChange={({ value }) => (accordionValue = value)}>
 			<Accordion.Item value="details">
-				{#snippet control()}
+				<Accordion.ItemTrigger>
 					<h3 class="h3">Details</h3>
-				{/snippet}
-				{#snippet panel()}
+				</Accordion.ItemTrigger>
+				<Accordion.ItemContent>
 					<div class="space-y-4">
 						{#if $nodeDetails}
 							{#each $nodeDetails as d}
@@ -69,7 +78,7 @@
 							{/each}
 						{/if}
 					</div>
-				{/snippet}
+				</Accordion.ItemContent>
 			</Accordion.Item>
 		</Accordion>
 	</div>

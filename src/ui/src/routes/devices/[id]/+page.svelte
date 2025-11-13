@@ -15,7 +15,6 @@
 
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
 
-	// Accordion state using $state for Skeleton v3
 	let accordionValue = $state(['details']);
 
 	const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
@@ -48,19 +47,19 @@
 <div class="flex h-full min-h-0">
 	<div class="flex flex-col flex-grow min-h-0">
 		<!-- Breadcrumb Navigation -->
-		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView='map' />
+		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView="map" />
 
 		<div class="grid flex-1 min-h-0">
 			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
 		</div>
 	</div>
 	<div class="w-64 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
-		<Accordion value={accordionValue} onValueChange={(e) => (accordionValue = e.value)}>
+		<Accordion value={accordionValue} onValueChange={({ value }) => (accordionValue = value)}>
 			<Accordion.Item value="details">
-				{#snippet control()}
+				<Accordion.ItemTrigger>
 					<h3 class="text-lg font-semibold">Details</h3>
-				{/snippet}
-				{#snippet panel()}
+				</Accordion.ItemTrigger>
+				<Accordion.ItemContent>
 					<div class="space-y-3 p-1">
 						{#if $deviceDetails}
 							{#if $deviceDetails.length > 0}
@@ -77,7 +76,7 @@
 							<p class="text-sm italic">Loading details...</p>
 						{/if}
 					</div>
-				{/snippet}
+				</Accordion.ItemContent>
 			</Accordion.Item>
 		</Accordion>
 	</div>
