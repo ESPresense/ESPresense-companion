@@ -1,5 +1,5 @@
 ﻿using ESPresense.Models;
-using MQTTnet.Client;
+using MQTTnet;
 
 namespace ESPresense.Extensions;
 

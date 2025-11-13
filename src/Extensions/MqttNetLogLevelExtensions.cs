@@ -1,4 +1,4 @@
-﻿using MQTTnet.Diagnostics;
+﻿using MQTTnet.Diagnostics.Logger;
 
 namespace ESPresense.Extensions
 {

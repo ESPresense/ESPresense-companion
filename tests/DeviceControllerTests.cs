@@ -235,7 +235,7 @@ public class DeviceControllerTests
         // Create all required dependencies for MqttCoordinator
         var mockConfigLoader = new Mock<ConfigLoader>("test-config-dir");
         var mockLogger = new Mock<ILogger<MqttCoordinator>>();
-        var mockMqttNetLogger = new Mock<MQTTnet.Diagnostics.IMqttNetLogger>();
+        var mockMqttNetLogger = new Mock<MQTTnet.Diagnostics.Logger.IMqttNetLogger>();
         var mockSupervisorLogger = new Mock<ILogger<SupervisorConfigLoader>>();
         var supervisorConfigLoader = new SupervisorConfigLoader(mockSupervisorLogger.Object);
         

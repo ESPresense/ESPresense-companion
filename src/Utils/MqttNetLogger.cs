@@ -1,5 +1,5 @@
 using ESPresense.Extensions;
-using MQTTnet.Diagnostics;
+using MQTTnet.Diagnostics.Logger;
 using Serilog;
 
 namespace ESPresense.Utils;

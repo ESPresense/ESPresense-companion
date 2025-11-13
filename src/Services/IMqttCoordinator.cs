@@ -1,7 +1,5 @@
 using ESPresense.Events;
 using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
 
 namespace ESPresense.Services;
 
