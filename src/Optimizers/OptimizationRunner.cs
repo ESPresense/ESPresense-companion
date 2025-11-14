@@ -55,7 +55,8 @@ internal class OptimizationRunner : BackgroundService
             {
                 new RxAdjRssiOptimizer(_state),
                 new AbsorptionAvgOptimizer(_state),
-                new AbsorptionErrOptimizer(_state)
+                new AbsorptionErrOptimizer(_state),
+                new IsotonicRegressionOptimizer(_state)
             }
         };
     }

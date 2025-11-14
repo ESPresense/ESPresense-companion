@@ -76,10 +76,10 @@ public class StateController : ControllerBase
     {
         IEnumerable<Device> d = _state.Devices.Values;
         if (!showAll) d = d.Where(a => a is { Track: true });
-        
+
         // Populate configured RefRssi from DeviceSettings
         EnrichDevices(d);
-        
+
         return d;
     }
 
@@ -112,6 +112,7 @@ public class StateController : ControllerBase
         var mapDistances = new List<double>();
         var actualDistances = new List<double>();
 
+        // Process traditional Node-to-Node relationships
         foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
         {
             var txNs = _nsd.Get(txId);
@@ -134,6 +135,39 @@ public class StateController : ControllerBase
                 {
                     mapDistances.Add(rx.MapDistance);
                     actualDistances.Add(rx.Distance);
+                }
+            }
+        }
+
+        // Process Anchored Devices as Transmitters
+        foreach (var device in _state.Devices.Values.Where(d => d.IsAnchored && d.Anchor != null && d.Nodes.Values.Any(dn => dn.Current)))
+        {
+            var anchorName = device.Name ?? device.Id;
+            var txM = c.Matrix.GetOrAdd($"{anchorName}");
+
+            foreach (var (rxId, deviceNode) in device.Nodes.Where(dn => dn.Value.Current && dn.Value.Node?.HasLocation == true))
+            {
+                var rxNode = deviceNode.Node!;
+                var rxNs = _nsd.Get(rxNode.Id);
+                var rxM = txM.GetOrAdd(rxNode.Name ?? rxNode.Id);
+
+                // Anchored devices don't have tx calibration settings, but receivers still have their settings
+                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
+                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
+
+                // Calculate map distance from anchor to receiver
+                var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);
+                rxM["mapDistance"] = mapDistance;
+                rxM["distance"] = deviceNode.Distance;
+                rxM["rssi"] = deviceNode.Rssi;
+                rxM["diff"] = deviceNode.Distance - mapDistance;
+                rxM["percent"] = mapDistance != 0 ? ((deviceNode.Distance - mapDistance) / mapDistance) : 0;
+                if (deviceNode.DistVar is not null) rxM["var"] = deviceNode.DistVar.Value;
+
+                if (mapDistance > 0 && deviceNode.Distance > 0)
+                {
+                    mapDistances.Add(mapDistance);
+                    actualDistances.Add(deviceNode.Distance);
                 }
             }
         }

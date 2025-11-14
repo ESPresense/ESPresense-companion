@@ -5,7 +5,7 @@ using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
+public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore) : BackgroundService
 {
     private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
     private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
@@ -192,6 +192,28 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
     private async Task<bool> CheckDeviceAsync(Device device)
     {
         var wasTracked = device.Track;
+        var settings = deviceSettingsStore.Get(device.Id);
+        if (settings?.HasAnchor ?? false)
+        {
+            // Ensure the anchor is restored from settings if not already set
+            if (!device.IsAnchored)
+            {
+                deviceSettingsStore.ApplyToDevice(device.Id, settings);
+            }
+
+            device.Track = true;
+            device.Check = false;
+            if (!wasTracked)
+            {
+                tele.UpdateTrackedDevices(state.Devices.Values.Count(a => a.Track));
+                Log.Information("[+] Track {Device} (anchored)", device);
+                foreach (var ad in device.HassAutoDiscovery)
+                    await ad.Send(mqtt);
+                return true;
+            }
+            return false;
+        }
+
         if (device.Check)
         {
             Log.Debug("Checking {Device}", device);

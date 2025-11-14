@@ -91,5 +91,128 @@ namespace ESPresense.Utils
             // Ensure confidence is within the defined floor and ceiling (100)
             return Math.Clamp(confidence, ConfidenceFloor, 100);
         }
+
+        /// <summary>
+        /// Applies weighted isotonic regression using the pool-adjacent-violators algorithm.
+        /// </summary>
+        public static double[] IsotonicRegression(IReadOnlyList<double> x, IReadOnlyList<double> y, IReadOnlyList<double>? weights = null, bool increasing = true)
+        {
+            if (x == null) throw new ArgumentNullException(nameof(x));
+            if (y == null) throw new ArgumentNullException(nameof(y));
+            if (x.Count != y.Count) throw new ArgumentException("Input arrays must have the same length.");
+            if (weights != null && weights.Count != x.Count) throw new ArgumentException("Weights must match input length.");
+
+            int n = x.Count;
+            if (n == 0) return Array.Empty<double>();
+
+            var order = Enumerable.Range(0, n).OrderBy(i => x[i]).ToArray();
+            var sortedY = new double[n];
+            var sortedWeights = new double[n];
+
+            for (int idx = 0; idx < n; idx++)
+            {
+                int originalIndex = order[idx];
+                sortedY[idx] = y[originalIndex];
+                double weight = weights == null ? 1.0 : weights[originalIndex];
+                sortedWeights[idx] = weight <= 0 ? 1e-9 : weight;
+            }
+
+            if (!increasing)
+            {
+                for (int i = 0; i < n; i++)
+                    sortedY[i] = -sortedY[i];
+            }
+
+            var fittedSorted = FitIncreasing(sortedY, sortedWeights);
+
+            if (!increasing)
+            {
+                for (int i = 0; i < fittedSorted.Length; i++)
+                    fittedSorted[i] = -fittedSorted[i];
+            }
+
+            var result = new double[n];
+            for (int idx = 0; idx < n; idx++)
+            {
+                result[order[idx]] = fittedSorted[idx];
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Computes weighted linear regression parameters. Returns null when insufficient data or variance.
+        /// </summary>
+        public static (double Slope, double Intercept)? WeightedLinearRegression(IReadOnlyList<double> x, IReadOnlyList<double> y, IReadOnlyList<double>? weights = null)
+        {
+            if (x == null) throw new ArgumentNullException(nameof(x));
+            if (y == null) throw new ArgumentNullException(nameof(y));
+            if (x.Count != y.Count) throw new ArgumentException("Input arrays must have the same length.");
+            if (weights != null && weights.Count != x.Count) throw new ArgumentException("Weights must match input length.");
+
+            int n = x.Count;
+            if (n < 2) return null;
+
+            double sw = 0;
+            double sx = 0;
+            double sy = 0;
+            double sxx = 0;
+            double sxy = 0;
+
+            for (int i = 0; i < n; i++)
+            {
+                double weight = weights == null ? 1.0 : Math.Max(weights[i], 0);
+                if (weight == 0) continue;
+
+                double xi = x[i];
+                double yi = y[i];
+                sw += weight;
+                sx += weight * xi;
+                sy += weight * yi;
+                sxx += weight * xi * xi;
+                sxy += weight * xi * yi;
+            }
+
+            if (sw == 0) return null;
+            double denominator = sw * sxx - sx * sx;
+            if (Math.Abs(denominator) < 1e-9) return null;
+
+            double slope = (sw * sxy - sx * sy) / denominator;
+            double intercept = (sy - slope * sx) / sw;
+            return (slope, intercept);
+        }
+
+        private static double[] FitIncreasing(IReadOnlyList<double> values, IReadOnlyList<double> weights)
+        {
+            var blocks = new List<Block>();
+            for (int i = 0; i < values.Count; i++)
+            {
+                var block = new Block(i, i, Math.Max(weights[i], 1e-9), values[i]);
+                blocks.Add(block);
+
+                while (blocks.Count >= 2 && blocks[^2].Value > blocks[^1].Value)
+                {
+                    var right = blocks[^1];
+                    var left = blocks[^2];
+                    double totalWeight = left.Weight + right.Weight;
+                    double mergedValue = (left.Value * left.Weight + right.Value * right.Weight) / totalWeight;
+                    blocks[^2] = new Block(left.Start, right.End, totalWeight, mergedValue);
+                    blocks.RemoveAt(blocks.Count - 1);
+                }
+            }
+
+            var fitted = new double[values.Count];
+            foreach (var block in blocks)
+            {
+                for (int i = block.Start; i <= block.End; i++)
+                {
+                    fitted[i] = block.Value;
+                }
+            }
+
+            return fitted;
+        }
+
+        private readonly record struct Block(int Start, int End, double Weight, double Value);
     }
 }

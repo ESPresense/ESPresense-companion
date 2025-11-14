@@ -23,6 +23,8 @@
 	// Local storage for all device messages (keyed by nodeId)
 	let deviceMessages: Record<string, DeviceMessage[]> = {};
 
+	$: isAnchored = deviceSettings?.x != null && deviceSettings?.y != null && deviceSettings?.z != null;
+
 	// Function to fetch device settings based on deviceId
 	async function fetchDeviceSettings() {
 		try {
@@ -221,6 +223,68 @@
 			});
 	}
 
+	function buildSettingsPayload(overrides: Partial<DeviceSetting & { x: number | null; y: number | null; z: number | null }>) {
+		const { error, ...baseSettings } = deviceSettings ?? {};
+		return {
+			...baseSettings,
+			...overrides
+		};
+	}
+
+	async function anchorDevice() {
+		if (!deviceSettings?.id && !deviceSettings?.originalId) return;
+		if (!calibrationSpot || calibrationSpot.x == null || calibrationSpot.y == null) {
+			toastStore.trigger({ message: 'Select a position on the map before anchoring.', background: 'preset-filled-error-500' });
+			return;
+		}
+
+		const zValue = calibrationSpot.z ?? (bounds ? bounds[0][2] + calibrationSpotHeight : calibrationSpotHeight);
+		const payload = buildSettingsPayload({
+			x: calibrationSpot.x,
+			y: calibrationSpot.y,
+			z: zValue
+		});
+
+		try {
+			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to anchor device');
+			}
+
+			deviceSettings = { ...deviceSettings, x: calibrationSpot.x, y: calibrationSpot.y, z: zValue };
+			toastStore.trigger({ message: 'Device anchored to the selected location.', background: 'preset-filled-success-500' });
+		} catch (error) {
+			console.error('Error anchoring device:', error);
+			toastStore.trigger({ message: 'Error anchoring device.', background: 'preset-filled-error-500' });
+		}
+	}
+
+	async function clearAnchor() {
+		if (!deviceSettings?.id && !deviceSettings?.originalId) return;
+		const payload = buildSettingsPayload({ x: null, y: null, z: null });
+		try {
+			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+			if (!response.ok) {
+				throw new Error('Failed to clear anchor');
+			}
+
+			deviceSettings = { ...deviceSettings, x: null, y: null, z: null };
+			toastStore.trigger({ message: 'Anchor removed. Device will return to automatic positioning.', background: 'preset-filled-success-500' });
+		} catch (error) {
+			console.error('Error clearing anchor:', error);
+			toastStore.trigger({ message: 'Error clearing anchor.', background: 'preset-filled-error-500' });
+		}
+	}
+
 	// Update this function to use only parameters from device messages
 	function calculateFinalRssi() {
 		const refRssiEstimates: Array<{ refRssi: number; weight: number }> = [];
@@ -379,6 +443,24 @@
 		{#if selectedFloorId}
 			<div class="card h-[400px] relative overflow-hidden">
 				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
+			</div>
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div class="text-sm text-surface-700-300">
+					{#if isAnchored}
+						<span class="text-success-500 font-medium">Anchored</span>
+						<span>
+							@ ({deviceSettings?.x?.toFixed(2) ?? '-'}, {deviceSettings?.y?.toFixed(2) ?? '-'}, {deviceSettings?.z?.toFixed(2) ?? '-'})
+						</span>
+					{:else}
+						<span>Device is not anchored. Position updates will use auto-location.</span>
+					{/if}
+				</div>
+				<div class="flex gap-2">
+					<button class="btn preset-filled-primary-500" onclick={anchorDevice} disabled={!calibrationSpot}>Anchor here</button>
+					{#if isAnchored}
+						<button class="btn preset-filled-error-500" onclick={clearAnchor}>Remove anchor</button>
+					{/if}
+				</div>
 			</div>
 		{/if}
 

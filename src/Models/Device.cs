@@ -1,9 +1,10 @@
 using System.Collections.Concurrent;
 using System.Text;
-using System.Text.Json.Serialization;
+using STJ = System.Text.Json.Serialization;
 using ESPresense.Converters;
 using ESPresense.Extensions;
 using MathNet.Spatial.Euclidean;
+using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
@@ -17,7 +18,7 @@ public class Device
     /// <summary>
     /// Access to the device's Kalman filter for prediction
     /// </summary>
-    [JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
+    [STJ.JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
 
     public Device(string id, string? discoveryId, TimeSpan timeout)
     {
@@ -38,16 +39,24 @@ public class Device
     public string Id { get; init; }
     public string? Name { get; set; }
 
-    [JsonIgnore] public Point3D ReportedLocation { get; set; }
+    [STJ.JsonIgnore] public Point3D ReportedLocation { get; set; }
 
-    [JsonConverter(typeof(DeviceToNodeConverter))]
+    [STJ.JsonIgnore] public DeviceAnchor? Anchor { get; private set; }
+
+    [STJ.JsonPropertyName("isAnchored")]
+    [JsonProperty("isAnchored")]
+    public bool IsAnchored => Anchor != null;
+
+    [STJ.JsonConverter(typeof(DeviceToNodeConverter))]
     public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
-    [JsonConverter(typeof(RoomConverter))] public Room? Room => BestScenario?.Room;
+    [STJ.JsonConverter(typeof(RoomConverter))]
+    public Room? Room => Anchor?.Room ?? BestScenario?.Room;
 
-    [JsonConverter(typeof(FloorConverter))] public Floor? Floor => BestScenario?.Floor;
+    [STJ.JsonConverter(typeof(FloorConverter))]
+    public Floor? Floor => Anchor?.Floor ?? BestScenario?.Floor;
 
-    public int? Confidence => BestScenario?.Confidence;
+    public int? Confidence => IsAnchored ? 100 : BestScenario?.Confidence;
 
     public double? Scale => BestScenario?.Scale;
 
@@ -67,36 +76,26 @@ public class Device
         }
     }
 
-    [JsonIgnore] public bool Check { get; set; }
-    [JsonIgnore] public bool Track { get; set; }
+    [STJ.JsonIgnore] public bool Check { get; set; }
+    [STJ.JsonIgnore] public bool Track { get; set; }
 
-    [JsonIgnore] public Scenario? BestScenario { get; set; }
-    [JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
+    [STJ.JsonIgnore] public Scenario? BestScenario { get; set; }
+    [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
 
-    [JsonConverter(typeof(Point3DConverter))]
-    public Point3D? Location
-    {
-        get
-        {
-            // If no best scenario, return null
-            if (BestScenario == null) return null;
+    [STJ.JsonConverter(typeof(Point3DConverter))]
+    public Point3D? Location => Anchor?.Location ?? (BestScenario == null ? null : _kalmanLocation.Location);
 
-            // Return the smoothed location
-            return _kalmanLocation.Location;
-        }
-    }
+    [STJ.JsonIgnore] public DateTime? LastCalculated { get; set; }
 
-    [JsonIgnore] public DateTime? LastCalculated { get; set; }
-
-    [JsonIgnore] public IList<AutoDiscovery> HassAutoDiscovery { get; set; } = new List<AutoDiscovery>();
-    [JsonIgnore] public string? ReportedState { get; set; }
-    [JsonConverter(typeof(TimeSpanMillisConverter))]
+    [STJ.JsonIgnore] public IList<AutoDiscovery> HassAutoDiscovery { get; set; } = new List<AutoDiscovery>();
+    [STJ.JsonIgnore] public string? ReportedState { get; set; }
+    [STJ.JsonConverter(typeof(TimeSpanMillisConverter))]
     public TimeSpan Timeout { get; set; }
 
-    [JsonIgnore]
+    [STJ.JsonIgnore]
     public int? ConfiguredRefRssi { get; set; }
 
-    [JsonPropertyName("rssi@1m")]
+    [STJ.JsonPropertyName("rssi@1m")]
     public double? RefRssi
     {
         get
@@ -107,7 +106,7 @@ public class Device
         }
     }
 
-    [JsonPropertyName("measuredRssi@1m")]
+    [STJ.JsonPropertyName("measuredRssi@1m")]
     public double? MeasuredRefRssi
     {
         get
@@ -128,6 +127,20 @@ public class Device
     public void UpdateLocation(Point3D newLocation)
     {
         _kalmanLocation.Update(newLocation);
+    }
+
+    public void SetAnchor(DeviceAnchor? anchor)
+    {
+        Anchor = anchor;
+        if (anchor != null)
+        {
+            _kalmanLocation.Reset(anchor.Location);
+            BestScenario = null;
+        }
+        else
+        {
+            Check = true;
+        }
     }
 
     public virtual IEnumerable<KeyValuePair<string, string>> GetDetails()
@@ -155,6 +168,18 @@ public class Device
             yield return new KeyValuePair<string, string>($"{dn.Node?.Name} Distance", $"{dn.Distance}");
             yield return new KeyValuePair<string, string>($"{dn.Node?.Name} Hits", $"{dn.Hits}");
             yield return new KeyValuePair<string, string>($"{dn.Node?.Name} Last Hit", $"{dn.LastHit?.ToLocalTime():s}");
+        }
+
+        if (Anchor != null)
+        {
+            yield return new KeyValuePair<string, string>("Anchored", "true");
+            yield return new KeyValuePair<string, string>("Anchor X", $"{Anchor.Location.X:##.000}");
+            yield return new KeyValuePair<string, string>("Anchor Y", $"{Anchor.Location.Y:##.000}");
+            yield return new KeyValuePair<string, string>("Anchor Z", $"{Anchor.Location.Z:##.000}");
+            if (Anchor.Floor != null)
+                yield return new KeyValuePair<string, string>("Anchor Floor", Anchor.Floor.Name ?? Anchor.Floor.Id ?? string.Empty);
+            if (Anchor.Room != null)
+                yield return new KeyValuePair<string, string>("Anchor Room", Anchor.Room.Name ?? Anchor.Room.Id ?? string.Empty);
         }
 
         foreach (var s in scenarios)
