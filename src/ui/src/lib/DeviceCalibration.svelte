@@ -26,7 +26,7 @@
 	// Function to fetch device settings based on deviceId
 	async function fetchDeviceSettings() {
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceId}`));
+			const response = await fetch(resolve(`/api/device/${deviceSettings.id}`));
 			if (response.ok) {
 				deviceSettings = await response.json();
 				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
@@ -35,7 +35,7 @@
 				toastStore.trigger({ message: `Error fetching device settings: ${errorData || response.statusText}`, background: 'preset-filled-error-500' });
 			}
 		} catch (error) {
-			console.error(`Error fetching settings for device ${deviceId}:`, error);
+			console.error(`Error fetching settings for device ${deviceSettings.id}:`, error);
 			toastStore.trigger({ message: 'Error fetching device settings.', background: 'preset-filled-error-500' });
 		}
 	}
