@@ -39,7 +39,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 var (lat, lon) = gps?.Report == true ? gps.Add(anchorLocation.X, anchorLocation.Y) : (null, null);
                 var elevation = gps?.Report == true ? anchorLocation.Z + gps?.Elevation : null;
 
-                if (device.ReportedState != "not_home")
+                var stateChanged = device.ReportedState != "not_home";
+                if (stateChanged)
                 {
                     await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", "not_home");
                     device.ReportedState = "not_home";
@@ -49,7 +50,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 device.ReportedLocation = anchorLocation;
                 device.BestScenario = null;
 
-                if (locationChanged)
+                // Force publication when device transitions to anchored state or location changes
+                if (locationChanged || stateChanged)
                 {
                     var payload = JsonConvert.SerializeObject(new
                     {
