@@ -6,6 +6,7 @@ using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Weighting;
 using Serilog;
+using System.Linq;
 
 namespace ESPresense.Models;
 
@@ -108,6 +109,8 @@ public class State
             {
                 var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
                 var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx!.Name, Location = meas.Rx.Location });
+                tx.Location = txNode.Location;
+                rx.Location = meas.Rx.Location;
                 if (meas.Current)
                 {
                     os.Measures.Add(new Measure()
@@ -123,6 +126,34 @@ public class State
                     });
                 }
             }
+
+        foreach (var device in Devices.Values.Where(d => d.IsAnchored && d.Anchor != null))
+        {
+            var anchorLocation = device.Anchor!.Location;
+            var anchorNode = nodes.GetOrAdd(device.Id, _ => new OptNode { Id = device.Id, Name = device.Name ?? device.Id, Location = anchorLocation });
+            anchorNode.Location = anchorLocation;
+            anchorNode.Name = device.Name ?? device.Id;
+
+            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current))
+            {
+                var rxNode = deviceNode.Node!;
+                var optRx = nodes.GetOrAdd(rxNode.Id, _ => new OptNode { Id = rxNode.Id, Name = rxNode.Name, Location = rxNode.Location });
+                optRx.Location = rxNode.Location;
+                optRx.Name = rxNode.Name;
+
+                os.Measures.Add(new Measure
+                {
+                    Distance = deviceNode.Distance,
+                    DistVar = deviceNode.DistVar,
+                    Rssi = deviceNode.Rssi,
+                    RssiRxAdj = null,
+                    RssiVar = deviceNode.RssiVar,
+                    RefRssi = deviceNode.RefRssi,
+                    Tx = anchorNode,
+                    Rx = optRx,
+                });
+            }
+        }
 
         // Remove expired snapshots by time
         var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
@@ -148,6 +179,20 @@ public class State
 
     public IEnumerable<Scenario> GetScenarios(Device device)
     {
+        // Check if device is anchored first - if so, only return the anchor scenario
+        if (device.IsAnchored && device.Anchor != null)
+        {
+            var anchor = device.Anchor;
+            var scenario = new Scenario(Config, new AnchorLocator(anchor.Location), "Anchored")
+            {
+                Floor = anchor.Floor,
+                Room = anchor.Room,
+                Confidence = 100
+            };
+            yield return scenario;
+            yield break;
+        }
+
         var nelderMead = Config?.Locators?.NelderMead;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
@@ -168,8 +213,15 @@ public class State
         else
         {
             Log.Warning("No locators enabled, using default NelderMead");
-            foreach (var floor in Floors.Values)
-                yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+            if (Floors.Values.Any())
+            {
+                foreach (var floor in Floors.Values)
+                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+            }
+            else
+            {
+                yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
+            }
         }
     }
 
