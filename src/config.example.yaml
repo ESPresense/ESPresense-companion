@@ -52,7 +52,7 @@ optimization:
 
 bayesian_probabilities:
   enabled: false          # Publish per-room probability vectors (default disabled)
-  discovery_threshold: 0.1 # Minimum probability before creating Home Assistant sensor
+  discovery_threshold: 0.1 # Minimum probability (0.0-1.0) before creating Home Assistant sensor
   retain: true             # Retain MQTT probability topics so sensors restore on restart
 
 locators:

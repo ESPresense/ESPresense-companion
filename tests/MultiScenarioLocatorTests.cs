@@ -159,6 +159,15 @@ public class MultiScenarioLocatorTests
         var probabilityTopic = $"espresense/companion/{device.Id}/probabilities/kitchen";
         Assert.That(published.Any(p => p.topic == probabilityTopic && !string.IsNullOrWhiteSpace(p.payload)), Is.True);
 
+        // Assert retain flag is honored on probability topics
+        var probabilityMessages = published.Where(p => p.topic.Contains("/probabilities/")).ToArray();
+        Assert.That(probabilityMessages, Is.Not.Empty);
+        Assert.That(probabilityMessages.All(p => p.retain == true), Is.True, "All probability topics should have retain=true");
+
+        // Assert discovery config published for rooms above threshold
+        var discoveryMessages = published.Where(p => p.topic.Contains("homeassistant/sensor/")).ToArray();
+        Assert.That(discoveryMessages, Is.Not.Empty, "Discovery messages should be published for rooms above threshold");
+
         var attributesMessage = published.LastOrDefault(p => p.topic == $"espresense/companion/{device.Id}/attributes");
         Assert.That(attributesMessage.payload, Is.Not.Null);
 
@@ -167,6 +176,20 @@ public class MultiScenarioLocatorTests
         Assert.That(probabilities, Is.Not.Null);
         Assert.That(probabilities!["Kitchen"]?.Value<double>(), Is.GreaterThan(0));
         Assert.That(probabilities!["Hall"]?.Value<double>(), Is.GreaterThan(0));
+
+        // Test untracking deletes probability sensors
+        device.Scenarios.Clear();
+        published.Clear();
+        await locator.ProcessDevice(device);
+
+        // Assert null payloads sent to clear probability topics with retain=true
+        var clearMessages = published.Where(p => p.topic.Contains("/probabilities/") && p.payload == null).ToArray();
+        Assert.That(clearMessages, Is.Not.Empty, "Null payloads should be sent to clear probability topics");
+        Assert.That(clearMessages.All(p => p.retain == true), Is.True, "Tombstone messages should use retain=true");
+
+        // Assert discovery delete messages sent
+        var deleteMessages = published.Where(p => p.topic.Contains("homeassistant/sensor/") && p.payload == null).ToArray();
+        Assert.That(deleteMessages, Is.Not.Empty, "Discovery delete messages should be sent when untracking");
     }
 
     [Test]

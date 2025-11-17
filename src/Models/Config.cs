@@ -148,11 +148,17 @@ namespace ESPresense.Models
 
     public partial class ConfigBayesianProbabilities
     {
+        private double _discoveryThreshold = 0.1;
+
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; } = false;
 
         [YamlMember(Alias = "discovery_threshold")]
-        public double DiscoveryThreshold { get; set; } = 0.1;
+        public double DiscoveryThreshold
+        {
+            get => _discoveryThreshold;
+            set => _discoveryThreshold = Math.Clamp(value, 0.0, 1.0);
+        }
 
         [YamlMember(Alias = "retain")]
         public bool Retain { get; set; } = true;
