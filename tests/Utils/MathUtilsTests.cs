@@ -27,7 +27,7 @@ public class MathUtilsTests
 
         for (int i = 1; i < fitted.Length; i++)
         {
-            Assert.That(fitted[i], Is.LessThanOrEqualTo(fitted[i - 1]) + 1e-9);
+            Assert.That(fitted[i], Is.LessThanOrEqualTo(fitted[i - 1]).Within(1e-9));
         }
     }
 

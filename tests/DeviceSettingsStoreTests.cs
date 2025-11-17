@@ -243,7 +243,7 @@ public class DeviceSettingsStoreTests
         Assert.That(device.Anchor!.Location.Y, Is.EqualTo(2));
         Assert.That(device.Anchor!.Location.Z, Is.EqualTo(3));
         Assert.That(device.ConfiguredRefRssi, Is.EqualTo(-55));
-        Assert.That(device.Track, Is.True);
+        Assert.That(device.Check, Is.True);
     }
 
     [Test]
@@ -270,7 +270,7 @@ public class DeviceSettingsStoreTests
         Assert.That(device.Anchor!.Location.X, Is.EqualTo(4));
         Assert.That(device.Anchor!.Location.Y, Is.EqualTo(5));
         Assert.That(device.Anchor!.Location.Z, Is.EqualTo(6));
-        Assert.That(device.Track, Is.True);
+        Assert.That(device.Check, Is.True);
     }
 
     [Test]
