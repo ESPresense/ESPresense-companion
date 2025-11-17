@@ -169,9 +169,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     latitude      = includeLocation ? lat : null,
                     longitude     = includeLocation ? lon : null,
                     elevation     = includeLocation ? elevation : null,
-                    x             = includeLocation ? location.X : null,
-                    y             = includeLocation ? location.Y : null,
-                    z             = includeLocation ? location.Z : null,
+                    x             = includeLocation ? (double?)location.X : null,
+                    y             = includeLocation ? (double?)location.Y : null,
+                    z             = includeLocation ? (double?)location.Z : null,
                     confidence    = bestScenario?.Confidence,
                     fixes         = bestScenario?.Fixes,
                     best_scenario = bestScenario?.Name,
@@ -270,12 +270,13 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
         foreach (var (roomName, probability) in probabilities)
         {
-            var payloadChanged = !device.BayesianProbabilities.TryGetValue(roomName, out var existing) || Math.Abs(existing - probability) > ProbabilityEpsilon;
+            var roundedProbability = Math.Round(probability, 4);
+            var payloadChanged = !device.BayesianProbabilities.TryGetValue(roomName, out var existing) || Math.Abs(Math.Round(existing, 4) - roundedProbability) > ProbabilityEpsilon;
             if (payloadChanged)
             {
-                var payload = probability.ToString("0.####", CultureInfo.InvariantCulture);
+                var payload = roundedProbability.ToString("0.####", CultureInfo.InvariantCulture);
                 await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, roomName), payload, retain: config.Retain);
-                device.BayesianProbabilities[roomName] = probability;
+                device.BayesianProbabilities[roomName] = roundedProbability;
                 changed = true;
             }
 
@@ -298,7 +299,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
         {
             if (activeKeys.Contains(key)) continue;
 
-            await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: config.Retain);
+            await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: true);
             device.BayesianProbabilities.TryRemove(key, out _);
 
             if (device.BayesianDiscoveries.TryRemove(key, out var discovery))
