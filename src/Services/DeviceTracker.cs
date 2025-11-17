@@ -205,13 +205,13 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
             {
                 Log.Information("[+] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
-                    await ad.Send(mqtt);
+                    await ad.Send(mqtt, mqtt.DiscoveryTopic);
             }
             else
             {
                 Log.Information("[-] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
-                    await ad.Delete(mqtt);
+                    await ad.Delete(mqtt, mqtt.DiscoveryTopic);
             }
             return true;
         }

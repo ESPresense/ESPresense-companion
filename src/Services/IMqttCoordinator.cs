@@ -5,6 +5,9 @@ namespace ESPresense.Services;
 
 public interface IMqttCoordinator
 {
+    // Properties
+    string DiscoveryTopic { get; }
+
     // Events
     event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
     event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;

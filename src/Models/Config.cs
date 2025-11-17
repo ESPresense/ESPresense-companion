@@ -195,6 +195,10 @@ namespace ESPresense.Models
         [JsonProperty("client_id")]
         [YamlMember(Alias = "client_id")]
         public string ClientId { get; set; } = "espresense-companion";
+
+        [JsonProperty("discovery_topic")]
+        [YamlMember(Alias = "discovery_topic")]
+        public string DiscoveryTopic { get; set; } = "homeassistant";
     }
 
     public partial class ConfigDevice

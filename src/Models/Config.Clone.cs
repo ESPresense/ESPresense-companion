@@ -166,7 +166,8 @@ namespace ESPresense.Models
                 Ssl = Ssl,
                 Username = Username,
                 Password = Password,
-                ClientId = ClientId
+                ClientId = ClientId,
+                DiscoveryTopic = DiscoveryTopic
             };
         }
     }

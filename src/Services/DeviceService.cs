@@ -131,7 +131,7 @@ public class DeviceService
             // Clean up Home Assistant auto-discovery entries
             foreach (var ad in device.HassAutoDiscovery)
             {
-                await ad.Delete(_mqtt);
+                await ad.Delete(_mqtt, _mqtt.DiscoveryTopic);
             }
         }
         catch (Exception ex)

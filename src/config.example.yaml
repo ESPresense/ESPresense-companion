@@ -5,6 +5,7 @@ mqtt:
   ssl: false
   username:
   password:
+  discovery_topic: homeassistant  # Home Assistant MQTT discovery topic prefix (default: homeassistant)
 
 # This gets added to the x,y,z to derive a gps location
 gps:

@@ -46,26 +46,26 @@ public class AutoDiscovery
         Message = message;
     }
 
-    public async Task Send(MqttCoordinator mqtt)
+    public async Task Send(MqttCoordinator mqtt, string discoveryTopic = "homeassistant")
     {
         if (_sent) return;
         _sent = true;
 
         Log.Debug($"[+] Discovery {Component} {DiscoveryId}");
-        await mqtt.EnqueueAsync($"homeassistant/{Component}/{DiscoveryId}/config",
+        await mqtt.EnqueueAsync($"{discoveryTopic}/{Component}/{DiscoveryId}/config",
             JsonConvert.SerializeObject(Message, SerializerSettings.NullIgnore), true);
     }
 
-    public async Task Delete(MqttCoordinator mqtt)
+    public async Task Delete(MqttCoordinator mqtt, string discoveryTopic = "homeassistant")
     {
         Log.Debug($"[-] Discovery {Component} {DiscoveryId}");
-        await mqtt.EnqueueAsync($"homeassistant/{Component}/{DiscoveryId}/config", null, true);
+        await mqtt.EnqueueAsync($"{discoveryTopic}/{Component}/{DiscoveryId}/config", null, true);
     }
 
-    internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg)
+    internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant")
     {
         var parts = topic.Split("/");
-        if (parts.Length != 4 || parts[0] != "homeassistant" || parts[3] != "config")
+        if (parts.Length != 4 || parts[0] != discoveryTopic || parts[3] != "config")
         {
             Log.Debug("Invalid topic structure");
             msg = null;
