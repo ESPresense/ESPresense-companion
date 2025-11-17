@@ -40,6 +40,9 @@ public class MqttCoordinator : IMqttCoordinator
     private Task? _reconnectTask;
     private ConfigMqtt? _lastConfig;
     private bool _reconnectRequired;
+    private string _discoveryTopic = "homeassistant";
+
+    public string DiscoveryTopic => _discoveryTopic;
 
     public MqttCoordinator(
         ConfigLoader cfg,
@@ -67,7 +70,8 @@ public class MqttCoordinator : IMqttCoordinator
               _lastConfig.Port != config.Port ||
               !string.Equals(_lastConfig.Username, config.Username) ||
               !string.Equals(_lastConfig.Password, config.Password) ||
-              _lastConfig.Ssl != config.Ssl);
+              _lastConfig.Ssl != config.Ssl ||
+              !string.Equals(_lastConfig.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<ConfigMqtt?> GetUserConfig()
@@ -155,7 +159,7 @@ public class MqttCoordinator : IMqttCoordinator
             await mqttClient.SubscribeAsync("espresense/settings/+/config").ConfigureAwait(false);
             await mqttClient.SubscribeAsync("espresense/rooms/+/+").ConfigureAwait(false);
             await mqttClient.SubscribeAsync("espresense/rooms/*/+/set").ConfigureAwait(false);
-            await mqttClient.SubscribeAsync("homeassistant/device_tracker/+/config").ConfigureAwait(false);
+            await mqttClient.SubscribeAsync($"{config.DiscoveryTopic}/device_tracker/+/config").ConfigureAwait(false);
             await mqttClient.SubscribeAsync("espresense/companion/+/attributes").ConfigureAwait(false);
         };
 
@@ -213,6 +217,7 @@ public class MqttCoordinator : IMqttCoordinator
         }
 
         _lastConfig = config.Clone();
+        _discoveryTopic = config.DiscoveryTopic;
         _reconnectRequired = false;
 
         return mqttClient;
@@ -353,6 +358,13 @@ public class MqttCoordinator : IMqttCoordinator
 
         try
         {
+            // Check for Home Assistant discovery messages with configurable topic
+            if (parts.Length == 4 && parts[0] == _discoveryTopic && parts[1] == "device_tracker" && parts[3] == "config")
+            {
+                await ProcessDiscoveryMessage(arg.ApplicationMessage.Topic, payload);
+                return;
+            }
+
             switch (parts)
             {
                 case ["espresense", "rooms", _, "telemetry"]:
@@ -372,9 +384,6 @@ public class MqttCoordinator : IMqttCoordinator
                     break;
                 case ["espresense", "settings", _, "config"]:
                     await ProcessDeviceConfigMessage(parts[2], payload);
-                    break;
-                case ["homeassistant", "device_tracker", _, "config"]:
-                    await ProcessDiscoveryMessage(arg.ApplicationMessage.Topic, payload);
                     break;
                 case ["espresense", "companion", _, "attributes"]:
                     await ProcessDeviceAttributesMessage(parts[2], payload);
@@ -672,7 +681,7 @@ public class MqttCoordinator : IMqttCoordinator
                 return;
             }
 
-            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg))
+            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, _discoveryTopic))
                 throw new MqttMessageProcessingException("Failed to deserialize discovery message", topic, payload, "Discovery");
 
             PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs { AutoDiscover = msg });

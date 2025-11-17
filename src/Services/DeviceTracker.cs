@@ -5,7 +5,7 @@ using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
 {
     private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
     private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
