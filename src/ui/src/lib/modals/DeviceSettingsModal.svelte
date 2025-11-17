@@ -14,8 +14,10 @@
 
 	// Create a local copy to avoid directly mutating the prop
 	let localSettings = { ...deviceSetting };
-	let anchorEnabled = localSettings.x != null && localSettings.y != null && localSettings.z != null;
 	let isSaving = false; // Track saving state
+
+	// Reactive anchor toggle - keeps checkbox in sync with coordinate values
+	$: anchorEnabled = localSettings.x != null && localSettings.y != null && localSettings.z != null;
 
 	async function save() {
 		try {

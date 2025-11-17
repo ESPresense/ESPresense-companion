@@ -69,7 +69,7 @@ namespace ESPresense.Services
             device.SetAnchor(anchor);
             if (anchor != null)
             {
-                device.Track = true;
+                device.Check = true;
             }
         }
 
