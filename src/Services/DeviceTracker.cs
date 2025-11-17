@@ -5,7 +5,7 @@ using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher) : BackgroundService
 {
     private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
     private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
@@ -205,13 +205,13 @@ public class DeviceTracker(State state, MqttCoordinator mqtt, TelemetryService t
             {
                 Log.Information("[+] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
-                    await ad.Send(mqtt, mqtt.DiscoveryTopic);
+                    await ad.Send(mqtt);
             }
             else
             {
                 Log.Information("[-] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
-                    await ad.Delete(mqtt, mqtt.DiscoveryTopic);
+                    await ad.Delete(mqtt);
             }
             return true;
         }

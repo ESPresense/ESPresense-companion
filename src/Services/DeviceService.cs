@@ -10,11 +10,11 @@ namespace ESPresense.Services;
 public class DeviceService
 {
     private readonly State _state;
-    private readonly MqttCoordinator _mqtt;
+    private readonly IMqttCoordinator _mqtt;
     private readonly GlobalEventDispatcher _events;
     private readonly ILogger<DeviceService> _logger;
 
-    public DeviceService(State state, MqttCoordinator mqtt, GlobalEventDispatcher events, ILogger<DeviceService> logger)
+    public DeviceService(State state, IMqttCoordinator mqtt, GlobalEventDispatcher events, ILogger<DeviceService> logger)
     {
         _state = state;
         _mqtt = mqtt;
@@ -131,7 +131,7 @@ public class DeviceService
             // Clean up Home Assistant auto-discovery entries
             foreach (var ad in device.HassAutoDiscovery)
             {
-                await ad.Delete(_mqtt, _mqtt.DiscoveryTopic);
+                await ad.Delete(_mqtt);
             }
         }
         catch (Exception ex)

@@ -46,20 +46,20 @@ public class AutoDiscovery
         Message = message;
     }
 
-    public async Task Send(MqttCoordinator mqtt, string discoveryTopic = "homeassistant")
+    public async Task Send(IMqttCoordinator mqtt)
     {
         if (_sent) return;
         _sent = true;
 
         Log.Debug($"[+] Discovery {Component} {DiscoveryId}");
-        await mqtt.EnqueueAsync($"{discoveryTopic}/{Component}/{DiscoveryId}/config",
+        await mqtt.EnqueueAsync($"{mqtt.DiscoveryTopic}/{Component}/{DiscoveryId}/config",
             JsonConvert.SerializeObject(Message, SerializerSettings.NullIgnore), true);
     }
 
-    public async Task Delete(MqttCoordinator mqtt, string discoveryTopic = "homeassistant")
+    public async Task Delete(IMqttCoordinator mqtt)
     {
         Log.Debug($"[-] Discovery {Component} {DiscoveryId}");
-        await mqtt.EnqueueAsync($"{discoveryTopic}/{Component}/{DiscoveryId}/config", null, true);
+        await mqtt.EnqueueAsync($"{mqtt.DiscoveryTopic}/{Component}/{DiscoveryId}/config", null, true);
     }
 
     internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant")
