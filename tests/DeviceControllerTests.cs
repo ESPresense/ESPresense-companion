@@ -155,7 +155,7 @@ public class DeviceControllerTests
         
         _mockDeviceSettingsStore
             .Setup(x => x.Get(deviceId))
-            .Returns((DeviceSettings)null);
+            .Returns((DeviceSettings?)null);
 
         // Act
         var result = _deviceController.Get(deviceId);

@@ -5,7 +5,6 @@ using ESPresense.Converters;
 using ESPresense.Extensions;
 using MathNet.Spatial.Euclidean;
 using Newtonsoft.Json;
-using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
