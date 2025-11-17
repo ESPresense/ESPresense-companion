@@ -17,7 +17,7 @@
 		"@floating-ui/dom": "^1.7.4",
 		"@playwright/test": "^1.55.0",
 		"@skeletonlabs/floating-ui-svelte": "^0.3.9",
-		"@skeletonlabs/skeleton": "^4.3.2",
+		"@skeletonlabs/skeleton": "^4.4.0",
 		"@skeletonlabs/skeleton-svelte": "^4.3.2",
 		"@skeletonlabs/tw-plugin": "^0.4.1",
 		"@sveltejs/adapter-static": "^3.0.9",
