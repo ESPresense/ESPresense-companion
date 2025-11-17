@@ -28,15 +28,16 @@ Set `bayesian_probabilities.enabled: true` in `config.yaml` to turn it on:
 ```yaml
 bayesian_probabilities:
   enabled: true
-  discovery_threshold: 0.1   # auto-create sensors above this probability
+  discovery_threshold: 0.1   # auto-create sensors above this probability (range: 0.0-1.0)
   retain: true               # keep MQTT state so HA restores after restart
 ```
 
 When enabled the companion:
 
 - Publishes `espresense/companion/<device_id>/probabilities/<room>` topics containing a `0.0-1.0` float for each room.
+  - Room names are normalized to lowercase for MQTT topic consistency.
 - Adds a `probabilities` object to the device attribute payload (`espresense/companion/<device_id>/attributes`).
-- Auto-discovers Home Assistant `sensor` entities for any room whose probability crosses the configured threshold.
+- Auto-discovers Home Assistant `sensor` entities for any room whose probability crosses the configured threshold (0.0-1.0 range).
 
 You can fuse multiple device probabilities into a person-level Bayesian sensor in Home Assistant:
 
