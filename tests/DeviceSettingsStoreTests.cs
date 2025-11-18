@@ -230,10 +230,13 @@ public class DeviceSettingsStoreTests
             OriginalId = "keys:anchor",
             Name = "Anchored Keys",
             RefRssi = -55,
-            X = 1,
-            Y = 2,
-            Z = 3
+            X = 1.0,
+            Y = 2.0,
+            Z = 3.0
         };
+
+        // Verify HasAnchor is true before applying
+        Assert.That(deviceSettings.HasAnchor, Is.True, "DeviceSettings should have HasAnchor=true when X, Y, Z are set");
 
         SimulateMqttDeviceConfig("keys:anchor", deviceSettings);
 
@@ -258,10 +261,13 @@ public class DeviceSettingsStoreTests
             OriginalId = "keys:original",
             Name = "Alias Device",
             RefRssi = -60,
-            X = 4,
-            Y = 5,
-            Z = 6
+            X = 4.0,
+            Y = 5.0,
+            Z = 6.0
         };
+
+        // Verify HasAnchor is true before applying
+        Assert.That(deviceSettings.HasAnchor, Is.True, "DeviceSettings should have HasAnchor=true when X, Y, Z are set");
 
         SimulateMqttDeviceConfig("keys:original", deviceSettings);
 
@@ -283,10 +289,13 @@ public class DeviceSettingsStoreTests
         {
             Id = "keys:anchor-clear",
             OriginalId = "keys:anchor-clear",
-            X = 1,
-            Y = 1,
-            Z = 1
+            X = 1.0,
+            Y = 1.0,
+            Z = 1.0
         };
+
+        // Verify HasAnchor is true before applying
+        Assert.That(anchoredSettings.HasAnchor, Is.True, "DeviceSettings should have HasAnchor=true when X, Y, Z are set");
 
         SimulateMqttDeviceConfig("keys:anchor-clear", anchoredSettings);
         Assert.That(device.IsAnchored, Is.True);
@@ -299,6 +308,9 @@ public class DeviceSettingsStoreTests
             Y = null,
             Z = null
         };
+
+        // Verify HasAnchor is false when clearing anchor
+        Assert.That(clearedSettings.HasAnchor, Is.False, "DeviceSettings should have HasAnchor=false when X, Y, Z are null");
 
         device.Check = false;
 

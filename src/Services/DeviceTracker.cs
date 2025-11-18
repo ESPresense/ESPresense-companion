@@ -195,23 +195,25 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         var settings = deviceSettingsStore.Get(device.Id);
         if (settings?.HasAnchor ?? false)
         {
-            // Ensure the anchor is restored from settings if not already set
-            if (!device.IsAnchored)
-            {
-                deviceSettingsStore.ApplyToDevice(device.Id, settings);
-            }
+            // Apply anchor settings to device
+            deviceSettingsStore.ApplyToDevice(device.Id, settings);
 
-            device.Track = true;
-            device.Check = false;
-            if (!wasTracked)
+            // Only take the fast-path if device actually has a valid anchor after applying
+            if (device.IsAnchored)
             {
-                tele.UpdateTrackedDevices(state.Devices.Values.Count(a => a.Track));
-                Log.Information("[+] Track {Device} (anchored)", device);
-                foreach (var ad in device.HassAutoDiscovery)
-                    await ad.Send(mqtt);
-                return true;
+                device.Track = true;
+                device.Check = false;
+                if (!wasTracked)
+                {
+                    tele.UpdateTrackedDevices(state.Devices.Values.Count(a => a.Track));
+                    Log.Information("[+] Track {Device} (anchored)", device);
+                    foreach (var ad in device.HassAutoDiscovery)
+                        await ad.Send(mqtt);
+                    return true;
+                }
+                return false;
             }
-            return false;
+            // If anchor failed to apply, fall through to normal tracking logic
         }
 
         if (device.Check)
