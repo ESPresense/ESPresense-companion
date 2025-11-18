@@ -25,11 +25,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    DeviceHistoryStore deviceHistory,
                                    ILeaseService leaseService) : BackgroundService
 {
-    private const string LocatingLeaseName = "locating";
-    private const double PriorWeight     = 0.7;  // temporal smoothing
-    private const double NewDataWeight   = 0.3;
-    private const double MotionSigma     = 2.0;  // metres, for Gaussian weight
-
     internal async Task ProcessDevice(Device device)
     {
             if (device.IsAnchored && device.Anchor is { } anchor)
@@ -80,6 +75,11 @@ public class MultiScenarioLocator(DeviceTracker dl,
             // -----------------------------------------------------------------
             // 1. Refresh all scenarios -------------------------------------------------
             // -----------------------------------------------------------------
+            
+            // Get filtering config
+            var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
+            device.KalmanFilter.UpdateConfiguration(filtering.ProcessNoise, filtering.MeasurementNoise, filtering.MaxVelocity);
+
             device.LastCalculated = DateTime.UtcNow;
             var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
 
@@ -111,7 +111,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 }
 
                 double delta = predictedLocation.DistanceTo(scenario.Location);
-                double mcw   = Math.Exp(-(delta * delta) / (2 * MotionSigma * MotionSigma));
+                double mcw   = Math.Exp(-(delta * delta) / (2 * filtering.MotionSigma * filtering.MotionSigma));
                 scenario.WeightedConfidence = (scenario.Confidence ?? 0) * mcw;
             }
 
@@ -122,10 +122,13 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
             if (totalWeightedConfidence > 0)
             {
+                var priorWeight = filtering.SmoothingWeight;
+                var newDataWeight = 1.0 - priorWeight;
+
                 foreach (var scenario in device.Scenarios)
                 {
                     double newProb = scenario.WeightedConfidence / totalWeightedConfidence;
-                    scenario.Probability = PriorWeight * scenario.Probability + NewDataWeight * newProb;
+                    scenario.Probability = priorWeight * scenario.Probability + newDataWeight * newProb;
                 }
 
                 // normalise
