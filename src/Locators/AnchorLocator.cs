@@ -7,11 +7,15 @@ namespace ESPresense.Locators;
 public class AnchorLocator : ILocate
 {
     private readonly Point3D _anchorLocation;
+    private readonly Floor? _floor;
+    private readonly Room? _room;
     private readonly IEnumerable<Floor>? _floors;
 
-    public AnchorLocator(Point3D anchorLocation, IEnumerable<Floor>? floors = null)
+    public AnchorLocator(Point3D anchorLocation, Floor? floor = null, Room? room = null, IEnumerable<Floor>? floors = null)
     {
         _anchorLocation = anchorLocation;
+        _floor = floor;
+        _room = room;
         _floors = floors;
     }
 
@@ -35,8 +39,13 @@ public class AnchorLocator : ILocate
         scenario.ResetLocation(_anchorLocation);
         scenario.Confidence = 100;
 
-        // Determine floor and room based on anchor location for consistency
-        if (_floors != null)
+        // Prefer explicit floor/room if provided, otherwise try to find them spatially
+        if (_floor != null || _room != null)
+        {
+            scenario.Floor = _floor;
+            scenario.Room = _room;
+        }
+        else if (_floors != null)
         {
             var (floor, room) = SpatialUtils.FindFloorAndRoom(_anchorLocation, _floors);
             scenario.Floor = floor;

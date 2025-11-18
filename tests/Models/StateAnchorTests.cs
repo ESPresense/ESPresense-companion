@@ -123,12 +123,22 @@ public class StateAnchorTests
 
         // Create floor and room using their Update methods
         var floor = new Floor();
-        var configFloor = new ConfigFloor { Name = "Test Floor" };
+        var configFloor = new ConfigFloor
+        {
+            Id = "test_floor",
+            Name = "Test Floor",
+            Bounds = new double[][]
+            {
+                new double[] { -10, -10, -10 },  // Min bounds
+                new double[] { 10, 10, 10 }      // Max bounds
+            }
+        };
         floor.Update(_configLoader.Config!, configFloor);
 
         var room = new Room();
         var configRoom = new ConfigRoom
         {
+            Id = "test_room",
             Name = "Test Room",
             Points = new double[][]
             {
@@ -140,15 +150,24 @@ public class StateAnchorTests
         };
         room.Update(_configLoader.Config!, floor, configRoom);
 
+        // Add room to floor's Rooms dictionary
+        floor.Rooms[room.Id] = room;
+
+        // Add floor to State so AnchorLocator can find it
+        _state.Floors[floor.Id] = floor;
+
         var anchor = new DeviceAnchor(anchorLocation, floor, room);
         device.SetAnchor(anchor);
 
         // Act
         var scenarios = _state.GetScenarios(device).ToList();
+        Assert.That(scenarios, Has.Count.EqualTo(1));
+
+        var scenario = scenarios[0];
+        // Locate() must be called to set Floor and Room
+        scenario.Locate();
 
         // Assert
-        Assert.That(scenarios, Has.Count.EqualTo(1));
-        var scenario = scenarios[0];
         Assert.That(scenario.Floor, Is.EqualTo(floor));
         Assert.That(scenario.Room, Is.EqualTo(room));
     }

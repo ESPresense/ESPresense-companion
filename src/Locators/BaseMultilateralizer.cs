@@ -39,8 +39,8 @@ public abstract class BaseMultilateralizer : ILocate
 
         var pos = nodes.Select(a => a.Node!.Location).ToArray();
 
-        scenario.Minimum = nodes.Min(a => (double?)a.Distance);
-        scenario.LastHit = nodes.Max(a => a.LastHit);
+        scenario.Minimum = nodes.Any() ? nodes.Min(a => (double?)a.Distance) : null;
+        scenario.LastHit = nodes.Any() ? nodes.Max(a => a.LastHit) : null;
         scenario.Fixes = pos.Length;
 
         if (pos.Length <= 1)
