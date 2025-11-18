@@ -226,6 +226,7 @@ export interface CalibrationResponse {
 	rmse?: number;
 	r?: number;
 	optimizerState?: OptimizerState;
+	anchored?: string[];
 }
 
 /**
