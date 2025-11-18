@@ -183,10 +183,8 @@ public class State
         if (device.IsAnchored && device.Anchor != null)
         {
             var anchor = device.Anchor;
-            var scenario = new Scenario(Config, new AnchorLocator(anchor.Location), "Anchored")
+            var scenario = new Scenario(Config, new AnchorLocator(anchor.Location, Floors.Values), "Anchored")
             {
-                Floor = anchor.Floor,
-                Room = anchor.Room,
                 Confidence = 100
             };
             yield return scenario;
