@@ -44,8 +44,7 @@ public class FilteringTests
     public void TestDefaultFilteringValues()
     {
         string yaml = @"
-        mqtt:
-          host: localhost
+        timeout: 30
         ";
 
         var deserializer = new DeserializerBuilder().Build();
@@ -111,5 +110,39 @@ public class FilteringTests
         Assert.That(processNoise, Is.EqualTo(0.123));
         Assert.That(measurementNoise, Is.EqualTo(0.456));
         Assert.That(maxVelocity, Is.EqualTo(0.789));
+    }
+
+    [Test]
+    public void TestFilteringParametersAffectOutput()
+    {
+        // Scenario: We have a device at 0,0,0. It suddenly jumps to 10,0,0.
+        // We want to compare a "Smooth" filter (trusts model, ignores noise) vs a "Responsive" filter (trusts measurement).
+
+        var startPoint = new Point3D(0, 0, 0);
+        var newPoint = new Point3D(10, 0, 0);
+
+        // 1. Responsive Filter: High Process Noise (expects change), Low Measurement Noise (trusts data)
+        var responsiveFilter = new KalmanLocation(processNoise: 1.0, measurementNoise: 0.01, maxVelocity: 100.0);
+        responsiveFilter.Update(startPoint, TimeSpan.Zero); // Initialize
+        responsiveFilter.Update(newPoint, TimeSpan.FromSeconds(1));
+        var responsiveResult = responsiveFilter.Location;
+
+        // 2. Smooth Filter: Low Process Noise (expects stability), High Measurement Noise (distrusts data)
+        var smoothFilter = new KalmanLocation(processNoise: 0.001, measurementNoise: 10.0, maxVelocity: 100.0);
+        smoothFilter.Update(startPoint, TimeSpan.Zero); // Initialize
+        smoothFilter.Update(newPoint, TimeSpan.FromSeconds(1));
+        var smoothResult = smoothFilter.Location;
+
+        Console.WriteLine($"Responsive Result X: {responsiveResult.X}");
+        Console.WriteLine($"Smooth Result X: {smoothResult.X}");
+
+        // The responsive filter should have moved MUCH closer to 10 than the smooth filter
+        Assert.That(responsiveResult.X, Is.GreaterThan(smoothResult.X));
+        
+        // Responsive should be very close to 10 (the measurement)
+        Assert.That(responsiveResult.X, Is.GreaterThan(9.0));
+
+        // Smooth should be closer to 0 (the previous state)
+        Assert.That(smoothResult.X, Is.LessThan(2.0));
     }
 }
