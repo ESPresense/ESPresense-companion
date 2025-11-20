@@ -69,7 +69,7 @@
 				}
 			});
 		});
-		rxColumns = Array.from(rxSet);
+		rxColumns = Array.from(rxSet).sort();
 	}
 
 	// Helper function to check if a transmitter is an anchored device
@@ -172,7 +172,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each Object.entries($calibration.matrix) as [id1, n1] (id1)}
+							{#each Object.entries($calibration.matrix).sort((a, b) => a[0].localeCompare(b[0])) as [id1, n1] (id1)}
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}
