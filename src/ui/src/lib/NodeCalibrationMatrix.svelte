@@ -63,7 +63,7 @@
 		Object.values(matrix).forEach((n1) => {
 			Object.keys(n1).forEach((key) => rxSet.add(key));
 		});
-		rxColumns = Array.from(rxSet);
+		rxColumns = Array.from(rxSet).sort();
 	}
 
 	let data_point: DataPoint = 0;
@@ -161,7 +161,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each Object.entries($calibration.matrix) as [id1, n1] (id1)}
+							{#each Object.entries($calibration.matrix).sort((a, b) => a[0].localeCompare(b[0])) as [id1, n1] (id1)}
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}</td>
 									{#each rxColumns as id2 (id2)}
