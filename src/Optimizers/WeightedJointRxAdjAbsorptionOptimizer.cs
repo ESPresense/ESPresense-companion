@@ -38,7 +38,7 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
 
         foreach (var g in os.ByRx())
         {
-            NodeSettings nodeSettings;
+            NodeSettings? nodeSettings;
             existingSettings.TryGetValue(g.Key.Id, out nodeSettings);
             var rxNodes = g.ToArray();
 

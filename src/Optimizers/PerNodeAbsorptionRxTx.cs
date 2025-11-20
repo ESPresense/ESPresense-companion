@@ -56,6 +56,8 @@ public class PerNodeAbsorptionRxTx : IOptimizer
 
         int totalParams = paramIndex;
 
+        if (optimization == null) return or;
+
         var targetAbsorption = optimization.AbsorptionMin + (optimization.AbsorptionMax - optimization.AbsorptionMin) / 2.0;
         double penaltyWeight = 10;
 

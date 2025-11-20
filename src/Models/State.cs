@@ -106,8 +106,11 @@ public class State
         foreach (var (txId, txNode) in Nodes)
             foreach (var (rxId, meas) in txNode.RxNodes)
             {
+                if (meas.Rx == null) continue;
                 var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
-                var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx!.Name, Location = meas.Rx.Location });
+                var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx.Name, Location = meas.Rx.Location });
+                tx.Location = txNode.Location;
+                rx.Location = meas.Rx.Location;
                 if (meas.Current)
                 {
                     os.Measures.Add(new Measure()
