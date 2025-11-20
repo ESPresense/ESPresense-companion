@@ -81,6 +81,12 @@ namespace ESPresense.Services
             if (!settings.X.HasValue || !settings.Y.HasValue || !settings.Z.HasValue)
                 return null;
 
+            // Validate coordinates are not NaN or Infinity
+            if (double.IsNaN(settings.X.Value) || double.IsInfinity(settings.X.Value) ||
+                double.IsNaN(settings.Y.Value) || double.IsInfinity(settings.Y.Value) ||
+                double.IsNaN(settings.Z.Value) || double.IsInfinity(settings.Z.Value))
+                return null;
+
             var location = new MathNet.Spatial.Euclidean.Point3D(settings.X.Value, settings.Y.Value, settings.Z.Value);
             var (floor, room) = SpatialUtils.FindFloorAndRoom(location, state.Floors.Values);
             return new DeviceAnchor(location, floor, room);

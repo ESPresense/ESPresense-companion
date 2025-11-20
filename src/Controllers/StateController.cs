@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
@@ -206,7 +207,11 @@ public class StateController : ControllerBase
         ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
-            changes.Enqueue(JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
+            };
+            changes.Enqueue(JsonSerializer.Serialize(value, options));
             newMessage.Set();
         }
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
