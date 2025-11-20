@@ -28,6 +28,8 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         var or = new OptimizationResults();
         var optimization = _state.Config?.Optimization;
 
+        if (optimization == null) return or;
+
         // Group all valid measurements
         var allRxNodes = os.ByRx().SelectMany(g => g).ToList();
 
@@ -260,7 +262,7 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         var validAbsorptions = existingSettings.Values
             .Select(ns => ns.Calibration?.Absorption)
             .Where(a => a.HasValue)
-            .Select(a => a.Value)
+            .Select(a => a!.Value)
             .ToList();
 
         double initialGlobalAbsorptionGuess;

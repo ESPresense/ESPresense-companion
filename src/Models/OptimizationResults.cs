@@ -19,6 +19,7 @@ public class OptimizationResults
         {
             foreach (var m in os.Measures)
             {
+                if (m.Tx?.Id == null || m.Rx?.Id == null) continue;
                 var tx = nss.Get(m.Tx.Id);
                 var rx = nss.Get(m.Rx.Id);
 
