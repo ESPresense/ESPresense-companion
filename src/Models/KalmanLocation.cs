@@ -13,11 +13,18 @@ public class KalmanLocation
     private DateTime? _lastLocationUpdate;
 
     // Default filter parameters
-    private readonly double _processNoise;
-    private readonly double _measurementNoise;
+    private double _processNoise;
+    private double _measurementNoise;
 
     // Maximum human walking speed in meters/second (typical is 1.4 m/s, we use 1.25 as default)
-    private readonly double _maxVelocity;
+    private double _maxVelocity;
+
+    public void UpdateConfiguration(double processNoise, double measurementNoise, double maxVelocity)
+    {
+        _processNoise = processNoise;
+        _measurementNoise = measurementNoise;
+        _maxVelocity = maxVelocity;
+    }
 
     // The filtered location (x,y,z)
     public Point3D Location { get; private set; } = new Point3D();
@@ -88,16 +95,27 @@ public class KalmanLocation
     /// <returns>The filtered location after applying the update</returns>
     public Point3D Update(Point3D newLocation)
     {
+        return Update(newLocation, DateTime.UtcNow);
+    }
+
+    /// <summary>
+    /// Updates the filtered location with a new measurement at a specific time
+    /// </summary>
+    /// <param name="newLocation">The new measured location</param>
+    /// <param name="now">The timestamp of the measurement</param>
+    /// <returns>The filtered location after applying the update</returns>
+    public Point3D Update(Point3D newLocation, DateTime now)
+    {
         // Initialize Kalman filter if this is the first update
         if (_kalmanStateEstimate == null || _kalmanErrorCovariance == null)
         {
             InitializeKalmanFilter(newLocation);
             Location = newLocation;
+            _lastLocationUpdate = now;
             return Location;
         }
 
         // Calculate time delta
-        var now = DateTime.UtcNow;
         var dt = _lastLocationUpdate.HasValue
             ? (now - _lastLocationUpdate.Value).TotalSeconds
             : 0.1; // Default to 100ms if no previous update

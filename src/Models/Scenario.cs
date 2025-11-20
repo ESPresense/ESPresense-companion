@@ -49,4 +49,11 @@ public class Scenario(Config? config, ILocate locator, string? name)
         // Use the KalmanLocation to get a filtered position
         _kalmanLocation.Update(newLocation);
     }
+
+    public void ResetLocation(Point3D newLocation)
+    {
+        LastHit = DateTime.UtcNow;
+        LastLocation = newLocation;
+        _kalmanLocation.Reset(newLocation);
+    }
 }

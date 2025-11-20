@@ -339,7 +339,7 @@ public class MqttCoordinator : IMqttCoordinator
     }
 
     public event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
-    
+
     public event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
     public event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
