@@ -28,6 +28,8 @@ public class CombinedOptimizer : IOptimizer
 
         try
         {
+            if (optimization == null) return results;
+            
             // Step 1: Optimize RxAdjRssi and path-specific absorptions
             var (rxAdjRssiDict, pathAbsorptionDict, error) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
 

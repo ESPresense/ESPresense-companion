@@ -56,6 +56,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 Log.Debug("Ignoring, component isn't device_tracker (" + arg.AutoDiscover.Component + ")");
                 return;
             }
+            if (arg.AutoDiscover.Message?.StateTopic == null) return;
             var deviceId = arg.AutoDiscover.Message.StateTopic.Split("/").Last();
             bool isNode = deviceId.StartsWith("node:");
             if (isNode) return;

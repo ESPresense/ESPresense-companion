@@ -113,6 +113,7 @@ namespace ESPresense.Services
             mqtt.NodeSettingReceivedAsync += arg =>
             {
                 Log.Debug("Received {0} for {1}: {2}", arg.Setting, arg.NodeId, arg.Payload);
+                if (arg.NodeId == null) return Task.CompletedTask;
                 if (string.IsNullOrEmpty(arg.Payload) && !_storeById.ContainsKey(arg.NodeId))
                     return Task.CompletedTask;
                 try

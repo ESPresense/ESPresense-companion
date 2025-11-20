@@ -13,6 +13,7 @@
     <SpaProxyLaunchCommand>pnpm start</SpaProxyLaunchCommand>
     <RootNamespace>ESPresense</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);CS8618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
