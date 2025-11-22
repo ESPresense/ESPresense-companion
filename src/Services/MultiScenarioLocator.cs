@@ -22,8 +22,10 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    State state,
                                    MqttCoordinator mqtt,
                                    GlobalEventDispatcher globalEventDispatcher,
-                                   DeviceHistoryStore deviceHistory) : BackgroundService
+                                   DeviceHistoryStore deviceHistory,
+                                   ILeaseService leaseService) : BackgroundService
 {
+    private const string LocatingLeaseName = "locating";
     private const double PriorWeight     = 0.7;  // temporal smoothing
     private const double NewDataWeight   = 0.3;
     private const double MotionSigma     = 2.0;  // metres, for Gaussian weight
@@ -176,6 +178,11 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await using var lease = await leaseService.AcquireAsync(
+            LocatingLeaseName,
+            timeout: null,
+            cancellationToken: stoppingToken);
+
         await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
         {
             await ProcessDevice(device);

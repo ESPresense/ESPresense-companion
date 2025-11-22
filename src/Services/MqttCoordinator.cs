@@ -41,6 +41,7 @@ public class MqttCoordinator : IMqttCoordinator
     private ConfigMqtt? _lastConfig;
     private bool _reconnectRequired;
     private string _discoveryTopic = "homeassistant";
+    private volatile TaskCompletionSource _connectionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public string DiscoveryTopic => _discoveryTopic;
 
@@ -150,21 +151,34 @@ public class MqttCoordinator : IMqttCoordinator
         {
             _logger.LogInformation("MQTT connected!");
 
-            if (!IsReadOnlyClient(config.ClientId))
+            try
             {
-                await mqttClient.PublishStringAsync("espresense/companion/status", "online").ConfigureAwait(false);
+                if (!IsReadOnlyClient(config.ClientId))
+                {
+                    await mqttClient.PublishStringAsync("espresense/companion/status", "online").ConfigureAwait(false);
+                }
+
+                await mqttClient.SubscribeAsync("espresense/devices/+/+").ConfigureAwait(false);
+                await mqttClient.SubscribeAsync("espresense/settings/+/config").ConfigureAwait(false);
+                await mqttClient.SubscribeAsync("espresense/rooms/+/+").ConfigureAwait(false);
+                await mqttClient.SubscribeAsync("espresense/rooms/*/+/set").ConfigureAwait(false);
+                await mqttClient.SubscribeAsync($"{config.DiscoveryTopic}/device_tracker/+/config").ConfigureAwait(false);
+                await mqttClient.SubscribeAsync("espresense/companion/+/attributes").ConfigureAwait(false);
+                await mqttClient.SubscribeAsync("espresense/companion/lease/+").ConfigureAwait(false);
+            }
+            catch (MQTTnet.Exceptions.MqttClientNotConnectedException ex)
+            {
+                _logger.LogError(ex, "Error during MQTT post-connection subscription");
             }
 
-            await mqttClient.SubscribeAsync("espresense/devices/+/+").ConfigureAwait(false);
-            await mqttClient.SubscribeAsync("espresense/settings/+/config").ConfigureAwait(false);
-            await mqttClient.SubscribeAsync("espresense/rooms/+/+").ConfigureAwait(false);
-            await mqttClient.SubscribeAsync("espresense/rooms/*/+/set").ConfigureAwait(false);
-            await mqttClient.SubscribeAsync($"{config.DiscoveryTopic}/device_tracker/+/config").ConfigureAwait(false);
-            await mqttClient.SubscribeAsync("espresense/companion/+/attributes").ConfigureAwait(false);
+            _connectionTcs.TrySetResult();
         };
 
         mqttClient.DisconnectedAsync += args =>
         {
+            if (_connectionTcs.Task.IsCompleted)
+                _connectionTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
             if (args.Exception != null)
             {
                 _logger.LogWarning(args.Exception, "MQTT disconnected");
@@ -338,8 +352,14 @@ public class MqttCoordinator : IMqttCoordinator
         }
     }
 
+    public async Task WaitForConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var tcs = _connectionTcs;
+        await tcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
-    
+
     public event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
     public event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
