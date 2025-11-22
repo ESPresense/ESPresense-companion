@@ -35,8 +35,9 @@ public class MultiScenarioLocatorTests
         var tele = new TelemetryService(mqttMock.Object);
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher());
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
+        var leaseServiceMock = new Mock<ILeaseService>();
 
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history);
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
 
         var device = new Device("id", null, TimeSpan.FromSeconds(1))
         {

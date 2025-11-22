@@ -10,20 +10,23 @@ namespace ESPresense.Optimizers;
 
 internal class OptimizationRunner : BackgroundService
 {
+    private const string OptimizationLeaseName = "optimization";
     private readonly State _state;
     private readonly NodeSettingsStore _nsd;
     private readonly ILogger<OptimizationRunner> _logger;
     private readonly ConfigLoader _cfg;
+    private readonly ILeaseService _leaseService;
     private IList<IOptimizer> _optimizers;
     private readonly object _optimizersLock = new();
     private string? _lastOptimizerMode;
 
-    public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger, ConfigLoader cfg)
+    public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger, ConfigLoader cfg, ILeaseService leaseService)
     {
         _state = state;
         _nsd = nsd;
         _logger = logger;
         _cfg = cfg;
+        _leaseService = leaseService;
         _optimizers = new List<IOptimizer>();
 
         _cfg.ConfigChanged += (_, config) =>
@@ -71,6 +74,13 @@ internal class OptimizationRunner : BackgroundService
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                 optimization = _state.Config?.Optimization;
             }
+
+            // Try to acquire the optimization lease (wait indefinitely)
+            _state.OptimizerState.Optimizers = "Acquiring lease...";
+            await using var lease = await _leaseService.AcquireAsync(
+                OptimizationLeaseName,
+                timeout: null, // Wait indefinitely
+                cancellationToken: stoppingToken);
 
             Log.Information("Optimization enabled");
             _state.OptimizerState.Optimizers = "Starting...";
