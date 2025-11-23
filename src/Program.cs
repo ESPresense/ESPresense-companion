@@ -13,6 +13,7 @@ using ESPresense.Utils;
 using Microsoft.AspNetCore.DataProtection;
 using Flurl.Http.Newtonsoft;
 using Flurl.Http;
+using ModelContextProtocol.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +25,7 @@ FlurlHttp.Clients.UseNewtonsoft();
 
 builder.Host.UseSerilog((context, cfg) => cfg.ReadFrom.Configuration(context.Configuration));
 
-Log.Logger.Information(MathNet.Numerics.Control.Describe().Trim('\r','\n'));
+Log.Logger.Information(MathNet.Numerics.Control.Describe().Trim('\r', '\n'));
 
 var configDir = Environment.GetEnvironmentVariable("CONFIG_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".espresense");
 var storageDir = Path.Combine(configDir, ".storage");
@@ -89,6 +90,14 @@ builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddMcpServer(options =>
+{
+    options.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = "ESPresense.Companion", Version = "1.0.0" };
+})
+    .WithResources<McpResources>()
+    .WithTools<McpResources>()
+    .WithHttpTransport();
+
 var app = builder.Build();
 
 app.UseWebSockets(new WebSocketOptions
@@ -107,6 +116,7 @@ app.UseSwaggerUI(c => c.RoutePrefix = "api/swagger");
 
 app.UseStaticFiles();
 app.UseRouting();
+app.MapMcp("/api/mcp");
 
 app.MapControllerRoute(
     name: "default",
