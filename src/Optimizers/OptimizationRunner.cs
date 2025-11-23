@@ -80,7 +80,8 @@ internal class OptimizationRunner : BackgroundService
             await using var lease = await _leaseService.AcquireAsync(
                 OptimizationLeaseName,
                 timeout: null, // Wait indefinitely
-                cancellationToken: stoppingToken);
+                cancellationToken: stoppingToken)
+                ?? throw new InvalidOperationException("Optimization lease acquisition returned null unexpectedly.");
 
             Log.Information("Optimization enabled");
             _state.OptimizerState.Optimizers = "Starting...";
@@ -96,7 +97,7 @@ internal class OptimizationRunner : BackgroundService
             double previousBestCorr = double.NaN;
             double previousBestRmse = double.NaN;
 
-            while (optimization is { Enabled: true })
+            while (optimization is { Enabled: true } && _leaseService.HasLease(OptimizationLeaseName))
             {
                 var os = _state.TakeOptimizationSnapshot();
 

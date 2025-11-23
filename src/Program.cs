@@ -84,6 +84,7 @@ builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
     opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    opt.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
