@@ -71,7 +71,7 @@ public class LeaseService : ILeaseService, IDisposable
         _mqttCoordinator = mqttCoordinator;
         _logger = logger;
         var shortId = Guid.NewGuid().ToString("N")[..8]; // Short unique ID
-        _instanceId = $"{Environment.MachineName}-{shortId}";
+        _instanceId = $"{Environment.MachineName}-{shortId}".ToLowerInvariant();
 
         _logger.LogInformation("LeaseService initialized with instance ID: {InstanceId}", _instanceId);
 
