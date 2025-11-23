@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet;
@@ -10,7 +11,10 @@ namespace ESPresense.Services;
 
 public class LeaseInfo
 {
+    [JsonPropertyName("instanceId")]
     public string InstanceId { get; set; } = string.Empty;
+
+    [JsonPropertyName("expiresAt")]
     public DateTime ExpiresAt { get; set; }
 }
 
