@@ -36,6 +36,9 @@ public class LeaseHandle : IAsyncDisposable
         _disposed = true;
         await _leaseService.ReleaseAsync(_leaseName);
     }
+
+    public bool HasLease()
+        => _leaseService.HasLease(_leaseName);
 }
 
 public interface ILeaseService

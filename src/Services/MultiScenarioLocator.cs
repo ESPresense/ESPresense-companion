@@ -183,8 +183,13 @@ public class MultiScenarioLocator(DeviceTracker dl,
             timeout: null,
             cancellationToken: stoppingToken);
 
+        if (lease == null) return; // Failed to acquire lease
+
         await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
         {
+            if (!lease.HasLease())
+                break;
+
             await ProcessDevice(device);
         }
     }
