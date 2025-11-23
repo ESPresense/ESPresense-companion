@@ -55,7 +55,7 @@ public class LeaseService : ILeaseService, IDisposable
     private const string TopicPrefix = "espresense/companion/lease/";
     private readonly IMqttCoordinator _mqtt;
     private readonly ILogger<LeaseService> _log;
-    private readonly string _instanceId = $"{Environment.MachineName}-{Guid.NewGuid().ToString("N")[..8]}".ToLowerInvariant();
+    private readonly string _instanceId;
     private class LeaseState
     {
         public LeaseInfo Observed { get; set; } = new();
@@ -70,6 +70,7 @@ public class LeaseService : ILeaseService, IDisposable
     {
         _mqtt = mqtt;
         _log = log;
+        _instanceId = $"{Environment.MachineName}-{Guid.NewGuid().ToString("N")[..8]}".ToLowerInvariant();
         _log.LogInformation("LeaseService started – instance: {InstanceId}", _instanceId);
 
         _mqtt.MqttMessageReceivedAsync += OnMqttMessage;
