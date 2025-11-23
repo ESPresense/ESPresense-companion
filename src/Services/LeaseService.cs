@@ -62,6 +62,7 @@ public class LeaseService : ILeaseService, IDisposable
         public LeaseInfo Owned { get; set; } = new();
         public Timer? RenewalTimer { get; set; }
         public SemaphoreSlim Lock { get; } = new(1, 1);
+        public bool CompetingLeaseObserved { get; set; }
     }
 
     private readonly ConcurrentDictionary<string, LeaseState> _leases = new();
@@ -90,6 +91,12 @@ public class LeaseService : ILeaseService, IDisposable
         var state = _leases.GetOrAdd(leaseName, _ => new LeaseState());
 
         state.Observed = info;
+
+        // Track if we observed a competing instance's valid lease (for race detection)
+        if (info.InstanceId != _instanceId && info.ExpiresAt > DateTime.UtcNow)
+        {
+            state.CompetingLeaseObserved = true;
+        }
 
         // Drop our lease if: someone else has a valid lease, OR we observed our own expired lease
         var shouldDrop = (info.InstanceId != _instanceId && info.ExpiresAt > DateTime.UtcNow) ||  // Someone else has it
@@ -149,6 +156,9 @@ public class LeaseService : ILeaseService, IDisposable
             await state.Lock.WaitAsync(ct);
             try
             {
+                // Clear the competing lease flag before we attempt to acquire
+                state.CompetingLeaseObserved = false;
+
                 var observed = state.Observed;
 
                 // Lease is still held by someone else - wait for expiry
@@ -175,13 +185,23 @@ public class LeaseService : ILeaseService, IDisposable
                         JsonSerializer.Serialize(proposed),
                         retain: true);
 
-                    state.Owned = proposed;
-                    StartRenewal(state, leaseName, leaseDurationSecs, renewalIntervalSecs);
+                    // Check if we observed a competing lease during the publish (race condition)
+                    if (state.CompetingLeaseObserved)
+                    {
+                        _log.LogWarning("Lost race for lease '{LeaseName}' - competing lease observed during publish", leaseName);
+                        // Don't set Owned or start renewal - we lost the race
+                        state.CompetingLeaseObserved = false;
+                    }
+                    else
+                    {
+                        state.Owned = proposed;
+                        StartRenewal(state, leaseName, leaseDurationSecs, renewalIntervalSecs);
 
-                    _log.LogInformation("Acquired lease '{LeaseName}' (expires: {Expiry})",
-                        leaseName, proposed.ExpiresAt);
+                        _log.LogInformation("Acquired lease '{LeaseName}' (expires: {Expiry})",
+                            leaseName, proposed.ExpiresAt);
 
-                    return new LeaseHandle(this, leaseName);
+                        return new LeaseHandle(this, leaseName);
+                    }
                 }
             }
             finally
