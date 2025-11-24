@@ -8,6 +8,7 @@ using ModelContextProtocol.Protocol;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.ComponentModel;
+using AutoMapper;
 
 namespace ESPresense.Services;
 
@@ -20,15 +21,17 @@ public class McpResources
     private readonly NodeSettingsStore _nsd;
     private readonly DeviceSettingsStore _dss;
     private readonly TelemetryService _telemetryService;
+    private readonly IMapper _mapper;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public McpResources(State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, TelemetryService telemetryService)
+    public McpResources(State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, TelemetryService telemetryService, IMapper mapper)
     {
         _state = state;
         _config = config;
         _nsd = nsd;
         _dss = dss;
         _telemetryService = telemetryService;
+        _mapper = mapper;
         _jsonOptions = new JsonSerializerOptions
         {
             Converters = { new JsonStringEnumConverter() },
@@ -55,14 +58,16 @@ public class McpResources
     [Description("Get the list of nodes and their current status")]
     public Task<string> GetNodesResource()
     {
-        return Task.FromResult(JsonSerializer.Serialize(_state.Nodes.Values, _jsonOptions));
+        var nodes = _mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values);
+        return Task.FromResult(JsonSerializer.Serialize(nodes, _jsonOptions));
     }
 
     [McpServerTool(Name = "get_nodes")]
     [Description("Get the list of nodes and their status")]
     public Task<string> GetNodesTool()
     {
-        return Task.FromResult(JsonSerializer.Serialize(_state.Nodes.Values, _jsonOptions));
+        var nodes = _mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values);
+        return Task.FromResult(JsonSerializer.Serialize(nodes, _jsonOptions));
     }
 
     [McpServerResource(UriTemplate = "state://devices", Name = "Devices Status", MimeType = "application/json")]
