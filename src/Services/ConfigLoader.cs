@@ -106,10 +106,11 @@ public class ConfigLoader : BackgroundService
     /// <summary>
     /// Forces a reload of the configuration file. Useful for testing.
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token to cancel the reload operation</param>
     /// <returns>A task that completes when the configuration has been reloaded.</returns>
-    public async Task ReloadAsync()
+    public async Task ReloadAsync(CancellationToken cancellationToken = default)
     {
-        await _reloadSemaphore.WaitAsync();
+        await _reloadSemaphore.WaitAsync(cancellationToken);
         try
         {
             _lastModified = DateTime.MinValue; // Force reload
@@ -122,9 +123,12 @@ public class ConfigLoader : BackgroundService
         }
     }
 
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        _reloadSemaphore?.Dispose();
-        base.Dispose();
+        if (disposing)
+        {
+            _reloadSemaphore?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
