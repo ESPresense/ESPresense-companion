@@ -121,4 +121,10 @@ public class ConfigLoader : BackgroundService
             _reloadSemaphore.Release();
         }
     }
+
+    public override void Dispose()
+    {
+        _reloadSemaphore?.Dispose();
+        base.Dispose();
+    }
 }

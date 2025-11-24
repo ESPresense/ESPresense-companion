@@ -84,7 +84,6 @@ filtering:
         await File.WriteAllTextAsync(Path.Combine(workDir, "config.yaml"), yaml);
 
         await configLoader.ReloadAsync(); // Force reload of the config file
-        await configLoader.ConfigAsync(); // Wait for load
 
         var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
         var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
