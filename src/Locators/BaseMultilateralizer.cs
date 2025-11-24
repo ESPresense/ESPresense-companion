@@ -30,7 +30,7 @@ public abstract class BaseMultilateralizer : ILocate
     /// <returns>True if there are enough nodes to proceed with localization</returns>
     protected bool InitializeScenario(Scenario scenario, out DeviceToNode[] nodes, out Point3D guess)
     {
-        var confidence = scenario.Confidence;
+        var confidence = scenario.Confidence ?? 0;
 
         nodes = Device.Nodes.Values
             .Where(a => a.Current && (a.Node?.Floors?.Contains(Floor) ?? false))
@@ -39,8 +39,8 @@ public abstract class BaseMultilateralizer : ILocate
 
         var pos = nodes.Select(a => a.Node!.Location).ToArray();
 
-        scenario.Minimum = nodes.Any() ? nodes.Min(a => (double?)a.Distance) : null;
-        scenario.LastHit = nodes.Any() ? nodes.Max(a => a.LastHit) : null;
+        scenario.Minimum = nodes.Min(a => (double?)a.Distance);
+        scenario.LastHit = nodes.Max(a => a.LastHit);
         scenario.Fixes = pos.Length;
 
         if (pos.Length <= 1)
