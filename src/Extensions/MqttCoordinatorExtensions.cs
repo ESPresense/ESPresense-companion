@@ -17,7 +17,7 @@ namespace ESPresense.Services
         /// <param name="retain">Indicates whether the MQTT message should be retained.</param>
         /// <param name="oldValue">The current string value of the setting; treats null or empty as an empty value.</param>
         /// <returns>An asynchronous task representing the update operation.</returns>
-        public static async Task UpdateSetting(this MqttCoordinator mqtt, string id, string setting, string? value, bool retain, string? oldValue)
+        public static async Task UpdateSetting(this IMqttCoordinator mqtt, string id, string setting, string? value, bool retain, string? oldValue)
         {
             // Only log and send if values are different
             if (value != oldValue)
@@ -40,7 +40,7 @@ namespace ESPresense.Services
         /// <param name="value">The new boolean value. True is converted to "ON", false to "OFF", and null indicates no value.</param>
         /// <param name="retain">Indicates whether the MQTT message should be retained by the broker.</param>
         /// <param name="oldValue">The previous boolean value for comparison, where null implies an unset value.</param>
-        public static async Task UpdateSetting(this MqttCoordinator mqtt, string id, string setting, bool? value, bool retain, bool? oldValue)
+        public static async Task UpdateSetting(this IMqttCoordinator mqtt, string id, string setting, bool? value, bool retain, bool? oldValue)
         {
             // Convert to ON/OFF string format for MQTT
             string? strValue = value.HasValue ? (value.Value ? "ON" : "OFF") : null;
@@ -62,7 +62,7 @@ namespace ESPresense.Services
         /// <param name="retain">Indicates whether the update should be retained by the MQTT broker.</param>
         /// <param name="oldValue">The previous integer value of the setting for comparison.</param>
         /// <returns>A Task that represents the asynchronous update operation.</returns>
-        public static async Task UpdateSetting(this MqttCoordinator mqtt, string id, string setting, int? value, bool retain, int? oldValue)
+        public static async Task UpdateSetting(this IMqttCoordinator mqtt, string id, string setting, int? value, bool retain, int? oldValue)
         {
             // Convert to string for comparison and mqtt
             string? strValue = value?.ToString();
@@ -90,7 +90,7 @@ namespace ESPresense.Services
         /// <param name="value">The new double value, formatted to two decimal places if present.</param>
         /// <param name="retain">Indicates whether the MQTT broker should retain the update.</param>
         /// <param name="oldValue">The previous double value for change detection, formatted similarly if present.</param>
-        public static async Task UpdateSetting(this MqttCoordinator mqtt, string id, string setting, double? value, bool retain, double? oldValue)
+        public static async Task UpdateSetting(this IMqttCoordinator mqtt, string id, string setting, double? value, bool retain, double? oldValue)
         {
             // Convert to string with proper formatting for comparison and mqtt
             string? strValue = value.HasValue ? $"{value:0.00}" : null;
