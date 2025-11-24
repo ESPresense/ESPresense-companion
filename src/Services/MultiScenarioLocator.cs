@@ -32,11 +32,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
             // -----------------------------------------------------------------
             // 1. Refresh all scenarios -------------------------------------------------
             // -----------------------------------------------------------------
-
-            // Update Kalman filter parameters if config changed (efficiently tracked per-device)
-            var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
-            device.UpdateKalmanFilterIfNeeded(filtering.ProcessNoise, filtering.MeasurementNoise, filtering.MaxVelocity);
-
             device.LastCalculated = DateTime.UtcNow;
             var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
 
@@ -59,6 +54,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
             // -----------------------------------------------------------------
             // 3. Motion‑consistency weighting for every scenario -------------------
             // -----------------------------------------------------------------
+            var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
             foreach (var scenario in device.Scenarios)
             {
                 if (!scenario.Current)

@@ -12,12 +12,10 @@ public class KalmanLocation
     private Matrix<double>? _kalmanErrorCovariance;
     private DateTime? _lastLocationUpdate;
 
-    // Default filter parameters
-    private readonly double _processNoise;
-    private readonly double _measurementNoise;
-
-    // Maximum human walking speed in meters/second (typical is 1.4 m/s, we use 1.25 as default)
-    private readonly double _maxVelocity;
+    /// <summary>
+    /// Settings for the Kalman filter (shared across devices)
+    /// </summary>
+    public KalmanFilterSettings Settings { get; set; }
 
     // The filtered location (x,y,z)
     public Point3D Location { get; private set; } = new Point3D();
@@ -47,7 +45,7 @@ public class KalmanLocation
 
         // Create state transition matrix and process noise matrix
         var F = CreateStateTransitionMatrix(dt);
-        var Q = CreateProcessNoiseMatrix(dt, _processNoise);
+        var Q = CreateProcessNoiseMatrix(dt, Settings.ProcessNoise);
 
         // Predict step (without modifying internal state)
         var predictedState = F * _kalmanStateEstimate;
@@ -64,21 +62,17 @@ public class KalmanLocation
     }
 
     /// <summary>
-    /// Creates a new KalmanLocation with default parameters
+    /// Creates a new KalmanLocation with default settings
     /// </summary>
-    public KalmanLocation() : this(0.01, 0.1, 0.5) { }
+    public KalmanLocation() : this(KalmanFilterSettings.Default) { }
 
     /// <summary>
-    /// Creates a new KalmanLocation with specified process and measurement noise
+    /// Creates a new KalmanLocation with specified settings
     /// </summary>
-    /// <param name="processNoise">Process noise, controls how quickly the filter adapts to change (lower = slower adaptation)</param>
-    /// <param name="measurementNoise">Measurement noise, affects how much new measurements are trusted (higher = trust measurements less)</param>
-    /// <param name="maxVelocity">Maximum allowed velocity in meters per second (to constrain to human movement)</param>
-    public KalmanLocation(double processNoise, double measurementNoise, double maxVelocity)
+    /// <param name="settings">The Kalman filter settings to use</param>
+    public KalmanLocation(KalmanFilterSettings settings)
     {
-        _processNoise = processNoise;
-        _measurementNoise = measurementNoise;
-        _maxVelocity = maxVelocity;
+        Settings = settings;
     }
 
     /// <summary>
@@ -121,10 +115,10 @@ public class KalmanLocation
         double distanceToNewLocation = Location.DistanceTo(newLocation);
 
         // Calculate the maximum possible distance a human could have moved in this timeframe
-        double maxPossibleDistance = _maxVelocity * dt;
+        double maxPossibleDistance = Settings.MaxVelocity * dt;
 
         // If the new location is too far away, adjust the measurement noise based on how extreme the movement is
-        double dynamicMeasurementNoise = _measurementNoise;
+        double dynamicMeasurementNoise = Settings.MeasurementNoise;
         if (distanceToNewLocation > maxPossibleDistance)
         {
             // Scale up the measurement noise based on how much the movement exceeds the maximum
@@ -134,7 +128,7 @@ public class KalmanLocation
 
         // Update state transition matrix based on dt
         var F = CreateStateTransitionMatrix(dt);
-        var Q = CreateProcessNoiseMatrix(dt, _processNoise);
+        var Q = CreateProcessNoiseMatrix(dt, Settings.ProcessNoise);
 
         // Predict step
         _kalmanStateEstimate = F * _kalmanStateEstimate;
@@ -201,9 +195,9 @@ public class KalmanLocation
         double velocityMagnitude = Math.Sqrt(vx*vx + vy*vy + vz*vz);
 
         // If velocity exceeds maximum, scale it back while preserving direction
-        if (velocityMagnitude > _maxVelocity && velocityMagnitude > 0)
+        if (velocityMagnitude > Settings.MaxVelocity && velocityMagnitude > 0)
         {
-            double scaleFactor = _maxVelocity / velocityMagnitude;
+            double scaleFactor = Settings.MaxVelocity / velocityMagnitude;
 
             // Scale each component
             _kalmanStateEstimate[3, 0] = vx * scaleFactor;

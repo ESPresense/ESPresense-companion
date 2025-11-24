@@ -67,6 +67,18 @@ public class State
                 "exponential" => new ExponentialWeighting(w?.Props),
                 _ => new GaussianWeighting(w?.Props),
             };
+
+            // Update Kalman filter settings and propagate to all devices
+            var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
+            if (!newKalmanSettings.Equals(KalmanSettings))
+            {
+                KalmanSettings = newKalmanSettings;
+                foreach (var device in Devices.Values)
+                {
+                    device.KalmanFilter.Settings = KalmanSettings;
+                }
+            }
+
             foreach (var device in Devices.Values) device.Check = true;
         }
 
@@ -75,6 +87,11 @@ public class State
     }
 
     public Config? Config;
+
+    /// <summary>
+    /// Shared Kalman filter settings used by all devices
+    /// </summary>
+    public KalmanFilterSettings KalmanSettings { get; private set; } = KalmanFilterSettings.Default;
 
     public ConcurrentDictionary<string, Node> Nodes { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Device> Devices { get; } = new(StringComparer.OrdinalIgnoreCase);
