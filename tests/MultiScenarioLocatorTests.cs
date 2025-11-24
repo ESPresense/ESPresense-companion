@@ -84,7 +84,8 @@ public class MultiScenarioLocatorTests
         var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history);
+        var leaseServiceMock = new Mock<ILeaseService>();
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
 
         var device = new Device("anchored", null, TimeSpan.FromSeconds(1));
         var anchorLocation = new Point3D(5, 6, 1);
