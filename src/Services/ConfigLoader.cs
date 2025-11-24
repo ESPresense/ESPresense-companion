@@ -108,6 +108,7 @@ public class ConfigLoader : BackgroundService
     public async Task ReloadAsync()
     {
         _lastModified = DateTime.MinValue; // Force reload
-        await Load();
+        _toWait = Load();
+        await _toWait;
     }
 }
