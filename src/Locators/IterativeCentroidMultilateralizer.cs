@@ -8,26 +8,16 @@ using MathNet.Spatial.Euclidean;
 namespace ESPresense.Locators;
 
 
-public class IterativeCentroidMultilateralizer(Device device, Floor floor) : ILocate
+public class IterativeCentroidMultilateralizer(Device device, Floor floor, State state) : BaseMultilateralizer(device, floor, state)
 {
-    public bool Locate(Scenario scenario)
+    public override bool Locate(Scenario scenario)
     {
-        // Get anchor nodes from the device
-        var nodes = device.Nodes.Values
-            .Where(a => a.Current && (a.Node?.Floors?.Contains(floor) ?? false))
-            .ToArray();
-
-        scenario.Minimum = nodes.Min(a => (double?)a.Distance);
-        scenario.LastHit = nodes.Max(a => a.LastHit);
-        scenario.Fixes = nodes.Length;
-        scenario.Floor = floor;
+        if (!InitializeScenario(scenario, out var nodes, out _))
+            return false;
 
         if (nodes.Length < 3)
         {
-            scenario.Room = null;
-            scenario.Confidence = 0;
-            scenario.Error = null;
-            scenario.Floor = null;
+            ResetScenario(scenario);
             return false;
         }
 
@@ -51,7 +41,7 @@ public class IterativeCentroidMultilateralizer(Device device, Floor floor) : ILo
                 scenario.Confidence = 1;
                 scenario.ReasonForExit = ExitCondition.LackOfProgress;
                 scenario.UpdateLocation(new Point3D(centroid[0], centroid[1], centroid[2]));
-                scenario.Room = floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
+                AssignRoom(scenario);
                 return Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) >= 0.1;
             }
 
@@ -67,18 +57,9 @@ public class IterativeCentroidMultilateralizer(Device device, Floor floor) : ILo
                 scenario.Error = err;
                 scenario.Confidence = Math.Clamp((10000 - (int?)Math.Ceiling(100 * err)) ?? 0, 0, 100);
 
-                if (nodes.Length >= 2)
-                {
-                    var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
-                    var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
-                    scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
-                }
-                else
-                {
-                    scenario.PearsonCorrelation = null; // Not enough data points
-                }
+                CalculateAndSetPearsonCorrelation(scenario, nodes);
                 scenario.UpdateLocation(new Point3D(centroid[0], centroid[1], centroid[2]));
-                scenario.Room = floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
+                AssignRoom(scenario);
                 return Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) >= 0.1;
             }
 

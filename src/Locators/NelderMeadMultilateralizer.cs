@@ -8,46 +8,27 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-public class NelderMeadMultilateralizer(Device device, Floor floor, State state) : ILocate
+public class NelderMeadMultilateralizer(Device device, Floor floor, State state) : BaseMultilateralizer(device, floor, state)
 {
-    public bool Locate(Scenario scenario)
+    public override bool Locate(Scenario scenario)
     {
         double Error(IList<double> x, DeviceToNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) * x[3] - dn.Distance;
 
-        var confidence = scenario.Confidence;
-
-        var nodes = device.Nodes.Values.Where(a => a.Current && (a.Node?.Floors?.Contains(floor) ?? false)).OrderBy(a => a.Distance).ToArray();
-        var pos = nodes.Select(a => a.Node!.Location).ToArray();
-
-        scenario.Minimum = nodes.Min(a => (double?)a.Distance);
-        scenario.LastHit = nodes.Max(a => a.LastHit);
-        scenario.Fixes = pos.Length;
-
-        if (pos.Length <= 1)
-        {
-            scenario.Room = null;
-            scenario.Confidence = 0;
-            scenario.Error = null;
-            scenario.Floor = null;
+        if (!InitializeScenario(scenario, out var nodes, out var guess))
             return false;
-        }
 
-        scenario.Floor = floor;
-
-        var guess = confidence < 5
-            ? Point3D.MidPoint(pos[0], pos[1])
-            : scenario.Location;
+        int confidence = scenario.Confidence ?? 0;
         try
         {
-            if (pos.Length < 3 || floor.Bounds == null)
+            if (nodes.Length < 3 || Floor.Bounds == null)
             {
                 confidence = 1;
                 scenario.UpdateLocation(guess);
             }
             else
             {
-                var lowerBound = Vector<double>.Build.DenseOfArray(new[] { floor.Bounds[0].X, floor.Bounds[0].Y, floor.Bounds[0].Z, 0.5 });
-                var upperBound = Vector<double>.Build.DenseOfArray(new[] { floor.Bounds[1].X, floor.Bounds[1].Y, floor.Bounds[1].Z, 1.5 });
+                var lowerBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[0].X, Floor.Bounds[0].Y, Floor.Bounds[0].Z, 0.5 });
+                var upperBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[1].X, Floor.Bounds[1].Y, Floor.Bounds[1].Z, 1.5 });
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
@@ -56,15 +37,16 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
                             .PointwiseMaximum(0)
                             .L2Norm();
                         return (distanceFromBoundingBox > 0 ? Math.Pow(5, 1 + distanceFromBoundingBox) : 0) + Math.Pow(5 * (1 - x[3]), 2) + nodes
-                            .Select((dn, i) => new { err = Error(x, dn), weight = state?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
+                            .Select((dn, i) => new { err = Error(x, dn), weight = State?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
                             .Average(a => a.weight * Math.Pow(a.err, 2));
                     });
 
+                var clampedGuess = ClampToFloorBounds(guess);
                 var initialGuess = Vector<double>.Build.DenseOfArray(new[]
                 {
-                    Math.Max(floor.Bounds[0].X, Math.Min(floor.Bounds[1].X, guess.X)),
-                    Math.Max(floor.Bounds[0].Y, Math.Min(floor.Bounds[1].Y, guess.Y)),
-                    Math.Max(floor.Bounds[0].Z, Math.Min(floor.Bounds[1].Z, guess.Z)),
+                    clampedGuess.X,
+                    clampedGuess.Y,
+                    clampedGuess.Z,
                     scenario.Scale ?? 1.0
                 });
                 var centroid = Point3D.Centroid(nodes.Select(n => n.Node!.Location).Take(3)).ToVector();
@@ -76,7 +58,7 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
                 var minimizingPoint = result.MinimizingPoint.PointwiseMinimum(upperBound).PointwiseMaximum(lowerBound);
                 scenario.UpdateLocation(new Point3D(minimizingPoint[0], minimizingPoint[1], minimizingPoint[2]));
                 scenario.Scale = minimizingPoint[3];
-                scenario.Fixes = pos.Length;
+                scenario.Fixes = nodes.Length;
                 scenario.Error = result.FunctionInfoAtMinimum.Value;
                 scenario.Iterations = result switch
                 {
@@ -97,27 +79,11 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
         }
         catch (Exception ex)
         {
-            confidence = 0;
-            scenario.UpdateLocation(new Point3D());
-            Log.Error("Error finding location for {0}: {1}", device, ex.Message);
+            confidence = HandleLocatorException(ex, scenario, guess);
         }
 
-        scenario.Confidence = confidence;
+        CalculateAndSetPearsonCorrelation(scenario, nodes);
 
-        if (nodes.Length >= 2)
-        {
-            var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
-            var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
-            scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
-        }
-        else
-        {
-            scenario.PearsonCorrelation = null; // Not enough data points
-        }
-
-        if (confidence <= 0) return false;
-        if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
-        scenario.Room = floor.Rooms.Values.FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
-        return true;
+        return FinalizeScenario(scenario, confidence);
     }
 }
