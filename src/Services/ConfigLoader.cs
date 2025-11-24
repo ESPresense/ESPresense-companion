@@ -12,6 +12,7 @@ public class ConfigLoader : BackgroundService
     private Task _toWait;
     private DateTime _lastModified;
     private readonly string _configPath;
+    private readonly object _reloadLock = new object();
     public Config? Config { get; private set; }
 
     public ConfigLoader(string configDir)
@@ -105,10 +106,14 @@ public class ConfigLoader : BackgroundService
     /// <summary>
     /// Forces a reload of the configuration file. Useful for testing.
     /// </summary>
+    /// <returns>A task that completes when the configuration has been reloaded.</returns>
     public async Task ReloadAsync()
     {
-        _lastModified = DateTime.MinValue; // Force reload
-        _toWait = Load();
+        lock (_reloadLock)
+        {
+            _lastModified = DateTime.MinValue; // Force reload
+            _toWait = Load();
+        }
         await _toWait;
     }
 }
