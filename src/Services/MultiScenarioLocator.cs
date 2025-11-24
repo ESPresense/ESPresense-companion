@@ -25,6 +25,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    DeviceHistoryStore deviceHistory,
                                    ILeaseService leaseService) : BackgroundService
 {
+
+    const string LocatingLeaseName = "locating";
+
     internal async Task ProcessDevice(Device device)
     {
             if (device.IsAnchored && device.Anchor is { } anchor)
