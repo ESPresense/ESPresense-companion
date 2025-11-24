@@ -12,7 +12,7 @@ public class ConfigLoader : BackgroundService
     private Task _toWait;
     private DateTime _lastModified;
     private readonly string _configPath;
-    private readonly object _reloadLock = new object();
+    private readonly SemaphoreSlim _reloadSemaphore = new SemaphoreSlim(1, 1);
     public Config? Config { get; private set; }
 
     public ConfigLoader(string configDir)
@@ -109,11 +109,16 @@ public class ConfigLoader : BackgroundService
     /// <returns>A task that completes when the configuration has been reloaded.</returns>
     public async Task ReloadAsync()
     {
-        lock (_reloadLock)
+        await _reloadSemaphore.WaitAsync();
+        try
         {
             _lastModified = DateTime.MinValue; // Force reload
             _toWait = Load();
+            await _toWait;
         }
-        await _toWait;
+        finally
+        {
+            _reloadSemaphore.Release();
+        }
     }
 }
