@@ -12,12 +12,41 @@ public class Device
     private DateTime? _lastSeen;
 
     // Kalman filter for location smoothing
-    private readonly KalmanLocation _kalmanLocation = new();
+    private KalmanLocation _kalmanLocation = new();
+    private (double ProcessNoise, double MeasurementNoise, double MaxVelocity)? _kalmanParams;
 
     /// <summary>
     /// Access to the device's Kalman filter for prediction
     /// </summary>
     [JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
+
+    /// <summary>
+    /// Updates the Kalman filter with new parameters if they differ from current settings
+    /// </summary>
+    public void UpdateKalmanFilterIfNeeded(double processNoise, double measurementNoise, double maxVelocity)
+    {
+        // Check if parameters actually changed
+        if (_kalmanParams.HasValue &&
+            _kalmanParams.Value.ProcessNoise == processNoise &&
+            _kalmanParams.Value.MeasurementNoise == measurementNoise &&
+            _kalmanParams.Value.MaxVelocity == maxVelocity)
+        {
+            return; // No change, skip expensive recreation
+        }
+
+        // Parameters changed, recreate the filter
+        var currentLocation = _kalmanLocation.Location;
+        var newFilter = new KalmanLocation(processNoise, measurementNoise, maxVelocity);
+
+        // Preserve current state if filter was already initialized
+        if (currentLocation.X != 0 || currentLocation.Y != 0 || currentLocation.Z != 0)
+        {
+            newFilter.Reset(currentLocation);
+        }
+
+        _kalmanLocation = newFilter;
+        _kalmanParams = (processNoise, measurementNoise, maxVelocity);
+    }
 
     public Device(string id, string? discoveryId, TimeSpan timeout)
     {
