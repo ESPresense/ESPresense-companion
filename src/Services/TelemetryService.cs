@@ -6,48 +6,48 @@ namespace ESPresense.Services;
 
 public class TelemetryService(MqttCoordinator mqtt) : BackgroundService
 {
-    private readonly Telemetry _telemetry = new() { Ip = IpUtils.GetLocalIpAddress() };
+    public Telemetry Telemetry { get; } = new() { Ip = IpUtils.GetLocalIpAddress() };
 
     public void IncrementMalformedMessages()
     {
-        _telemetry.Malformed++;
+        Telemetry.Malformed++;
     }
 
     public void IncrementMessages()
     {
-        _telemetry.Messages++;
+        Telemetry.Messages++;
     }
 
     public void IncrementMoved()
     {
-        _telemetry.Moved++;
+        Telemetry.Moved++;
     }
 
     public void IncrementSkipped()
     {
-        _telemetry.Skipped++;
+        Telemetry.Skipped++;
     }
 
     public void UpdateTrackedDevices(int count)
     {
-        _telemetry.Tracked = count;
+        Telemetry.Tracked = count;
     }
 
     public bool AddUnknownNode(string nodeId)
     {
-        return _telemetry.UnknownNodes.Add(nodeId);
+        return Telemetry.UnknownNodes.Add(nodeId);
     }
 
     public void UpdateDevicesCount(int count)
     {
-        _telemetry.Devices = count;
+        Telemetry.Devices = count;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await mqtt.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(_telemetry, SerializerSettings.NullIgnore));
+            await mqtt.EnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(Telemetry, SerializerSettings.NullIgnore));
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
         }
     }
