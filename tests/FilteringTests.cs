@@ -69,6 +69,9 @@ public class FilteringTests
         Directory.CreateDirectory(workDir);
         var configLoader = new ConfigLoader(workDir);
 
+        // Wait for initial load to complete
+        await configLoader.ConfigAsync();
+
         // Write config to file
         var yaml = @"
 filtering:
@@ -80,6 +83,7 @@ filtering:
 ";
         await File.WriteAllTextAsync(Path.Combine(workDir, "config.yaml"), yaml);
 
+        await configLoader.ReloadAsync(); // Force reload of the config file
         await configLoader.ConfigAsync(); // Wait for load
 
         var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));

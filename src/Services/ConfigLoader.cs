@@ -101,4 +101,13 @@ public class ConfigLoader : BackgroundService
             ct.ThrowIfCancellationRequested();
         }
     }
+
+    /// <summary>
+    /// Forces a reload of the configuration file. Useful for testing.
+    /// </summary>
+    public async Task ReloadAsync()
+    {
+        _lastModified = DateTime.MinValue; // Force reload
+        await Load();
+    }
 }
