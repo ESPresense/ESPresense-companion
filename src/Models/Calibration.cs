@@ -6,4 +6,5 @@ public class Calibration
     public double? R { get; set; }
     public Dictionary<string, Dictionary<string, Dictionary<string, double>>> Matrix { get; } = new();
     public OptimizerState OptimizerState { get; set; } = new();
+    public HashSet<string> Anchored { get; } = new();
 }

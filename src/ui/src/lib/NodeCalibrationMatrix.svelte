@@ -59,11 +59,22 @@
 	$: {
 		const matrix = $calibration?.matrix ?? {};
 		const rxSet = new Set<string>();
-		Object.keys(matrix).forEach((key) => rxSet.add(key));
+
+		// Only include receivers that have actual data from at least one transmitter
 		Object.values(matrix).forEach((n1) => {
-			Object.keys(n1).forEach((key) => rxSet.add(key));
+			Object.keys(n1).forEach((key) => {
+				// Only add receivers that have measurement data (not empty/null)
+				if (n1[key] && Object.keys(n1[key]).length > 0) {
+					rxSet.add(key);
+				}
+			});
 		});
 		rxColumns = Array.from(rxSet).sort();
+	}
+
+	// Helper function to check if a transmitter is an anchored device
+	function isAnchored(txName: string): boolean {
+		return $calibration?.anchored?.includes(txName) ?? false;
 	}
 
 	let data_point: DataPoint = 0;
@@ -163,7 +174,7 @@
 						<tbody>
 							{#each Object.entries($calibration.matrix).sort((a, b) => a[0].localeCompare(b[0])) as [id1, n1] (id1)}
 								<tr>
-									<td style="text-align: right; white-space: nowrap;">Tx: {id1}</td>
+									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}
 										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'}
 											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td

@@ -49,9 +49,6 @@ optimization:
     # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5)
     rmse: 0.5
 
-history:
-  enabled: false # Enable to log history to db (Beta)
-  expire_after: 24h # Expire after 24 hours
 
 locators:
   nadaraya_watson:
@@ -71,6 +68,20 @@ locators:
   nearest_node:
     enabled: true
     max_distance: 10
+
+filtering:
+  # Kalman Filter Parameters
+  process_noise: 0.01      # Controls how quickly the filter adapts to change. Lower = smoother but more lag.
+  measurement_noise: 0.1   # Controls how much new measurements are trusted. Higher = trust model more (smoother).
+  max_velocity: 0.5        # Maximum expected velocity in m/s. Used to reject/dampen impossible movements.
+
+  # Smoothing Parameters
+  smoothing_weight: 0.7    # Weight given to previous state (0.0-1.0). Higher = more stable/repeatable.
+  motion_sigma: 2.0        # Motion consistency sensitivity. Controls how much distant scenarios are penalized.
+
+history:
+  enabled: false # Enable to log history to db (Beta)
+  expire_after: 24h # Expire after 24 hours
 
 # Floors w/ the points to draw it in meters
 floors:

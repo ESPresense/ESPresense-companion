@@ -13,11 +13,18 @@ public class KalmanLocation
     private DateTime? _lastLocationUpdate;
 
     // Default filter parameters
-    private readonly double _processNoise;
-    private readonly double _measurementNoise;
+    private double _processNoise;
+    private double _measurementNoise;
 
     // Maximum human walking speed in meters/second (typical is 1.4 m/s, we use 1.25 as default)
-    private readonly double _maxVelocity;
+    private double _maxVelocity;
+
+    public void UpdateConfiguration(double processNoise, double measurementNoise, double maxVelocity)
+    {
+        _processNoise = processNoise;
+        _measurementNoise = measurementNoise;
+        _maxVelocity = maxVelocity;
+    }
 
     // The filtered location (x,y,z)
     public Point3D Location { get; private set; } = new Point3D();

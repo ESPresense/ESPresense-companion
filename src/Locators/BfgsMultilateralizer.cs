@@ -17,7 +17,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
 
     public override bool Locate(Scenario scenario)
     {
-        double Weight(int index, int total) => Math.Pow((float)total - index, 3) / Math.Pow(total, 3);
+        double Weight(int index, int total) => (double)(total - index) / total;
         double Error(IList<double> x, DeviceToNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - dn.Distance;
 
         if (!InitializeScenario(scenario, out var nodes, out var guess))
@@ -42,10 +42,23 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                     ,
                     x =>
                     {
-                        var known = nodes.Select(a => a.Node!.Location.ToVector()).ToList();
+                        var current = new Point3D(x[0], x[1], x[2]);
                         var gradient = new double[3];
+
                         for (var i = 0; i < 3; i++)
-                            gradient[i] = known.Select((a, j) => (2 * x[i] - 2 * known[j][i]) * Weight(j, known.Count)).Average();
+                        {
+                            gradient[i] = nodes.Select((dn, j) =>
+                            {
+                                var nodeLoc = dn.Node!.Location;
+                                var dist = current.DistanceTo(nodeLoc);
+                                if (dist < 1e-6) dist = 1e-6; // Avoid division by zero
+
+                                var err = dist - dn.Distance;
+                                var dDist_dX = (x[i] - nodeLoc.ToVector()[i]) / dist;
+
+                                return 2 * err * dDist_dX * Weight(j, nodes.Length);
+                            }).Sum();
+                        }
                         return Vector<double>.Build.Dense(gradient);
                     });
 
@@ -56,7 +69,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                     clampedGuess.Y,
                     clampedGuess.Z
                 });
-                var solver = new BfgsBMinimizer(0, 0.25, 0.25, 1000);
+                var solver = new BfgsBMinimizer(1e-5, 1e-5, 1e-5, 1000);
                 var result = solver.FindMinimum(obj, lowerBound, upperBound, initialGuess);
                 scenario.UpdateLocation(new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]));
                 scenario.Fixes = nodes.Length;
