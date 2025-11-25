@@ -11,7 +11,7 @@ public class Device
 {
     private DateTime? _lastSeen;
 
-    // Kalman filter for location smoothing
+    // Kalman filter for location smoothing (settings are shared globally)
     private readonly KalmanLocation _kalmanLocation = new();
 
     /// <summary>

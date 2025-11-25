@@ -10,8 +10,11 @@ namespace ESPresense.Models
         [YamlMember(Alias = "mqtt")]
         public ConfigMqtt Mqtt { get; set; } = new();
 
-        [YamlMember(Alias = "bounds")]
-        public double[][] Bounds { get; set; } = [];
+        [YamlMember(Alias = "gps")]
+        public ConfigGps Gps { get; set; } = new();
+
+        [YamlMember(Alias = "map")]
+        public ConfigMap Map { get; set; } = new();
 
         [YamlMember(Alias = "timeout")]
         public int Timeout { get; set; } = 30;
@@ -19,11 +22,27 @@ namespace ESPresense.Models
         [YamlMember(Alias = "away_timeout")]
         public int AwayTimeout { get; set; } = 120;
 
-        [YamlMember(Alias = "gps")]
-        public ConfigGps Gps { get; set; } = new();
+        // Retention policy for inactive devices (duration string, e.g., "30d", "720h")
+        [YamlMember(Alias = "device_retention")]
+        public string DeviceRetention { get; set; } = "30d";
 
-        [YamlMember(Alias = "map")]
-        public ConfigMap Map { get; set; } = new();
+        [YamlIgnore]
+        public TimeSpan DeviceRetentionTimeSpan => DeviceRetention.TryParseDurationString(out var ts, DurationUnit.Days) ? ts : TimeSpan.FromDays(30);
+
+        [YamlMember(Alias = "optimization")]
+        public ConfigOptimization Optimization { get; set; } = new();
+
+        [YamlMember(Alias = "locators")]
+        public ConfigLocators Locators { get; set; } = new();
+
+        [YamlMember(Alias = "filtering")]
+        public ConfigFiltering Filtering { get; set; } = new();
+
+        [YamlMember(Alias = "history")]
+        public ConfigHistory History { get; set; } = new();
+
+        [YamlMember(Alias = "bounds")]
+        public double[][] Bounds { get; set; } = [];
 
         [YamlMember(Alias = "floors")]
         public ConfigFloor[] Floors { get; set; } = Array.Empty<ConfigFloor>();
@@ -36,22 +55,6 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "exclude_devices")]
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
-
-        [YamlMember(Alias = "history")]
-        public ConfigHistory History { get; set; } = new();
-
-        [YamlMember(Alias = "locators")]
-        public ConfigLocators Locators { get; set; } = new();
-
-        [YamlMember(Alias = "optimization")]
-        public ConfigOptimization Optimization { get; set; } = new();
-
-        // Retention policy for inactive devices (duration string, e.g., "30d", "720h")
-        [YamlMember(Alias = "device_retention")]
-        public string DeviceRetention { get; set; } = "30d";
-
-        [YamlIgnore]
-        public TimeSpan DeviceRetentionTimeSpan => DeviceRetention.TryParseDurationString(out var ts, DurationUnit.Days) ? ts : TimeSpan.FromDays(30);
     }
 
     public partial class ConfigLocators
@@ -267,5 +270,23 @@ namespace ESPresense.Models
         public bool Stationary { get; set; } = true;
 
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
+    }
+
+    public partial class ConfigFiltering
+    {
+        [YamlMember(Alias = "process_noise")]
+        public double ProcessNoise { get; set; } = 0.01;
+
+        [YamlMember(Alias = "measurement_noise")]
+        public double MeasurementNoise { get; set; } = 0.1;
+
+        [YamlMember(Alias = "max_velocity")]
+        public double MaxVelocity { get; set; } = 0.5;
+
+        [YamlMember(Alias = "smoothing_weight")]
+        public double SmoothingWeight { get; set; } = 0.7;
+
+        [YamlMember(Alias = "motion_sigma")]
+        public double MotionSigma { get; set; } = 2.0;
     }
 }

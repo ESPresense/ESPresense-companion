@@ -26,9 +26,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    ILeaseService leaseService) : BackgroundService
 {
     private const string LocatingLeaseName = "locating";
-    private const double PriorWeight     = 0.7;  // temporal smoothing
-    private const double NewDataWeight   = 0.3;
-    private const double MotionSigma     = 2.0;  // metres, for Gaussian weight
 
     internal async Task ProcessDevice(Device device)
     {
@@ -57,6 +54,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
             // -----------------------------------------------------------------
             // 3. Motion‑consistency weighting for every scenario -------------------
             // -----------------------------------------------------------------
+            var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
             foreach (var scenario in device.Scenarios)
             {
                 if (!scenario.Current)
@@ -66,7 +64,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 }
 
                 double delta = predictedLocation.DistanceTo(scenario.Location);
-                double mcw   = Math.Exp(-(delta * delta) / (2 * MotionSigma * MotionSigma));
+                double mcw   = Math.Exp(-(delta * delta) / (2 * filtering.MotionSigma * filtering.MotionSigma));
                 scenario.WeightedConfidence = (scenario.Confidence ?? 0) * mcw;
             }
 
@@ -77,10 +75,13 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
             if (totalWeightedConfidence > 0)
             {
+                var priorWeight = filtering.SmoothingWeight;
+                var newDataWeight = 1.0 - priorWeight;
+
                 foreach (var scenario in device.Scenarios)
                 {
                     double newProb = scenario.WeightedConfidence / totalWeightedConfidence;
-                    scenario.Probability = PriorWeight * scenario.Probability + NewDataWeight * newProb;
+                    scenario.Probability = priorWeight * scenario.Probability + newDataWeight * newProb;
                 }
 
                 // normalise

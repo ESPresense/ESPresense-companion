@@ -1,3 +1,4 @@
+using System.Threading;
 using ESPresense.Events;
 using MQTTnet;
 
@@ -39,4 +40,12 @@ public interface IMqttCoordinator
     /// <returns>A task that completes when MQTT is connected and ready, or throws if connection fails.</returns>
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or connection is invalidated due to configuration change.</exception>
     Task WaitForConnectionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears retained messages for the specified topic filter.
+    /// </summary>
+    /// <param name="topicFilter">MQTT topic filter to clear retained messages for.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
+    /// <returns>A task that completes when the operation is complete.</returns>
+    Task ClearRetainedAsync(string topicFilter, CancellationToken cancellationToken = default);
 }
