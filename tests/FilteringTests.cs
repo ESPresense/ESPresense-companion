@@ -1,7 +1,6 @@
 using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
-using ESPresense.Controllers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SQLite;
@@ -10,11 +9,23 @@ using System.IO;
 using System.Threading.Tasks;
 using MathNet.Spatial.Euclidean;
 using ESPresense.Locators;
+using ESPresense.Controllers;
 
 namespace ESPresense.Companion.Tests;
 
 public class FilteringTests
 {
+    private class StaticLocator(Point3D location, int confidence = 100) : ILocate
+    {
+        public bool Locate(Scenario scenario)
+        {
+            scenario.Confidence = confidence;
+            scenario.LastHit = DateTime.UtcNow;
+            scenario.UpdateLocation(location);
+            return true;
+        }
+    }
+
     [Test]
     public void TestFilteringDeserialization()
     {
@@ -65,9 +76,9 @@ public class FilteringTests
     public async Task TestFilteringConfigurationIsAppliedToDevice()
     {
         // Arrange
-        var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg-filtering");
+        var testId = TestContext.CurrentContext.Test.ID ?? Guid.NewGuid().ToString("N");
+        var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"cfg-filtering-{testId}");
         Directory.CreateDirectory(workDir);
-        var configLoader = new ConfigLoader(workDir);
 
         // Write config to file
         var yaml = @"
@@ -79,37 +90,45 @@ filtering:
   motion_sigma: 5.0
 ";
         await File.WriteAllTextAsync(Path.Combine(workDir, "config.yaml"), yaml);
+        var configLoader = new ConfigLoader(workDir);
+        await configLoader.StartAsync(CancellationToken.None);
 
-        await configLoader.ConfigAsync(); // Wait for load
+        try
+        {
+            await configLoader.ConfigAsync(); // Wait for load
 
-        var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+            var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
+            var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
 
-        var tele = new TelemetryService(mqttMock.Object);
-        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
-        var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
-        var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
-        var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+            var tele = new TelemetryService(mqttMock.Object);
+            var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object);
+            var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher());
+            var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
+            var leaseServiceMock = new Mock<ILeaseService>();
+            var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
 
-        var device = new Device("test_device", null, TimeSpan.FromSeconds(10));
-        // Add a dummy scenario so it processes something
-        device.Scenarios.Add(new Scenario(state.Config, new AnchorLocator(new Point3D()), "test"));
+            var device = new Device("test_device", null, TimeSpan.FromSeconds(10));
+            device.KalmanFilter.Settings = state.KalmanSettings;
+            // Add a dummy scenario so it processes something
+            device.Scenarios.Add(new Scenario(state.Config, new StaticLocator(new Point3D(1, 2, 3)), "test"));
 
-        // Act
-        await locator.ProcessDevice(device);
+            // Act
+            await locator.ProcessDevice(device);
 
-        // Assert - Verify Kalman Filter settings via Reflection
-        var kf = device.KalmanFilter;
-        var type = kf.GetType();
+            // Assert - Verify Kalman Filter settings come from config
+            var kf = device.KalmanFilter.Settings;
 
-        var processNoise = (double)type.GetField("_processNoise", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(kf);
-        var measurementNoise = (double)type.GetField("_measurementNoise", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(kf);
-        var maxVelocity = (double)type.GetField("_maxVelocity", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(kf);
-
-        Assert.That(processNoise, Is.EqualTo(0.123));
-        Assert.That(measurementNoise, Is.EqualTo(0.456));
-        Assert.That(maxVelocity, Is.EqualTo(0.789));
+            Assert.That(kf.ProcessNoise, Is.EqualTo(0.123));
+            Assert.That(kf.MeasurementNoise, Is.EqualTo(0.456));
+            Assert.That(kf.MaxVelocity, Is.EqualTo(0.789));
+            Assert.That(device.Location?.X, Is.EqualTo(1));
+        }
+        finally
+        {
+            await configLoader.StopAsync(CancellationToken.None);
+            if (Directory.Exists(workDir))
+                Directory.Delete(workDir, true);
+        }
     }
 
     [Test]
@@ -124,13 +143,13 @@ filtering:
         var startTime = DateTime.UtcNow;
 
         // 1. Responsive Filter: High Process Noise (expects change), Low Measurement Noise (trusts data)
-        var responsiveFilter = new KalmanLocation(processNoise: 1.0, measurementNoise: 0.01, maxVelocity: 100.0);
+        var responsiveFilter = new KalmanLocation(new KalmanFilterSettings(1.0, 0.01, 100.0));
         responsiveFilter.Update(startPoint, startTime); // Initialize
         responsiveFilter.Update(newPoint, startTime.AddSeconds(1));
         var responsiveResult = responsiveFilter.Location;
 
         // 2. Smooth Filter: Low Process Noise (expects stability), High Measurement Noise (distrusts data)
-        var smoothFilter = new KalmanLocation(processNoise: 0.001, measurementNoise: 10.0, maxVelocity: 100.0);
+        var smoothFilter = new KalmanLocation(new KalmanFilterSettings(0.001, 10.0, 100.0));
         smoothFilter.Update(startPoint, startTime); // Initialize
         smoothFilter.Update(newPoint, startTime.AddSeconds(1));
         var smoothResult = smoothFilter.Location;
