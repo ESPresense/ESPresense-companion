@@ -29,6 +29,51 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
     internal async Task ProcessDevice(Device device)
     {
+        if (device.IsAnchored && device.Anchor is { } anchor)
+        {
+            device.LastCalculated = DateTime.UtcNow;
+            var anchorLocation = anchor.Location;
+
+            var gps = state?.Config?.Gps;
+            var (lat, lon) = gps?.Report == true ? gps.Add(anchorLocation.X, anchorLocation.Y) : (null, null);
+            var elevation = gps?.Report == true ? anchorLocation.Z + gps?.Elevation : null;
+
+            var stateChanged = device.ReportedState != "not_home";
+            if (stateChanged)
+            {
+                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", "not_home");
+                device.ReportedState = "not_home";
+            }
+
+            var locationChanged = device.ReportedLocation != anchorLocation;
+            device.ReportedLocation = anchorLocation;
+            device.BestScenario = null;
+
+            // Force publication when device transitions to anchored state or location changes
+            if (locationChanged || stateChanged)
+            {
+                var payload = JsonConvert.SerializeObject(new
+                {
+                    source_type = "espresense",
+                    latitude = lat,
+                    longitude = lon,
+                    elevation,
+                    x = anchorLocation.X,
+                    y = anchorLocation.Y,
+                    z = anchorLocation.Z,
+                    confidence = 100,
+                    fixes = 0,
+                    best_scenario = "Anchored",
+                    last_seen = device.LastSeen
+                }, SerializerSettings.NullIgnore);
+
+                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
+                globalEventDispatcher.OnDeviceChanged(device, false);
+            }
+
+            return;
+        }
+
             // -----------------------------------------------------------------
             // 1. Refresh all scenarios -------------------------------------------------
             // -----------------------------------------------------------------
