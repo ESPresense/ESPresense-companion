@@ -53,7 +53,10 @@ builder.Services.AddSingleton(a =>
     return sqLiteConnection;
 });
 
-builder.Services.AddAutoMapper(cfg => { }, typeof(MappingProfile).Assembly);
+builder.Services.AddAutoMapper(cfg =>
+{
+    cfg.LicenseKey = AutoMapperLicense.Key;
+}, typeof(MappingProfile).Assembly);
 
 builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<DatabaseFactory>();
