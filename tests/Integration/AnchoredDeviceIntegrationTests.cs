@@ -350,6 +350,7 @@ public class AnchoredDeviceIntegrationTests
     public void AnchorLocator_WithFloors_AssignsCorrectFloorAndRoom()
     {
         // Arrange
+        _state.Floors.Clear(); // Clear any floors from example config
         var floor = CreateTestFloor("floor1", "Test Floor",
             new double[] { -10, -10, -10 },
             new double[] { 10, 10, 10 });

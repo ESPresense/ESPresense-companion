@@ -207,7 +207,7 @@ public class DeviceSettingsStoreTests
 
         // This simulates what would happen if state data came in for the aliased ID
         // but there's no separate config for it (which should be prevented)
-        
+
         // Assert - We should only have one logical device, not conflicting records
         var resultByOriginal = _deviceSettingsStore.Get("keys:dt-spar");
         var resultByAlias = _deviceSettingsStore.Get("keys:dt-spare");
