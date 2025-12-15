@@ -59,7 +59,7 @@
 		"typescript-eslint": "^8.48.0",
 		"vite": "^7.3.0",
 		"vite-plugin-devtools-json": "^1.0.0",
-		"vitest": "^4.0.14"
+		"vitest": "^4.0.15"
 	},
 	"type": "module"
 }
