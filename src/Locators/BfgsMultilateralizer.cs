@@ -26,7 +26,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
         int confidence = scenario.Confidence ?? 0;
         try
         {
-            if (nodes.Length < 3 || Floor.Bounds == null)
+            if (nodes.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
             {
                 confidence = 1;
                 scenario.UpdateLocation(guess);

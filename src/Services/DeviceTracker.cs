@@ -216,6 +216,10 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 }
                 return false;
             }
+            else
+            {
+                Log.Warning("Anchor failed to apply for device {DeviceId} - falling back to normal tracking", device.Id);
+            }
             // If anchor failed to apply, fall through to normal tracking logic
         }
 

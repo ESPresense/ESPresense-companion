@@ -122,11 +122,22 @@ public class MqttCoordinator : IMqttCoordinator
 
             if (_initTask != null)
             {
-                return await _initTask.ConfigureAwait(false);
+                if (_initTask.IsFaulted)
+                    _initTask = null;
+                else
+                    return await _initTask.ConfigureAwait(false);
             }
 
             _initTask = InitializeClientAsync();
-            return await _initTask.ConfigureAwait(false);
+            try
+            {
+                return await _initTask.ConfigureAwait(false);
+            }
+            catch
+            {
+                _initTask = null;
+                throw;
+            }
         }
         finally
         {

@@ -57,8 +57,8 @@ public class IterativeCentroidMultilateralizer(Device device, Floor floor, State
                 scenario.Error = err;
                 scenario.Confidence = Math.Clamp((10000 - (int?)Math.Ceiling(100 * err)) ?? 0, 0, 100);
 
-                CalculateAndSetPearsonCorrelation(scenario, nodes);
                 scenario.UpdateLocation(new Point3D(centroid[0], centroid[1], centroid[2]));
+                CalculateAndSetPearsonCorrelation(scenario, nodes);
                 AssignRoom(scenario);
                 return Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) >= 0.1;
             }

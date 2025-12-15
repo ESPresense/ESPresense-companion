@@ -37,7 +37,7 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         int confidence = scenario.Confidence ?? 0;
         try
         {
-            if (pos.Length < 3 || Floor.Bounds == null)
+            if (pos.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
             {
                 confidence = 1;
                 scenario.UpdateLocation(guess);
@@ -132,7 +132,7 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         }
 
         if (selectedTransmitters.Count < numberOfTransmitters)
-            return new Tuple<Vector3[], float[]>(dns.Select(a=>a.Node!.Location.ToVector3()).ToArray(), dns.Select(a=>(float)a.Distance).ToArray());
+            return new Tuple<Vector3[], float[]>(dns.Select(a => a.Node!.Location.ToVector3()).ToArray(), dns.Select(a => (float)a.Distance).ToArray());
 
         return new Tuple<Vector3[], float[]>(selectedTransmitters.ToArray(), selectedRanges.ToArray());
     }
@@ -169,8 +169,8 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
                 // Construct the Jacobian matrix
                 var jacobian = DenseMatrix.OfArray(new double[_transmitters.Length, 3]);
                 for (var i = 0; i < _transmitters.Length; ++i)
-                for (var j = 0; j < 3; ++j)
-                    jacobian[i, j] = 2 * (guess - _transmitters[i])[j];
+                    for (var j = 0; j < 3; ++j)
+                        jacobian[i, j] = 2 * (guess - _transmitters[i])[j];
 
                 // Construct the residual vector
                 var residuals = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(_transmitters.Length);

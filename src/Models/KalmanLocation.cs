@@ -39,13 +39,14 @@ public class KalmanLocation
 
         // Calculate time delta
         var now = DateTime.UtcNow;
+        var settings = Settings;
         var dt = _lastLocationUpdate.HasValue
             ? (now - _lastLocationUpdate.Value).TotalSeconds
             : 0.1; // Default to 100ms if no previous update
 
         // Create state transition matrix and process noise matrix
         var F = CreateStateTransitionMatrix(dt);
-        var Q = CreateProcessNoiseMatrix(dt, Settings.ProcessNoise);
+        var Q = CreateProcessNoiseMatrix(dt, settings.ProcessNoise);
 
         // Predict step (without modifying internal state)
         var predictedState = F * _kalmanStateEstimate;
@@ -108,6 +109,8 @@ public class KalmanLocation
             : 0.1; // Default to 100ms if no previous update
         _lastLocationUpdate = now;
 
+        var settings = Settings;
+
         dt = Math.Max(dt, 0.001); // Minimum 1ms interval
 
         // Check if the proposed move exceeds human movement capabilities
@@ -115,10 +118,10 @@ public class KalmanLocation
         double distanceToNewLocation = Location.DistanceTo(newLocation);
 
         // Calculate the maximum possible distance a human could have moved in this timeframe
-        double maxPossibleDistance = Settings.MaxVelocity * dt;
+        double maxPossibleDistance = settings.MaxVelocity * dt;
 
         // If the new location is too far away, adjust the measurement noise based on how extreme the movement is
-        double dynamicMeasurementNoise = Settings.MeasurementNoise;
+        double dynamicMeasurementNoise = settings.MeasurementNoise;
         if (distanceToNewLocation > maxPossibleDistance)
         {
             // Scale up the measurement noise based on how much the movement exceeds the maximum
@@ -128,14 +131,14 @@ public class KalmanLocation
 
         // Update state transition matrix based on dt
         var F = CreateStateTransitionMatrix(dt);
-        var Q = CreateProcessNoiseMatrix(dt, Settings.ProcessNoise);
+        var Q = CreateProcessNoiseMatrix(dt, settings.ProcessNoise);
 
         // Predict step
         _kalmanStateEstimate = F * _kalmanStateEstimate;
         _kalmanErrorCovariance = F * _kalmanErrorCovariance * F.Transpose() + Q;
 
         // Apply velocity constraints to the predicted state
-        ConstrainVelocity();
+        ConstrainVelocity(settings);
 
         // Measurement matrix maps the state to the measurement
         var H = Matrix<double>.Build.DenseOfArray(new double[,] {
@@ -167,7 +170,7 @@ public class KalmanLocation
         _kalmanErrorCovariance = (Matrix<double>.Build.DenseIdentity(6) - K * H) * _kalmanErrorCovariance;
 
         // Apply velocity constraints again after the update
-        ConstrainVelocity();
+        ConstrainVelocity(settings);
 
         // Update the filtered location
         Location = new Point3D(
@@ -182,7 +185,7 @@ public class KalmanLocation
     /// <summary>
     /// Constrains the velocity in the state estimate to be within human movement capabilities
     /// </summary>
-    private void ConstrainVelocity()
+    private void ConstrainVelocity(KalmanFilterSettings settings)
     {
         if (_kalmanStateEstimate == null) return;
 
@@ -192,12 +195,12 @@ public class KalmanLocation
         double vz = _kalmanStateEstimate[5, 0];
 
         // Calculate velocity magnitude
-        double velocityMagnitude = Math.Sqrt(vx*vx + vy*vy + vz*vz);
+        double velocityMagnitude = Math.Sqrt(vx * vx + vy * vy + vz * vz);
 
         // If velocity exceeds maximum, scale it back while preserving direction
-        if (velocityMagnitude > Settings.MaxVelocity && velocityMagnitude > 0)
+        if (velocityMagnitude > settings.MaxVelocity && velocityMagnitude > 0)
         {
-            double scaleFactor = Settings.MaxVelocity / velocityMagnitude;
+            double scaleFactor = settings.MaxVelocity / velocityMagnitude;
 
             // Scale each component
             _kalmanStateEstimate[3, 0] = vx * scaleFactor;
