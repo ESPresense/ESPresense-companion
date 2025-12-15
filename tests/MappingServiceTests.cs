@@ -39,7 +39,10 @@ public class MappingServiceTests
         services.AddLogging();
         services.AddSingleton(nts);
         services.AddSingleton(fs);
-        services.AddAutoMapper(cfg => { }, typeof(MappingProfile).Assembly);
+        services.AddAutoMapper(cfg =>
+        {
+            cfg.LicenseKey = AutoMapperLicense.Key;
+        }, typeof(MappingProfile).Assembly);
         var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<IMapper>();
     }
