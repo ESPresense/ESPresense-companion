@@ -174,8 +174,19 @@ public class MultiScenarioLocatorTests
         var attributes = JObject.Parse(attributesMessage.payload!);
         var probabilities = attributes["probabilities"] as JObject;
         Assert.That(probabilities, Is.Not.Null);
-        Assert.That(probabilities!["Kitchen"]?.Value<double>(), Is.GreaterThan(0));
-        Assert.That(probabilities!["Hall"]?.Value<double>(), Is.GreaterThan(0));
+
+        // Check that probabilities exist and are valid (case-insensitive check since room names might vary)
+        var probabilityKeys = probabilities!.Properties().Select(p => p.Name).ToList();
+        Assert.That(probabilityKeys.Count, Is.GreaterThan(0), $"Expected probabilities but got keys: {string.Join(", ", probabilityKeys)}");
+
+        // Find kitchen and hall probabilities (case-insensitive)
+        var kitchenProb = probabilities.Properties().FirstOrDefault(p => p.Name.Equals("Kitchen", StringComparison.OrdinalIgnoreCase))?.Value.Value<double>();
+        var hallProb = probabilities.Properties().FirstOrDefault(p => p.Name.Equals("Hall", StringComparison.OrdinalIgnoreCase))?.Value.Value<double>();
+
+        Assert.That(kitchenProb, Is.Not.Null, $"Kitchen probability not found. Available keys: {string.Join(", ", probabilityKeys)}");
+        Assert.That(hallProb, Is.Not.Null, $"Hall probability not found. Available keys: {string.Join(", ", probabilityKeys)}");
+        Assert.That(kitchenProb, Is.GreaterThan(0));
+        Assert.That(hallProb, Is.GreaterThan(0));
 
         // Test untracking deletes probability sensors
         device.Scenarios.Clear();
