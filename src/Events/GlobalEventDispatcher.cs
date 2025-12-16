@@ -10,6 +10,7 @@ public class GlobalEventDispatcher()
     public event EventHandler<DeviceEventArgs>? DeviceStateChanged;
     public event EventHandler<CalibrationEventArgs>? CalibrationChanged;
     public event EventHandler<DeviceRemovedEventArgs>? DeviceRemoved;
+    public event EventHandler<LocatorStateEventArgs>? LocatorStateChanged;
 
     public void OnNodeStateChanged(NodeState state)
     {
@@ -35,6 +36,11 @@ public class GlobalEventDispatcher()
     {
         DeviceRemoved?.Invoke(this, new DeviceRemovedEventArgs(deviceId));
     }
+
+    public void OnLocatorStateChanged(LocatorState state)
+    {
+        LocatorStateChanged?.Invoke(this, new LocatorStateEventArgs(state));
+    }
 }
 
 public class NodeStateEventArgs(NodeState state) : EventArgs
@@ -56,4 +62,9 @@ public class CalibrationEventArgs(Calibration calibration) : EventArgs
 public class DeviceRemovedEventArgs(string deviceId) : EventArgs
 {
     public string DeviceId { get; } = deviceId;
+}
+
+public class LocatorStateEventArgs(LocatorState state) : EventArgs
+{
+    public LocatorState LocatorState { get; } = state;
 }

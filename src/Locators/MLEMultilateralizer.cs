@@ -31,7 +31,7 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : Base
         int confidence = scenario.Confidence ?? 0;
         try
         {
-            if (nodes.Length < 3 || Floor.Bounds == null)
+            if (nodes.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
             {
                 confidence = 1;
                 scenario.UpdateLocation(guess);
@@ -49,7 +49,7 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : Base
                             .L2Norm();
                         return (distanceFromBoundingBox > 0 ? Math.Pow(5, 1 + distanceFromBoundingBox) : 0) + Math.Pow(5 * (1 - x[3]), 2) + nodes
                             .Select((dn, i) => new { err = Error(x, dn), weight = State?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
-                            .Average(a => a.weight * Math.Pow(a.err, 2));
+                            .Average(a => a.weight * a.err);
                     });
 
                 var clampedGuess = ClampToFloorBounds(guess);

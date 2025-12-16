@@ -16,15 +16,36 @@
 	let localSettings = { ...deviceSetting };
 	let isSaving = false; // Track saving state
 
+	// Reactive anchor toggle - keeps checkbox in sync with coordinate values
+	let anchorEnabled = localSettings.x != null && localSettings.y != null && localSettings.z != null;
+
 	async function save() {
 		try {
 			isSaving = true;
 
 			// Ensure rssi@1m is a number or null
-			const rssiRef = Math.floor(parseFloat(localSettings['rssi@1m'] + ''));
+			const rssiRef = Math.floor(parseFloat((localSettings['rssi@1m'] ?? '') + ''));
 			localSettings['rssi@1m'] = isNaN(rssiRef) ? null : rssiRef;
 
-			const response = await fetch(resolve(`/api/device/${deviceSetting.id}`), {
+			if (!anchorEnabled) {
+				localSettings.x = null;
+				localSettings.y = null;
+				localSettings.z = null;
+			} else {
+				// Normalize anchor coordinates (allow empty values to clear anchor)
+				const normalizeCoordinate = (value: unknown) => {
+					if (value === '' || value === null || value === undefined) return null;
+					const numeric = parseFloat(String(value));
+					return isNaN(numeric) ? null : numeric;
+				};
+
+				localSettings.x = normalizeCoordinate(localSettings.x);
+				localSettings.y = normalizeCoordinate(localSettings.y);
+				localSettings.z = normalizeCoordinate(localSettings.z);
+			}
+
+			const targetId = deviceSetting.originalId ?? deviceSetting.id;
+			const response = await fetch(resolve(`/api/device/${targetId}`), {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
@@ -84,7 +105,7 @@
 	</header>
 
 	<!-- Use the DeviceSettings component, passing the local state -->
-	<DeviceSettings settings={localSettings} />
+	<DeviceSettings settings={localSettings} bind:anchorEnabled />
 
 	<!-- Modal Actions -->
 	<footer class="modal-footer flex justify-end space-x-2 pt-4">

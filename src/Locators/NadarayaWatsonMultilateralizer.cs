@@ -21,18 +21,18 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         if (heard.Length <= 1)
         {
             scenario.Confidence = 0;
-            scenario.Room       = null;
-            scenario.Error      = null;
+            scenario.Room = null;
+            scenario.Error = null;
             return false;
         }
 
         scenario.Minimum = heard.Min(n => (double?)n.Distance);
         scenario.LastHit = heard.Max(n => n.LastHit);
-        scenario.Fixes   = heard.Length;
-        scenario.Floor   = floor;
+        scenario.Fixes = heard.Length;
+        scenario.Floor = floor;
 
         Point3D est;
-        double  weightedError = 0;
+        double weightedError = 0;
 
         try
         {
@@ -65,7 +65,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
 
             scenario.UpdateLocation(est);
 
-            var measured   = heard.Select(n => n.Distance).ToList();
+            var measured = heard.Select(n => n.Distance).ToList();
             var calculated = heard.Select(n => est.DistanceTo(n.Node!.Location)).ToList();
             scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measured, calculated);
 
@@ -87,7 +87,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         {
             scenario.UpdateLocation(scenario.Location); // revert to last good
             scenario.Confidence = 0;
-            scenario.Error      = null;
+            scenario.Error = null;
             Log.Error("Locator error for {Device}: {Message}", device, ex.Message);
         }
 
