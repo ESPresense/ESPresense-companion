@@ -124,8 +124,8 @@ public class DeviceTrackerAnchorRestoreTests
             Z = 1.5
         };
 
-        // Apply the settings to the device settings store (but not to device)
-        _mockDeviceSettingsStore.Object.ApplyToDevice(deviceId, deviceSettings);
+        // Setup the mock to return the settings
+        _mockDeviceSettingsStore.Setup(m => m.Get(deviceId)).Returns(deviceSettings);
 
         // Reset to the original anchor to test that it doesn't get overwritten
         device.SetAnchor(existingAnchor);
@@ -181,7 +181,8 @@ public class DeviceTrackerAnchorRestoreTests
             // Z is null
         };
 
-        _mockDeviceSettingsStore.Object.ApplyToDevice(deviceId, deviceSettings);
+        // Setup the mock to return the settings
+        _mockDeviceSettingsStore.Setup(m => m.Get(deviceId)).Returns(deviceSettings);
 
         // Act
         var checkMethod = typeof(DeviceTracker).GetMethod("CheckDeviceAsync",

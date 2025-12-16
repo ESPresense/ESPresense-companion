@@ -196,7 +196,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     {
         var wasTracked = device.Track;
         var settings = deviceSettingsStore.Get(device.Id);
-        if (settings?.HasAnchor ?? false)
+        if ((settings?.HasAnchor ?? false) && !device.IsAnchored)
         {
             // Apply anchor settings to device
             deviceSettingsStore.ApplyToDevice(device.Id, settings);

@@ -98,8 +98,10 @@ internal class OptimizationRunner : BackgroundService
             double previousBestCorr = double.NaN;
             double previousBestRmse = double.NaN;
 
-            while (optimization is { Enabled: true } && lease.HasLease())
+            while (lease.HasLease())
             {
+                optimization = _state.Config?.Optimization;
+                if (optimization is not { Enabled: true }) break;
                 var os = _state.TakeOptimizationSnapshot();
 
                 var baselineResults = new OptimizationResults();
