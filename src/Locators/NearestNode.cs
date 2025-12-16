@@ -15,6 +15,17 @@ internal class NearestNode : ILocate
 
     public bool Locate(Scenario scenario)
     {
-        return false;
+        var device = _device;
+        var nodes = device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
+        var nearest = nodes.FirstOrDefault();
+        if (nearest == null) return false;
+
+        scenario.UpdateLocation(nearest.Node!.Location);
+        scenario.Confidence = 1;
+        scenario.Fixes = 1;
+        scenario.Floor = nearest.Node.Floors?.FirstOrDefault();
+        scenario.Room = null;
+
+        return true;
     }
 }

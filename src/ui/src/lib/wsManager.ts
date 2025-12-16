@@ -10,6 +10,7 @@ interface Listeners {
 	deviceMessage: Set<EventCallback>;
 	configChanged: Set<EventCallback>;
 	time: Set<EventCallback>;
+	locatorStateChanged: Set<EventCallback>;
 }
 
 export class WSManager {
@@ -28,7 +29,8 @@ export class WSManager {
 			nodeChanged: new Set(),
 			deviceMessage: new Set(),
 			configChanged: new Set(),
-			time: new Set()
+			time: new Set(),
+			locatorStateChanged: new Set()
 		};
 		this.connect();
 	}
@@ -111,6 +113,9 @@ export class WSManager {
 					break;
 				case 'deviceRemoved':
 					this.listeners.deviceRemoved.forEach((cb) => cb(eventData));
+					break;
+				case 'locatorStateChanged':
+					this.listeners.locatorStateChanged.forEach((cb) => cb(eventData.data));
 					break;
 				default:
 					console.log('Unhandled websocket event:', eventData);

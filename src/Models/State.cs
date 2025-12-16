@@ -104,6 +104,7 @@ public class State
     public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
     public IWeighting? Weighting { get; set; }
     public OptimizerState OptimizerState { get; set; } = new();
+    public LocatorState LocatorState { get; } = new();
 
     /// <summary>
     /// Creates an optimization snapshot from current node measurements and purges expired snapshots.

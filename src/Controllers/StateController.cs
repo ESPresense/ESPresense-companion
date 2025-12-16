@@ -91,6 +91,12 @@ public class StateController : ControllerBase
         return _config.Config ?? new Config();
     }
 
+    [HttpGet("api/state/locator")]
+    public IActionResult GetLocator()
+    {
+        return Ok(_state.LocatorState);
+    }
+
     /// <summary>
     /// Retrieves calibration data and computes statistical measures based on active node distance measurements.
     /// </summary>
@@ -218,6 +224,7 @@ public class StateController : ControllerBase
         void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => EnqueueAndSignal(new { type = "calibrationChanged", data = e.Calibration });
         void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => EnqueueAndSignal(new { type = "nodeStateChanged", data = e.NodeState });
         void OnDeviceRemoved(object? sender, DeviceRemovedEventArgs e) => EnqueueAndSignal(new { type = "deviceRemoved", deviceId = e.DeviceId });
+        void OnLocatorStateChanged(object? sender, LocatorStateEventArgs e) => EnqueueAndSignal(new { type = "locatorStateChanged", data = e.LocatorState });
         void OnDeviceChanged(object? sender, DeviceEventArgs e)
         {
             if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
@@ -249,6 +256,7 @@ public class StateController : ControllerBase
         _eventDispatcher.DeviceStateChanged += OnDeviceChanged;
         _eventDispatcher.DeviceMessageReceived += OnDeviceMessageReceived;
         _eventDispatcher.DeviceRemoved += OnDeviceRemoved;
+        _eventDispatcher.LocatorStateChanged += OnLocatorStateChanged;
 
         try
         {
@@ -348,6 +356,7 @@ public class StateController : ControllerBase
             _eventDispatcher.DeviceStateChanged -= OnDeviceChanged;
             _eventDispatcher.DeviceMessageReceived -= OnDeviceMessageReceived;
             _eventDispatcher.DeviceRemoved -= OnDeviceRemoved;
+            _eventDispatcher.LocatorStateChanged -= OnLocatorStateChanged;
         }
     }
 
