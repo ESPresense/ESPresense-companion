@@ -1,8 +1,12 @@
 import type { Page } from '@playwright/test';
+import type { FirmwareManifest, Release } from '../src/lib/types';
 
 type MockApiOptions = {
 	// If your UI opens a WebSocket on load, stub it to stay fully offline.
 	stubWebSocket?: boolean;
+	nodes?: any[];
+	firmwareTypes?: FirmwareManifest;
+	releases?: Release[];
 };
 
 /**
@@ -11,10 +15,10 @@ type MockApiOptions = {
  * Installs handlers for:
  * - API state config endpoint returns a demo configuration object
  * - API state devices endpoint returns a demo devices array
- * - API state nodes endpoint returns []
+ * - API state nodes endpoint returns provided mock nodes (defaults to [])
  * - API state calibration endpoint returns { matrix: {} }
  * - any other API state paths return []
- * Also registers API devices endpoint returns [].
+ * Also registers API devices endpoint returns [], optional firmware types, and optional release data.
  *
  * When `options.stubWebSocket` is true, a lightweight MockWebSocket implementation replaces window.WebSocket in the browser,
  * which opens immediately, no-ops on send, and fires close when closed — useful to keep the app's websocket logic inactive during tests.
@@ -92,6 +96,57 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		}
 	];
 
+	const demoNodes = options.nodes ?? [];
+	const demoFirmwareTypes = options.firmwareTypes;
+	const demoReleases = options.releases;
+
+	if (demoReleases) {
+		await page.route('https://api.github.com/repos/ESPresense/ESPresense/releases', (route) =>
+			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demoReleases) })
+		);
+	}
+
+	if (demoFirmwareTypes) {
+		await page.route('**/api/firmware/types', (route) =>
+			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demoFirmwareTypes) })
+		);
+	}
+
+	const defaultSettingsResponse = {
+		settings: {
+			id: 'mock-node',
+			name: 'Mock Node',
+			updating: { autoUpdate: null, prerelease: null },
+			scanning: { forgetAfterMs: null },
+			counting: { idPrefixes: null, minDistance: null, maxDistance: null, minMs: null },
+			filtering: { includeIds: null, excludeIds: null, maxDistance: null, skipDistance: null, skipMs: null },
+			calibration: { absorption: null, rxRefRssi: null, rxAdjRssi: null, txRefRssi: null }
+		},
+		details: []
+	};
+
+	await page.route('**/api/node/*', (route) => {
+		const method = route.request().method();
+		const url = route.request().url();
+		let pathname: string;
+
+		try {
+			pathname = new URL(url, 'http://localhost:4173').pathname;
+		} catch {
+			pathname = url;
+		}
+
+		if (pathname.endsWith('/update') || pathname.endsWith('/restart')) {
+			return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+		}
+
+		if (method === 'PUT') {
+			return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(defaultSettingsResponse) });
+		}
+
+		return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(defaultSettingsResponse) });
+	});
+
 	// HTTP API mocks via a single catch-all route so querystrings are covered
 	await page.route('**/api/state/**', (route) => {
 		const request = route.request();
@@ -109,7 +164,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 
 		if (pathname.endsWith('/api/state/config')) return respond(demoConfig);
 		if (pathname.endsWith('/api/state/devices')) return respond(demoDevices);
-		if (pathname.endsWith('/api/state/nodes')) return respond([]);
+		if (pathname.endsWith('/api/state/nodes')) return respond(demoNodes);
 		if (pathname.endsWith('/api/state/calibration')) return respond({ matrix: {} });
 		return respond([]);
 	});
