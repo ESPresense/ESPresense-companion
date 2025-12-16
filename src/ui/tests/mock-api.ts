@@ -1,17 +1,5 @@
 import type { Page } from '@playwright/test';
-
-type FirmwareManifest = {
-	firmware: Array<{ name: string; cpu: string; flavor: string }>;
-	flavors: Array<{ name: string; value: string; cpus: string[] }>;
-	cpus: Array<{ name: string; value: string }>;
-};
-
-type Release = {
-	assets: Array<{ id: number; name: string }>;
-	prerelease: boolean;
-	tag_name: string;
-	name: string;
-};
+import type { FirmwareManifest, Release } from '../src/lib/types';
 
 type MockApiOptions = {
 	// If your UI opens a WebSocket on load, stub it to stay fully offline.
