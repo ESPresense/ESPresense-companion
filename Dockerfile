@@ -25,6 +25,9 @@ RUN dotnet publish -c Release -o out
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+RUN apt-get update && \
+    apt-get install -y libssl3 && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /App
 EXPOSE 8267 8268
 
@@ -32,7 +35,7 @@ ENV HTTP_PORTS=8267 \
     HTTPS_PORTS="" \
     OTA_UPDATE_PORT=8268 \
     CONFIG_DIR="/config/espresense"
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 
 COPY --from=build-env /App/out .
 
