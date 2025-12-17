@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ESPresense-companion is a Home Assistant Add-on / Docker container that processes indoor position data from ESPresense BLE nodes. It's a full-stack application with:
 
-- **Backend**: ASP.NET Core (.NET 8.0) with C# providing REST APIs, WebSocket communication, and MQTT integration
+- **Backend**: ASP.NET Core (.NET 10.0) with C# providing REST APIs, WebSocket communication, and MQTT integration
 - **Frontend**: SvelteKit 5 with TypeScript providing a reactive web interface for device visualization and management
 - **Database**: SQLite for storing historical data and device settings
 - **Communication**: MQTT for node communication, WebSockets for real-time UI updates
@@ -59,7 +59,7 @@ pnpm check
 ```
 
 ### Development Setup
-1. Install .NET SDK 8.0 and Node.js 20
+1. Install .NET SDK 10.0 and Node.js 20
 2. Install pnpm globally: `npm install -g pnpm`
 3. Run `dotnet watch --project src` (serves backend on port 5279)
 4. During development, Vite dev server proxies `/api` and `/ws` requests to the .NET backend
