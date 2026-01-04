@@ -15,7 +15,7 @@
 	"devDependencies": {
 		"@eslint/js": "^9.39.1",
 		"@floating-ui/dom": "^1.7.4",
-		"@playwright/test": "^1.56.1",
+		"@playwright/test": "^1.57.0",
 		"@skeletonlabs/floating-ui-svelte": "^0.3.9",
 		"@skeletonlabs/skeleton": "^4.7.1",
 		"@skeletonlabs/skeleton-svelte": "^4.7.4",
