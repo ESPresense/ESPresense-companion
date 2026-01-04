@@ -75,6 +75,7 @@ builder.Services.AddSingleton<FirmwareTypeStore>();
 builder.Services.AddSingleton<DeviceService>();
 builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
+builder.Services.AddSingleton<BayesianProbabilityPublisher>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();

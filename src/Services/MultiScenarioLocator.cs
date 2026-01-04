@@ -4,9 +4,6 @@ using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
 using Newtonsoft.Json;
 using ESPresense.Extensions;
-using System.Globalization;
-using System.Text;
-using TextExtensions;
 using ESPresense.Events;
 using Serilog;
 
@@ -28,10 +25,10 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    MqttCoordinator mqtt,
                                    GlobalEventDispatcher globalEventDispatcher,
                                    DeviceHistoryStore deviceHistory,
-                                   ILeaseService leaseService) : BackgroundService
+                                   ILeaseService leaseService,
+                                   BayesianProbabilityPublisher bayesianPublisher) : BackgroundService
 {
     private const string LocatingLeaseName = "locating";
-    private const double ProbabilityEpsilon = 0.001;
 
     internal async Task ProcessDevice(Device device)
     {
@@ -58,7 +55,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
             // Clear Bayesian state for anchored devices
             if (device.BayesianProbabilities.Count > 0 || device.BayesianDiscoveries.Count > 0)
             {
-                await ClearProbabilityOutputsAsync(device);
+                await bayesianPublisher.ClearProbabilityOutputsAsync(device);
             }
 
             // Force publication when device transitions to anchored state or location changes
@@ -168,8 +165,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
         if (probabilityConfig is { Enabled: true })
         {
-            var probabilityVector = BuildProbabilityVector(device, bestScenario);
-            probabilityChanged = await PublishProbabilitySensorsAsync(device, probabilityVector, probabilityConfig);
+            var probabilityVector = bayesianPublisher.BuildProbabilityVector(device, bestScenario);
+            probabilityChanged = await bayesianPublisher.PublishProbabilitySensorsAsync(device, probabilityVector, probabilityConfig);
 
             if (probabilityVector.Count > 0)
             {
@@ -180,12 +177,13 @@ public class MultiScenarioLocator(DeviceTracker dl,
         }
         else
         {
-            probabilityChanged = await ClearProbabilityOutputsAsync(device);
+            probabilityChanged = await bayesianPublisher.ClearProbabilityOutputsAsync(device);
         }
 
         // -----------------------------------------------------------------
         // 6. Publish state / attributes if anything moved ----------------------
         // -----------------------------------------------------------------
+        // Note: State updates require a bestScenario for room assignment
         if (bestScenario != null)
         {
             var newState = device.Room?.Name ?? device.Floor?.Name ?? "not_home";
@@ -203,6 +201,10 @@ public class MultiScenarioLocator(DeviceTracker dl,
             device.ReportedState = "not_home";
         }
 
+        // Publish attributes if location changed OR probabilities changed
+        // When Bayesian probabilities are enabled, we may publish attributes with only probabilities
+        // (no location data) when bestScenario is null but probabilityAttributes exist.
+        // In this case, source_type and location fields will be null, but probabilities will be present.
         if ((moved > 0 || probabilityChanged) && (bestScenario != null || probabilityAttributes != null))
         {
             var includeLocation = bestScenario != null;
@@ -263,190 +265,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
             }
         }
     }
-
-    private Dictionary<string, double> BuildProbabilityVector(Device device, Scenario? bestScenario)
-    {
-        var result = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-
-        var activeScenarios = device.Scenarios.Where(s => s.Current && s.Probability > 0).ToList();
-        if (activeScenarios.Count == 0 || bestScenario == null)
-        {
-            result["not_home"] = 1;
-            return result;
-        }
-
-        foreach (var scenario in activeScenarios)
-        {
-            var key = scenario.Room?.Name ?? scenario.Name ?? scenario.Floor?.Name ?? "unknown";
-            if (string.IsNullOrWhiteSpace(key)) key = "unknown";
-
-            result[key] = result.TryGetValue(key, out var existing)
-                ? existing + scenario.Probability
-                : scenario.Probability;
-        }
-
-        var sum = result.Values.Sum();
-        if (sum <= 0)
-        {
-            result.Clear();
-            result["other"] = 1;
-            return result;
-        }
-
-        foreach (var key in result.Keys.ToList())
-        {
-            var normalized = result[key] / sum;
-            result[key] = Math.Clamp(normalized, 0, 1);
-        }
-
-        var normalisedSum = result.Values.Sum();
-        if (normalisedSum < 1)
-        {
-            var remainder = Math.Max(0, 1 - normalisedSum);
-            if (remainder > 0.0001)
-            {
-                result["other"] = result.TryGetValue("other", out var other) ? other + remainder : remainder;
-            }
-        }
-        else if (normalisedSum > 1)
-        {
-            foreach (var key in result.Keys.ToList())
-            {
-                result[key] /= normalisedSum;
-            }
-        }
-
-        return result;
-    }
-
-    private async Task<bool> PublishProbabilitySensorsAsync(Device device, IReadOnlyDictionary<string, double> probabilities, ConfigBayesianProbabilities config)
-    {
-        var changed = false;
-        var activeKeys = new HashSet<string>(probabilities.Keys, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var (roomName, probability) in probabilities)
-        {
-            var roundedProbability = Math.Round(probability, 4);
-            var payloadChanged = !device.BayesianProbabilities.TryGetValue(roomName, out var existing) || Math.Abs(Math.Round(existing, 4) - roundedProbability) > ProbabilityEpsilon;
-            if (payloadChanged)
-            {
-                var payload = roundedProbability.ToString("0.####", CultureInfo.InvariantCulture);
-                await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, roomName), payload, retain: config.Retain);
-                device.BayesianProbabilities[roomName] = roundedProbability;
-                changed = true;
-            }
-
-            if (!IsSyntheticRoom(roomName) && probability >= config.DiscoveryThreshold)
-            {
-                var discovery = device.BayesianDiscoveries.GetOrAdd(roomName, key => CreateProbabilityDiscovery(device, key));
-                if (!device.HassAutoDiscovery.Contains(discovery))
-                    device.HassAutoDiscovery.Add(discovery);
-                await discovery.Send(mqtt);
-            }
-            else if (device.BayesianDiscoveries.TryRemove(roomName, out var staleDiscovery))
-            {
-                device.HassAutoDiscovery.Remove(staleDiscovery);
-                await staleDiscovery.Delete(mqtt);
-                changed = true;
-            }
-        }
-
-        foreach (var key in device.BayesianProbabilities.Keys.ToArray())
-        {
-            if (activeKeys.Contains(key)) continue;
-
-            await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: true);
-            device.BayesianProbabilities.TryRemove(key, out _);
-
-            if (device.BayesianDiscoveries.TryRemove(key, out var discovery))
-            {
-                device.HassAutoDiscovery.Remove(discovery);
-                await discovery.Delete(mqtt);
-            }
-
-            changed = true;
-        }
-
-        return changed;
-    }
-
-    private async Task<bool> ClearProbabilityOutputsAsync(Device device)
-    {
-        var changed = false;
-
-        foreach (var key in device.BayesianProbabilities.Keys.ToArray())
-        {
-            await mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: true);
-            device.BayesianProbabilities.TryRemove(key, out _);
-            changed = true;
-        }
-
-        foreach (var entry in device.BayesianDiscoveries.ToArray())
-        {
-            device.HassAutoDiscovery.Remove(entry.Value);
-            await entry.Value.Delete(mqtt);
-            device.BayesianDiscoveries.TryRemove(entry.Key, out _);
-            changed = true;
-        }
-
-        return changed;
-    }
-
-    private AutoDiscovery CreateProbabilityDiscovery(Device device, string roomName)
-    {
-        var sanitizedRoom = SanitizeSegment(roomName);
-        var discoveryId = ($"espresense-{device.Id}-{sanitizedRoom}-probability").ToSnakeCase() ?? $"espresense-{device.Id}-{sanitizedRoom}-probability";
-
-        var record = new AutoDiscovery.DiscoveryRecord
-        {
-            Name = $"{device.Name ?? device.Id} {roomName} Probability",
-            UniqueId = $"espresense-companion-{device.Id}-{sanitizedRoom}",
-            StateTopic = BuildProbabilityTopic(device.Id, roomName),
-            EntityStatusTopic = "espresense/companion/status",
-            Device = new AutoDiscovery.DeviceRecord
-            {
-                Name = device.Name ?? device.Id,
-                Manufacturer = "ESPresense",
-                Model = "Companion",
-                SwVersion = "1.0.0",
-                Identifiers = new[] { $"espresense-{device.Id}" }
-            },
-            Origin = new AutoDiscovery.OriginRecord { Name = "ESPresense Companion" },
-            StateClass = "measurement",
-            Icon = "mdi:account-location"
-        };
-
-        return new AutoDiscovery("sensor", discoveryId, record);
-    }
-
-    private static string BuildProbabilityTopic(string deviceId, string roomName)
-    {
-        var segment = SanitizeSegment(roomName);
-        return $"espresense/companion/{deviceId}/probabilities/{segment}";
-    }
-
-    private static string SanitizeSegment(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return "unknown";
-
-        var snake = value.ToSnakeCase();
-        var working = !string.IsNullOrWhiteSpace(snake) ? snake! : value;
-
-        var builder = new StringBuilder();
-        foreach (var c in working.ToLowerInvariant())
-        {
-            if (char.IsLetterOrDigit(c) || c is '_' or '-')
-                builder.Append(c);
-            else
-                builder.Append('_');
-        }
-
-        var sanitized = builder.ToString().Trim('_');
-        return string.IsNullOrWhiteSpace(sanitized) ? "unknown" : sanitized;
-    }
-
-    private static bool IsSyntheticRoom(string roomName)
-        => roomName.Equals("other", StringComparison.OrdinalIgnoreCase) || roomName.Equals("not_home", StringComparison.OrdinalIgnoreCase);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

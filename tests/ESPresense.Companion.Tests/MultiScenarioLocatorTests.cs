@@ -56,8 +56,9 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
+        var bayesianPublisher = new BayesianProbabilityPublisher(mqttMock.Object);
 
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object, bayesianPublisher);
 
         var device = new Device("id", null, TimeSpan.FromSeconds(1))
         {
@@ -142,7 +143,8 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var bayesianPublisher = new BayesianProbabilityPublisher(mqttMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object, bayesianPublisher);
 
         var config = await configLoader.ConfigAsync();
         var floor = state.Floors.Values.First();
@@ -224,7 +226,8 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var bayesianPublisher = new BayesianProbabilityPublisher(mqttMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object, bayesianPublisher);
 
         var device = new Device("anchored", null, TimeSpan.FromSeconds(1));
         var anchorLocation = new Point3D(5, 6, 1);

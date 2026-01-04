@@ -105,7 +105,8 @@ filtering:
             var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
             var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
             var leaseServiceMock = new Mock<ILeaseService>();
-            var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+            var bayesianPublisher = new BayesianProbabilityPublisher(mqttMock.Object);
+            var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object, bayesianPublisher);
 
             var device = new Device("test_device", null, TimeSpan.FromSeconds(10));
             device.KalmanFilter.Settings = state.KalmanSettings;
