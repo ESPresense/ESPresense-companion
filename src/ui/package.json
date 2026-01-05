@@ -42,7 +42,7 @@
 		"eslint-plugin-playwright": "^2.3.0",
 		"eslint-plugin-svelte": "^3.13.1",
 		"globals": "^16.4.0",
-		"jsdom": "^27.3.0",
+		"jsdom": "^27.4.0",
 		"layercake": "^10.0.1",
 		"ol": "^10.7.0",
 		"prettier": "^3.7.4",
