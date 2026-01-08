@@ -37,7 +37,22 @@ namespace ESPresense.Models
             {
                 NadarayaWatson = NadarayaWatson.Clone(),
                 NelderMead = NelderMead.Clone(),
-                NearestNode = NearestNode.Clone()
+                NearestNode = NearestNode.Clone(),
+                IterativeNadarayaWatson = IterativeNadarayaWatson.Clone()
+            };
+        }
+    }
+
+    public partial class IterativeNadarayaWatsonConfig
+    {
+        public IterativeNadarayaWatsonConfig Clone()
+        {
+            return new IterativeNadarayaWatsonConfig
+            {
+                Enabled = Enabled,
+                Floors = Floors?.ToArray(),
+                Kernel = Kernel.Clone(),
+                MaxIterations = MaxIterations
             };
         }
     }
@@ -50,8 +65,19 @@ namespace ESPresense.Models
             {
                 Enabled = Enabled,
                 Floors = Floors?.ToArray(),
-                Bandwidth = Bandwidth,
-                Kernel = Kernel
+                Kernel = Kernel.Clone()
+            };
+        }
+    }
+
+    public partial class ConfigKernel
+    {
+        public ConfigKernel Clone()
+        {
+            return new ConfigKernel
+            {
+                Algorithm = Algorithm,
+                Props = new Dictionary<string, double>(Props)
             };
         }
     }
