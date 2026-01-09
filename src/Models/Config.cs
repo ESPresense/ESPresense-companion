@@ -55,6 +55,9 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "exclude_devices")]
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
+
+        [YamlMember(Alias = "bayesian_probabilities")]
+        public ConfigBayesianProbabilities BayesianProbabilities { get; set; } = new();
     }
 
     public partial class ConfigLocators
@@ -141,6 +144,24 @@ namespace ESPresense.Models
 
         [YamlIgnore] public double CorrelationWeight => Weights.TryGetValue("correlation", out var val) ? val : 0.5;
         [YamlIgnore] public double RmseWeight => Weights.TryGetValue("rmse", out var val) ? val : 0.5;
+    }
+
+    public partial class ConfigBayesianProbabilities
+    {
+        private double _discoveryThreshold = 0.1;
+
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; } = false;
+
+        [YamlMember(Alias = "discovery_threshold")]
+        public double DiscoveryThreshold
+        {
+            get => _discoveryThreshold;
+            set => _discoveryThreshold = Math.Clamp(value, 0.0, 1.0);
+        }
+
+        [YamlMember(Alias = "retain")]
+        public bool Retain { get; set; } = true;
     }
 
     public partial class ConfigHistory
