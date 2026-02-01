@@ -34,10 +34,8 @@ bayesian_probabilities:
 
 When enabled the companion:
 
-- Publishes `espresense/companion/<device_id>/probabilities/<room>` topics containing a `0.0-1.0` float for each room.
-  - Room names are normalized to lowercase for MQTT topic consistency.
-- Adds a `probabilities` object to the device attribute payload (`espresense/companion/<device_id>/attributes`).
-- Auto-discovers Home Assistant `sensor` entities for any room whose probability crosses the configured threshold (0.0-1.0 range).
+- Publishes probability data as a `probabilities` object in the device attribute payload (`espresense/companion/<device_id>/attributes`).
+- Auto-discovers Home Assistant `sensor` entities for any room whose probability crosses the configured threshold (0.0-1.0 range). Once discovered, sensors are "sticky" and persist (reporting 0.0 when you leave) to ensure Home Assistant UI stability. These sensors use a `value_template` to extract data from the device attributes topic.
 
 You can fuse multiple device probabilities into a person-level Bayesian sensor in Home Assistant:
 

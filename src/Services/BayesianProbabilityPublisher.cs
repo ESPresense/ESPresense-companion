@@ -12,7 +12,6 @@ namespace ESPresense.Services;
 public class BayesianProbabilityPublisher
 {
     private const double NormalizationEpsilon = 0.0001; // Minimum remainder to add to "other" room (matches 4-decimal precision)
-    private const double DiscoveryHysteresisRatio = 0.8; // Remove sensors at 80% of discovery threshold to prevent flapping
 
     private readonly MqttCoordinator _mqtt;
 
@@ -96,14 +95,10 @@ public class BayesianProbabilityPublisher
             var payloadChanged = !device.BayesianProbabilities.TryGetValue(roomName, out var existing) || Math.Round(existing, 4) != roundedProbability;
             if (payloadChanged)
             {
-                var payload = roundedProbability.ToString("0.####", CultureInfo.InvariantCulture);
-                await _mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, roomName), payload, retain: config.Retain);
                 device.BayesianProbabilities[roomName] = roundedProbability;
                 changed = true;
             }
 
-            // Use hysteresis to prevent sensor flapping: create at threshold, remove at 80% of threshold
-            var removalThreshold = config.DiscoveryThreshold * DiscoveryHysteresisRatio;
             var hasDiscovery = device.BayesianDiscoveries.ContainsKey(roomName);
 
             if (!IsSyntheticRoom(roomName) && probability >= config.DiscoveryThreshold)
@@ -113,7 +108,7 @@ public class BayesianProbabilityPublisher
                     device.HassAutoDiscovery.Add(discovery);
                 await discovery.Send(_mqtt);
             }
-            else if (hasDiscovery && (IsSyntheticRoom(roomName) || probability < removalThreshold))
+            else if (hasDiscovery && IsSyntheticRoom(roomName))
             {
                 if (device.BayesianDiscoveries.TryRemove(roomName, out var staleDiscovery))
                 {
@@ -128,7 +123,6 @@ public class BayesianProbabilityPublisher
         {
             if (activeKeys.Contains(key)) continue;
 
-            await _mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: true);
             device.BayesianProbabilities.TryRemove(key, out _);
 
             if (device.BayesianDiscoveries.TryRemove(key, out var discovery))
@@ -153,7 +147,6 @@ public class BayesianProbabilityPublisher
 
         foreach (var key in device.BayesianProbabilities.Keys.ToArray())
         {
-            await _mqtt.EnqueueAsync(BuildProbabilityTopic(device.Id, key), null, retain: true);
             device.BayesianProbabilities.TryRemove(key, out _);
             changed = true;
         }
@@ -178,7 +171,8 @@ public class BayesianProbabilityPublisher
         {
             Name = $"{device.Name ?? device.Id} {roomName} Probability",
             UniqueId = $"espresense-companion-{device.Id}-{sanitizedRoom}",
-            StateTopic = BuildProbabilityTopic(device.Id, roomName),
+            StateTopic = $"espresense/companion/{device.Id}/attributes",
+            ValueTemplate = $"{{{{ value_json.probabilities['{sanitizedRoom}'] | default(0) }}}}",
             EntityStatusTopic = "espresense/companion/status",
             Device = new AutoDiscovery.DeviceRecord
             {
@@ -196,13 +190,8 @@ public class BayesianProbabilityPublisher
         return new AutoDiscovery("sensor", discoveryId, record);
     }
 
-    private static string BuildProbabilityTopic(string deviceId, string roomName)
-    {
-        var segment = SanitizeSegment(roomName);
-        return $"espresense/companion/{deviceId}/probabilities/{segment}";
-    }
 
-    private static string SanitizeSegment(string value)
+    public static string SanitizeSegment(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "unknown";
 
