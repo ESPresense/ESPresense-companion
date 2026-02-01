@@ -42,20 +42,35 @@ When enabled the companion:
 You can fuse multiple device probabilities into a person-level Bayesian sensor in Home Assistant:
 
 ```yaml
-sensor:
+binary_sensor:
   - platform: bayesian
     name: "Pat in Kitchen"
-    prior: 0.5
+    prior: 0.1
+    probability_threshold: 0.75
     observations:
-      - platform: template
-        value_template: "{{ states('sensor.pat_phone_kitchen_probability') | float }}"
-        probability: 0.6
-      - platform: template
-        value_template: "{{ states('sensor.pat_watch_kitchen_probability') | float }}"
-        probability: 0.9
+      - platform: numeric_state
+        entity_id: sensor.pat_phone_kitchen_probability
+        above: 0.5
+        prob_given_true: 0.6
+      - platform: numeric_state
+        entity_id: sensor.pat_watch_kitchen_probability
+        above: 0.5
+        prob_given_true: 0.9
 ```
 
-Automations can then trigger on thresholds (for example, turn on lights when `sensor.pat_in_kitchen > 0.7`).
+Automations can then trigger on the binary sensor state:
+
+```yaml
+automation:
+  - trigger:
+      - platform: state
+        entity_id: binary_sensor.pat_in_kitchen
+        to: "on"
+    action:
+      - service: light.turn_on
+        target:
+          entity_id: light.kitchen
+```
 
 ## Need Help?
 - Join our [Discord Community](https://discord.gg/jbqmn7V6n6)
