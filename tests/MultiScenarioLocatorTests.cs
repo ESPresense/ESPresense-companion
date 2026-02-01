@@ -8,7 +8,6 @@ using Moq;
 using Newtonsoft.Json.Linq;
 using MathNet.Spatial.Euclidean;
 using SQLite;
-using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Companion.Tests;
 
@@ -19,16 +18,18 @@ public class MultiScenarioLocatorTests
         public bool Locate(Scenario scenario) => true;
     }
 
-    private class FixedRoomLocator(Room room, int confidence) : ILocate
+    private class FixedRoomLocator(Room room, int confidence, double probability = 1.0) : ILocate
     {
         private readonly Room _room = room;
         private readonly int _confidence = confidence;
+        private readonly double _probability = probability;
 
         public bool Locate(Scenario scenario)
         {
             scenario.Room = _room;
             scenario.Floor = _room.Floor;
             scenario.Confidence = _confidence;
+            scenario.Probability = _probability;
             scenario.Fixes = (scenario.Fixes ?? 0) + 1;
             scenario.UpdateLocation(new Point3D());
             return true;
@@ -158,17 +159,19 @@ public class MultiScenarioLocatorTests
 
         await locator.ProcessDevice(device);
 
-        var probabilityTopic = $"espresense/companion/{device.Id}/probabilities/kitchen";
-        Assert.That(published.Any(p => p.topic == probabilityTopic && !string.IsNullOrWhiteSpace(p.payload)), Is.True);
+        // Assert NO separate probability topics published
+        var hasProbabilityTopics = published.Any(p => p.topic.Contains("/probabilities/"));
+        Assert.That(hasProbabilityTopics, Is.False, "No separate probability topics should be published");
 
-        // Assert retain flag is honored on probability topics
-        var probabilityMessages = published.Where(p => p.topic.Contains("/probabilities/")).ToArray();
-        Assert.That(probabilityMessages, Is.Not.Empty);
-        Assert.That(probabilityMessages.All(p => p.retain == true), Is.True, "All probability topics should have retain=true");
-
-        // Assert discovery config published for rooms above threshold
-        var discoveryMessages = published.Where(p => p.topic.Contains("homeassistant/sensor/")).ToArray();
+        // Assert discovery config published for rooms above threshold with correct template
+        var discoveryMessages = published.Where(p => p.topic.Contains("homeassistant/sensor/")).ToList();
         Assert.That(discoveryMessages, Is.Not.Empty, "Discovery messages should be published for rooms above threshold");
+
+        var kitchenDiscovery = discoveryMessages.FirstOrDefault(m => m.payload?.Contains("Kitchen Probability") == true);
+        Assert.That(kitchenDiscovery.payload, Is.Not.Null);
+        var kitchenObj = JObject.Parse(kitchenDiscovery.payload!);
+        Assert.That(kitchenObj["state_topic"]?.ToString(), Is.EqualTo($"espresense/companion/{device.Id}/attributes"));
+        Assert.That(kitchenObj["value_template"]?.ToString(), Is.EqualTo("{{ value_json.probabilities['kitchen'] | default(0) }}"));
 
         var attributesMessage = published.LastOrDefault(p => p.topic == $"espresense/companion/{device.Id}/attributes");
         Assert.That(attributesMessage.payload, Is.Not.Null);
@@ -190,17 +193,23 @@ public class MultiScenarioLocatorTests
         Assert.That(kitchenProb, Is.GreaterThan(0));
         Assert.That(hallProb, Is.GreaterThan(0));
 
-        // Test untracking deletes probability sensors
+        // Test probability drop stays "sticky" (discovery NOT deleted for existing rooms)
+        device.Scenarios.Clear();
+        // Kitchen stays, but drops below threshold (0.01 / 1.01 = ~0.009 << 0.1)
+        device.Scenarios.Add(new Scenario(config, new FixedRoomLocator(kitchen, 80, 0.01), kitchen.Name));
+        // Hall stays above threshold (1.0 / 1.01 = ~0.99 >> 0.1)
+        device.Scenarios.Add(new Scenario(config, new FixedRoomLocator(hall, 60, 1.0), hall.Name));
+        published.Clear();
+        await locator.ProcessDevice(device);
+
+        var kitchenDelete = published.Any(p => p.topic.Contains("kitchen/config") && p.payload == null);
+        Assert.That(kitchenDelete, Is.False, "Kitchen discovery should NOT be deleted even though probability dropped");
+
+        // Test untracking STILL deletes discovery entities
         device.Scenarios.Clear();
         published.Clear();
         await locator.ProcessDevice(device);
 
-        // Assert null payloads sent to clear probability topics with retain=true
-        var clearMessages = published.Where(p => p.topic.Contains("/probabilities/") && p.payload == null).ToArray();
-        Assert.That(clearMessages, Is.Not.Empty, "Null payloads should be sent to clear probability topics");
-        Assert.That(clearMessages.All(p => p.retain == true), Is.True, "Tombstone messages should use retain=true");
-
-        // Assert discovery delete messages sent
         var deleteMessages = published.Where(p => p.topic.Contains("homeassistant/sensor/") && p.payload == null).ToArray();
         Assert.That(deleteMessages, Is.Not.Empty, "Discovery delete messages should be sent when untracking");
     }

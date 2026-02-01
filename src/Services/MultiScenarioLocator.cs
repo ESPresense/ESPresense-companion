@@ -171,7 +171,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
             if (probabilityVector.Count > 0)
             {
                 probabilityAttributes = probabilityVector.ToDictionary(
-                    kvp => kvp.Key,
+                    kvp => BayesianProbabilityPublisher.SanitizeSegment(kvp.Key),
                     kvp => Math.Round(kvp.Value, 4));
             }
         }
