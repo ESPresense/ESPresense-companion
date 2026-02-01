@@ -46,7 +46,7 @@
 		"layercake": "^10.0.1",
 		"ol": "^10.7.0",
 		"prettier": "^3.7.4",
-		"prettier-plugin-svelte": "^3.4.0",
+		"prettier-plugin-svelte": "^3.4.1",
 		"s-ago": "^2.2.0",
 		"svelte": "^5.46.3",
 		"svelte-check": "^4.3.5",
