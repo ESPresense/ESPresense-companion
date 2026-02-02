@@ -168,9 +168,11 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var probabilityVector = bayesianPublisher.BuildProbabilityVector(device, bestScenario);
             probabilityChanged = await bayesianPublisher.PublishProbabilitySensorsAsync(device, probabilityVector, probabilityConfig);
 
-            if (probabilityVector.Count > 0)
+            // Use device.BayesianProbabilities (not probabilityVector) to include sticky rooms with 0 probability
+            // This ensures all discovered sensors appear in the attributes payload
+            if (device.BayesianProbabilities.Count > 0)
             {
-                probabilityAttributes = probabilityVector.ToDictionary(
+                probabilityAttributes = device.BayesianProbabilities.ToDictionary(
                     kvp => BayesianProbabilityPublisher.SanitizeSegment(kvp.Key),
                     kvp => Math.Round(kvp.Value, 4));
             }

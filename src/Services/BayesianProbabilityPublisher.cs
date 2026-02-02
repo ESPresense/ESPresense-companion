@@ -119,19 +119,30 @@ public class BayesianProbabilityPublisher
             }
         }
 
+        // For rooms no longer in the probability vector:
+        // - If they have a discovery (sticky sensor), keep discovery but set probability to 0
+        // - If they're synthetic rooms without discovery, just remove them
         foreach (var key in device.BayesianProbabilities.Keys.ToArray())
         {
             if (activeKeys.Contains(key)) continue;
 
-            device.BayesianProbabilities.TryRemove(key, out _);
+            var hasDiscovery = device.BayesianDiscoveries.ContainsKey(key);
 
-            if (device.BayesianDiscoveries.TryRemove(key, out var discovery))
+            if (hasDiscovery)
             {
-                device.HassAutoDiscovery.Remove(discovery);
-                await discovery.Delete(_mqtt);
+                // Sticky behavior: keep the discovery, just set probability to 0
+                if (device.BayesianProbabilities.TryGetValue(key, out var existing) && existing != 0)
+                {
+                    device.BayesianProbabilities[key] = 0;
+                    changed = true;
+                }
             }
-
-            changed = true;
+            else
+            {
+                // No discovery (synthetic room or never crossed threshold) - safe to remove
+                device.BayesianProbabilities.TryRemove(key, out _);
+                changed = true;
+            }
         }
 
         return changed;
@@ -169,7 +180,7 @@ public class BayesianProbabilityPublisher
 
         var record = new AutoDiscovery.DiscoveryRecord
         {
-            Name = $"{device.Name ?? device.Id} {roomName} Probability",
+            Name = $"{roomName} Probability",
             UniqueId = $"espresense-companion-{device.Id}-{sanitizedRoom}",
             StateTopic = $"espresense/companion/{device.Id}/attributes",
             ValueTemplate = $"{{{{ value_json.probabilities['{sanitizedRoom}'] | default(0) }}}}",

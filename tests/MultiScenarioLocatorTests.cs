@@ -205,13 +205,25 @@ public class MultiScenarioLocatorTests
         var kitchenDelete = published.Any(p => p.topic.Contains("kitchen/config") && p.payload == null);
         Assert.That(kitchenDelete, Is.False, "Kitchen discovery should NOT be deleted even though probability dropped");
 
-        // Test untracking STILL deletes discovery entities
+        // Test device leaving all rooms (not_home) - discoveries should persist (sticky behavior)
+        // The HA sensors use `| default(0)` template, so they'll show 0 when the room isn't in probabilities
         device.Scenarios.Clear();
         published.Clear();
         await locator.ProcessDevice(device);
 
         var deleteMessages = published.Where(p => p.topic.Contains("homeassistant/sensor/") && p.payload == null).ToArray();
-        Assert.That(deleteMessages, Is.Not.Empty, "Discovery delete messages should be sent when untracking");
+        Assert.That(deleteMessages, Is.Empty, "Discovery should NOT be deleted when device leaves - sticky sensors persist");
+
+        // Verify discoveries still exist on the device
+        Assert.That(device.BayesianDiscoveries.Count, Is.GreaterThan(0), "Discoveries should persist after device leaves");
+
+        // Test that ResetBayesianState (called by DeviceTracker on untrack) DOES delete discoveries
+        published.Clear();
+        device.ResetBayesianState();
+
+        // ResetBayesianState clears the dictionaries but doesn't publish - that's handled by DeviceTracker
+        Assert.That(device.BayesianDiscoveries.Count, Is.EqualTo(0), "ResetBayesianState should clear discoveries");
+        Assert.That(device.BayesianProbabilities.Count, Is.EqualTo(0), "ResetBayesianState should clear probabilities");
     }
 
     [Test]
