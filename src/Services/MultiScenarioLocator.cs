@@ -4,7 +4,6 @@ using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
 using Newtonsoft.Json;
 using ESPresense.Extensions;
-using System.Text.Json;
 using ESPresense.Events;
 using Serilog;
 
@@ -26,7 +25,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    MqttCoordinator mqtt,
                                    GlobalEventDispatcher globalEventDispatcher,
                                    DeviceHistoryStore deviceHistory,
-                                   ILeaseService leaseService) : BackgroundService
+                                   ILeaseService leaseService,
+                                   BayesianProbabilityPublisher bayesianPublisher) : BackgroundService
 {
     private const string LocatingLeaseName = "locating";
 
@@ -51,6 +51,12 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var locationChanged = device.ReportedLocation != anchorLocation;
             device.ReportedLocation = anchorLocation;
             device.BestScenario = null;
+
+            // Clear Bayesian state for anchored devices
+            if (device.BayesianProbabilities.Count > 0 || device.BayesianDiscoveries.Count > 0)
+            {
+                await bayesianPublisher.ClearProbabilityOutputsAsync(device);
+            }
 
             // Force publication when device transitions to anchored state or location changes
             if (locationChanged || stateChanged)
@@ -153,9 +159,33 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
         device.BestScenario = bestScenario;
 
+        var probabilityConfig = state.Config?.BayesianProbabilities;
+        Dictionary<string, double>? probabilityAttributes = null;
+        var probabilityChanged = false;
+
+        if (probabilityConfig is { Enabled: true })
+        {
+            var probabilityVector = bayesianPublisher.BuildProbabilityVector(device, bestScenario);
+            probabilityChanged = await bayesianPublisher.PublishProbabilitySensorsAsync(device, probabilityVector, probabilityConfig);
+
+            // Use device.BayesianProbabilities (not probabilityVector) to include sticky rooms with 0 probability
+            // This ensures all discovered sensors appear in the attributes payload
+            if (device.BayesianProbabilities.Count > 0)
+            {
+                probabilityAttributes = device.BayesianProbabilities.ToDictionary(
+                    kvp => BayesianProbabilityPublisher.SanitizeSegment(kvp.Key),
+                    kvp => Math.Round(kvp.Value, 4));
+            }
+        }
+        else
+        {
+            probabilityChanged = await bayesianPublisher.ClearProbabilityOutputsAsync(device);
+        }
+
         // -----------------------------------------------------------------
         // 6. Publish state / attributes if anything moved ----------------------
         // -----------------------------------------------------------------
+        // Note: State updates require a bestScenario for room assignment
         if (bestScenario != null)
         {
             var newState = device.Room?.Name ?? device.Floor?.Name ?? "not_home";
@@ -173,53 +203,66 @@ public class MultiScenarioLocator(DeviceTracker dl,
             device.ReportedState = "not_home";
         }
 
-        if (moved > 0 && bestScenario != null)
+        // Publish attributes if location changed OR probabilities changed
+        // When Bayesian probabilities are enabled, we may publish attributes with only probabilities
+        // (no location data) when bestScenario is null but probabilityAttributes exist.
+        // In this case, source_type and location fields will be null, but probabilities will be present.
+        if ((moved > 0 || probabilityChanged) && (bestScenario != null || probabilityAttributes != null))
         {
-            device.ReportedLocation = device.Location ?? new Point3D();
+            var includeLocation = bestScenario != null;
+
+            if (includeLocation)
+            {
+                device.ReportedLocation = device.Location ?? new Point3D();
+            }
 
             var gps = state?.Config?.Gps;
             var location = device.Location ?? new Point3D();
 
-            // Only include GPS coordinates if reporting is enabled
-            var (lat, lon) = gps?.Report == true ? gps.Add(location.X, location.Y) : (null, null);
-            var elevation = gps?.Report == true ? location.Z + gps?.Elevation : null;
+            // Only include GPS coordinates if reporting is enabled and we have a best scenario
+            var (lat, lon) = includeLocation && gps?.Report == true ? gps.Add(location.X, location.Y) : (null, null);
+            var elevation = includeLocation && gps?.Report == true ? location.Z + gps?.Elevation : null;
 
             var payload = JsonConvert.SerializeObject(new
             {
-                source_type = "espresense",
-                latitude = lat,
-                longitude = lon,
-                elevation = elevation,
-                x = location.X,
-                y = location.Y,
-                z = location.Z,
-                confidence = bestScenario.Confidence,
-                fixes = bestScenario.Fixes,
-                best_scenario = bestScenario.Name,
-                last_seen = device.LastSeen
+                source_type = includeLocation ? "espresense" : null,
+                latitude = includeLocation ? lat : null,
+                longitude = includeLocation ? lon : null,
+                elevation = includeLocation ? elevation : null,
+                x = includeLocation ? (double?)location.X : null,
+                y = includeLocation ? (double?)location.Y : null,
+                z = includeLocation ? (double?)location.Z : null,
+                confidence = bestScenario?.Confidence,
+                fixes = bestScenario?.Fixes,
+                best_scenario = bestScenario?.Name,
+                last_seen = device.LastSeen,
+                probabilities = probabilityAttributes
             }, SerializerSettings.NullIgnore);
 
             await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
 
-            globalEventDispatcher.OnDeviceChanged(device, false);
-
-            // optional history
-            if (state?.Config?.History?.Enabled ?? false)
+            if (includeLocation)
             {
-                foreach (var ds in device.Scenarios.Where(ds => ds.Confidence != 0))
+                globalEventDispatcher.OnDeviceChanged(device, false);
+
+                // optional history
+                if (state?.Config?.History?.Enabled ?? false)
                 {
-                    await deviceHistory.Add(new DeviceHistory
+                    foreach (var ds in device.Scenarios.Where(ds => ds.Confidence != 0))
                     {
-                        Id = device.Id,
-                        When = DateTime.UtcNow,
-                        X = ds.Location.X,
-                        Y = ds.Location.Y,
-                        Z = ds.Location.Z,
-                        Confidence = ds.Confidence ?? 0,
-                        Fixes = ds.Fixes ?? 0,
-                        Scenario = ds.Name,
-                        Best = ds == bestScenario
-                    });
+                        await deviceHistory.Add(new DeviceHistory
+                        {
+                            Id = device.Id,
+                            When = DateTime.UtcNow,
+                            X = ds.Location.X,
+                            Y = ds.Location.Y,
+                            Z = ds.Location.Z,
+                            Confidence = ds.Confidence ?? 0,
+                            Fixes = ds.Fixes ?? 0,
+                            Scenario = ds.Name,
+                            Best = ds == bestScenario
+                        });
+                    }
                 }
             }
         }
