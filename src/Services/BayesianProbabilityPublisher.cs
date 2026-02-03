@@ -12,6 +12,7 @@ namespace ESPresense.Services;
 public class BayesianProbabilityPublisher
 {
     private const double NormalizationEpsilon = 0.0001; // Minimum remainder to add to "other" room (matches 4-decimal precision)
+    private const int FallbackConfidenceThreshold = 5; // Scenarios with confidence <= this are considered fallbacks (e.g., NearestNode)
 
     private readonly MqttCoordinator _mqtt;
 
@@ -33,6 +34,14 @@ public class BayesianProbabilityPublisher
         {
             result["not_home"] = 1;
             return result;
+        }
+
+        // Filter out fallback scenarios (very low confidence like NearestNode) when better locators are working
+        // This prevents fallback locators from polluting the probability mix
+        var maxConfidence = activeScenarios.Max(s => s.Confidence ?? 0);
+        if (maxConfidence > FallbackConfidenceThreshold)
+        {
+            activeScenarios = activeScenarios.Where(s => (s.Confidence ?? 0) > FallbackConfidenceThreshold).ToList();
         }
 
         foreach (var scenario in activeScenarios)
