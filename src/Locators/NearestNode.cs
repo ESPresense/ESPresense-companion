@@ -34,8 +34,10 @@ internal class NearestNode : ILocate
         scenario.Confidence = 1;
         scenario.Fixes = 1;
 
-        // Find the floor containing the node
-        scenario.Floor = node.Floors?.FirstOrDefault();
+        // Find the floor containing the node's location; fall back to first configured floor
+        scenario.Floor = node.Floors == null
+            ? null
+            : SpatialUtils.FindFloorContaining(location, node.Floors) ?? node.Floors.FirstOrDefault();
 
         // Try to find the room:
         // 1. First try to find a room containing the node's location
