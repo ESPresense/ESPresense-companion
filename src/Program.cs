@@ -92,6 +92,7 @@ builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks();
 
 builder.Services.AddMcpServer(options =>
 {
@@ -120,6 +121,7 @@ app.UseSwaggerUI(c => c.RoutePrefix = "api/swagger");
 app.UseStaticFiles();
 app.UseRouting();
 app.MapMcp("/api/mcp");
+app.MapHealthChecks("/healthz");
 
 app.MapControllerRoute(
     name: "default",

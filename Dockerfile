@@ -25,6 +25,11 @@ RUN dotnet publish -c Release -o out
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /App
 EXPOSE 8267 8268
 
@@ -40,5 +45,8 @@ LABEL \
   io.hass.version="VERSION" \
   io.hass.type="addon" \
   io.hass.arch="${TARGETPLATFORM}"
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8267/healthz || exit 1
 
 ENTRYPOINT ["dotnet", "ESPresense.Companion.dll"]
