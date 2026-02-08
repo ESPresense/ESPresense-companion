@@ -70,8 +70,8 @@ class Program
             foreach (var scenario in scenarios)
             {
                 Console.WriteLine($"\n--- {scenario.Name} ---");
-                
-                var sim = new MultilaterationSimulator(floor, state);
+
+                var sim = new MultilaterationSimulator(floor, state, seed: 12345); // Fixed seed for reproducibility
                 nodeConfig.Setup(sim);
                 scenario.Configure(sim);
                 
