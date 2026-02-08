@@ -9,8 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
-    <PackageReference Include="MathNet.Spatial" Version="0.6.0" />
+    <ProjectReference Include="..\src\ESPresense.Companion.csproj" />
   </ItemGroup>
 
 </Project>
