@@ -26,12 +26,15 @@ public class MultiFloorMultilateralizer : ILocate
 
         double Error(IList<double> x, DeviceToNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
         var nodes = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
+        var weights = nodes.Select((dn, i) => _state.Weighting?.Get(i, nodes.Length) ?? 1.0).ToArray();
+        var weightSum = weights.Sum();
+        if (weightSum <= 0) weightSum = 1;
 
         var obj = ObjectiveFunction.Value(x =>
         {
             return Math.Pow(5*(1 - x[3]), 2) + nodes
-                .Select((dn, i) => new { err = Error(x, dn), weight = _state.Weighting?.Get(i, nodes.Length) ?? 1.0 })
-                .Average(a => a.weight * Math.Pow(a.err, 2));
+                .Select((dn, i) => new { err = Error(x, dn), weight = weights[i] })
+                .Sum(a => a.weight * Math.Pow(a.err, 2)) / weightSum;
         });
         var pos = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).Select(a => a.Node!.Location).ToList();
 

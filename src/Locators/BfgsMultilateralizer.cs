@@ -33,12 +33,17 @@ public class BfgsMultilateralizer : BaseMultilateralizer
             }
             else
             {
+                double weightSum = Enumerable.Range(0, nodes.Length)
+                    .Select(i => Weight(i, nodes.Length))
+                    .Sum();
+                if (weightSum <= 0) weightSum = 1;
+
                 var lowerBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[0].X, Floor.Bounds[0].Y, Floor.Bounds[0].Z });
                 var upperBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[1].X, Floor.Bounds[1].Y, Floor.Bounds[1].Z });
                 var obj = ObjectiveFunction.Gradient(
                     x => nodes
                         .Select((dn, i) => new { err = Error(x, dn), weight = Weight(i, nodes.Length) })
-                        .Sum(a => a.weight * Math.Pow(a.err, 2))
+                        .Sum(a => a.weight * Math.Pow(a.err, 2)) / weightSum
                     ,
                     x =>
                     {
@@ -57,7 +62,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                                 var dDist_dX = (x[i] - nodeLoc.ToVector()[i]) / dist;
 
                                 return 2 * err * dDist_dX * Weight(j, nodes.Length);
-                            }).Sum();
+                            }).Sum() / weightSum;
                         }
                         return Vector<double>.Build.Dense(gradient);
                     });
