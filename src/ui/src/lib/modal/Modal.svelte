@@ -22,21 +22,25 @@
 		return isInsideInteractive(element.parentElement);
 	}
 
-	async function handleKeydown(event: KeyboardEvent) {
-		if ($modalStore.length === 0) return;
+        async function closeModal(modal: (typeof $modalStore)[number]) {
+                if (modal.onCancel) {
+                        await modal.onCancel();
+                } else if (modal.onConfirm) {
+                        await modal.onConfirm();
+                } else {
+                        modalStore.close();
+                }
+        }
 
-		const modal = $modalStore[$modalStore.length - 1];
+        async function handleKeydown(event: KeyboardEvent) {
+                if ($modalStore.length === 0) return;
 
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			event.stopPropagation();
-			if (modal.onCancel) {
-				await modal.onCancel();
-			} else if (modal.onConfirm) {
-				await modal.onConfirm();
-			} else {
-				modalStore.close();
-			}
+                const modal = $modalStore[$modalStore.length - 1];
+
+                if (event.key === 'Escape') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        await closeModal(modal);
 		} else if (event.key === 'Enter') {
 			const target = event.target as HTMLElement;
 			if (isInsideInteractive(target)) {
@@ -53,29 +57,26 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#each $modalStore as modal (modal.id)}
-	<div
-		class="fixed inset-0 z-50 flex items-center justify-center p-4"
-		onclick={async () => {
-			if (modal.onCancel) {
-				await modal.onCancel();
-			} else if (modal.onConfirm) {
-				await modal.onConfirm();
-			} else {
-				modalStore.close();
-			}
-		}}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="modal-title-{modal.id}"
-	>
-		<!-- Backdrop -->
-		<div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div
+                class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                tabindex="-1"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={`modal-title-${modal.id}`}
+        >
+                <!-- Backdrop -->
+                <button
+                        type="button"
+                        class="absolute inset-0 z-0 bg-black/50 backdrop-blur-sm focus:outline-none"
+                        aria-label="Dismiss modal"
+                        on:click={() => closeModal(modal)}
+                ></button>
 
-		<!-- Modal Content -->
-		<div class="relative z-10 max-w-lg w-full" onclick={(e) => e.stopPropagation()} aria-hidden="false" role="region">
-			{#if modal.type === 'alert'}
-				<AlertModal {modal} />
-			{:else if modal.type === 'confirm'}
+                <!-- Modal Content -->
+                <div class="relative z-10 max-w-lg w-full" aria-hidden="false" role="region">
+                        {#if modal.type === 'alert'}
+                                <AlertModal {modal} />
+                        {:else if modal.type === 'confirm'}
 				<ConfirmModal {modal} />
 			{:else if modal.type === 'component' && modal.component}
 				<ComponentModal {modal} />

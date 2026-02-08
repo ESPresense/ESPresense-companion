@@ -238,3 +238,9 @@ node_modules
 
 test-results
 .env
+
+# Frontend (SvelteKit)
+pnpm-debug.log
+src/ui/.svelte-kit/
+src/ui/build/
+src/ui/.env*
