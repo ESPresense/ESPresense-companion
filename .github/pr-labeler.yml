@@ -1,0 +1,27 @@
+feature:
+  - 'feature/*'
+  - 'feat/*'
+fix:
+  - 'fix/*'
+chore:
+  - 'chore/*'
+docs:
+  - 'docs/*'
+ci:
+  - 'ci/*'
+build:
+  - 'build/*'
+deps:
+  - 'deps/*'
+  - 'dependabot/*'
+  - 'bump/*'
+refactor:
+  - 'refactor/*'
+test:
+  - 'test/*'
+major:
+  - 'major/*'
+minor:
+  - 'minor/*'
+patch:
+  - 'patch/*'
