@@ -1,18 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ESPresense.Locators;
+using ESPresense.Models;
 using MathNet.Spatial.Euclidean;
+using Serilog;
 
 namespace ESPresense.Simulation;
 
 /// <summary>
-/// Simulates multilateration scenarios to test locator algorithms
+/// Simulates multilateration scenarios using actual ILocate implementations
 /// </summary>
 public class MultilaterationSimulator
 {
     private readonly Floor _floor;
+    private readonly State _state;
     private readonly List<Node> _nodes = new();
     private readonly Random _random = new();
+    private Device? _device;
     
     // Simulation parameters
     public double NoiseStdDev { get; set; } = 0.5; // meters
@@ -20,9 +25,16 @@ public class MultilaterationSimulator
     public double OutlierProbability { get; set; } = 0.05; // 5% of readings are outliers
     public double OutlierMultiplier { get; set; } = 2.0; // Outliers are 2x distance
     
-    public MultilaterationSimulator(Floor floor)
+    public MultilaterationSimulator(Floor floor, State state)
     {
         _floor = floor;
+        _state = state;
+        
+        // Setup logging to suppress during simulation
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Error()
+            .WriteTo.Console()
+            .CreateLogger();
     }
     
     /// <summary>
@@ -30,7 +42,9 @@ public class MultilaterationSimulator
     /// </summary>
     public void AddNode(string id, Point3D location)
     {
-        _nodes.Add(new Node { Id = id, Location = location });
+        var node = new Node(id, location);
+        _nodes.Add(node);
+        _state.Nodes[id] = node;
     }
     
     /// <summary>
@@ -63,7 +77,6 @@ public class MultilaterationSimulator
     /// </summary>
     public void GeneratePerimeterNodes(int count, double width, double height)
     {
-        // Place nodes on perimeter
         for (int i = 0; i < count; i++)
         {
             double t = (double)i / count;
@@ -82,12 +95,21 @@ public class MultilaterationSimulator
     }
     
     /// <summary>
-    /// Simulate a measurement from device to all nodes
+    /// Simulate a measurement from device to all nodes using actual ILocate
     /// </summary>
-    public SimulationResult Simulate(Point3D truePosition, Func<List<DeviceToNode>, Point3D?> locateFunc)
+    public SimulationResult Simulate(Point3D truePosition, ILocate locator, Config config)
     {
-        var measurements = new List<DeviceToNode>();
+        // Create or update device
+        if (_device == null)
+        {
+            _device = new Device("sim-device", "Simulated Device");
+            _state.Devices["sim-device"] = _device;
+        }
         
+        // Clear previous node readings
+        _device.Nodes.Clear();
+        
+        // Generate measurements to all nodes
         foreach (var node in _nodes)
         {
             double trueDistance = truePosition.DistanceTo(node.Location);
@@ -103,34 +125,50 @@ public class MultilaterationSimulator
             if (_random.NextDouble() < OutlierProbability)
                 measuredDistance *= OutlierMultiplier;
             
-            measurements.Add(new DeviceToNode
+            // Create device-to-node reading
+            var dtn = new DeviceToNode(_device, node)
             {
-                Node = node,
-                Distance = Math.Max(0.1, measuredDistance), // Min 10cm
+                Distance = Math.Max(0.1, measuredDistance),
+                LastHit = DateTime.UtcNow,
                 Current = true
-            });
+            };
+            
+            _device.Nodes[node.Id] = dtn;
         }
         
-        // Run the locator
+        // Create scenario with the locator
+        var scenario = new Scenario(config, locator, "simulation");
+        
+        // Set initial location for scenario (so it has something to work with)
+        scenario.ResetLocation(truePosition);
+        scenario.Confidence = 10; // Give it some confidence
+        
+        // Run the actual locator
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var estimatedPosition = locateFunc(measurements);
+        bool moved = locator.Locate(scenario);
         stopwatch.Stop();
+        
+        var estimatedPosition = scenario.Location;
+        double error = estimatedPosition.DistanceTo(truePosition);
         
         return new SimulationResult
         {
             TruePosition = truePosition,
             EstimatedPosition = estimatedPosition,
-            Error = estimatedPosition.HasValue ? truePosition.DistanceTo(estimatedPosition.Value) : double.NaN,
+            Error = error,
             ComputationTimeMs = stopwatch.ElapsedMilliseconds,
             NodeCount = _nodes.Count,
-            Measurements = measurements
+            Fixes = scenario.Fixes ?? 0,
+            Confidence = scenario.Confidence ?? 0,
+            Iterations = scenario.Iterations ?? 0,
+            Moved = moved
         };
     }
     
     /// <summary>
     /// Run Monte Carlo simulation
     /// </summary>
-    public SimulationReport RunMonteCarlo(int iterations, Func<List<DeviceToNode>, Point3D?> locateFunc)
+    public SimulationReport RunMonteCarlo(int iterations, ILocate locator, Config config)
     {
         var results = new List<SimulationResult>();
         
@@ -138,12 +176,12 @@ public class MultilaterationSimulator
         {
             // Random position on floor
             var truePos = new Point3D(
-                _random.NextDouble() * 10, // 10m width
-                _random.NextDouble() * 10, // 10m height
+                _random.NextDouble() * 10 + 1, // 1-11m (avoid edges)
+                _random.NextDouble() * 10 + 1,
                 1.0 // 1m device height
             );
             
-            results.Add(Simulate(truePos, locateFunc));
+            results.Add(Simulate(truePos, locator, config));
         }
         
         return new SimulationReport(results);
@@ -162,11 +200,14 @@ public class MultilaterationSimulator
 public class SimulationResult
 {
     public Point3D TruePosition { get; set; }
-    public Point3D? EstimatedPosition { get; set; }
+    public Point3D EstimatedPosition { get; set; }
     public double Error { get; set; }
     public long ComputationTimeMs { get; set; }
     public int NodeCount { get; set; }
-    public List<DeviceToNode> Measurements { get; set; } = new();
+    public int Fixes { get; set; }
+    public int Confidence { get; set; }
+    public int Iterations { get; set; }
+    public bool Moved { get; set; }
 }
 
 public class SimulationReport
@@ -178,41 +219,49 @@ public class SimulationReport
         _results = results;
     }
     
-    public double MeanError => _results.Where(r => !double.IsNaN(r.Error)).Average(r => r.Error);
-    public double MedianError => _results.Where(r => !double.IsNaN(r.Error)).OrderBy(r => r.Error).Skip(_results.Count / 2).First().Error;
-    public double StdDevError => Math.Sqrt(_results.Where(r => !double.IsNaN(r.Error)).Average(r => Math.Pow(r.Error - MeanError, 2)));
-    public double MaxError => _results.Where(r => !double.IsNaN(r.Error)).Max(r => r.Error);
-    public double MinError => _results.Where(r => !double.IsNaN(r.Error)).Min(r => r.Error);
-    public double SuccessRate => (double)_results.Count(r => !double.IsNaN(r.Error)) / _results.Count;
+    public int TotalRuns => _results.Count;
+    public int SuccessfulRuns => _results.Count(r => r.Fixes >= 3);
+    public double SuccessRate => (double)SuccessfulRuns / TotalRuns;
+    
+    public double MeanError => _results.Where(r => r.Fixes >= 3).Average(r => r.Error);
+    public double MedianError 
+    { 
+        get 
+        {
+            var errors = _results.Where(r => r.Fixes >= 3).Select(r => r.Error).OrderBy(e => e).ToList();
+            if (errors.Count == 0) return double.NaN;
+            return errors[errors.Count / 2];
+        }
+    }
+    public double StdDevError 
+    { 
+        get 
+        {
+            var errors = _results.Where(r => r.Fixes >= 3).Select(r => r.Error).ToList();
+            if (errors.Count < 2) return 0;
+            var mean = errors.Average();
+            return Math.Sqrt(errors.Average(e => Math.Pow(e - mean, 2)));
+        }
+    }
+    public double MaxError => _results.Where(r => r.Fixes >= 3).DefaultIfEmpty().Max(r => r?.Error ?? 0);
+    public double MinError => _results.Where(r => r.Fixes >= 3).DefaultIfEmpty().Min(r => r?.Error ?? 0);
     public double MeanComputationTimeMs => _results.Average(r => r.ComputationTimeMs);
+    public double MeanFixes => _results.Average(r => r.Fixes);
+    public double MeanIterations => _results.Average(r => r.Iterations);
     
     public void PrintReport(string algorithmName)
     {
         Console.WriteLine($"\n=== {algorithmName} ===");
-        Console.WriteLine($"Success Rate: {SuccessRate:P1}");
-        Console.WriteLine($"Mean Error: {MeanError:F2}m");
-        Console.WriteLine($"Median Error: {MedianError:F2}m");
-        Console.WriteLine($"Std Dev: {StdDevError:F2}m");
-        Console.WriteLine($"Min/Max Error: {MinError:F2}m / {MaxError:F2}m");
+        Console.WriteLine($"Success Rate: {SuccessRate:P1} ({SuccessfulRuns}/{TotalRuns})");
+        if (SuccessfulRuns > 0)
+        {
+            Console.WriteLine($"Mean Error: {MeanError:F2}m");
+            Console.WriteLine($"Median Error: {MedianError:F2}m");
+            Console.WriteLine($"Std Dev: {StdDevError:F2}m");
+            Console.WriteLine($"Min/Max Error: {MinError:F2}m / {MaxError:F2}m");
+            Console.WriteLine($"Mean Fixes: {MeanFixes:F1}");
+            Console.WriteLine($"Mean Iterations: {MeanIterations:F1}");
+        }
         Console.WriteLine($"Mean Computation Time: {MeanComputationTimeMs:F1}ms");
     }
-}
-
-public class Node
-{
-    public string Id { get; set; } = "";
-    public Point3D Location { get; set; }
-}
-
-public class DeviceToNode
-{
-    public Node? Node { get; set; }
-    public double Distance { get; set; }
-    public bool Current { get; set; }
-}
-
-public class Floor
-{
-    public string? Name { get; set; }
-    public Point3D[]? Bounds { get; set; }
 }
