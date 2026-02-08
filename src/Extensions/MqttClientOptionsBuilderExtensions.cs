@@ -16,7 +16,7 @@ public static class MqttClientOptionsBuilderExtensions
             mcob.WithTlsOptions(o =>
             {
                 o.UseTls(mqtt.Ssl ?? false);
-                o.WithAllowUndefinedCertificates();
+                o.WithAllowUntrustedCertificates();
             });
         return mcob;
     }

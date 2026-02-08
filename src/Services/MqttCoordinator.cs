@@ -198,7 +198,7 @@ public class MqttCoordinator : IMqttCoordinator
                     args.Exception.GetType().Name,
                     config.Host);
             }
-            else if (args.Reason != MqttClientDisconnectReason.Unspecified)
+            else if (args.Reason != MqttClientDisconnectReason.NormalDisconnection)
             {
                 _logger.LogWarning("MQTT disconnected with reason: {Reason} ({ReasonCode}). Client was connected: {WasConnected}. Broker: {Broker}",
                     args.Reason.ToString(),
@@ -248,16 +248,16 @@ public class MqttCoordinator : IMqttCoordinator
         {
             await mqttClient.ConnectAsync(mqttClientOptions).ConfigureAwait(false);
         }
-        catch (MQTTnet.Exceptions.MqttCommunicationException ex)
+        catch (MQTTnet.Exceptions.MqttClientNotConnectedException ex)
         {
-            _logger.LogError(ex, "MQTT connection failed: {Message}. Check broker address, port, and TLS settings.", ex.Message);
+            _logger.LogError(ex, "MQTT client not connected after connect attempt. Broker may be rejecting the connection (check protocol version).");
             _mqttClient = null;
             mqttClient.Dispose();
             throw;
         }
-        catch (MQTTnet.Exceptions.MqttClientNotConnectedException ex)
+        catch (MQTTnet.Exceptions.MqttCommunicationException ex)
         {
-            _logger.LogError(ex, "MQTT client not connected after connect attempt. Broker may be rejecting the connection (check protocol version).");
+            _logger.LogError(ex, "MQTT connection failed: {Message}. Check broker address, port, and TLS settings.", ex.Message);
             _mqttClient = null;
             mqttClient.Dispose();
             throw;
