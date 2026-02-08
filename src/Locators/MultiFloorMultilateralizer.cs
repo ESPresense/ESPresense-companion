@@ -70,8 +70,29 @@ public class MultiFloorMultilateralizer : ILocate
                     scenario.Fixes = pos.Count;
                     scenario.Minimum = nodes.Min(a => (double?) a.Distance);
                     scenario.LastHit = nodes.Max(a => a.LastHit);
+                    scenario.Error = result.FunctionInfoAtMinimum.Value;
 
-                    confidence = (int)Math.Max(Math.Min(100, (100 * pos.Count - 1) / 4.0), Math.Min(100, 100 * pos.Count / 4.0) - result.FunctionInfoAtMinimum.Value);
+                    if (nodes.Length >= 2)
+                    {
+                        var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
+                        var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
+                        scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
+                    }
+                    else
+                    {
+                        scenario.PearsonCorrelation = null; // Not enough data points
+                    }
+
+                    // Calculate number of possible nodes (all nodes since MultiFloor is floor-agnostic)
+                    int nodesPossibleOnline = _state.Nodes.Values.Count();
+
+                    // Use the centralized confidence calculation
+                    confidence = MathUtils.CalculateConfidence(
+                        scenario.Error,
+                        scenario.PearsonCorrelation,
+                        nodes.Length,
+                        nodesPossibleOnline
+                    );
                 }
                 else
                 {
@@ -90,17 +111,6 @@ public class MultiFloorMultilateralizer : ILocate
         }
 
         scenario.Confidence = confidence;
-
-        if (nodes.Length >= 2)
-        {
-            var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
-            var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
-            scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
-        }
-        else
-        {
-            scenario.PearsonCorrelation = null; // Not enough data points
-        }
 
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;

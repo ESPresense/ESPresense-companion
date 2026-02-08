@@ -87,15 +87,26 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                 };
 
                 scenario.ReasonForExit = result.ReasonForExit;
-                confidence = (int)Math.Max(10, Math.Min(100, Math.Min(100, 100 * nodes.Length / 4.0) - result.FunctionInfoAtMinimum.Value));
+
+                CalculateAndSetPearsonCorrelation(scenario, nodes);
+
+                // Calculate number of possible nodes for this floor
+                int nodesPossibleOnline = State.Nodes.Values
+                    .Count(n => n.Floors?.Contains(Floor) ?? false);
+
+                // Use the centralized confidence calculation
+                confidence = MathUtils.CalculateConfidence(
+                    scenario.Error,
+                    scenario.PearsonCorrelation,
+                    nodes.Length,
+                    nodesPossibleOnline
+                );
             }
         }
         catch (Exception ex)
         {
             confidence = HandleLocatorException(ex, scenario, guess);
         }
-
-        CalculateAndSetPearsonCorrelation(scenario, nodes);
 
         return FinalizeScenario(scenario, confidence);
     }

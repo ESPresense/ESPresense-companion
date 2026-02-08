@@ -72,7 +72,20 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
                 };
 
                 scenario.ReasonForExit = result.ReasonForExit;
-                confidence = (int)Math.Min(100, Math.Max(10, 100.0 - (Math.Pow(scenario.Minimum ?? 1, 2) + Math.Pow(10 * (1 - (scenario.Scale ?? 1)), 2) + (scenario.Minimum + result.FunctionInfoAtMinimum.Value ?? 10.00))));
+
+                CalculateAndSetPearsonCorrelation(scenario, nodes);
+
+                // Calculate number of possible nodes for this floor
+                int nodesPossibleOnline = State.Nodes.Values
+                    .Count(n => n.Floors?.Contains(Floor) ?? false);
+
+                // Use the centralized confidence calculation
+                confidence = MathUtils.CalculateConfidence(
+                    scenario.Error,
+                    scenario.PearsonCorrelation,
+                    nodes.Length,
+                    nodesPossibleOnline
+                );
             }
         }
         catch (MaximumIterationsException)
@@ -85,8 +98,6 @@ public class NelderMeadMultilateralizer(Device device, Floor floor, State state)
         {
             confidence = HandleLocatorException(ex, scenario, guess);
         }
-
-        CalculateAndSetPearsonCorrelation(scenario, nodes);
 
         return FinalizeScenario(scenario, confidence);
     }
