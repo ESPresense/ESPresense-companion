@@ -1,0 +1,274 @@
+# MQTT Connection, if empty will query and use hassio provided mqtt
+mqtt:
+  host:
+  port: 1883
+  ssl: false
+  username:
+  password:
+  discovery_topic: homeassistant  # Home Assistant MQTT discovery topic prefix (default: homeassistant)
+
+# This gets added to the x,y,z to derive a gps location
+gps:
+  latitude: 38.897957
+  longitude: -77.036560
+  elevation: 146
+  rotation: 10 # Rotation in degrees from north (0 degrees)
+  report: false # Include GPS latitude/longitude when reporting to Home Assistant
+
+map:
+  flip_x: false        # Set to true to flip X coordinates (default: false)
+  flip_y: true         # Set to true to use bottom-left origin, false for top-left origin (default: true)
+  wall_thickness: 0.1  # Wall thickness in meters
+  wall_color: "#ddd"   # Optional wall color, if not set uses room color
+  wall_opacity: 0.35   # Optional wall opacity, if not set defaults to 0.35
+
+# How long before device considered stale
+timeout: 30
+# How long before device is considered away
+away_timeout: 120
+
+# Retain devices for this long since last seen (duration string)
+# Examples: "30d", "720h", "2592000s"
+device_retention: 30d
+
+optimization:
+  enabled: true
+  interval_secs: 3600
+  keep_snapshot_mins: 5   # How long to keep optimization snapshots (default: 5 minutes)
+  optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
+  limits:
+    absorption_min: 2.5
+    absorption_max: 3.5
+    rx_adj_rssi_min: -5
+    rx_adj_rssi_max: 25
+    tx_ref_rssi_min: -80
+    tx_ref_rssi_max: -40
+  weights:
+    # Weighting factor for Pearson Correlation in best scenario scoring (default: 0.5)
+    correlation: 0.5
+    # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5)
+    rmse: 0.5
+
+
+locators:
+  nadaraya_watson:
+    enabled: true
+    floors: ["first", "second"]
+    bandwidth: 0.5
+    kernel: gaussian
+
+  nelder_mead:
+    enabled: false
+    floors: ["first", "second"]
+    weighting:
+      algorithm: gaussian
+      props:
+        sigma: 0.10
+
+  nearest_node:
+    enabled: true
+    max_distance: 10
+
+filtering:
+  # Kalman Filter Parameters
+  process_noise: 0.01      # Controls how quickly the filter adapts to change. Lower = smoother but more lag.
+  measurement_noise: 0.1   # Controls how much new measurements are trusted. Higher = trust model more (smoother).
+  max_velocity: 0.5        # Maximum expected velocity in m/s. Used to reject/dampen impossible movements.
+
+  # Smoothing Parameters
+  smoothing_weight: 0.7    # Weight given to previous state (0.0-1.0). Higher = more stable/repeatable.
+  motion_sigma: 2.0        # Motion consistency sensitivity. Controls how much distant scenarios are penalized.
+
+history:
+  enabled: false # Enable to log history to db (Beta)
+  expire_after: 24h # Expire after 24 hours
+
+# Floors w/ the points to draw it in meters
+floors:
+  - id: first
+    name: First Floor
+    # Bounds (x,y,z) of map in meters
+    bounds: [[0, 0, 0], [17, 18, 3]]
+    rooms:
+      - name: Powder
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [6.3, 10.2]
+          - [8.4, 10.2]
+          - [8.4, 9]
+          - [7.1, 7.6]
+          - [6.3, 7.6]
+          - [6.3, 10.2]
+      - name: Den
+        points:
+          - [6.3,14]
+          - [9.9,14]
+          - [9.9,12.7]
+          - [9.8,12.7]
+          - [9.8,11.5]
+          - [8.4,10.2]
+          - [6.3,10.2]
+      - name: Family
+        points:
+          - [0.0, 0.7]
+          - [0.0, 5.4]
+          - [5.0, 5.4]
+          - [6, 4.5]
+          - [6, 0.75]
+          - [5.25, 0.0]
+          - [0.7, 0.0]
+          - [0.0, 0.7]
+      - name: Kitchen
+        points:
+          - [6, 0.8]
+          - [6, 4.5]
+          - [7.3, 6.3]
+          - [8.4, 7.4]
+          - [12.4, 7.4]
+          - [12.4, 1.75]
+          - [8.9, 1.75]
+          - [8.9, 0.50]
+          - [6.3, 0.50]
+          - [6.0, 0.7]
+      - name: Garage
+        points:
+          - [0, 17.375]
+          - [2.3, 17.375]
+          - [2.3, 17.7]
+          - [6.3, 17.7]
+          - [6.3, 7.6]
+          - [0, 7.6]
+          - [0, 17.375]
+      - name: Living
+        points:
+          - [16.45,11.8]
+          - [16.45, 7.1]
+          - [12.4, 7.1]
+          - [12.4, 11.8]
+          - [16.45, 11.8]
+      - name: Dining
+        points:
+          - [16.45, 2.75]
+          - [16.45, 7.1]
+          - [12.4, 7.1]
+          - [12.4, 2.4]
+          - [16.45, 2.4]
+      - name: Foyer
+        points:
+          - [9.8,12.7]
+          - [12.4,12.7]
+          - [12.4,8.5]
+          - [10.9,7.4]
+          - [8.4,7.4]
+          - [8.4,8.6]
+          - [8.4,10.2]
+          - [9.8,11.5]
+          - [9.8,12.5]
+      - name: Laundry
+        points:
+          - [0, 5.4]
+          - [0, 7.6]
+          - [3.5, 7.6]
+          - [3.5, 5.4]
+          - [0, 5.4]
+  - id: second
+    name: Second Floor
+    bounds: [[0, 0, 3], [17, 18, 5.5]]
+    rooms:
+      - name: Master
+        points:
+          - [3.2,7.6]
+          - [3.2,12.3]
+          - [6.3,12.3]
+          - [6.3,10.2]
+          - [8.4,10.2]
+          - [8.4,9]
+          - [6.9,7.6]
+          - [3.7,7.6]
+      - name: Office
+        points:
+          - [6.3,14]
+          - [9.9,14]
+          - [9.9,12.7]
+          - [9.8,12.7]
+          - [9.8,11.5]
+          - [8.4,10.2]
+          - [6.3,10.2]
+      - name: Master Bathroom
+        points:
+          - [0, 7.6]
+          - [0, 12.3]
+          - [3.2, 12.3]
+          - [3.2, 7.6]
+      - name: Master Closet
+        points:
+          - [1.3,12.3]
+          - [5,12.3]
+          - [5,17.1]
+          - [1.3,17.1]
+
+# Locations of espresense nodes in meters
+nodes:
+  - name: Master
+    point: [3.4, 10.4, 3.4]
+    floors: ["second"]
+  - name: Bathroom
+    point: [0.15, 8.6, 4]
+    floors: ["second"]
+  - name: Upstairs Hallway
+    point: [10.4, 6.4, 3.4]
+    floors: ["second"]
+  - name: Garage
+    point: [1, 17.3, 0.5]
+    floors: ["first"]
+  - name: Office
+    point: [6.8, 13.5, 3.6]
+    floors: ["second"]
+  - name: Family
+    point: [0.25, 0.4, 0.4]
+    floors: ["first"]
+  - name: Kitchen
+    point: [8, 6.5, 1]
+    floors: ["first"]
+  - name: Nook
+    point: [7, 0.55, 0.4]
+    floors: ["first"]
+  - name: Dining
+    point: [16.3, 2.6, 1.29]
+    floors: ["first", "second"]
+  - name: Basement
+    point: [15.8, 11.5, -0.5]
+    floors: ["first"]
+  - name: Laundry
+    point: [4.3, 7.6, 1]
+    floors: ["first"]
+  - name: Back Stairs
+    point: [4.5, 7.5, 3.4]
+    floors: ["first", "second"]
+  - name: Foyer
+    point: [9.9, 8.3, 0.4]
+    floors: ["first", "second"]
+  - name: VW EOS
+    stationary: false
+    point: [-2, 15, 0.5]
+    floors: ["first"]
+
+# Devices to track
+devices:
+  - name: "*" # Track all named devices
+  - id: "tile:*" # Track all tiles
+  - id: "irk:*" # Track all IRKs
+  - id: "watch:*"
+  - id: "phone:*"
+  - id: "wallet:*"
+  - id: "keys:*"
+  - id: "therm:*"
+  - id: "iBeacon:*"
+  - id: "car:*"
+  - id: "laptop:*"
+  - id: "backpack:*"
+
+# Devices to NOT track
+exclude_devices:
+  - id: "iBeacon:e5ca1ade-f007-ba11-0000-000000000000-*" # These are junk, we alias them to node:*

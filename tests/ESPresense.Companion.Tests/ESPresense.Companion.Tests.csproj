@@ -7,7 +7,7 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <SpaRoot>..\src\ui</SpaRoot>
+    <SpaRoot>..\..\src\ui</SpaRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\ESPresense.Companion.csproj" />
+    <ProjectReference Include="..\..\src\ESPresense.Companion.csproj" />
   </ItemGroup>
 
   <Target Name="RunFrontendTests" BeforeTargets="VSTest">
