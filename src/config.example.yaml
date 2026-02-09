@@ -67,7 +67,7 @@ locators:
       props:
         # gaussian: sigma controls spread (higher = flatter weights, default: 0.3)
         sigma: 0.30
-        # exponential: lambda controls decay (higher = steeper decay, default: 3.0 for cubic)
+        # exponential: lambda controls decay (higher = steeper decay, default: 1.0)
         # lambda: 3.0
 
   bfgs:
