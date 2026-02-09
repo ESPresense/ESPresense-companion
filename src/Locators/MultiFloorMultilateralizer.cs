@@ -1,6 +1,7 @@
 ﻿using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
@@ -12,11 +13,23 @@ public class MultiFloorMultilateralizer : ILocate
 {
     private readonly Device _device;
     private readonly State _state;
+    private readonly IWeighting _weighting;
 
     public MultiFloorMultilateralizer(Device device, State state)
     {
         _device = device;
         _state = state;
+
+        // Use NelderMead weighting config as default for multi-floor
+        var w = state.Config?.Locators?.NelderMead?.Weighting;
+        _weighting = w?.Algorithm switch
+        {
+            "equal" => new EqualWeighting(),
+            "linear" => new LinearWeighting(w?.Props),
+            "gaussian" => new GaussianWeighting(w?.Props),
+            "exponential" => new ExponentialWeighting(w?.Props),
+            _ => new GaussianWeighting(w?.Props),
+        };
     }
 
     public bool Locate(Scenario scenario)
@@ -26,7 +39,7 @@ public class MultiFloorMultilateralizer : ILocate
 
         double Error(IList<double> x, DeviceToNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
         var nodes = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
-        var weights = nodes.Select((dn, i) => _state.Weighting?.Get(i, nodes.Length) ?? 1.0).ToArray();
+        var weights = nodes.Select((dn, i) => _weighting.Get(i, nodes.Length)).ToArray();
         var weightSum = weights.Sum();
         if (weightSum <= 0) weightSum = 1;
 

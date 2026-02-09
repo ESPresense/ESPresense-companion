@@ -1,6 +1,7 @@
 ﻿using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
@@ -8,8 +9,24 @@ using Serilog;
 
 namespace ESPresense.Locators;
 
-public class MLEMultilateralizer(Device device, Floor floor, State state) : BaseMultilateralizer(device, floor, state)
+public class MLEMultilateralizer : BaseMultilateralizer
 {
+    private readonly IWeighting _weighting;
+
+    public MLEMultilateralizer(Device device, Floor floor, State state) : base(device, floor, state)
+    {
+        // Load weighting from MLE config, defaulting to Gaussian if not specified
+        var w = state.Config?.Locators?.Mle?.Weighting;
+        _weighting = w?.Algorithm switch
+        {
+            "equal" => new EqualWeighting(),
+            "linear" => new LinearWeighting(w?.Props),
+            "gaussian" => new GaussianWeighting(w?.Props),
+            "exponential" => new ExponentialWeighting(w?.Props),
+            _ => new GaussianWeighting(w?.Props),
+        };
+    }
+
     public override bool Locate(Scenario scenario)
     {
         double Error(IList<double> x, DeviceToNode dn)
@@ -38,7 +55,7 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : Base
             }
             else
             {
-                var weights = nodes.Select((dn, i) => State?.Weighting?.Get(i, nodes.Length) ?? 1.0).ToArray();
+                var weights = nodes.Select((dn, i) => _weighting.Get(i, nodes.Length)).ToArray();
                 var weightSum = weights.Sum();
                 if (weightSum <= 0) weightSum = 1;
 

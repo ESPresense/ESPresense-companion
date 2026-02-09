@@ -60,16 +60,6 @@ public class State
             NamesToTrack = namesToTrack;
             ConfigDeviceByName = configDeviceByName;
 
-            var w = c?.Locators?.NelderMead?.Weighting;
-            Weighting = w?.Algorithm switch
-            {
-                "equal" => new EqualWeighting(),
-                "linear" => new LinearWeighting(w?.Props),
-                "gaussian" => new GaussianWeighting(w?.Props),
-                "exponential" => new ExponentialWeighting(w?.Props),
-                _ => new GaussianWeighting(w?.Props),
-            };
-
             // Update Kalman filter settings and propagate to all devices
             var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
             if (!newKalmanSettings.Equals(KalmanSettings))
@@ -103,7 +93,6 @@ public class State
     public List<Glob> IdsToTrack { get; private set; } = new();
     public List<Glob> NamesToTrack { get; private set; } = new();
     public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
-    public IWeighting? Weighting { get; set; }
     public OptimizerState OptimizerState { get; set; } = new();
     public LocatorState LocatorState { get; } = new();
 
@@ -213,10 +202,11 @@ public class State
 
         var nelderMead = Config?.Locators?.NelderMead;
         var bfgs = Config?.Locators?.Bfgs;
+        var mle = Config?.Locators?.Mle;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
 
-        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
         {
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
@@ -225,6 +215,10 @@ public class State
             if (bfgs?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(bfgs?.Floors))
                     yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this), floor.Name);
+
+            if (mle?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(mle?.Floors))
+                    yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this), floor.Name);
 
             if (nadarayaWatson?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))

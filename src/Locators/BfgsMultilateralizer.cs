@@ -1,6 +1,7 @@
 ﻿using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
@@ -10,14 +11,26 @@ namespace ESPresense.Locators;
 
 public class BfgsMultilateralizer : BaseMultilateralizer
 {
+    private readonly IWeighting _weighting;
+
     public BfgsMultilateralizer(Device device, Floor floor, State state)
         : base(device, floor, state)
     {
+        // Load weighting from BFGS config, defaulting to Gaussian if not specified
+        var w = state.Config?.Locators?.Bfgs?.Weighting;
+        _weighting = w?.Algorithm switch
+        {
+            "equal" => new EqualWeighting(),
+            "linear" => new LinearWeighting(w?.Props),
+            "gaussian" => new GaussianWeighting(w?.Props),
+            "exponential" => new ExponentialWeighting(w?.Props),
+            _ => new GaussianWeighting(w?.Props),
+        };
     }
 
     public override bool Locate(Scenario scenario)
     {
-        double Weight(int index, int total) => State?.Weighting?.Get(index, total) ?? (double)(total - index) / total;
+        double Weight(int index, int total) => _weighting.Get(index, total);
         double Error(IList<double> x, DeviceToNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - dn.Distance;
 
         if (!InitializeScenario(scenario, out var nodes, out var guess))
