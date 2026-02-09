@@ -203,10 +203,11 @@ public class State
         var nelderMead = Config?.Locators?.NelderMead;
         var bfgs = Config?.Locators?.Bfgs;
         var mle = Config?.Locators?.Mle;
+        var multiFloor = Config?.Locators?.MultiFloor;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
 
-        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (multiFloor?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
         {
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
@@ -219,6 +220,9 @@ public class State
             if (mle?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(mle?.Floors))
                     yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this), floor.Name);
+
+            if (multiFloor?.Enabled ?? false)
+                yield return new Scenario(Config, new MultiFloorMultilateralizer(device, this), "MultiFloor");
 
             if (nadarayaWatson?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
