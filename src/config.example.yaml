@@ -65,10 +65,10 @@ locators:
       # Options: equal, linear, gaussian, exponential
       algorithm: gaussian
       props:
-        # gaussian: sigma controls spread (higher = flatter weights)
+        # gaussian: sigma controls spread (higher = flatter weights, default: 0.3)
         sigma: 0.30
-        # exponential: lambda controls decay (higher = steeper decay)
-        # lambda: 0.35
+        # exponential: lambda controls decay (higher = steeper decay, default: 3.0 for cubic)
+        # lambda: 3.0
 
   bfgs:
     enabled: false
