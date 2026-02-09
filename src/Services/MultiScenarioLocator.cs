@@ -254,6 +254,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 if (state.Config?.Locators?.NelderMead?.Enabled ?? false) active.Add("NelderMead");
                 if (state.Config?.Locators?.Bfgs?.Enabled ?? false) active.Add("Bfgs");
                 if (state.Config?.Locators?.Mle?.Enabled ?? false) active.Add("Mle");
+                if (state.Config?.Locators?.MultiFloor?.Enabled ?? false) active.Add("MultiFloor");
                 if (state.Config?.Locators?.NearestNode?.Enabled ?? false) active.Add("NearestNode");
 
                 UpdateStatus(active.Count > 0 ? string.Join(", ", active) : "None");
