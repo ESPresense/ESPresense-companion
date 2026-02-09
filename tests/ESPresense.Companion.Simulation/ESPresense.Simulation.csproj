@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\ESPresense.Companion.csproj" />
+    <ProjectReference Include="../../src/ESPresense.Companion.csproj" />
   </ItemGroup>
 
 </Project>
