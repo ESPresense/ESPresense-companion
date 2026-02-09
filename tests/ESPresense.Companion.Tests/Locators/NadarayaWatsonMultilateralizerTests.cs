@@ -39,6 +39,12 @@ public class NadarayaWatsonMultilateralizerTests
             _configLoader.Dispose();
         }
 
+        if (_nodeTelemetryStore != null)
+        {
+            await _nodeTelemetryStore.StopAsync(CancellationToken.None);
+            _nodeTelemetryStore.Dispose();
+        }
+
         if (Directory.Exists(_configDir))
         {
             try
@@ -249,9 +255,10 @@ public class NadarayaWatsonMultilateralizerTests
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "NadarayaWatson");
 
         // Act
-        multilateralizer.Locate(scenario);
+        var result = multilateralizer.Locate(scenario);
 
         // Assert
+        Assert.That(result, Is.True);
         Assert.That(scenario.PearsonCorrelation, Is.Not.Null);
     }
 
@@ -328,9 +335,10 @@ public class NadarayaWatsonMultilateralizerTests
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "NadarayaWatson");
 
         // Act
-        multilateralizer.Locate(scenario);
+        var result = multilateralizer.Locate(scenario);
 
         // Assert - position should be much closer to node1 due to inverse-distance-squared weighting
+        Assert.That(result, Is.True);
         Assert.That(scenario.Location.DistanceTo(node1.Location), Is.LessThan(3.0));
         Assert.That(scenario.Location.DistanceTo(node2.Location), Is.GreaterThan(5.0));
     }
@@ -368,9 +376,10 @@ public class NadarayaWatsonMultilateralizerTests
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "NadarayaWatson");
 
         // Act
-        multilateralizer.Locate(scenario);
+        var result = multilateralizer.Locate(scenario);
 
         // Assert - error should be set and non-negative
+        Assert.That(result, Is.True);
         Assert.That(scenario.Error, Is.Not.Null);
         Assert.That(scenario.Error, Is.GreaterThanOrEqualTo(0));
     }
@@ -415,9 +424,10 @@ public class NadarayaWatsonMultilateralizerTests
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "NadarayaWatson");
 
         // Act
-        multilateralizer.Locate(scenario);
+        var result = multilateralizer.Locate(scenario);
 
         // Assert - confidence should account for 3/5 coverage ratio
+        Assert.That(result, Is.True);
         Assert.That(scenario.Confidence, Is.GreaterThanOrEqualTo(5));
         Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(100));
     }
@@ -472,9 +482,10 @@ public class NadarayaWatsonMultilateralizerTests
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "NadarayaWatson");
 
         // Act
-        multilateralizer.Locate(scenario);
+        var result = multilateralizer.Locate(scenario);
 
         // Assert
+        Assert.That(result, Is.True);
         Assert.That(scenario.Room, Is.EqualTo(room));
     }
 }

@@ -36,6 +36,12 @@ public class MLEMultilateralizerTests
             _configLoader.Dispose();
         }
 
+        if (_nodeTelemetryStore != null)
+        {
+            await _nodeTelemetryStore.StopAsync(CancellationToken.None);
+            _nodeTelemetryStore.Dispose();
+        }
+
         if (Directory.Exists(_configDir))
         {
             try
@@ -223,9 +229,10 @@ public class MLEMultilateralizerTests
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "MLE");
 
         // Act
-        multilateralizer.Locate(scenario);
+        var result = multilateralizer.Locate(scenario);
 
         // Assert
+        Assert.That(result, Is.True);
         Assert.That(scenario.PearsonCorrelation, Is.Not.Null);
     }
 
