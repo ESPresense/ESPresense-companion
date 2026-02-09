@@ -77,10 +77,18 @@ class Program
 
     static void Main(string[] args)
     {
+        // Check if user wants weighting comparison
+        if (args.Length > 0 && args[0] == "weightings")
+        {
+            CompareWeightings.Run();
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
         Console.WriteLine($"Accurate run threshold: <= {SuccessThresholdMeters:F1}m 2D error\n");
+        Console.WriteLine("Tip: Run 'dotnet run weightings' to compare weighting schemes\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]
