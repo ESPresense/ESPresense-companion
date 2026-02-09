@@ -73,11 +73,12 @@ class Program
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]
         {
-            ("Perfect Data (no noise)", s => s.NoiseStdDev = 0),
-            ("Realistic Noise (0.5m std dev)", s => s.NoiseStdDev = 0.5),
-            ("Heavy Noise (1.5m std dev)", s => s.NoiseStdDev = 1.5),
-            ("Noisy with Outliers (5% outliers)", s => { s.NoiseStdDev = 0.5; s.OutlierProbability = 0.05; }),
-            ("Obstacles (30% walls)", s => { s.NoiseStdDev = 0.5; s.ObstacleAbsorption = 0.3; }),
+            ("Perfect Data (no noise)", s => { s.NoiseStdDev = 0; s.ObstacleAbsorption = 0; s.OutlierProbability = 0; }),
+            ("Realistic Noise (0.5m std dev)", s => { s.NoiseStdDev = 0.5; s.ObstacleAbsorption = 0; s.OutlierProbability = 0; }),
+            ("Heavy Noise (1.5m std dev)", s => { s.NoiseStdDev = 1.5; s.ObstacleAbsorption = 0; s.OutlierProbability = 0; }),
+            ("Noise + Outliers (5%)", s => { s.NoiseStdDev = 0.5; s.ObstacleAbsorption = 0; s.OutlierProbability = 0.05; }),
+            ("Noise + Obstacles (30% walls)", s => { s.NoiseStdDev = 0.5; s.ObstacleAbsorption = 0.3; s.OutlierProbability = 0; }),
+            ("Real World (all effects)", s => { s.NoiseStdDev = 0.5; s.ObstacleAbsorption = 0.3; s.OutlierProbability = 0.05; }),
         };
         
         // Node configurations
@@ -95,7 +96,6 @@ class Program
             ("Gauss-Newton", (d, f, s, nts) => new GaussNewtonMultilateralizer(d, f, s)),
             ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s)),
             ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s)),
-            ("Iterative Centroid", (d, f, s, nts) => new IterativeCentroidMultilateralizer(d, f, s)),
             ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s)),
             ("Nadaraya-Watson", (d, f, s, nts) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
         };

@@ -71,19 +71,30 @@ public class MultilaterationSimulator
     }
     
     /// <summary>
+    /// Generate a realistic node height between 0-2m, varied per node
+    /// </summary>
+    private double NodeHeight(int index)
+    {
+        // Vary heights: 0.0, 0.5, 1.0, 1.5, 2.0m cycling through
+        double[] heights = { 0.0, 0.5, 1.0, 1.5, 2.0, 1.2, 0.8, 1.8 };
+        return heights[index % heights.Length];
+    }
+
+    /// <summary>
     /// Generate nodes in a grid pattern
     /// </summary>
     public void GenerateGridNodes(int rows, int cols, double spacing)
     {
+        int idx = 0;
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < cols; c++)
             {
-                AddNode($"node-{r}-{c}", new Point3D(c * spacing, r * spacing, 2.5)); // 2.5m height
+                AddNode($"node-{r}-{c}", new Point3D(c * spacing, r * spacing, NodeHeight(idx++)));
             }
         }
     }
-    
+
     /// <summary>
     /// Generate nodes in a line (collinearity test)
     /// </summary>
@@ -91,10 +102,10 @@ public class MultilaterationSimulator
     {
         for (int i = 0; i < count; i++)
         {
-            AddNode($"node-{i}", new Point3D(i * spacing, 0, 2.5));
+            AddNode($"node-{i}", new Point3D(i * spacing, 0, NodeHeight(i)));
         }
     }
-    
+
     /// <summary>
     /// Generate nodes in perimeter (best for multilateration)
     /// </summary>
@@ -105,14 +116,14 @@ public class MultilaterationSimulator
             double t = (double)i / count;
             Point3D loc;
             if (t < 0.25)
-                loc = new Point3D(t * 4 * width, 0, 2.5);
+                loc = new Point3D(t * 4 * width, 0, NodeHeight(i));
             else if (t < 0.5)
-                loc = new Point3D(width, (t - 0.25) * 4 * height, 2.5);
+                loc = new Point3D(width, (t - 0.25) * 4 * height, NodeHeight(i));
             else if (t < 0.75)
-                loc = new Point3D((0.75 - t) * 4 * width, height, 2.5);
+                loc = new Point3D((0.75 - t) * 4 * width, height, NodeHeight(i));
             else
-                loc = new Point3D(0, (1 - t) * 4 * height, 2.5);
-            
+                loc = new Point3D(0, (1 - t) * 4 * height, NodeHeight(i));
+
             AddNode($"node-{i}", loc);
         }
     }
@@ -172,13 +183,20 @@ public class MultilaterationSimulator
         stopwatch.Stop();
         
         var estimatedPosition = scenario.Location;
-        double error = estimatedPosition.DistanceTo(truePosition);
-        
+
+        // 2D error (X,Y only) - what matters for indoor positioning
+        double error2D = Math.Sqrt(
+            Math.Pow(estimatedPosition.X - truePosition.X, 2) +
+            Math.Pow(estimatedPosition.Y - truePosition.Y, 2));
+        // 3D error for reference
+        double error3D = estimatedPosition.DistanceTo(truePosition);
+
         return new SimulationResult
         {
             TruePosition = truePosition,
             EstimatedPosition = estimatedPosition,
-            Error = error,
+            Error = error2D,
+            Error3D = error3D,
             ComputationTimeMs = stopwatch.ElapsedMilliseconds,
             NodeCount = _nodes.Count,
             Fixes = scenario.Fixes ?? 0,
@@ -224,7 +242,8 @@ public class SimulationResult
 {
     public Point3D TruePosition { get; set; }
     public Point3D EstimatedPosition { get; set; }
-    public double Error { get; set; }
+    public double Error { get; set; }      // 2D (X,Y) error
+    public double Error3D { get; set; }    // 3D error for reference
     public long ComputationTimeMs { get; set; }
     public int NodeCount { get; set; }
     public int Fixes { get; set; }
@@ -247,8 +266,10 @@ public class SimulationReport
     public double SuccessRate => TotalRuns > 0 ? (double)SuccessfulRuns / TotalRuns : 0;
     
     private List<double> ValidErrors => _results.Where(r => r.Fixes >= 3).Select(r => r.Error).ToList();
-    
+    private List<double> ValidErrors3D => _results.Where(r => r.Fixes >= 3).Select(r => r.Error3D).ToList();
+
     public double MeanError => ValidErrors.Count > 0 ? ValidErrors.Average() : double.NaN;
+    public double MeanError3D => ValidErrors3D.Count > 0 ? ValidErrors3D.Average() : double.NaN;
     public double MedianError 
     { 
         get 
@@ -281,13 +302,10 @@ public class SimulationReport
         Console.WriteLine($"Success Rate: {SuccessRate:P1} ({SuccessfulRuns}/{TotalRuns})");
         if (SuccessfulRuns > 0)
         {
-            Console.WriteLine($"Mean Error: {MeanError:F2}m");
-            Console.WriteLine($"Median Error: {MedianError:F2}m");
-            if (ValidErrors.Count >= 2)
-                Console.WriteLine($"Std Dev: {StdDevError:F2}m");
-            Console.WriteLine($"Min/Max Error: {MinError:F2}m / {MaxError:F2}m");
-            Console.WriteLine($"Mean Fixes: {MeanFixes:F1}");
-            Console.WriteLine($"Mean Iterations: {MeanIterations:F1}");
+            Console.WriteLine($"2D Error (X,Y): {MeanError:F2}m (median {MedianError:F2}m, std {(ValidErrors.Count >= 2 ? StdDevError : 0):F2}m)");
+            Console.WriteLine($"3D Error:       {MeanError3D:F2}m");
+            Console.WriteLine($"Min/Max 2D:     {MinError:F2}m / {MaxError:F2}m");
+            Console.WriteLine($"Fixes: {MeanFixes:F1}  Iterations: {MeanIterations:F1}");
         }
         else
         {
