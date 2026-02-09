@@ -5,6 +5,7 @@ using ESPresense.Locators;
 using ESPresense.Models;
 using MathNet.Spatial.Euclidean;
 using Serilog;
+using Serilog.Core;
 
 namespace ESPresense.Simulation;
 
@@ -31,12 +32,18 @@ public class MultilaterationSimulator
         _state = state;
         _randomSeed = seed ?? Random.Shared.Next();
         _random = new Random(_randomSeed);
+    }
 
-        // Setup logging to suppress during simulation
-        Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Error()
-            .WriteTo.Console()
-            .CreateLogger();
+    static MultilaterationSimulator()
+    {
+        // Setup logging to suppress during simulation (only once)
+        if (Log.Logger.GetType().Name == "SilentLogger")
+        {
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Error()
+                .WriteTo.Console()
+                .CreateLogger();
+        }
     }
 
     /// <summary>
@@ -46,8 +53,6 @@ public class MultilaterationSimulator
     {
         _nodes.Clear();
         _state.Nodes.Clear();
-        // Re-seed for reproducibility
-        _random = new Random(_randomSeed);
     }
     
     /// <summary>
@@ -55,7 +60,12 @@ public class MultilaterationSimulator
     /// </summary>
     public void AddNode(string id, Point3D location)
     {
-        var node = new Node(id, location);
+        var node = new Node(id, NodeSourceType.Config);
+        // Manually set location using private setter workaround via ConfigNode
+        var configNode = new ConfigNode { Name = id, Point = new[] { location.X, location.Y, location.Z } };
+        var config = new Config();
+        node.Update(config, configNode, new[] { _floor });
+
         _nodes.Add(node);
         _state.Nodes[id] = node;
     }
@@ -110,10 +120,14 @@ public class MultilaterationSimulator
     /// <summary>
     /// Simulate a measurement from device to all nodes using actual ILocate
     /// </summary>
-    public SimulationResult Simulate(Point3D truePosition, ILocate locator, Config config)
+    /// <param name="truePosition">The true position of the device</param>
+    /// <param name="locator">The locator to test</param>
+    /// <param name="config">Configuration</param>
+    /// <param name="device">The SAME device instance the locator was constructed with</param>
+    public SimulationResult Simulate(Point3D truePosition, ILocate locator, Config config, Device device)
     {
-        // Create FRESH device for each simulation to avoid state accumulation
-        var device = new Device($"sim-device-{_random.Next(100000)}", "Simulated Device");
+        // Clear previous readings on the locator's own device
+        device.Nodes.Clear();
         
         // Generate measurements to all nodes
         foreach (var node in _nodes)
@@ -135,24 +149,21 @@ public class MultilaterationSimulator
             var dtn = new DeviceToNode(device, node)
             {
                 Distance = Math.Max(0.1, measuredDistance),
-                LastHit = DateTime.UtcNow,
-                Current = true
+                LastHit = DateTime.UtcNow
+                // Current is a computed property based on LastHit and Device.Timeout
             };
-            
+
             device.Nodes[node.Id] = dtn;
         }
         
         // Create scenario with the locator
         var scenario = new Scenario(config, locator, "simulation");
-        
-        // Set initial location to centroid of nodes (NOT the true position)
-        // This gives iterative solvers a realistic starting point
-        var centroid = new Point3D(
-            _nodes.Average(n => n.Location.X),
-            _nodes.Average(n => n.Location.Y),
-            _nodes.Average(n => n.Location.Z)
-        );
-        scenario.ResetLocation(centroid);
+
+        // Do NOT call ResetLocation here - leave the Kalman filter uninitialized.
+        // When uninitialized, the first UpdateLocation call from the locator will
+        // accept the computed position directly (no filtering). If we Reset first,
+        // the near-zero dt between Reset and Update causes the Kalman filter to
+        // reject the measurement as "physically impossible movement".
         scenario.Confidence = 0; // Start with no confidence
         
         // Run the actual locator
@@ -180,10 +191,10 @@ public class MultilaterationSimulator
     /// <summary>
     /// Run Monte Carlo simulation
     /// </summary>
-    public SimulationReport RunMonteCarlo(int iterations, ILocate locator, Config config)
+    public SimulationReport RunMonteCarlo(int iterations, ILocate locator, Config config, Device device)
     {
         var results = new List<SimulationResult>();
-        
+
         for (int i = 0; i < iterations; i++)
         {
             // Random position on floor
@@ -192,8 +203,8 @@ public class MultilaterationSimulator
                 _random.NextDouble() * 10 + 1,
                 1.0 // 1m device height
             );
-            
-            results.Add(Simulate(truePos, locator, config));
+
+            results.Add(Simulate(truePos, locator, config, device));
         }
         
         return new SimulationReport(results);

@@ -2,10 +2,43 @@ using System;
 using System.Collections.Generic;
 using ESPresense.Locators;
 using ESPresense.Models;
+using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
 using ESPresense.Simulation;
 
 namespace ESPresense.Simulation.Tests;
+
+/// <summary>
+/// Mock ConfigLoader for simulation - no background service needed
+/// </summary>
+class MockConfigLoader : ConfigLoader
+{
+    private readonly Config _config;
+
+    public MockConfigLoader(Config config) : base(string.Empty)
+    {
+        _config = config;
+        // Trigger the ConfigChanged event to initialize State
+        typeof(ConfigLoader)
+            .GetProperty(nameof(Config))!
+            .SetValue(this, config);
+    }
+
+    public new Config Config => _config;
+}
+
+/// <summary>
+/// Mock NodeTelemetryStore for simulation - all nodes are considered online
+/// </summary>
+class MockNodeTelemetryStore : NodeTelemetryStore
+{
+    public MockNodeTelemetryStore() : base(null!)
+    {
+    }
+
+    public override bool Online(string id) => true;
+    public override NodeTelemetry? Get(string id) => null;
+}
 
 /// <summary>
 /// Compares actual multilateration algorithms from ESPresense.Companion
@@ -19,14 +52,22 @@ class Program
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
         
         // Setup floor and state
-        var floor = new Floor("Test Floor", new[] { new Point3D(0, 0, 0), new Point3D(12, 12, 3) });
-        var state = new State();
-        
-        // Setup config
-        var config = new Config();
+        var floor = new Floor();
+        var configFloor = new ConfigFloor
+        {
+            Name = "Test Floor",
+            Bounds = new[] { new[] { 0.0, 0.0, 0.0 }, new[] { 12.0, 12.0, 3.0 } }
+        };
+        var config = new Config { Floors = new[] { configFloor } };
+        floor.Update(config, configFloor);
+
+        // Create mock dependencies for State
+        var mockConfigLoader = new MockConfigLoader(config);
+        var mockNodeTelemetryStore = new MockNodeTelemetryStore();
+        var state = new State(mockConfigLoader, mockNodeTelemetryStore);
         
         // Create test device (needed for locators)
-        var device = new Device("sim-device", "Test Device");
+        var device = new Device("sim-device", "test-discovery", TimeSpan.FromSeconds(30));
         state.Devices["sim-device"] = device;
         
         // Test scenarios
@@ -49,14 +90,14 @@ class Program
         };
         
         // Locators to test
-        var locators = new (string Name, Func<Device, Floor, State, ILocate> Factory)[]
+        var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, ILocate> Factory)[]
         {
-            ("Gauss-Newton", (d, f, s) => new GaussNewtonMultilateralizer(d, f, s)),
-            ("Nelder-Mead", (d, f, s) => new NelderMeadMultilateralizer(d, f, s)),
-            ("BFGS", (d, f, s) => new BfgsMultilateralizer(d, f, s)),
-            ("Iterative Centroid", (d, f, s) => new IterativeCentroidMultilateralizer(d, f, s)),
-            ("MLE", (d, f, s) => new MLEMultilateralizer(d, f, s)),
-            ("Nadaraya-Watson", (d, f, s) => new NadarayaWatsonMultilateralizer(d, f, s)),
+            ("Gauss-Newton", (d, f, s, nts) => new GaussNewtonMultilateralizer(d, f, s)),
+            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s)),
+            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s)),
+            ("Iterative Centroid", (d, f, s, nts) => new IterativeCentroidMultilateralizer(d, f, s)),
+            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s)),
+            ("Nadaraya-Watson", (d, f, s, nts) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
         };
         
         int iterations = 100;
@@ -80,8 +121,8 @@ class Program
                     try
                     {
                         // Create fresh locator for each test
-                        var locator = locatorInfo.Factory(device, floor, state);
-                        var report = sim.RunMonteCarlo(iterations, locator, config);
+                        var locator = locatorInfo.Factory(device, floor, state, mockNodeTelemetryStore);
+                        var report = sim.RunMonteCarlo(iterations, locator, config, device);
                         report.PrintReport(locatorInfo.Name);
                     }
                     catch (Exception ex)
