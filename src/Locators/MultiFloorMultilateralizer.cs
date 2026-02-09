@@ -26,12 +26,15 @@ public class MultiFloorMultilateralizer : ILocate
 
         double Error(IList<double> x, DeviceToNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
         var nodes = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
+        var weights = nodes.Select((dn, i) => _state.Weighting?.Get(i, nodes.Length) ?? 1.0).ToArray();
+        var weightSum = weights.Sum();
+        if (weightSum <= 0) weightSum = 1;
 
         var obj = ObjectiveFunction.Value(x =>
         {
             return Math.Pow(5*(1 - x[3]), 2) + nodes
-                .Select((dn, i) => new { err = Error(x, dn), weight = _state.Weighting?.Get(i, nodes.Length) ?? 1.0 })
-                .Average(a => a.weight * Math.Pow(a.err, 2));
+                .Select((dn, i) => new { err = Error(x, dn), weight = weights[i] })
+                .Sum(a => a.weight * Math.Pow(a.err, 2)) / weightSum;
         });
         var pos = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).Select(a => a.Node!.Location).ToList();
 
@@ -67,8 +70,29 @@ public class MultiFloorMultilateralizer : ILocate
                     scenario.Fixes = pos.Count;
                     scenario.Minimum = nodes.Min(a => (double?) a.Distance);
                     scenario.LastHit = nodes.Max(a => a.LastHit);
+                    scenario.Error = result.FunctionInfoAtMinimum.Value;
 
-                    confidence = (int)Math.Max(Math.Min(100, (100 * pos.Count - 1) / 4.0), Math.Min(100, 100 * pos.Count / 4.0) - result.FunctionInfoAtMinimum.Value);
+                    if (nodes.Length >= 2)
+                    {
+                        var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
+                        var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
+                        scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
+                    }
+                    else
+                    {
+                        scenario.PearsonCorrelation = null; // Not enough data points
+                    }
+
+                    // Calculate number of possible nodes (all nodes since MultiFloor is floor-agnostic)
+                    int nodesPossibleOnline = _state.Nodes.Values.Count();
+
+                    // Use the centralized confidence calculation
+                    confidence = MathUtils.CalculateConfidence(
+                        scenario.Error,
+                        scenario.PearsonCorrelation,
+                        nodes.Length,
+                        nodesPossibleOnline
+                    );
                 }
                 else
                 {
@@ -87,17 +111,6 @@ public class MultiFloorMultilateralizer : ILocate
         }
 
         scenario.Confidence = confidence;
-
-        if (nodes.Length >= 2)
-        {
-            var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
-            var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
-            scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
-        }
-        else
-        {
-            scenario.PearsonCorrelation = null; // Not enough data points
-        }
 
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;

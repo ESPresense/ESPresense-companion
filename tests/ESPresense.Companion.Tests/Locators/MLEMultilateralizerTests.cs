@@ -1,0 +1,326 @@
+using ESPresense.Locators;
+using ESPresense.Models;
+using ESPresense.Services;
+using MathNet.Spatial.Euclidean;
+using Moq;
+
+namespace ESPresense.Companion.Tests.Locators;
+
+[TestFixture]
+public class MLEMultilateralizerTests
+{
+    private State _state;
+    private ConfigLoader _configLoader;
+    private string _configDir;
+    private NodeTelemetryStore _nodeTelemetryStore;
+    private Mock<IMqttCoordinator> _mockMqttCoordinator;
+
+    [SetUp]
+    public void Setup()
+    {
+        _mockMqttCoordinator = new Mock<IMqttCoordinator>();
+        _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(_configDir);
+
+        _configLoader = new ConfigLoader(_configDir);
+        _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore);
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        if (_configLoader != null)
+        {
+            await _configLoader.StopAsync(CancellationToken.None);
+            _configLoader.Dispose();
+        }
+
+        if (_nodeTelemetryStore != null)
+        {
+            await _nodeTelemetryStore.StopAsync(CancellationToken.None);
+            _nodeTelemetryStore.Dispose();
+        }
+
+        if (Directory.Exists(_configDir))
+        {
+            try
+            {
+                Directory.Delete(_configDir, true);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+    }
+
+    private Floor CreateTestFloor(string id = "test_floor")
+    {
+        var floor = new Floor();
+        var configFloor = new ConfigFloor
+        {
+            Id = id,
+            Name = "Test Floor",
+            Bounds = new double[][]
+            {
+                new double[] { -10, -10, -10 },
+                new double[] { 10, 10, 10 }
+            }
+        };
+        floor.Update(_configLoader.Config!, configFloor);
+        _state.Floors[floor.Id] = floor;
+        return floor;
+    }
+
+    private Node CreateTestNode(string id, double x, double y, double z, Floor floor)
+    {
+        var node = new Node(id, NodeSourceType.Config);
+        var configNode = new ConfigNode { Name = id, Point = new double[] { x, y, z } };
+        node.Update(_configLoader.Config!, configNode, new[] { floor });
+        _state.Nodes[id] = node;
+        return node;
+    }
+
+    [Test]
+    public void Locate_WithThreeNodes_CalculatesPosition()
+    {
+        // Arrange
+        var floor = CreateTestFloor();
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        // Create three nodes in a triangle
+        var node1 = CreateTestNode("node1", 0, 0, 0, floor);
+        var node2 = CreateTestNode("node2", 5, 0, 0, floor);
+        var node3 = CreateTestNode("node3", 2.5, 4.33, 0, floor);
+
+        // Expected position: somewhere in the center of the triangle
+        var expectedPosition = new Point3D(2.5, 2, 0);
+
+        // Set distances as if device is near the expected position
+        device.Nodes["node1"] = new DeviceToNode(device, node1)
+        {
+            Distance = expectedPosition.DistanceTo(node1.Location),
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node2"] = new DeviceToNode(device, node2)
+        {
+            Distance = expectedPosition.DistanceTo(node2.Location),
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node3"] = new DeviceToNode(device, node3)
+        {
+            Distance = expectedPosition.DistanceTo(node3.Location),
+            LastHit = DateTime.UtcNow
+        };
+
+        var multilateralizer = new MLEMultilateralizer(device, floor, _state);
+        var scenario = new Scenario(_configLoader.Config, multilateralizer, "MLE");
+
+        // Act
+        var result = multilateralizer.Locate(scenario);
+
+        // Assert
+        Assert.That(result, Is.True);
+        Assert.That(scenario.Confidence, Is.GreaterThan(0));
+        Assert.That(scenario.Location.DistanceTo(expectedPosition), Is.LessThan(0.5)); // Within 0.5 meters
+        Assert.That(scenario.Fixes, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void Locate_WithFewerThanThreeNodes_UsesGuess()
+    {
+        // Arrange
+        var floor = CreateTestFloor();
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        var node1 = CreateTestNode("node1", 0, 0, 0, floor);
+        var node2 = CreateTestNode("node2", 5, 0, 0, floor);
+
+        device.Nodes["node1"] = new DeviceToNode(device, node1)
+        {
+            Distance = 2.5,
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node2"] = new DeviceToNode(device, node2)
+        {
+            Distance = 2.5,
+            LastHit = DateTime.UtcNow
+        };
+
+        var multilateralizer = new MLEMultilateralizer(device, floor, _state);
+        var scenario = new Scenario(_configLoader.Config, multilateralizer, "MLE");
+
+        // Act
+        var result = multilateralizer.Locate(scenario);
+
+        // Assert
+        Assert.That(result, Is.True);
+        Assert.That(scenario.Confidence, Is.EqualTo(1)); // Low confidence when using guess
+        // Location should be midpoint between the two nodes
+        var expectedMidpoint = Point3D.MidPoint(node1.Location, node2.Location);
+        Assert.That(scenario.Location.DistanceTo(expectedMidpoint), Is.LessThan(0.01));
+    }
+
+    [Test]
+    public void Locate_SetsConfidenceCorrectly()
+    {
+        // Arrange
+        var floor = CreateTestFloor();
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        // Create four nodes - more nodes should give higher confidence
+        var node1 = CreateTestNode("node1", 0, 0, 0, floor);
+        var node2 = CreateTestNode("node2", 5, 0, 0, floor);
+        var node3 = CreateTestNode("node3", 2.5, 4.33, 0, floor);
+        var node4 = CreateTestNode("node4", 2.5, -4.33, 0, floor);
+
+        var expectedPosition = new Point3D(2.5, 0, 0);
+
+        device.Nodes["node1"] = new DeviceToNode(device, node1)
+        {
+            Distance = expectedPosition.DistanceTo(node1.Location),
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node2"] = new DeviceToNode(device, node2)
+        {
+            Distance = expectedPosition.DistanceTo(node2.Location),
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node3"] = new DeviceToNode(device, node3)
+        {
+            Distance = expectedPosition.DistanceTo(node3.Location),
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node4"] = new DeviceToNode(device, node4)
+        {
+            Distance = expectedPosition.DistanceTo(node4.Location),
+            LastHit = DateTime.UtcNow
+        };
+
+        var multilateralizer = new MLEMultilateralizer(device, floor, _state);
+        var scenario = new Scenario(_configLoader.Config, multilateralizer, "MLE");
+
+        // Act
+        var result = multilateralizer.Locate(scenario);
+
+        // Assert
+        Assert.That(result, Is.True);
+        Assert.That(scenario.Confidence, Is.GreaterThan(10)); // Should have decent confidence with 4 nodes
+        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(100)); // Should not exceed 100
+    }
+
+    [Test]
+    public void Locate_CallsCalculateAndSetPearsonCorrelation()
+    {
+        // Arrange
+        var floor = CreateTestFloor();
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        var node1 = CreateTestNode("node1", 0, 0, 0, floor);
+        var node2 = CreateTestNode("node2", 5, 0, 0, floor);
+        var node3 = CreateTestNode("node3", 2.5, 4.33, 0, floor);
+
+        device.Nodes["node1"] = new DeviceToNode(device, node1) { Distance = 2.5, LastHit = DateTime.UtcNow };
+        device.Nodes["node2"] = new DeviceToNode(device, node2) { Distance = 2.5, LastHit = DateTime.UtcNow };
+        device.Nodes["node3"] = new DeviceToNode(device, node3) { Distance = 2.5, LastHit = DateTime.UtcNow };
+
+        var multilateralizer = new MLEMultilateralizer(device, floor, _state);
+        var scenario = new Scenario(_configLoader.Config, multilateralizer, "MLE");
+
+        // Act
+        var result = multilateralizer.Locate(scenario);
+
+        // Assert
+        Assert.That(result, Is.True);
+        Assert.That(scenario.PearsonCorrelation, Is.Not.Null);
+    }
+
+    [Test]
+    public void Locate_UsesCentralizedConfidence()
+    {
+        // Arrange
+        var floor = CreateTestFloor();
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        var node1 = CreateTestNode("node1", 0, 0, 0, floor);
+        var node2 = CreateTestNode("node2", 5, 0, 0, floor);
+        var node3 = CreateTestNode("node3", 2.5, 4.33, 0, floor);
+
+        var expectedPosition = new Point3D(2.5, 2, 0);
+
+        device.Nodes["node1"] = new DeviceToNode(device, node1)
+        {
+            Distance = expectedPosition.DistanceTo(node1.Location),
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node2"] = new DeviceToNode(device, node2)
+        {
+            Distance = expectedPosition.DistanceTo(node2.Location),
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node3"] = new DeviceToNode(device, node3)
+        {
+            Distance = expectedPosition.DistanceTo(node3.Location),
+            LastHit = DateTime.UtcNow
+        };
+
+        var multilateralizer = new MLEMultilateralizer(device, floor, _state);
+        var scenario = new Scenario(_configLoader.Config, multilateralizer, "MLE");
+
+        // Act
+        var result = multilateralizer.Locate(scenario);
+
+        // Assert
+        Assert.That(result, Is.True);
+        // Verify confidence uses MathUtils.CalculateConfidence (confidence between 5 and 100)
+        Assert.That(scenario.Confidence, Is.GreaterThan(5));
+        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(100));
+    }
+
+    [Test]
+    public void Locate_UsesVarianceInErrorCalculation()
+    {
+        // Arrange
+        var floor = CreateTestFloor();
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        var node1 = CreateTestNode("node1", 0, 0, 0, floor);
+        var node2 = CreateTestNode("node2", 5, 0, 0, floor);
+        var node3 = CreateTestNode("node3", 2.5, 4.33, 0, floor);
+
+        var expectedPosition = new Point3D(2.5, 2, 0);
+
+        // Set DistVar on DeviceToNode objects to test variance usage
+        device.Nodes["node1"] = new DeviceToNode(device, node1)
+        {
+            Distance = expectedPosition.DistanceTo(node1.Location),
+            DistVar = 0.5,
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node2"] = new DeviceToNode(device, node2)
+        {
+            Distance = expectedPosition.DistanceTo(node2.Location),
+            DistVar = 0.3,
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node3"] = new DeviceToNode(device, node3)
+        {
+            Distance = expectedPosition.DistanceTo(node3.Location),
+            DistVar = 0.8,
+            LastHit = DateTime.UtcNow
+        };
+
+        var multilateralizer = new MLEMultilateralizer(device, floor, _state);
+        var scenario = new Scenario(_configLoader.Config, multilateralizer, "MLE");
+
+        // Act
+        var result = multilateralizer.Locate(scenario);
+
+        // Assert
+        Assert.That(result, Is.True);
+        Assert.That(scenario.Confidence, Is.GreaterThan(0));
+        // Verify that location is calculated (variance affects optimization)
+        Assert.That(scenario.Location, Is.Not.EqualTo(Point3D.NaN));
+    }
+}

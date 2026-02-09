@@ -38,6 +38,10 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : Base
             }
             else
             {
+                var weights = nodes.Select((dn, i) => State?.Weighting?.Get(i, nodes.Length) ?? 1.0).ToArray();
+                var weightSum = weights.Sum();
+                if (weightSum <= 0) weightSum = 1;
+
                 var lowerBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[0].X, Floor.Bounds[0].Y, Floor.Bounds[0].Z, 0.5 });
                 var upperBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[1].X, Floor.Bounds[1].Y, Floor.Bounds[1].Z, 1.5 });
                 var obj = ObjectiveFunction.Value(
@@ -48,8 +52,8 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : Base
                             .PointwiseMaximum(0)
                             .L2Norm();
                         return (distanceFromBoundingBox > 0 ? Math.Pow(5, 1 + distanceFromBoundingBox) : 0) + Math.Pow(5 * (1 - x[3]), 2) + nodes
-                            .Select((dn, i) => new { err = Error(x, dn), weight = State?.Weighting?.Get(i, nodes.Length) ?? 1.0 })
-                            .Average(a => a.weight * a.err);
+                            .Select((dn, i) => new { err = Error(x, dn), weight = weights[i] })
+                            .Sum(a => a.weight * a.err) / weightSum;
                     });
 
                 var clampedGuess = ClampToFloorBounds(guess);
@@ -79,7 +83,20 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : Base
                 };
 
                 scenario.ReasonForExit = result.ReasonForExit;
-                confidence = (int)Math.Min(100, Math.Max(10, 100.0 - (Math.Pow(scenario.Minimum ?? 1, 2) + Math.Pow(10 * (1 - (scenario.Scale ?? 1)), 2) + (scenario.Minimum + result.FunctionInfoAtMinimum.Value ?? 10.00))));
+
+                CalculateAndSetPearsonCorrelation(scenario, nodes);
+
+                // Calculate number of possible nodes for this floor
+                int nodesPossibleOnline = State.Nodes.Values
+                    .Count(n => n.Floors?.Contains(Floor) ?? false);
+
+                // Use the centralized confidence calculation
+                confidence = MathUtils.CalculateConfidence(
+                    scenario.Error,
+                    scenario.PearsonCorrelation,
+                    nodes.Length,
+                    nodesPossibleOnline
+                );
             }
         }
         catch (MaximumIterationsException)
@@ -92,8 +109,6 @@ public class MLEMultilateralizer(Device device, Floor floor, State state) : Base
         {
             confidence = HandleLocatorException(ex, scenario, guess);
         }
-
-        CalculateAndSetPearsonCorrelation(scenario, nodes);
 
         return FinalizeScenario(scenario, confidence);
     }
