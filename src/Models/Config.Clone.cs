@@ -77,7 +77,8 @@ namespace ESPresense.Models
             return new BfgsConfig
             {
                 Enabled = Enabled,
-                Floors = Floors?.ToArray()
+                Floors = Floors?.ToArray(),
+                Weighting = Weighting.Clone()
             };
         }
     }
