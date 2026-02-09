@@ -12,7 +12,11 @@ public static class WeightingFactory
     /// </summary>
     public static IWeighting Create(ConfigWeighting? config)
     {
-        return config?.Algorithm switch
+        // If no config provided, return default Gaussian weighting
+        if (config == null)
+            return new GaussianWeighting(null);
+
+        return config.Algorithm switch
         {
             "equal" => new EqualWeighting(),
             "linear" => new LinearWeighting(config.Props),
