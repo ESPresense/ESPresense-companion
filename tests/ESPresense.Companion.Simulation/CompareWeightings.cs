@@ -17,6 +17,25 @@ class CompareWeightings
     private const int BaseSeed = 12345;
     private const double SuccessThresholdMeters = 1.0;
 
+    private static ConfigWeighting WeightingToConfig(IWeighting weighting)
+    {
+        return weighting switch
+        {
+            EqualWeighting => new ConfigWeighting { Algorithm = "equal" },
+            LinearWeighting => new ConfigWeighting { Algorithm = "linear" },
+            GaussianWeighting g => new ConfigWeighting
+            {
+                Algorithm = "gaussian",
+                Props = g.GetType().GetField("_sigma", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                    ?.GetValue(g) is double sigma
+                    ? new Dictionary<string, double> { ["sigma"] = sigma }
+                    : new Dictionary<string, double>()
+            },
+            ExponentialWeighting => new ConfigWeighting { Algorithm = "exponential" },
+            _ => new ConfigWeighting { Algorithm = "gaussian" }
+        };
+    }
+
     private static (Config Config, Floor Floor, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore)
         CreateSimulationContext(IWeighting? weighting)
     {
@@ -27,17 +46,24 @@ class CompareWeightings
             Bounds = new[] { new[] { 0.0, 0.0, 0.0 }, new[] { 12.0, 12.0, 3.0 } }
         };
         var config = new Config { Floors = new[] { configFloor } };
+
+        // Set weighting for all locators if provided
+        if (weighting != null)
+        {
+            var configWeighting = WeightingToConfig(weighting);
+            config.Locators = new ConfigLocators
+            {
+                Bfgs = new BfgsConfig { Weighting = configWeighting },
+                NelderMead = new NelderMeadConfig { Weighting = configWeighting },
+                Mle = new MleConfig { Weighting = configWeighting }
+            };
+        }
+
         floor.Update(config, configFloor);
 
         var mockConfigLoader = new MockConfigLoader(config);
         var nodeTelemetryStore = new MockNodeTelemetryStore();
         var state = new State(mockConfigLoader, nodeTelemetryStore);
-
-        // Override weighting if provided
-        if (weighting != null)
-        {
-            state.Weighting = weighting;
-        }
 
         var device = new Device("sim-device", "test-discovery", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
