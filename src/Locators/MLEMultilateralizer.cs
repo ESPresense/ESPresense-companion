@@ -16,15 +16,7 @@ public class MLEMultilateralizer : BaseMultilateralizer
     public MLEMultilateralizer(Device device, Floor floor, State state) : base(device, floor, state)
     {
         // Load weighting from MLE config, defaulting to Gaussian if not specified
-        var w = state.Config?.Locators?.Mle?.Weighting;
-        _weighting = w?.Algorithm switch
-        {
-            "equal" => new EqualWeighting(),
-            "linear" => new LinearWeighting(w?.Props),
-            "gaussian" => new GaussianWeighting(w?.Props),
-            "exponential" => new ExponentialWeighting(w?.Props),
-            _ => new GaussianWeighting(w?.Props),
-        };
+        _weighting = WeightingFactory.Create(state.Config?.Locators?.Mle?.Weighting);
     }
 
     public override bool Locate(Scenario scenario)

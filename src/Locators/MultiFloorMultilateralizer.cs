@@ -21,15 +21,7 @@ public class MultiFloorMultilateralizer : ILocate
         _state = state;
 
         // Load weighting from MultiFloor config, defaulting to Gaussian if not specified
-        var w = state.Config?.Locators?.MultiFloor?.Weighting;
-        _weighting = w?.Algorithm switch
-        {
-            "equal" => new EqualWeighting(),
-            "linear" => new LinearWeighting(w?.Props),
-            "gaussian" => new GaussianWeighting(w?.Props),
-            "exponential" => new ExponentialWeighting(w?.Props),
-            _ => new GaussianWeighting(w?.Props),
-        };
+        _weighting = WeightingFactory.Create(state.Config?.Locators?.MultiFloor?.Weighting);
     }
 
     public bool Locate(Scenario scenario)
