@@ -17,7 +17,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
 
     public override bool Locate(Scenario scenario)
     {
-        double Weight(int index, int total) => (double)(total - index) / total;
+        double Weight(int index, int total) => State?.Weighting?.Get(index, total) ?? (double)(total - index) / total;
         double Error(IList<double> x, DeviceToNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - dn.Distance;
 
         if (!InitializeScenario(scenario, out var nodes, out var guess))

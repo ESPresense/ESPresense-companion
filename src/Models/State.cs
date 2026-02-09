@@ -64,6 +64,7 @@ public class State
             Weighting = w?.Algorithm switch
             {
                 "equal" => new EqualWeighting(),
+                "linear" => new LinearWeighting(w?.Props),
                 "gaussian" => new GaussianWeighting(w?.Props),
                 "exponential" => new ExponentialWeighting(w?.Props),
                 _ => new GaussianWeighting(w?.Props),
