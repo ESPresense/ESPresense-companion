@@ -212,14 +212,19 @@ public class State
         }
 
         var nelderMead = Config?.Locators?.NelderMead;
+        var bfgs = Config?.Locators?.Bfgs;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
 
-        if ((nelderMead?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
         {
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
                     yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+
+            if (bfgs?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(bfgs?.Floors))
+                    yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this), floor.Name);
 
             if (nadarayaWatson?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))

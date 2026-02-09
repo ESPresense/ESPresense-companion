@@ -65,6 +65,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "nelder_mead")]
         public NelderMeadConfig NelderMead { get; set; } = new();
 
+        [YamlMember(Alias = "bfgs")]
+        public BfgsConfig Bfgs { get; set; } = new();
+
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
     }
@@ -94,6 +97,15 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "weighting")]
         public ConfigWeighting Weighting { get; set; } = new();
+    }
+
+    public partial class BfgsConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
     }
 
     public partial class NearestNodeConfig

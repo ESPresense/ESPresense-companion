@@ -20,6 +20,9 @@ public class ConfigTests
           nelder_mead:
             enabled: false
             floors: [""floor3""]
+          bfgs:
+            enabled: true
+            floors: [""floor4""]
           nearest_node:
             enabled: true
             max_distance: 10.0
@@ -40,6 +43,10 @@ public class ConfigTests
         var nelderMead = config.Locators.NelderMead;
         Assert.False(nelderMead.Enabled);
         Assert.That(nelderMead.Floors, Is.EqualTo(new[] { "floor3" }));
+
+        var bfgs = config.Locators.Bfgs;
+        Assert.True(bfgs.Enabled);
+        Assert.That(bfgs.Floors, Is.EqualTo(new[] { "floor4" }));
 
         var nearestNode = config.Locators.NearestNode;
         Assert.True(nearestNode.Enabled);

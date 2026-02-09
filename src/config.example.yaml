@@ -61,9 +61,18 @@ locators:
     enabled: false
     floors: ["first", "second"]
     weighting:
+      # Shared node weighting algorithm used by Nelder-Mead, BFGS, and MLE.
+      # Options: equal, linear, gaussian, exponential
       algorithm: gaussian
       props:
+        # gaussian: sigma controls spread (higher = flatter weights)
         sigma: 0.10
+        # exponential: lambda controls decay (higher = steeper decay)
+        # lambda: 0.35
+
+  bfgs:
+    enabled: false
+    floors: ["first", "second"]
 
   nearest_node:
     enabled: true

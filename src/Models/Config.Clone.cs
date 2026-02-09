@@ -37,6 +37,7 @@ namespace ESPresense.Models
             {
                 NadarayaWatson = NadarayaWatson.Clone(),
                 NelderMead = NelderMead.Clone(),
+                Bfgs = Bfgs.Clone(),
                 NearestNode = NearestNode.Clone()
             };
         }
@@ -65,6 +66,18 @@ namespace ESPresense.Models
                 Enabled = Enabled,
                 Floors = Floors?.ToArray(),
                 Weighting = Weighting.Clone()
+            };
+        }
+    }
+
+    public partial class BfgsConfig
+    {
+        public BfgsConfig Clone()
+        {
+            return new BfgsConfig
+            {
+                Enabled = Enabled,
+                Floors = Floors?.ToArray()
             };
         }
     }
