@@ -97,14 +97,15 @@ public class MultiFloorMultilateralizer : ILocate
                     }
 
                     // Calculate number of possible nodes (all nodes since MultiFloor is floor-agnostic)
-                    int nodesPossibleOnline = _state.Nodes.Values.Count();
+                    // Note: This includes offline nodes since we don't have NodeTelemetryStore access
+                    int nodesPossibleTotal = _state.Nodes.Values.Count();
 
                     // Use the centralized confidence calculation
                     confidence = MathUtils.CalculateConfidence(
                         scenario.Error,
                         scenario.PearsonCorrelation,
                         nodes.Length,
-                        nodesPossibleOnline
+                        nodesPossibleTotal
                     );
                 }
                 else
