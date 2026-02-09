@@ -20,8 +20,8 @@ public class MultiFloorMultilateralizer : ILocate
         _device = device;
         _state = state;
 
-        // Use NelderMead weighting config as default for multi-floor
-        var w = state.Config?.Locators?.NelderMead?.Weighting;
+        // Load weighting from MultiFloor config, defaulting to Gaussian if not specified
+        var w = state.Config?.Locators?.MultiFloor?.Weighting;
         _weighting = w?.Algorithm switch
         {
             "equal" => new EqualWeighting(),

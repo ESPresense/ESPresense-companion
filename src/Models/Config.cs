@@ -71,6 +71,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "mle")]
         public MleConfig Mle { get; set; } = new();
 
+        [YamlMember(Alias = "multi_floor")]
+        public MultiFloorConfig MultiFloor { get; set; } = new();
+
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
     }
@@ -121,6 +124,15 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "floors")]
         public string[]? Floors { get; set; }
+
+        [YamlMember(Alias = "weighting")]
+        public ConfigWeighting Weighting { get; set; } = new();
+    }
+
+    public partial class MultiFloorConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
 
         [YamlMember(Alias = "weighting")]
         public ConfigWeighting Weighting { get; set; } = new();

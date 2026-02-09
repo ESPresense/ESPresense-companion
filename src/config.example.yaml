@@ -90,6 +90,15 @@ locators:
       props:
         sigma: 0.30
 
+  multi_floor:
+    enabled: false
+    weighting:
+      # Node weighting algorithm for MultiFloor (cross-floor localization)
+      # Options: equal, linear, gaussian, exponential
+      algorithm: gaussian
+      props:
+        sigma: 0.30
+
   nearest_node:
     enabled: true
     max_distance: 10
