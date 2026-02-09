@@ -1,6 +1,7 @@
 ﻿using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
@@ -12,11 +13,15 @@ public class MultiFloorMultilateralizer : ILocate
 {
     private readonly Device _device;
     private readonly State _state;
+    private readonly IWeighting _weighting;
 
     public MultiFloorMultilateralizer(Device device, State state)
     {
         _device = device;
         _state = state;
+
+        // Load weighting from MultiFloor config, defaulting to Gaussian if not specified
+        _weighting = WeightingFactory.Create(state.Config?.Locators?.MultiFloor?.Weighting);
     }
 
     public bool Locate(Scenario scenario)
@@ -26,7 +31,7 @@ public class MultiFloorMultilateralizer : ILocate
 
         double Error(IList<double> x, DeviceToNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
         var nodes = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
-        var weights = nodes.Select((dn, i) => _state.Weighting?.Get(i, nodes.Length) ?? 1.0).ToArray();
+        var weights = nodes.Select((dn, i) => _weighting.Get(i, nodes.Length)).ToArray();
         var weightSum = weights.Sum();
         if (weightSum <= 0) weightSum = 1;
 
@@ -84,14 +89,15 @@ public class MultiFloorMultilateralizer : ILocate
                     }
 
                     // Calculate number of possible nodes (all nodes since MultiFloor is floor-agnostic)
-                    int nodesPossibleOnline = _state.Nodes.Values.Count();
+                    // Note: This includes offline nodes since we don't have NodeTelemetryStore access
+                    int nodesPossibleTotal = _state.Nodes.Values.Count();
 
                     // Use the centralized confidence calculation
                     confidence = MathUtils.CalculateConfidence(
                         scenario.Error,
                         scenario.PearsonCorrelation,
                         nodes.Length,
-                        nodesPossibleOnline
+                        nodesPossibleTotal
                     );
                 }
                 else

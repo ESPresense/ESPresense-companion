@@ -61,9 +61,43 @@ locators:
     enabled: false
     floors: ["first", "second"]
     weighting:
+      # Node weighting algorithm for Nelder-Mead
+      # Options: equal, linear, gaussian, exponential
       algorithm: gaussian
       props:
-        sigma: 0.10
+        # gaussian: sigma controls spread (higher = flatter weights, default: 0.3)
+        sigma: 0.30
+        # exponential: lambda controls decay (higher = steeper decay, default: 3.0 for cubic)
+        # lambda: 3.0
+
+  bfgs:
+    enabled: false
+    floors: ["first", "second"]
+    weighting:
+      # Node weighting algorithm for BFGS
+      # Options: equal, linear, gaussian, exponential
+      algorithm: gaussian
+      props:
+        sigma: 0.30
+
+  mle:
+    enabled: false
+    floors: ["first", "second"]
+    weighting:
+      # Node weighting algorithm for MLE
+      # Options: equal, linear, gaussian, exponential
+      algorithm: gaussian
+      props:
+        sigma: 0.30
+
+  multi_floor:
+    enabled: false
+    weighting:
+      # Node weighting algorithm for MultiFloor (cross-floor localization)
+      # Options: equal, linear, gaussian, exponential
+      algorithm: gaussian
+      props:
+        sigma: 0.30
 
   nearest_node:
     enabled: true
