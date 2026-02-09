@@ -45,13 +45,12 @@ class MockNodeTelemetryStore : NodeTelemetryStore
 /// </summary>
 class Program
 {
-    static void Main(string[] args)
+    private const int BaseSeed = 12345;
+    private const double SuccessThresholdMeters = 1.0;
+
+    private static (Config Config, Floor Floor, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore)
+        CreateSimulationContext()
     {
-        Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
-        Console.WriteLine("================================================");
-        Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
-        
-        // Setup floor and state
         var floor = new Floor();
         var configFloor = new ConfigFloor
         {
@@ -61,14 +60,27 @@ class Program
         var config = new Config { Floors = new[] { configFloor } };
         floor.Update(config, configFloor);
 
-        // Create mock dependencies for State
         var mockConfigLoader = new MockConfigLoader(config);
-        var mockNodeTelemetryStore = new MockNodeTelemetryStore();
-        var state = new State(mockConfigLoader, mockNodeTelemetryStore);
-        
-        // Create test device (needed for locators)
+        var nodeTelemetryStore = new MockNodeTelemetryStore();
+        var state = new State(mockConfigLoader, nodeTelemetryStore);
+
         var device = new Device("sim-device", "test-discovery", TimeSpan.FromSeconds(30));
-        state.Devices["sim-device"] = device;
+        state.Devices[device.Id] = device;
+
+        return (config, floor, state, device, nodeTelemetryStore);
+    }
+
+    private static int SeedFor(string nodeConfigName, string scenarioName)
+    {
+        return HashCode.Combine(BaseSeed, nodeConfigName, scenarioName);
+    }
+
+    static void Main(string[] args)
+    {
+        Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
+        Console.WriteLine("================================================");
+        Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
+        Console.WriteLine($"Accurate run threshold: <= {SuccessThresholdMeters:F1}m 2D error\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]
@@ -111,18 +123,29 @@ class Program
             foreach (var scenario in scenarios)
             {
                 Console.WriteLine($"\n--- {scenario.Name} ---");
-
-                var sim = new MultilaterationSimulator(floor, state, seed: 12345); // Fixed seed for reproducibility
-                nodeConfig.Setup(sim);
-                scenario.Configure(sim);
                 
                 foreach (var locatorInfo in locators)
                 {
                     try
                     {
-                        // Create fresh locator for each test
-                        var locator = locatorInfo.Factory(device, floor, state, mockNodeTelemetryStore);
-                        var report = sim.RunMonteCarlo(iterations, locator, config, device);
+                        // Fresh context per algorithm run prevents state leakage across runs.
+                        var context = CreateSimulationContext();
+                        var seed = SeedFor(nodeConfig.Name, scenario.Name);
+                        var sim = new MultilaterationSimulator(context.Floor, context.State, seed);
+                        nodeConfig.Setup(sim);
+                        scenario.Configure(sim);
+
+                        var locator = locatorInfo.Factory(
+                            context.Device,
+                            context.Floor,
+                            context.State,
+                            context.NodeTelemetryStore);
+                        var report = sim.RunMonteCarlo(
+                            iterations,
+                            locator,
+                            context.Config,
+                            context.Device,
+                            SuccessThresholdMeters);
                         report.PrintReport(locatorInfo.Name);
                     }
                     catch (Exception ex)

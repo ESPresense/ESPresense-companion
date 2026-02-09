@@ -179,10 +179,12 @@ public class MultilaterationSimulator
         
         // Run the actual locator
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        bool moved = locator.Locate(scenario);
+        bool located = locator.Locate(scenario);
         stopwatch.Stop();
         
         var estimatedPosition = scenario.Location;
+        bool hasFiniteLocation = IsFinite(estimatedPosition);
+        bool solved = located && hasFiniteLocation;
 
         // 2D error (X,Y only) - what matters for indoor positioning
         double error2D = Math.Sqrt(
@@ -202,14 +204,20 @@ public class MultilaterationSimulator
             Fixes = scenario.Fixes ?? 0,
             Confidence = scenario.Confidence ?? 0,
             Iterations = scenario.Iterations ?? 0,
-            Moved = moved
+            Located = located,
+            Solved = solved
         };
     }
     
     /// <summary>
     /// Run Monte Carlo simulation
     /// </summary>
-    public SimulationReport RunMonteCarlo(int iterations, ILocate locator, Config config, Device device)
+    public SimulationReport RunMonteCarlo(
+        int iterations,
+        ILocate locator,
+        Config config,
+        Device device,
+        double successThresholdMeters = 1.0)
     {
         var results = new List<SimulationResult>();
 
@@ -225,7 +233,7 @@ public class MultilaterationSimulator
             results.Add(Simulate(truePos, locator, config, device));
         }
         
-        return new SimulationReport(results);
+        return new SimulationReport(results, successThresholdMeters);
     }
     
     private double GenerateNoise()
@@ -235,6 +243,16 @@ public class MultilaterationSimulator
         double u2 = 1.0 - _random.NextDouble();
         double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
         return NoiseStdDev * randStdNormal;
+    }
+
+    private static bool IsFinite(Point3D point)
+    {
+        return !double.IsNaN(point.X) &&
+               !double.IsInfinity(point.X) &&
+               !double.IsNaN(point.Y) &&
+               !double.IsInfinity(point.Y) &&
+               !double.IsNaN(point.Z) &&
+               !double.IsInfinity(point.Z);
     }
 }
 
@@ -249,24 +267,30 @@ public class SimulationResult
     public int Fixes { get; set; }
     public int Confidence { get; set; }
     public int Iterations { get; set; }
-    public bool Moved { get; set; }
+    public bool Located { get; set; }
+    public bool Solved { get; set; }
 }
 
 public class SimulationReport
 {
     private readonly List<SimulationResult> _results;
+    public double SuccessThresholdMeters { get; }
     
-    public SimulationReport(List<SimulationResult> results)
+    public SimulationReport(List<SimulationResult> results, double successThresholdMeters)
     {
         _results = results ?? new List<SimulationResult>();
+        SuccessThresholdMeters = successThresholdMeters;
     }
     
     public int TotalRuns => _results.Count;
-    public int SuccessfulRuns => _results.Count(r => r.Fixes >= 3);
+    public int SolvedRuns => _results.Count(r => r.Solved);
+    public double SolveRate => TotalRuns > 0 ? (double)SolvedRuns / TotalRuns : 0;
+    public int SuccessfulRuns => _results.Count(r => r.Solved && r.Error <= SuccessThresholdMeters);
     public double SuccessRate => TotalRuns > 0 ? (double)SuccessfulRuns / TotalRuns : 0;
     
-    private List<double> ValidErrors => _results.Where(r => r.Fixes >= 3).Select(r => r.Error).ToList();
-    private List<double> ValidErrors3D => _results.Where(r => r.Fixes >= 3).Select(r => r.Error3D).ToList();
+    private List<SimulationResult> SolvedResults => _results.Where(r => r.Solved).ToList();
+    private List<double> ValidErrors => SolvedResults.Select(r => r.Error).ToList();
+    private List<double> ValidErrors3D => SolvedResults.Select(r => r.Error3D).ToList();
 
     public double MeanError => ValidErrors.Count > 0 ? ValidErrors.Average() : double.NaN;
     public double MeanError3D => ValidErrors3D.Count > 0 ? ValidErrors3D.Average() : double.NaN;
@@ -293,14 +317,15 @@ public class SimulationReport
     public double MaxError => ValidErrors.Count > 0 ? ValidErrors.Max() : double.NaN;
     public double MinError => ValidErrors.Count > 0 ? ValidErrors.Min() : double.NaN;
     public double MeanComputationTimeMs => TotalRuns > 0 ? _results.Average(r => r.ComputationTimeMs) : double.NaN;
-    public double MeanFixes => TotalRuns > 0 ? _results.Average(r => r.Fixes) : double.NaN;
-    public double MeanIterations => TotalRuns > 0 ? _results.Average(r => r.Iterations) : double.NaN;
+    public double MeanFixes => SolvedRuns > 0 ? SolvedResults.Average(r => r.Fixes) : double.NaN;
+    public double MeanIterations => SolvedRuns > 0 ? SolvedResults.Average(r => r.Iterations) : double.NaN;
     
     public void PrintReport(string algorithmName)
     {
         Console.WriteLine($"\n=== {algorithmName} ===");
-        Console.WriteLine($"Success Rate: {SuccessRate:P1} ({SuccessfulRuns}/{TotalRuns})");
-        if (SuccessfulRuns > 0)
+        Console.WriteLine($"Solve Rate: {SolveRate:P1} ({SolvedRuns}/{TotalRuns})");
+        Console.WriteLine($"Accurate <= {SuccessThresholdMeters:F1}m: {SuccessRate:P1} ({SuccessfulRuns}/{TotalRuns})");
+        if (SolvedRuns > 0)
         {
             Console.WriteLine($"2D Error (X,Y): {MeanError:F2}m (median {MedianError:F2}m, std {(ValidErrors.Count >= 2 ? StdDevError : 0):F2}m)");
             Console.WriteLine($"3D Error:       {MeanError3D:F2}m");
@@ -309,7 +334,7 @@ public class SimulationReport
         }
         else
         {
-            Console.WriteLine("No successful runs to report statistics");
+            Console.WriteLine("No solved runs to report statistics");
         }
         if (!double.IsNaN(MeanComputationTimeMs))
             Console.WriteLine($"Mean Computation Time: {MeanComputationTimeMs:F1}ms");
