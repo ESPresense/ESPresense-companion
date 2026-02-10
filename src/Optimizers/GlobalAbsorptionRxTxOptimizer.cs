@@ -35,7 +35,7 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
 
         if (allRxNodes.Count < 3)
         {
-            Log.Warning("Not enough valid measurements for optimization");
+            Log.Warning("Not enough valid measurements for optimization. Found {Count} measurements, need at least 3. Add more BLE beacons or ESPresense nodes.", allRxNodes.Count);
             return or;
         }
 
