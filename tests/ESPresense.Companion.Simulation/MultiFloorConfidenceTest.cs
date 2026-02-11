@@ -16,7 +16,6 @@ class MultiFloorConfidenceTest
 {
     private const int BaseSeed = 54321;
     private const int IterationsPerScenario = 100;
-    private const double FloorHeightMeters = 3.0; // Standard floor height
     
     private static (Config Config, List<Floor> Floors, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore)
         CreateMultiFloorContext()
@@ -70,7 +69,7 @@ class MultiFloorConfidenceTest
     private static List<Node> CreateNodesOnFloor(Floor floor, double zHeight, int count = 8)
     {
         var nodes = new List<Node>();
-        var bounds = floor.Bounds;
+        var bounds = floor.Bounds!;
         double width = bounds[1].X - bounds[0].X;
         double depth = bounds[1].Y - bounds[0].Y;
         
@@ -135,9 +134,9 @@ class MultiFloorConfidenceTest
     {
         var random = new Random(seed);
         var results = new List<SimulationResult>();
-        
+
         // Get bounds for random position generation
-        var bounds = targetFloor.Bounds;
+        var bounds = targetFloor.Bounds!;
         double minX = bounds[0].X + 1;
         double maxX = bounds[1].X - 1;
         double minY = bounds[0].Y + 1;
@@ -223,7 +222,7 @@ class MultiFloorConfidenceTest
                !double.IsNaN(point.Z) && !double.IsInfinity(point.Z);
     }
 
-    public static void Run()
+    public static bool Run()
     {
         Console.WriteLine("\n" + "=".PadRight(70, '='));
         Console.WriteLine("MULTI-FLOOR CONFIDENCE SIMULATION");
@@ -268,6 +267,8 @@ class MultiFloorConfidenceTest
             ("Nadaraya-Watson", (d, f, s, nts) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
         };
 
+        bool allPassed = true;
+
         foreach (var locatorInfo in locators)
         {
             Console.WriteLine("\n" + "-".PadRight(70, '-'));
@@ -276,9 +277,11 @@ class MultiFloorConfidenceTest
 
             // Test scenarios for First Floor as target
             Console.WriteLine("\n--- Target: First Floor (z=0-3m) ---");
-            
+
+            // Device below target floor (at basement level, but locator targets first floor)
+            // Using first floor bounds since the locator always targets first floor
             var belowResult = TestConfidenceAtZ(
-                -1.5, basement, floors, firstFloorNodes, secondFloorNodes, basementNodes,
+                -1.5, first, floors, firstFloorNodes, secondFloorNodes, basementNodes,
                 config, state, device, nodeTelemetryStore, locatorInfo.Factory(device, first, state, nodeTelemetryStore),
                 IterationsPerScenario, BaseSeed + 1);
             
@@ -297,9 +300,11 @@ class MultiFloorConfidenceTest
             PrintComparison("Device Above (4.5m)", aboveResult, onResult);
 
             // Verify confidence hierarchy
-            bool onFloorHighest = onResult.MeanConfidence >= belowResult.MeanConfidence && 
+            bool onFloorHighest = onResult.MeanConfidence >= belowResult.MeanConfidence &&
                                    onResult.MeanConfidence >= aboveResult.MeanConfidence;
-            
+
+            if (!onFloorHighest) allPassed = false;
+
             Console.WriteLine($"\n  ✓ On-floor confidence highest: {(onFloorHighest ? "PASS" : "FAIL")}");
             Console.WriteLine($"    On: {onResult.MeanConfidence:F1} vs Below: {belowResult.MeanConfidence:F1} vs Above: {aboveResult.MeanConfidence:F1}");
         }
@@ -307,6 +312,8 @@ class MultiFloorConfidenceTest
         Console.WriteLine("\n" + "=".PadRight(70, '='));
         Console.WriteLine("SIMULATION COMPLETE");
         Console.WriteLine("=".PadRight(70, '='));
+
+        return allPassed;
     }
 
     private static void PrintComparison(string label, FloorConfidenceResult result, FloorConfidenceResult baseline)

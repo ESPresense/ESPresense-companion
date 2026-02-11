@@ -87,7 +87,8 @@ class Program
         // Check if user wants multi-floor confidence test
         if (args.Length > 0 && args[0] == "multifloor")
         {
-            MultiFloorConfidenceTest.Run();
+            bool passed = MultiFloorConfidenceTest.Run();
+            Environment.Exit(passed ? 0 : 1);
             return;
         }
 
