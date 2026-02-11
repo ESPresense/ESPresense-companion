@@ -8,17 +8,18 @@
 	import type { Device } from '$lib/types';
 	import ago from 's-ago';
 
-	$: filteredDevices = $devices?.filter(device => {
-		// Check if device is active based on lastSeen and timeout
-		if (device.lastSeen == null) return false;
-		const timeout = device.timeout !== null && device.timeout !== undefined ? device.timeout : 30000;
-		return new Date().getTime() - new Date(device.lastSeen).getTime() < timeout;
-	}) || [];
+	$: filteredDevices =
+		$devices?.filter((device) => {
+			// Check if device is active based on lastSeen and timeout
+			if (device.lastSeen == null) return false;
+			const timeout = device.timeout !== null && device.timeout !== undefined ? device.timeout : 30000;
+			return new Date().getTime() - new Date(device.lastSeen).getTime() < timeout;
+		}) || [];
 
 	$: calibrationStats = {
 		total: filteredDevices.length,
-		calibrated: filteredDevices.filter(d => d['rssi@1m'] != null).length,
-		needsCalibration: filteredDevices.filter(d => d['rssi@1m'] == null).length
+		calibrated: filteredDevices.filter((d) => d['rssi@1m'] != null).length,
+		needsCalibration: filteredDevices.filter((d) => d['rssi@1m'] == null).length
 	};
 
 	function isDeviceActive(device: Device): boolean {
@@ -38,7 +39,7 @@
 
 	function displayRoomFloor(d: Device): string {
 		const base = baseRoomFloor(d);
-		return d.isAnchored ? `${base} 📍` : base;
+		return (d.isAnchored ?? false) ? `${base} 📍` : base;
 	}
 
 	const columns = [
@@ -136,16 +137,9 @@
 		<div class="card">
 			<header class="text-lg font-semibold mb-4">Device Calibration</header>
 			{#if filteredDevices.length > 0}
-				<DataTable
-					{columns}
-					rows={filteredDevices}
-					classNameTable="table table-compact"
-					onclickRow={onRowClick}
-				/>
+				<DataTable {columns} rows={filteredDevices} classNameTable="table table-compact" onclickRow={onRowClick} />
 			{:else}
-				<div class="text-center py-8 text-surface-600-400">
-					No active devices found
-				</div>
+				<div class="text-center py-8 text-surface-600-400">No active devices found</div>
 			{/if}
 		</div>
 	</div>
