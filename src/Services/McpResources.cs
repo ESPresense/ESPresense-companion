@@ -19,18 +19,30 @@ public class McpResources
     private readonly State _state;
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
+    private readonly NodeTelemetryStore _nts;
     private readonly DeviceSettingsStore _dss;
     private readonly TelemetryService _telemetryService;
+    private readonly FirmwareUpdateJobService _firmwareUpdateJobs;
     private readonly IMapper _mapper;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public McpResources(State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, TelemetryService telemetryService, IMapper mapper)
+    public McpResources(
+        State state,
+        ConfigLoader config,
+        NodeSettingsStore nsd,
+        NodeTelemetryStore nts,
+        DeviceSettingsStore dss,
+        TelemetryService telemetryService,
+        FirmwareUpdateJobService firmwareUpdateJobs,
+        IMapper mapper)
     {
         _state = state;
         _config = config;
         _nsd = nsd;
+        _nts = nts;
         _dss = dss;
         _telemetryService = telemetryService;
+        _firmwareUpdateJobs = firmwareUpdateJobs;
         _mapper = mapper;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -116,6 +128,105 @@ public class McpResources
     {
         var c = CalculateCalibration();
         return Task.FromResult(JsonSerializer.Serialize(c, _jsonOptions));
+    }
+
+    [McpServerTool(Name = "get_node_settings")]
+    [Description("Get the settings for a specific node")]
+    public Task<string> GetNodeSettingsTool(
+        [Description("Node identifier")] string nodeId)
+    {
+        var settings = _nsd.Get(nodeId);
+        return Task.FromResult(JsonSerializer.Serialize(settings, _jsonOptions));
+    }
+
+    [McpServerTool(Name = "set_node_settings")]
+    [Description("Set node settings. Only changed values are written via MQTT.")]
+    public async Task<string> SetNodeSettingsTool(
+        [Description("Node identifier")] string nodeId,
+        [Description("Node settings object")] NodeSettings settings)
+    {
+        settings.Id = nodeId;
+        await _nsd.Set(nodeId, settings);
+        return JsonSerializer.Serialize(new { ok = true, nodeId }, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "restart_node")]
+    [Description("Request node restart")]
+    public async Task<string> RestartNodeTool(
+        [Description("Node identifier")] string nodeId)
+    {
+        await _nsd.Restart(nodeId);
+        return JsonSerializer.Serialize(new { ok = true, nodeId }, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "request_node_update")]
+    [Description("Request node self-update with optional firmware URL")]
+    public async Task<string> RequestNodeUpdateTool(
+        [Description("Node identifier")] string nodeId,
+        [Description("Optional firmware URL")] string? url = null)
+    {
+        await _nsd.Update(nodeId, url);
+        return JsonSerializer.Serialize(new { ok = true, nodeId, url }, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "delete_node")]
+    [Description("Delete node settings/telemetry and remove from in-memory state")]
+    public async Task<string> DeleteNodeTool(
+        [Description("Node identifier")] string nodeId,
+        [Description("Allow deleting config-defined nodes")] bool allowConfigNode = false)
+    {
+        if (_state.Nodes.TryGetValue(nodeId, out var node) && node.SourceType == NodeSourceType.Config && !allowConfigNode)
+        {
+            return JsonSerializer.Serialize(
+                new { ok = false, error = "Node is config-defined. Set allowConfigNode=true to delete." },
+                _jsonOptions);
+        }
+
+        await _nsd.Delete(nodeId);
+        await _nts.Delete(nodeId);
+        _state.Nodes.TryRemove(nodeId, out _);
+        return JsonSerializer.Serialize(new { ok = true, nodeId }, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "start_firmware_update")]
+    [Description("Start an OTA firmware update job for a node. Returns a job id for polling.")]
+    public Task<string> StartFirmwareUpdateTool(
+        [Description("Node identifier")] string nodeId,
+        [Description("Firmware binary URL (ESPresense GitHub URLs only)")] string url)
+    {
+        var (job, error) = _firmwareUpdateJobs.Start(nodeId, url);
+        if (error != null)
+        {
+            return Task.FromResult(JsonSerializer.Serialize(new { ok = false, error }, _jsonOptions));
+        }
+
+        return Task.FromResult(JsonSerializer.Serialize(new { ok = true, job }, _jsonOptions));
+    }
+
+    [McpServerTool(Name = "get_firmware_update_job")]
+    [Description("Get firmware update job status and logs by job id")]
+    public Task<string> GetFirmwareUpdateJobTool(
+        [Description("Firmware update job identifier")] string jobId)
+    {
+        var job = _firmwareUpdateJobs.Get(jobId);
+        return Task.FromResult(JsonSerializer.Serialize(new { ok = job != null, job }, _jsonOptions));
+    }
+
+    [McpServerTool(Name = "list_firmware_update_jobs")]
+    [Description("List firmware update jobs (newest first)")]
+    public Task<string> ListFirmwareUpdateJobsTool()
+    {
+        var jobs = _firmwareUpdateJobs.GetAll();
+        return Task.FromResult(JsonSerializer.Serialize(jobs, _jsonOptions));
+    }
+
+    [McpServerTool(Name = "cancel_firmware_update_job")]
+    [Description("Cancel a running firmware update job")]
+    public Task<string> CancelFirmwareUpdateJobTool(
+        [Description("Firmware update job identifier")] string jobId)
+    {
+        var (cancelled, error) = _firmwareUpdateJobs.Cancel(jobId);
+        return Task.FromResult(JsonSerializer.Serialize(new { ok = cancelled, error }, _jsonOptions));
     }
 
     private Calibration CalculateCalibration()
