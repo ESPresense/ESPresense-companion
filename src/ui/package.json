@@ -28,7 +28,7 @@
 		"@testing-library/svelte": "^5.3.1",
 		"@testing-library/user-event": "^14.6.1",
 		"@types/d3": "^7.4.3",
-		"@types/node": "^25.0.6",
+		"@types/node": "^25.2.3",
 		"@types/three": "^0.182.0",
 		"@typescript-eslint/eslint-plugin": "^8.53.0",
 		"@typescript-eslint/parser": "^8.54.0",
