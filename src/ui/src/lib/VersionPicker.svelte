@@ -34,7 +34,7 @@
 						<select id="flavor" class="select w-full bg-surface-100-900 border-surface-300-600 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 rounded-md" bind:value={flavor}>
 							<option value="-">🔒 (Keep Current)</option>
 							<option value="">📦 Standard</option>
-							<option value="cdc">🔌 CDC (USB Serial)</option>
+							<option value="cdc">🔌 CDC (USB Serial, ESP32-C3/S3/C6)</option>
 							<option value="verbose">🔍 Verbose</option>
 							<option value="m5atom">🟢 M5Atom</option>
 							<option value="m5stickc">🔵 M5StickC</option>

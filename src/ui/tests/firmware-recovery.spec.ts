@@ -5,15 +5,17 @@ test('recovery update allows Standard firmware', async ({ page }) => {
 	const firmwareManifest = {
 		firmware: [
 			{ name: 'esp32-standard.bin', cpu: 'esp32', flavor: '' },
-			{ name: 'esp32c3-cdc.bin', cpu: 'esp32c3', flavor: 'cdc' }
+			{ name: 'esp32c3-cdc.bin', cpu: 'esp32c3', flavor: 'cdc' },
+			{ name: 'esp32c6-cdc.bin', cpu: 'esp32c6', flavor: 'cdc' }
 		],
 		flavors: [
 			{ name: 'Standard', value: '', cpus: ['esp32'] },
-			{ name: 'CDC', value: 'cdc', cpus: ['esp32c3'] }
+			{ name: 'CDC', value: 'cdc', cpus: ['esp32c3', 'esp32c6'] }
 		],
 		cpus: [
 			{ name: 'ESP32', value: 'esp32' },
-			{ name: 'ESP32-C3', value: 'esp32c3' }
+			{ name: 'ESP32-C3', value: 'esp32c3' },
+			{ name: 'ESP32-C6', value: 'esp32c6' }
 		]
 	};
 
@@ -65,4 +67,54 @@ test('recovery update allows Standard firmware', async ({ page }) => {
 	await firmwareModal.getByLabel('Firmware').selectOption('esp32-standard.bin');
 	const modalUpdateButton = firmwareModal.getByRole('button', { name: 'Update' });
 	await expect(modalUpdateButton).toBeEnabled();
+});
+
+test('recovery update resolves ESP32-C6 CPU aliases', async ({ page }) => {
+	const firmwareManifest = {
+		firmware: [{ name: 'esp32c6-cdc.bin', cpu: 'esp32c6', flavor: 'cdc' }],
+		flavors: [{ name: 'CDC', value: 'cdc', cpus: ['esp32c6'] }],
+		cpus: [{ name: 'ESP32-C6', value: 'esp32c6' }]
+	};
+
+	const releases = [
+		{
+			assets: Array.from({ length: 7 }, (_, index) => ({ id: index + 1, name: `asset-${index}` })),
+			prerelease: false,
+			tag_name: 'v1.0.0',
+			name: 'v1.0.0'
+		}
+	];
+
+	const nodes = [
+		{
+			id: 'node-c6',
+			name: 'Recovery C6 Node',
+			telemetry: { version: '1.0.0', ip: '192.168.1.6' },
+			cpu: { value: 'esp32-c6', name: 'ESP32-C6' },
+			flavor: { value: 'cdc', name: 'CDC', cpus: ['esp32c6'] },
+			online: true,
+			location: { x: 0, y: 0, z: 0 },
+			floors: [],
+			nodes: {},
+			sourceType: 'Config'
+		}
+	];
+
+	await mockApi(page, {
+		stubWebSocket: true,
+		nodes,
+		firmwareTypes: firmwareManifest,
+		releases
+	});
+
+	await page.goto('/nodes');
+	await page.locator('#updateMethod').selectOption('recovery');
+	await page.locator('#flavor').selectOption({ value: 'cdc' });
+	await page.locator('#version').selectOption('v1.0.0');
+
+	await page.getByRole('button', { name: 'Update node firmware' }).click();
+	const firmwareModal = page.getByRole('dialog');
+	await expect(firmwareModal).toBeVisible();
+	await expect(firmwareModal.getByLabel('Firmware')).toHaveValue('esp32c6-cdc.bin');
+	await expect(firmwareModal.getByRole('button', { name: 'Update' })).toBeEnabled();
 });

@@ -21,6 +21,10 @@
 
 	const toastStore = getToastStore();
 
+	function normalizeCpuTarget(value: string | null | undefined): string {
+		return (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+	}
+
 	function getUpdateDescription(flavorId: string | undefined): string {
 		const selectedFlavorId = flavor === '-' ? flavorId : flavor;
 		const flavorName = selectedFlavorId ? $firmwareTypes?.flavors?.find((f) => f.value === selectedFlavorId)?.name : undefined;
@@ -82,8 +86,10 @@
 	}
 
 	$: selectedFlavor = $firmwareTypes?.flavors?.find((d) => d.value === flavor);
-	$: possibleFirmware = $firmwareTypes?.firmware?.filter((d) => d.cpu === cpu && d.flavor == flavor);
+	$: possibleFirmware =
+		$firmwareTypes?.firmware?.filter((d) => normalizeCpuTarget(d.cpu) === normalizeCpuTarget(cpu) && d.flavor == flavor) ?? [];
 	$: hasFlavorSelection = flavor !== undefined && flavor !== null;
+	$: if (possibleFirmware.length > 0 && !possibleFirmware.find((d) => d.name === firmware)) firmware = possibleFirmware[0].name ?? '';
 	$: isValidForm = Boolean($firmwareTypes && hasFlavorSelection && cpu && firmware && url && url !== '#ERR');
 
 	// Base Classes

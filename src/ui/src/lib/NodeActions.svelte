@@ -16,6 +16,10 @@
 	const toastStore = getToastStore();
 	let loadingEdit = false;
 
+	function normalizeCpuTarget(value: string | null | undefined): string {
+		return (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+	}
+
 	async function onRestart(node: Node) {
 		try {
 			const response = await fetch(resolve(`/api/node/${node.id}/restart`), { method: 'POST' });
@@ -86,19 +90,25 @@
 		if (!node) return;
 
 		const selectedFlavorId = $flavor === '-' ? flavorId : $flavor;
-		const cpuId = node.cpu?.value;
+		let cpuId = node.cpu?.value;
 		let url: string | null = null;
 
 		try {
 			if ($updateMethod !== 'self') {
-				const matchingFirmware = $firmwareTypes?.firmware?.filter((d) => d.cpu === cpuId && d.flavor === selectedFlavorId);
-				const firmwareId = matchingFirmware?.length === 1 ? matchingFirmware[0].name : null;
+				const normalizedCpuId = normalizeCpuTarget(cpuId);
+				const matchingFirmware =
+					$firmwareTypes?.firmware?.filter((d) => normalizeCpuTarget(d.cpu) === normalizedCpuId && d.flavor === selectedFlavorId) ?? [];
+				const selectedFirmware = matchingFirmware.find((d) => d.cpu === cpuId) ?? matchingFirmware[0] ?? null;
 
-				if (!firmwareId) {
+				if (!selectedFirmware?.name || !selectedFirmware.cpu) {
 					throw new Error(`No firmware found for selected CPU (${cpuId}) and flavor (${selectedFlavorId})`);
 				}
 
-				url = $artifact ? getLocalFirmwareUrl($firmwareSource, $version, $artifact, firmwareId) : getFirmwareUrl($firmwareSource, $version, $artifact, firmwareId);
+				cpuId = selectedFirmware.cpu;
+				url =
+					$artifact
+						? getLocalFirmwareUrl($firmwareSource, $version, $artifact, selectedFirmware.name)
+						: getFirmwareUrl($firmwareSource, $version, $artifact, selectedFirmware.name);
 
 				if (!url) {
 					throw new Error(`No firmware URL found for ${$firmwareSource}, ${$version || $artifact}, ${cpuId}, ${selectedFlavorId}`);
