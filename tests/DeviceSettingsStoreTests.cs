@@ -332,5 +332,8 @@ public class DeviceSettingsStoreTests
 
         // Directly raise the event on the mock
         _mockMqttCoordinator.Raise(x => x.DeviceConfigReceivedAsync += null, eventArgs);
+        
+        // Allow time for async event handler to complete (important in .NET 10+)
+        Task.Delay(10).Wait();
     }
 }
