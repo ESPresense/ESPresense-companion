@@ -26,11 +26,23 @@ RUN echo "Building on ${BUILDPLATFORM} for ${TARGETPLATFORM}" && \
     echo "TARGETARCH=${TARGETARCH}" && \
     echo "TARGETPLATFORM=${TARGETPLATFORM}" && \
     echo "BUILDPLATFORM=${BUILDPLATFORM}"
-RUN dotnet restore src/ESPresense.Companion.csproj --os ${TARGETOS} -a ${TARGETARCH}
+RUN case "${TARGETARCH}" in \
+        amd64) dotnet_arch=x64 ;; \
+        arm64) dotnet_arch=arm64 ;; \
+        arm) dotnet_arch=arm ;; \
+        *) echo "Unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    dotnet restore src/ESPresense.Companion.csproj -r "${TARGETOS}-${dotnet_arch}"
 
 COPY . ./
 
-RUN dotnet publish src/ESPresense.Companion.csproj -c Release --no-restore --os ${TARGETOS} -a ${TARGETARCH} -o out
+RUN case "${TARGETARCH}" in \
+        amd64) dotnet_arch=x64 ;; \
+        arm64) dotnet_arch=arm64 ;; \
+        arm) dotnet_arch=arm ;; \
+        *) echo "Unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    dotnet publish src/ESPresense.Companion.csproj -c Release --no-restore -r "${TARGETOS}-${dotnet_arch}" -o out
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
