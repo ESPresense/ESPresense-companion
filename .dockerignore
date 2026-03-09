@@ -1,0 +1,6 @@
+.github
+**/bin
+**/obj
+src/ui/.svelte-kit
+src/ui/build
+src/ui/node_modules
