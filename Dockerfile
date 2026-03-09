@@ -2,6 +2,8 @@
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install Node.js
 RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
@@ -15,16 +17,24 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /App
-COPY . ./
+COPY ESPresense-companion.sln ./
+COPY src/ESPresense.Companion.csproj src/
+COPY src/ui/package.json src/ui/pnpm-lock.yaml src/ui/
 
 RUN echo "Building on ${BUILDPLATFORM} for ${TARGETPLATFORM}" && \
+    echo "TARGETOS=${TARGETOS}" && \
+    echo "TARGETARCH=${TARGETARCH}" && \
     echo "TARGETPLATFORM=${TARGETPLATFORM}" && \
     echo "BUILDPLATFORM=${BUILDPLATFORM}"
-RUN dotnet restore
-RUN dotnet publish -c Release -o out
+RUN dotnet restore src/ESPresense.Companion.csproj --os ${TARGETOS} -a ${TARGETARCH}
+
+COPY . ./
+
+RUN dotnet publish src/ESPresense.Companion.csproj -c Release --no-restore --os ${TARGETOS} -a ${TARGETARCH} -o out
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+ARG TARGETPLATFORM
 
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
