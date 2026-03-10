@@ -5,15 +5,17 @@ test('recovery update allows Standard firmware', async ({ page }) => {
 	const firmwareManifest = {
 		firmware: [
 			{ name: 'esp32-standard.bin', cpu: 'esp32', flavor: '' },
-			{ name: 'esp32c3-cdc.bin', cpu: 'esp32c3', flavor: 'cdc' }
+			{ name: 'esp32c3-cdc.bin', cpu: 'esp32c3', flavor: 'cdc' },
+			{ name: 'esp32c6-cdc.bin', cpu: 'esp32c6', flavor: 'cdc' }
 		],
 		flavors: [
 			{ name: 'Standard', value: '', cpus: ['esp32'] },
-			{ name: 'CDC', value: 'cdc', cpus: ['esp32c3'] }
+			{ name: 'CDC', value: 'cdc', cpus: ['esp32c3', 'esp32c6'] }
 		],
 		cpus: [
 			{ name: 'ESP32', value: 'esp32' },
-			{ name: 'ESP32-C3', value: 'esp32c3' }
+			{ name: 'ESP32-C3', value: 'esp32c3' },
+			{ name: 'ESP32-C6', value: 'esp32c6' }
 		]
 	};
 
