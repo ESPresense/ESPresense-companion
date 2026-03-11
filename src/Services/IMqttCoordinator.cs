@@ -34,6 +34,17 @@ public interface IMqttCoordinator
     Task EnqueueAsync(string topic, string? payload, bool retain = false);
 
     /// <summary>
+    /// Attempts to enqueue an MQTT message for delivery without throwing exceptions.
+    /// Logs errors but returns success/failure status instead of propagating exceptions.
+    /// Use this for best-effort publishes (telemetry, status updates) that shouldn't crash background services.
+    /// </summary>
+    /// <param name="topic">MQTT topic to publish to.</param>
+    /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
+    /// <param name="retain">If true, the broker will retain the message.</param>
+    /// <returns>True if the message was enqueued successfully, false if an error occurred.</returns>
+    Task<bool> TryEnqueueAsync(string topic, string? payload, bool retain = false);
+
+    /// <summary>
     /// Waits for MQTT connection to be established and ready (connected with all subscriptions active).
     /// </summary>
     /// <param name="cancellationToken">Cancellation token to cancel the wait operation.</param>

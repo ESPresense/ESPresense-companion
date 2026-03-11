@@ -515,6 +515,34 @@ public class MqttCoordinator : IMqttCoordinator
     }
 
     /// <summary>
+    /// Attempts to enqueue an MQTT message for delivery without throwing exceptions.
+    /// Logs errors but returns success/failure status instead of propagating exceptions.
+    /// Use this for best-effort publishes (telemetry, status updates) that shouldn't crash background services.
+    /// </summary>
+    /// <param name="topic">MQTT topic to publish to.</param>
+    /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
+    /// <param name="retain">If true, the broker will retain the message.</param>
+    /// <returns>True if the message was enqueued successfully, false if an error occurred.</returns>
+    public virtual async Task<bool> TryEnqueueAsync(string topic, string? payload, bool retain = false)
+    {
+        try
+        {
+            await EnqueueAsync(topic, payload, retain).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Already logged by EnqueueAsync, just return false
+            // Common causes: DNS resolution failure, network unreachable, broker down
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Clears retained MQTT messages that match a topic filter by subscribing to the filter, collecting the exact topics seen, and republishing each topic with a null payload and retain=true.
     /// </summary>
     /// <remarks>
