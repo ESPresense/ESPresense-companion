@@ -52,8 +52,8 @@ public class MultiScenarioLocatorTests
         };
         device.Scenarios.Add(scenario);
 
-        mqttMock.Setup(m => m.EnqueueAsync($"espresense/companion/{device.Id}", "not_home", false))
-                .Returns(Task.CompletedTask)
+        mqttMock.Setup(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", false))
+                .ReturnsAsync(true)
                 .Verifiable();
 
         // Act
