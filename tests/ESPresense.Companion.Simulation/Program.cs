@@ -84,11 +84,21 @@ class Program
             return;
         }
 
+        // Check if user wants multi-floor confidence test
+        if (args.Length > 0 && args[0] == "multifloor")
+        {
+            bool passed = MultiFloorConfidenceTest.Run();
+            Environment.Exit(passed ? 0 : 1);
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
         Console.WriteLine($"Accurate run threshold: <= {SuccessThresholdMeters:F1}m 2D error\n");
-        Console.WriteLine("Tip: Run 'dotnet run weightings' to compare weighting schemes\n");
+        Console.WriteLine("Tips:");
+        Console.WriteLine("  Run 'dotnet run weightings' to compare weighting schemes");
+        Console.WriteLine("  Run 'dotnet run multifloor' to test multi-floor confidence\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]
