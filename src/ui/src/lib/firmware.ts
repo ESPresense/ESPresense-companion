@@ -36,7 +36,7 @@ export const artifacts = readable<Map<string, WorkflowRun[]>>(new Map(), functio
 		try {
 			const res = await fetch('https://api.github.com/repos/ESPresense/ESPresense/actions/workflows/build.yml/runs?status=success&per_page=100', { credentials: 'same-origin' });
 			const data: { workflow_runs: WorkflowRun[] } = await res.json();
-			const wf = data.workflow_runs.filter((i) => i.head_repository.full_name === 'ESPresense/ESPresense' && i.status == 'completed' && (i.pull_requests.length > 0 || (i.head_branch == 'master' && Date.now() - +new Date(i.created_at) < 1000 * 60 * 60 * 24 * 7)));
+			const wf = data.workflow_runs.filter((i) => i.head_repository.full_name === 'ESPresense/ESPresense' && i.status == 'completed' && (i.pull_requests.length > 0 || (i.head_branch == 'main' && Date.now() - +new Date(i.created_at) < 1000 * 60 * 60 * 24 * 7)));
 
 			set(
 				wf.reduce((p: Map<string, WorkflowRun[]>, c) => {

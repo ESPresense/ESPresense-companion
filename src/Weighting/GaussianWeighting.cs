@@ -11,6 +11,10 @@ public class GaussianWeighting : IWeighting
 
     public double Get(int index, int total)
     {
+        // When there's only one node, give it full weight
+        if (total <= 1)
+            return 1.0;
+
         var x = (double)index / (total - 1);
         var y = 1d / (Math.Sqrt(2d * Math.PI) * _sigma) * Math.Exp(-(Math.Pow(x, 2d) / (2d * Math.Pow(_sigma, 2d))));
         return y;

@@ -90,6 +90,7 @@ builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks();
 
 builder.Services.AddMcpServer(options =>
 {

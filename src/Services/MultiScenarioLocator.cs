@@ -44,7 +44,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var stateChanged = device.ReportedState != "not_home";
             if (stateChanged)
             {
-                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", "not_home");
+                await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home");
                 device.ReportedState = "not_home";
             }
 
@@ -70,7 +70,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     last_seen = device.LastSeen
                 }, SerializerSettings.NullIgnore);
 
-                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
+                await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
                 globalEventDispatcher.OnDeviceChanged(device, false);
             }
 
@@ -162,14 +162,14 @@ public class MultiScenarioLocator(DeviceTracker dl,
             if (newState != device.ReportedState)
             {
                 moved += 1;
-                await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", newState);
+                await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", newState);
                 device.ReportedState = newState;
             }
         }
         else if (device.ReportedState != "not_home")
         {
             moved += 1;
-            await mqtt.EnqueueAsync($"espresense/companion/{device.Id}", "not_home");
+            await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home");
             device.ReportedState = "not_home";
         }
 
@@ -199,7 +199,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 last_seen = device.LastSeen
             }, SerializerSettings.NullIgnore);
 
-            await mqtt.EnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
+            await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
 
             globalEventDispatcher.OnDeviceChanged(device, false);
 
@@ -252,6 +252,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 var active = new List<string>();
                 if (state.Config?.Locators?.NadarayaWatson?.Enabled ?? false) active.Add("NadarayaWatson");
                 if (state.Config?.Locators?.NelderMead?.Enabled ?? false) active.Add("NelderMead");
+                if (state.Config?.Locators?.Bfgs?.Enabled ?? false) active.Add("Bfgs");
+                if (state.Config?.Locators?.Mle?.Enabled ?? false) active.Add("Mle");
+                if (state.Config?.Locators?.MultiFloor?.Enabled ?? false) active.Add("MultiFloor");
                 if (state.Config?.Locators?.NearestNode?.Enabled ?? false) active.Add("NearestNode");
 
                 UpdateStatus(active.Count > 0 ? string.Join(", ", active) : "None");

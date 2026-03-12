@@ -7,11 +7,11 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <SpaRoot>..\src\ui</SpaRoot>
+    <SpaRoot>..\..\src\ui</SpaRoot>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="16.0.0" />
+    <PackageReference Include="AutoMapper" Version="16.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\ESPresense.Companion.csproj" />
+    <ProjectReference Include="..\..\src\ESPresense.Companion.csproj" />
   </ItemGroup>
 
   <Target Name="RunFrontendTests" BeforeTargets="VSTest">

@@ -5,6 +5,7 @@ using Moq;
 
 namespace ESPresense.Companion.Tests;
 
+[FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
 public class DeviceSettingsStoreTests
 {
     private Mock<IMqttCoordinator> _mockMqttCoordinator = null!;
@@ -71,7 +72,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void Get_Should_Return_Device_By_Id()
+    public async Task Get_Should_Return_Device_By_Id()
     {
         // Arrange
         var deviceSettings = new DeviceSettings
@@ -83,7 +84,7 @@ public class DeviceSettingsStoreTests
         };
 
         // Simulate MQTT message received
-        SimulateMqttDeviceConfig("keys:darrell", deviceSettings);
+        await SimulateMqttDeviceConfig("keys:darrell", deviceSettings);
 
         // Act
         var result = _deviceSettingsStore.Get("keys:darrell");
@@ -95,7 +96,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void Get_Should_Return_Device_By_Alias()
+    public async Task Get_Should_Return_Device_By_Alias()
     {
         // Arrange
         var deviceSettings = new DeviceSettings
@@ -107,7 +108,7 @@ public class DeviceSettingsStoreTests
         };
 
         // Simulate MQTT message received on original topic
-        SimulateMqttDeviceConfig("keys:darrell-original", deviceSettings);
+        await SimulateMqttDeviceConfig("keys:darrell-original", deviceSettings);
 
         // Act - Try to get by aliased ID
         var result = _deviceSettingsStore.Get("keys:darrell-alias");
@@ -120,7 +121,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void Get_Should_Prefer_ById_Over_ByAlias()
+    public async Task Get_Should_Prefer_ById_Over_ByAlias()
     {
         // Arrange - Create two different settings
         var originalSettings = new DeviceSettings
@@ -140,8 +141,8 @@ public class DeviceSettingsStoreTests
         };
 
         // Simulate both MQTT messages
-        SimulateMqttDeviceConfig("keys:original-topic", originalSettings);
-        SimulateMqttDeviceConfig("keys:device1", aliasedSettings);
+        await SimulateMqttDeviceConfig("keys:original-topic", originalSettings);
+        await SimulateMqttDeviceConfig("keys:device1", aliasedSettings);
 
         // Act - Get by the conflicting ID
         var result = _deviceSettingsStore.Get("keys:device1");
@@ -153,7 +154,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void Should_Store_Calibration_Data_With_Original_ID()
+    public async Task Should_Store_Calibration_Data_With_Original_ID()
     {
         // Arrange - Device with aliased ID but calibration should stay with original
         var deviceSettings = new DeviceSettings
@@ -165,7 +166,7 @@ public class DeviceSettingsStoreTests
         };
 
         // Simulate MQTT config message on original topic
-        SimulateMqttDeviceConfig("keys:dt-spar", deviceSettings);
+        await SimulateMqttDeviceConfig("keys:dt-spar", deviceSettings);
 
         // Act - Verify we can get settings by original ID (for calibration data)
         var resultByOriginal = _deviceSettingsStore.Get("keys:dt-spar");
@@ -182,7 +183,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void Should_Not_Create_Conflicting_Records_When_Device_Aliased()
+    public async Task Should_Not_Create_Conflicting_Records_When_Device_Aliased()
     {
         // Arrange - This simulates the bug scenario
         var deviceSettings = new DeviceSettings
@@ -194,7 +195,7 @@ public class DeviceSettingsStoreTests
         };
 
         // Simulate the original MQTT config message
-        SimulateMqttDeviceConfig("keys:dt-spar", deviceSettings);
+        await SimulateMqttDeviceConfig("keys:dt-spar", deviceSettings);
 
         // Act - Try to create a conflicting record (this should not happen after the fix)
         var conflictingSettings = new DeviceSettings
@@ -219,7 +220,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void ApplyAnchor_Should_Set_DeviceAnchor_When_DeviceExists()
+    public async Task ApplyAnchor_Should_Set_DeviceAnchor_When_DeviceExists()
     {
         var device = new Device("keys:anchor", null, TimeSpan.FromSeconds(30));
         _state.Devices[device.Id] = device;
@@ -238,7 +239,7 @@ public class DeviceSettingsStoreTests
         // Verify HasAnchor is true before applying
         Assert.That(deviceSettings.HasAnchor, Is.True, "DeviceSettings should have HasAnchor=true when X, Y, Z are set");
 
-        SimulateMqttDeviceConfig("keys:anchor", deviceSettings);
+        await SimulateMqttDeviceConfig("keys:anchor", deviceSettings);
 
         Assert.That(device.IsAnchored, Is.True);
         Assert.That(device.Anchor, Is.Not.Null);
@@ -250,7 +251,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void ApplyAnchor_Should_Fallback_To_Alias_Id_When_Device_Not_Found_By_Topic()
+    public async Task ApplyAnchor_Should_Fallback_To_Alias_Id_When_Device_Not_Found_By_Topic()
     {
         var device = new Device("keys:alias", null, TimeSpan.FromSeconds(30));
         _state.Devices[device.Id] = device;
@@ -269,7 +270,7 @@ public class DeviceSettingsStoreTests
         // Verify HasAnchor is true before applying
         Assert.That(deviceSettings.HasAnchor, Is.True, "DeviceSettings should have HasAnchor=true when X, Y, Z are set");
 
-        SimulateMqttDeviceConfig("keys:original", deviceSettings);
+        await SimulateMqttDeviceConfig("keys:original", deviceSettings);
 
         Assert.That(device.IsAnchored, Is.True);
         Assert.That(device.Anchor, Is.Not.Null);
@@ -280,7 +281,7 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
-    public void ClearingAnchor_Should_Remove_Anchor_And_Flag_Device_For_Recheck()
+    public async Task ClearingAnchor_Should_Remove_Anchor_And_Flag_Device_For_Recheck()
     {
         var device = new Device("keys:anchor-clear", null, TimeSpan.FromSeconds(30));
         _state.Devices[device.Id] = device;
@@ -297,7 +298,7 @@ public class DeviceSettingsStoreTests
         // Verify HasAnchor is true before applying
         Assert.That(anchoredSettings.HasAnchor, Is.True, "DeviceSettings should have HasAnchor=true when X, Y, Z are set");
 
-        SimulateMqttDeviceConfig("keys:anchor-clear", anchoredSettings);
+        await SimulateMqttDeviceConfig("keys:anchor-clear", anchoredSettings);
         Assert.That(device.IsAnchored, Is.True);
 
         var clearedSettings = new DeviceSettings
@@ -314,25 +315,23 @@ public class DeviceSettingsStoreTests
 
         device.Check = false;
 
-        SimulateMqttDeviceConfig("keys:anchor-clear", clearedSettings);
+        await SimulateMqttDeviceConfig("keys:anchor-clear", clearedSettings);
 
         Assert.That(device.IsAnchored, Is.False);
         Assert.That(device.Anchor, Is.Null);
         Assert.That(device.Check, Is.True);
     }
 
-    private void SimulateMqttDeviceConfig(string deviceId, DeviceSettings deviceSettings)
+    private async Task SimulateMqttDeviceConfig(string deviceId, DeviceSettings deviceSettings)
     {
-        // Create the event args that MqttCoordinator would create
-        var eventArgs = new DeviceSettingsEventArgs
-        {
-            DeviceId = deviceId,
-            Payload = deviceSettings
-        };
+        var storeByIdField = typeof(DeviceSettingsStore).GetField("_storeById",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var storeByAliasField = typeof(DeviceSettingsStore).GetField("_storeByAlias",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
         // Directly raise the event on the mock
         _mockMqttCoordinator.Raise(x => x.DeviceConfigReceivedAsync += null, eventArgs);
-        
+
         // Allow time for async event handler to complete (important in .NET 10+)
         Task.Delay(10).Wait();
     }

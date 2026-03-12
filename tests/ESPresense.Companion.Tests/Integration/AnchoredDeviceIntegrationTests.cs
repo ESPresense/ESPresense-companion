@@ -143,6 +143,7 @@ public class AnchoredDeviceIntegrationTests
     public void AnchoredDevice_WithOverlappingRooms_SelectsCorrectRoom()
     {
         // Arrange
+        _state.Floors.Clear();
         var floor = CreateTestFloor("floor1", "Test Floor",
             new double[] { -10, -10, -10 },
             new double[] { 10, 10, 10 });

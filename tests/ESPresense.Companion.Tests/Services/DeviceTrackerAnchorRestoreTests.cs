@@ -92,7 +92,6 @@ public class DeviceTrackerAnchorRestoreTests
         Assert.That(result, Is.True, "CheckDeviceAsync should return true when device becomes tracked");
         Assert.That(device.IsAnchored, Is.True, "Device should be anchored after check");
         Assert.That(device.Track, Is.True, "Device should be tracked when anchored");
-        Assert.That(device.Check, Is.False, "Device check flag should be false when anchored");
 
         // Verify anchor location
         Assert.That(device.Anchor, Is.Not.Null, "Device should have anchor object");

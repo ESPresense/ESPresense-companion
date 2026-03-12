@@ -1,6 +1,7 @@
 ﻿using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
@@ -10,14 +11,18 @@ namespace ESPresense.Locators;
 
 public class BfgsMultilateralizer : BaseMultilateralizer
 {
+    private readonly IWeighting _weighting;
+
     public BfgsMultilateralizer(Device device, Floor floor, State state)
         : base(device, floor, state)
     {
+        // Load weighting from BFGS config, defaulting to Gaussian if not specified
+        _weighting = WeightingFactory.Create(state.Config?.Locators?.Bfgs?.Weighting);
     }
 
     public override bool Locate(Scenario scenario)
     {
-        double Weight(int index, int total) => (double)(total - index) / total;
+        double Weight(int index, int total) => _weighting.Get(index, total);
         double Error(IList<double> x, DeviceToNode dn) => new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location) - dn.Distance;
 
         if (!InitializeScenario(scenario, out var nodes, out var guess))
@@ -33,12 +38,17 @@ public class BfgsMultilateralizer : BaseMultilateralizer
             }
             else
             {
+                double weightSum = Enumerable.Range(0, nodes.Length)
+                    .Select(i => Weight(i, nodes.Length))
+                    .Sum();
+                if (weightSum <= 0) weightSum = 1;
+
                 var lowerBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[0].X, Floor.Bounds[0].Y, Floor.Bounds[0].Z });
                 var upperBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[1].X, Floor.Bounds[1].Y, Floor.Bounds[1].Z });
                 var obj = ObjectiveFunction.Gradient(
                     x => nodes
                         .Select((dn, i) => new { err = Error(x, dn), weight = Weight(i, nodes.Length) })
-                        .Sum(a => a.weight * Math.Pow(a.err, 2))
+                        .Sum(a => a.weight * Math.Pow(a.err, 2)) / weightSum
                     ,
                     x =>
                     {
@@ -57,7 +67,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                                 var dDist_dX = (x[i] - nodeLoc.ToVector()[i]) / dist;
 
                                 return 2 * err * dDist_dX * Weight(j, nodes.Length);
-                            }).Sum();
+                            }).Sum() / weightSum;
                         }
                         return Vector<double>.Build.Dense(gradient);
                     });
@@ -82,15 +92,26 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                 };
 
                 scenario.ReasonForExit = result.ReasonForExit;
-                confidence = (int)Math.Max(10, Math.Min(100, Math.Min(100, 100 * nodes.Length / 4.0) - result.FunctionInfoAtMinimum.Value));
+
+                CalculateAndSetPearsonCorrelation(scenario, nodes);
+
+                // Calculate number of possible nodes for this floor
+                int nodesPossibleOnline = State.Nodes.Values
+                    .Count(n => n.Floors?.Contains(Floor) ?? false);
+
+                // Use the centralized confidence calculation
+                confidence = MathUtils.CalculateConfidence(
+                    scenario.Error,
+                    scenario.PearsonCorrelation,
+                    nodes.Length,
+                    nodesPossibleOnline
+                );
             }
         }
         catch (Exception ex)
         {
             confidence = HandleLocatorException(ex, scenario, guess);
         }
-
-        CalculateAndSetPearsonCorrelation(scenario, nodes);
 
         return FinalizeScenario(scenario, confidence);
     }

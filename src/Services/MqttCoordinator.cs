@@ -190,13 +190,27 @@ public class MqttCoordinator : IMqttCoordinator
             if (_connectionTcs.Task.IsCompleted)
                 _connectionTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
+            // Enhanced logging with reason details for troubleshooting connection issues
             if (args.Exception != null)
             {
-                _logger.LogWarning(args.Exception, "MQTT disconnected");
+                _logger.LogWarning(args.Exception,
+                    "MQTT disconnected due to error: {ExceptionType}. Broker: {Broker}",
+                    args.Exception.GetType().Name,
+                    config.Host);
+            }
+            else if (args.Reason != MqttClientDisconnectReason.NormalDisconnection)
+            {
+                _logger.LogWarning("MQTT disconnected with reason: {Reason} ({ReasonCode}). Client was connected: {WasConnected}. Broker: {Broker}",
+                    args.Reason.ToString(),
+                    (int)args.Reason,
+                    args.ClientWasConnected,
+                    config.Host);
             }
             else
             {
-                _logger.LogInformation("MQTT disconnected");
+                _logger.LogInformation("MQTT disconnected. Client was connected: {WasConnected}. Broker: {Broker}",
+                    args.ClientWasConnected,
+                    config.Host);
             }
 
             if (!_reconnectRequired && args.ClientWasConnected)
@@ -234,8 +248,23 @@ public class MqttCoordinator : IMqttCoordinator
         {
             await mqttClient.ConnectAsync(mqttClientOptions).ConfigureAwait(false);
         }
-        catch
+        catch (MQTTnet.Exceptions.MqttClientNotConnectedException ex)
         {
+            _logger.LogError(ex, "MQTT client not connected after connect attempt. Broker may be rejecting the connection (check protocol version).");
+            _mqttClient = null;
+            mqttClient.Dispose();
+            throw;
+        }
+        catch (MQTTnet.Exceptions.MqttCommunicationException ex)
+        {
+            _logger.LogError(ex, "MQTT connection failed: {Message}. Check broker address, port, and TLS settings.", ex.Message);
+            _mqttClient = null;
+            mqttClient.Dispose();
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "MQTT connection failed unexpectedly: {Type} - {Message}", ex.GetType().Name, ex.Message);
             _mqttClient = null;
             mqttClient.Dispose();
             throw;
@@ -482,6 +511,30 @@ public class MqttCoordinator : IMqttCoordinator
             var sanitizedTopic = topic.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
             _logger.LogError(ex, "Failed to enqueue MQTT message to {Topic}", sanitizedTopic);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to enqueue an MQTT message for delivery without throwing exceptions.
+    /// Logs errors but returns success/failure status instead of propagating exceptions.
+    /// Use this for best-effort publishes (telemetry, status updates) that shouldn't crash background services.
+    /// </summary>
+    /// <param name="topic">MQTT topic to publish to.</param>
+    /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
+    /// <param name="retain">If true, the broker will retain the message.</param>
+    /// <returns>True if the message was enqueued successfully, false if an error occurred.</returns>
+    public virtual async Task<bool> TryEnqueueAsync(string topic, string? payload, bool retain = false)
+    {
+        try
+        {
+            await EnqueueAsync(topic, payload, retain).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // Already logged by EnqueueAsync, just return false
+            // Common causes: DNS resolution failure, network unreachable, broker down
+            return false;
         }
     }
 

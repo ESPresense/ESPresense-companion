@@ -37,6 +37,9 @@ namespace ESPresense.Models
             {
                 NadarayaWatson = NadarayaWatson.Clone(),
                 NelderMead = NelderMead.Clone(),
+                Bfgs = Bfgs.Clone(),
+                Mle = Mle.Clone(),
+                MultiFloor = MultiFloor.Clone(),
                 NearestNode = NearestNode.Clone()
             };
         }
@@ -64,6 +67,44 @@ namespace ESPresense.Models
             {
                 Enabled = Enabled,
                 Floors = Floors?.ToArray(),
+                Weighting = Weighting.Clone()
+            };
+        }
+    }
+
+    public partial class BfgsConfig
+    {
+        public BfgsConfig Clone()
+        {
+            return new BfgsConfig
+            {
+                Enabled = Enabled,
+                Floors = Floors?.ToArray(),
+                Weighting = Weighting.Clone()
+            };
+        }
+    }
+
+    public partial class MleConfig
+    {
+        public MleConfig Clone()
+        {
+            return new MleConfig
+            {
+                Enabled = Enabled,
+                Floors = Floors?.ToArray(),
+                Weighting = Weighting.Clone()
+            };
+        }
+    }
+
+    public partial class MultiFloorConfig
+    {
+        public MultiFloorConfig Clone()
+        {
+            return new MultiFloorConfig
+            {
+                Enabled = Enabled,
                 Weighting = Weighting.Clone()
             };
         }
