@@ -329,16 +329,10 @@ public class DeviceSettingsStoreTests
         var storeByAliasField = typeof(DeviceSettingsStore).GetField("_storeByAlias",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-        var storeById = (System.Collections.Concurrent.ConcurrentDictionary<string, DeviceSettings>)storeByIdField!.GetValue(_deviceSettingsStore)!;
-        var storeByAlias = (System.Collections.Concurrent.ConcurrentDictionary<string, DeviceSettings>)storeByAliasField!.GetValue(_deviceSettingsStore)!;
+        // Directly raise the event on the mock
+        _mockMqttCoordinator.Raise(x => x.DeviceConfigReceivedAsync += null, eventArgs);
 
-        storeById.AddOrUpdate(deviceId, _ => deviceSettings, (_, _) => deviceSettings);
-        if (deviceSettings.Id != null)
-        {
-            storeByAlias.AddOrUpdate(deviceSettings.Id, _ => deviceSettings, (_, _) => deviceSettings);
-        }
-
-        _deviceSettingsStore.ApplyToDevice(deviceId, deviceSettings);
-        await Task.CompletedTask;
+        // Allow time for async event handler to complete (important in .NET 10+)
+        Task.Delay(10).Wait();
     }
 }
