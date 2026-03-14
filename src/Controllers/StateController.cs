@@ -186,6 +186,14 @@ public class StateController : ControllerBase
 
         c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
         c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
+
+        // Populate antenna profiles for nodes that have one configured
+        foreach (var (nodeId, node) in _state.Nodes)
+        {
+            if (node.AntennaProfile is not null)
+                c.Antennas[node.Name ?? nodeId] = node.AntennaProfile;
+        }
+
         return c;
     }
 
