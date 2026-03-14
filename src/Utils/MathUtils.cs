@@ -237,7 +237,7 @@ namespace ESPresense.Utils
 
         /// <summary>
         /// Computes directional antenna gain in dB given boresight direction and Rx→Tx vector.
-        /// Returns 0.0 when the nodes are co-located or the antenna is isotropic.
+        /// Returns gMaxDb when the nodes are co-located or the antenna is isotropic.
         /// </summary>
         public static double ComputeGainDb(
             double boresightX, double boresightY, double boresightZ,

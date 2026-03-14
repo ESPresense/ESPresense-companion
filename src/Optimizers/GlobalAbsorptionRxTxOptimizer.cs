@@ -50,10 +50,11 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         // Phase 1: Optimize absorption, rxAdjRssi, txRefRssi (isotropic, proven path)
         Phase1_OptimizeAbsorptionRxTx(or, allRxNodes, uniqueRxIds, uniqueTxIds, nodeWeights, optimization, existingSettings);
 
-        // Phase 2: Optimize antenna angles only, holding Phase 1 results fixed
+        // Phase 2: Optimize antenna angles only, holding Phase 1 results fixed.
+        // Only run if Phase 1 produced results (or.Nodes is non-empty).
         var directionalRxIds = uniqueRxIds.Where(id => allRxNodes.Any(m => m.Rx.Id == id && m.Rx.IsNode && m.Rx.HasDirectionalAntenna)).ToList();
         Log.Debug("Phase 2 check: {Count} directional nodes out of {Total} Rx nodes", directionalRxIds.Count, uniqueRxIds.Count);
-        if (directionalRxIds.Count > 0)
+        if (directionalRxIds.Count > 0 && or.Nodes.Count > 0)
             Phase2_OptimizeAntennaAngles(or, allRxNodes, directionalRxIds, nodeWeights, optimization, existingSettings);
 
         return or;
