@@ -11,9 +11,7 @@
 		Absorption = 2,
 		RxRssiAdj = 3,
 		TxRssiRef = 4,
-		VarianceMeters = 5,
-		Azimuth = 6,
-		Elevation = 7
+		VarianceMeters = 5
 	}
 
 	function coloring(percent: number | null): string {
@@ -52,13 +50,7 @@
 				case DataPoint.VarianceMeters:
 					num = n1?.var;
 					break;
-				case DataPoint.Azimuth:
-					num = n1?.azimuth;
-					return num !== null && num !== undefined ? Number(num.toFixed(1)) + '°' : 'n/a';
-				case DataPoint.Elevation:
-					num = n1?.elevation;
-					return num !== null && num !== undefined ? Number(num.toFixed(1)) + '°' : 'n/a';
-			}
+				}
 			return num !== null && num !== undefined ? Number(num.toPrecision(3)) : 'n/a';
 		}
 	}
@@ -150,6 +142,38 @@
 		</div>
 		{/if}
 
+		{#if $calibration?.nodes && Object.keys($calibration.nodes).length > 0}
+		<div class="card mb-4">
+			<header class="text-lg font-semibold mb-4">Node Settings</header>
+			<div class="overflow-x-auto">
+				<table class="table">
+					<thead>
+						<tr>
+							<th style="color: oklch(1 0 none);">Node</th>
+							<th style="color: oklch(1 0 none);">Antenna</th>
+							<th style="color: oklch(1 0 none);">Azimuth</th>
+							<th style="color: oklch(1 0 none);">Elevation</th>
+							<th style="color: oklch(1 0 none);">Absorption</th>
+							<th style="color: oklch(1 0 none);">Rx Adj RSSI</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each Object.entries($calibration.nodes).sort((a, b) => a[0].localeCompare(b[0])) as [name, node] (name)}
+							<tr>
+								<td>{name}</td>
+								<td>{node.antenna ?? '-'}</td>
+								<td>{node.azimuth != null ? node.azimuth.toFixed(1) + '°' : '-'}</td>
+								<td>{node.elevation != null ? node.elevation.toFixed(1) + '°' : '-'}</td>
+								<td>{node.absorption != null ? node.absorption.toFixed(2) : '-'}</td>
+								<td>{node.rxAdjRssi != null ? node.rxAdjRssi.toFixed(0) : '-'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+		{/if}
+
 		{#if $calibration?.matrix}
 		<div class="card">
 			<header class="text-lg font-semibold mb-4">Node Calibration</header>
@@ -163,8 +187,6 @@
 							<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
 							<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
 							<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
-							<button class="btn {data_point === 6 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 6)}>Azimuth (°)</button>
-							<button class="btn {data_point === 7 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 7)}>Elevation (°)</button>
 						</div>
 						<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
 					</div>
@@ -186,7 +208,7 @@
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}
-										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}${$calibration?.antennas?.[id2] ? `\nRx Antenna: ${$calibration.antennas[id2]}` : ''}` : 'No beacon Received in last 30 seconds'}
+										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}${$calibration?.nodes?.[id2]?.antenna ? `\nRx Antenna: ${$calibration.nodes[id2].antenna}` : ''}` : 'No beacon Received in last 30 seconds'}
 											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
 										>
 									{/each}

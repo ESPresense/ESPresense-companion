@@ -187,11 +187,18 @@ public class StateController : ControllerBase
         c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
         c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
 
-        // Populate antenna profiles for nodes that have one configured
+        // Populate per-node calibration summary (antenna, azimuth, elevation, etc.)
         foreach (var (nodeId, node) in _state.Nodes)
         {
-            if (node.AntennaProfile is not null)
-                c.Antennas[node.Name ?? nodeId] = node.AntennaProfile;
+            var ns = _nsd.Get(nodeId);
+            c.Nodes[node.Name ?? nodeId] = new NodeCalibrationSummary
+            {
+                Antenna = node.AntennaProfile,
+                Azimuth = ns.Calibration.Azimuth,
+                Elevation = ns.Calibration.Elevation,
+                Absorption = ns.Calibration.Absorption,
+                RxAdjRssi = ns.Calibration.RxAdjRssi,
+            };
         }
 
         return c;
