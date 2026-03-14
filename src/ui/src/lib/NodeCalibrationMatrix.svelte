@@ -219,8 +219,7 @@
 									{#each rxColumns as id2 (id2)}
 										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? [
 										`Map: ${Number(n1[id2].mapDistance?.toPrecision(3))}m  Measured: ${Number(n1[id2]?.distance?.toPrecision(3))}m`,
-										`Error: ${Number(n1[id2]?.diff?.toPrecision(3))}m (${Number(Math.round(n1[id2].percent * 100))}%)`,
-										n1[id2]?.var != null ? `Variance: ${Number(n1[id2].var.toPrecision(3))}` : '',
+										`Error: ${Number(n1[id2]?.diff?.toPrecision(3))}m${n1[id2]?.var != null ? ' \u00B1' + Number(Math.sqrt(n1[id2].var).toPrecision(2)) + 'm' : ''} (${Number(Math.round(n1[id2].percent * 100))}%)`,
 										$calibration?.nodes?.[id1]?.antenna ? `Tx: ${$calibration.nodes[id1].antenna}` : '',
 										$calibration?.nodes?.[id2]?.antenna ? `Rx: ${$calibration.nodes[id2].antenna}` : ''
 									].filter(Boolean).join('\n') : 'No beacon received in last 30 seconds'}
