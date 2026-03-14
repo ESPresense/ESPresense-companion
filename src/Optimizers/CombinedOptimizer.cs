@@ -37,10 +37,10 @@ public class CombinedOptimizer : IOptimizer
             if (optimization == null) return results;
 
             // Step 1: Optimize RxAdjRssi and path-specific absorptions
-            var (rxAdjRssiDict, pathAbsorptionDict, error) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
+            var (rxAdjRssiDict, pathAbsorptionDict, _) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
 
             // Step 2: Optimize node-specific absorptions and antenna pointing (sinAz/cosAz/sinEl) while keeping RxAdjRssi constant
-            var (nodeAbsorptions, nodeAzimuths, nodeElevations) = OptimizeNodeAbsorptions(allNodes, uniqueDeviceIds, rxAdjRssiDict, pathAbsorptionDict, optimization, existingSettings);
+            var (nodeAbsorptions, nodeAzimuths, nodeElevations, nodeError) = OptimizeNodeAbsorptions(allNodes, uniqueDeviceIds, rxAdjRssiDict, pathAbsorptionDict, optimization, existingSettings);
 
             // Process and store results
             foreach (var deviceId in uniqueDeviceIds)
@@ -52,7 +52,7 @@ public class CombinedOptimizer : IOptimizer
                     {
                         RxAdjRssi = rxAdjRssi,
                         Absorption = absorption,
-                        Error = error
+                        Error = nodeError
                     };
                     if (nodeAzimuths.TryGetValue(deviceId, out var az)) proposed.Azimuth = az;
                     if (nodeElevations.TryGetValue(deviceId, out var el)) proposed.Elevation = el;
@@ -81,7 +81,6 @@ public class CombinedOptimizer : IOptimizer
             for (int i = 0; i < uniqueDeviceIds.Count; i++)
             {
                 var rxAdjRssi = x[i];
-                existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
                 // Bounds should always come from global config
                 double rxAdjMin = optimization?.RxAdjRssiMin ?? -15;
                 double rxAdjMax = optimization?.RxAdjRssiMax ?? 25;
@@ -136,12 +135,15 @@ public class CombinedOptimizer : IOptimizer
         return (rxAdjRssiDict, pathAbsorptionDict, result.FunctionInfoAtMinimum.Value);
     }
 
-    private (NodeAbsorptionMap Absorptions, NodeAzimuthMap Azimuths, NodeElevationMap Elevations) OptimizeNodeAbsorptions(List<Measure> allNodes, List<string> uniqueDeviceIds,
+    private (NodeAbsorptionMap Absorptions, NodeAzimuthMap Azimuths, NodeElevationMap Elevations, double Error) OptimizeNodeAbsorptions(List<Measure> allNodes, List<string> uniqueDeviceIds,
         Dictionary<string, double> rxAdjRssiDict, Dictionary<(string, string), double> pathAbsorptionDict, ConfigOptimization optimization, Dictionary<string, NodeSettings> existingSettings)
     {
-        int N = uniqueDeviceIds.Count;
-        // 4N blocked vector: [ abs_0..N-1 | sinAz_0..N-1 | cosAz_0..N-1 | sinEl_0..N-1 ]
-        int vecLen = Step2Layout.VectorLength(N);
+        int absorptionCount = uniqueDeviceIds.Count;
+        var directionalDeviceIds = uniqueDeviceIds
+            .Where(id => allNodes.Any(m => m.Rx.Id == id && m.Rx.IsNode && m.Rx.HasDirectionalAntenna))
+            .ToList();
+        int directionalCount = directionalDeviceIds.Count;
+        int vecLen = Step2Layout.VectorLength(absorptionCount, directionalCount);
 
         // Use ObjectiveFunction.Gradient() with gradient over the full 4N vector.
         // Both absorption and antenna direction parameters are optimised simultaneously
@@ -150,9 +152,9 @@ public class CombinedOptimizer : IOptimizer
             x => {
                 var xa = x.ToArray();
                 var nodeAbsorptionDict = new Dictionary<string, double>();
-                for (int i = 0; i < N; i++)
+                for (int i = 0; i < absorptionCount; i++)
                 {
-                    var absorption = xa[Step2Layout.AbsIndex(i, N)];
+                    var absorption = xa[Step2Layout.AbsIndex(i, absorptionCount)];
                     double absorptionMin = optimization?.AbsorptionMin ?? 2.5;
                     double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
                     if (absorption < absorptionMin || absorption > absorptionMax)
@@ -162,18 +164,18 @@ public class CombinedOptimizer : IOptimizer
 
                 // Build working direction dictionary from sin/cos params
                 var dirDict = new Dictionary<string, (double azRad, double elRad)>();
-                for (int i = 0; i < N; i++)
+                for (int i = 0; i < directionalCount; i++)
                 {
-                    dirDict[uniqueDeviceIds[i]] = (
-                        Step2Layout.GetAzimuthRad(xa, i, N),
-                        Step2Layout.GetElevationRad(xa, i, N)
+                    dirDict[directionalDeviceIds[i]] = (
+                        Step2Layout.GetAzimuthRad(xa, i, absorptionCount, directionalCount),
+                        Step2Layout.GetElevationRad(xa, i, absorptionCount, directionalCount)
                     );
                 }
 
                 // Regularization: sum of unit-circle penalties
                 double penalty = 0.0;
-                for (int i = 0; i < N; i++)
-                    penalty += Step2Layout.UnitCirclePenalty(xa, i, N);
+                for (int i = 0; i < directionalCount; i++)
+                    penalty += Step2Layout.UnitCirclePenalty(xa, i, absorptionCount, directionalCount);
 
                 double error = CalculateErrorWithGain(allNodes, rxAdjRssiDict, nodeAbsorptionDict, dirDict);
                 return error + penalty;
@@ -181,15 +183,15 @@ public class CombinedOptimizer : IOptimizer
             x => {
                 var xa = x.ToArray();
                 var nodeAbsorptionDict = new Dictionary<string, double>();
-                for (int i = 0; i < N; i++)
-                    nodeAbsorptionDict[uniqueDeviceIds[i]] = xa[Step2Layout.AbsIndex(i, N)];
+                for (int i = 0; i < absorptionCount; i++)
+                    nodeAbsorptionDict[uniqueDeviceIds[i]] = xa[Step2Layout.AbsIndex(i, absorptionCount)];
 
                 var dirDict = new Dictionary<string, (double azRad, double elRad)>();
-                for (int i = 0; i < N; i++)
+                for (int i = 0; i < directionalCount; i++)
                 {
-                    dirDict[uniqueDeviceIds[i]] = (
-                        Step2Layout.GetAzimuthRad(xa, i, N),
-                        Step2Layout.GetElevationRad(xa, i, N)
+                    dirDict[directionalDeviceIds[i]] = (
+                        Step2Layout.GetAzimuthRad(xa, i, absorptionCount, directionalCount),
+                        Step2Layout.GetElevationRad(xa, i, absorptionCount, directionalCount)
                     );
                 }
 
@@ -199,8 +201,8 @@ public class CombinedOptimizer : IOptimizer
 
                 double baseError = CalculateErrorWithGain(allNodes, rxAdjRssiDict, nodeAbsorptionDict, dirDict);
                 double basePenalty = 0.0;
-                for (int i = 0; i < N; i++)
-                    basePenalty += Step2Layout.UnitCirclePenalty(xa, i, N);
+                for (int i = 0; i < directionalCount; i++)
+                    basePenalty += Step2Layout.UnitCirclePenalty(xa, i, absorptionCount, directionalCount);
                 double baseVal = baseError + basePenalty;
 
                 for (int j = 0; j < vecLen; j++)
@@ -209,21 +211,21 @@ public class CombinedOptimizer : IOptimizer
                     xPlus[j] += eps;
 
                     var absPlus = new Dictionary<string, double>(nodeAbsorptionDict);
-                    for (int i = 0; i < N; i++)
-                        absPlus[uniqueDeviceIds[i]] = xPlus[Step2Layout.AbsIndex(i, N)];
+                    for (int i = 0; i < absorptionCount; i++)
+                        absPlus[uniqueDeviceIds[i]] = xPlus[Step2Layout.AbsIndex(i, absorptionCount)];
 
                     var dirPlus = new Dictionary<string, (double azRad, double elRad)>();
-                    for (int i = 0; i < N; i++)
+                    for (int i = 0; i < directionalCount; i++)
                     {
-                        dirPlus[uniqueDeviceIds[i]] = (
-                            Step2Layout.GetAzimuthRad(xPlus, i, N),
-                            Step2Layout.GetElevationRad(xPlus, i, N)
+                        dirPlus[directionalDeviceIds[i]] = (
+                            Step2Layout.GetAzimuthRad(xPlus, i, absorptionCount, directionalCount),
+                            Step2Layout.GetElevationRad(xPlus, i, absorptionCount, directionalCount)
                         );
                     }
 
                     double penPlus = 0.0;
-                    for (int i = 0; i < N; i++)
-                        penPlus += Step2Layout.UnitCirclePenalty(xPlus, i, N);
+                    for (int i = 0; i < directionalCount; i++)
+                        penPlus += Step2Layout.UnitCirclePenalty(xPlus, i, absorptionCount, directionalCount);
 
                     double errPlus = CalculateErrorWithGain(allNodes, rxAdjRssiDict, absPlus, dirPlus);
                     gradient[j] = (errPlus + penPlus - baseVal) / eps;
@@ -237,23 +239,26 @@ public class CombinedOptimizer : IOptimizer
         // blocks seeded to boresight-pointing identity (azimuth=0, elevation=0).
         // -----------------------------------------------------------------------
         var initialGuessArr = new double[vecLen];
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < absorptionCount; i++)
         {
             existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
             double absorptionMin = optimization?.AbsorptionMin ?? 2.5;
             double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
             // Abs block: clamp existing calibration value within global bounds
-            initialGuessArr[Step2Layout.AbsIndex(i, N)] = Math.Clamp(
+            initialGuessArr[Step2Layout.AbsIndex(i, absorptionCount)] = Math.Clamp(
                 nodeSettings?.Calibration?.Absorption ?? (absorptionMax - absorptionMin) / 2 + absorptionMin,
                 absorptionMin, absorptionMax);
-            // Antenna direction: seed from existing calibration if available, else az=0°, el=90°
+        }
+        for (int i = 0; i < directionalCount; i++)
+        {
+            existingSettings.TryGetValue(directionalDeviceIds[i], out var nodeSettings);
             double azDeg = nodeSettings?.Calibration?.Azimuth ?? 0.0;
             double elDeg = nodeSettings?.Calibration?.Elevation ?? 0.0; // Default horizontal for optimizer (node-to-node paths)
             double azRad = azDeg * Math.PI / 180.0;
             double elRad = elDeg * Math.PI / 180.0;
-            initialGuessArr[Step2Layout.SinAzIndex(i, N)] = Math.Sin(azRad);
-            initialGuessArr[Step2Layout.CosAzIndex(i, N)] = Math.Cos(azRad);
-            initialGuessArr[Step2Layout.SinElIndex(i, N)] = Math.Sin(elRad);
+            initialGuessArr[Step2Layout.SinAzIndex(i, absorptionCount, directionalCount)] = Math.Sin(azRad);
+            initialGuessArr[Step2Layout.CosAzIndex(i, absorptionCount, directionalCount)] = Math.Cos(azRad);
+            initialGuessArr[Step2Layout.SinElIndex(i, absorptionCount, directionalCount)] = Math.Sin(elRad);
         }
         var initialGuess = Vector<double>.Build.DenseOfArray(initialGuessArr);
 
@@ -265,18 +270,21 @@ public class CombinedOptimizer : IOptimizer
         // -----------------------------------------------------------------------
         var lowerBoundArr = new double[vecLen];
         var upperBoundArr = new double[vecLen];
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < absorptionCount; i++)
         {
             double absorptionMin = optimization?.AbsorptionMin ?? 2.5;
             double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
-            lowerBoundArr[Step2Layout.AbsIndex(i, N)] = absorptionMin;
-            upperBoundArr[Step2Layout.AbsIndex(i, N)] = absorptionMax;
-            lowerBoundArr[Step2Layout.SinAzIndex(i, N)] = -2.0;
-            upperBoundArr[Step2Layout.SinAzIndex(i, N)] =  2.0;
-            lowerBoundArr[Step2Layout.CosAzIndex(i, N)] = -2.0;
-            upperBoundArr[Step2Layout.CosAzIndex(i, N)] =  2.0;
-            lowerBoundArr[Step2Layout.SinElIndex(i, N)] = -1.0;
-            upperBoundArr[Step2Layout.SinElIndex(i, N)] =  1.0;
+            lowerBoundArr[Step2Layout.AbsIndex(i, absorptionCount)] = absorptionMin;
+            upperBoundArr[Step2Layout.AbsIndex(i, absorptionCount)] = absorptionMax;
+        }
+        for (int i = 0; i < directionalCount; i++)
+        {
+            lowerBoundArr[Step2Layout.SinAzIndex(i, absorptionCount, directionalCount)] = -2.0;
+            upperBoundArr[Step2Layout.SinAzIndex(i, absorptionCount, directionalCount)] =  2.0;
+            lowerBoundArr[Step2Layout.CosAzIndex(i, absorptionCount, directionalCount)] = -2.0;
+            upperBoundArr[Step2Layout.CosAzIndex(i, absorptionCount, directionalCount)] =  2.0;
+            lowerBoundArr[Step2Layout.SinElIndex(i, absorptionCount, directionalCount)] = -1.0;
+            upperBoundArr[Step2Layout.SinElIndex(i, absorptionCount, directionalCount)] =  1.0;
         }
         var lowerBound = Vector<double>.Build.DenseOfArray(lowerBoundArr);
         var upperBound = Vector<double>.Build.DenseOfArray(upperBoundArr);
@@ -286,29 +294,26 @@ public class CombinedOptimizer : IOptimizer
 
         var minPoint = result.MinimizingPoint.ToArray();
         var nodeAbsorptions = new NodeAbsorptionMap();
-        for (int i = 0; i < N; i++)
-            nodeAbsorptions[uniqueDeviceIds[i]] = minPoint[Step2Layout.AbsIndex(i, N)];
+        for (int i = 0; i < absorptionCount; i++)
+            nodeAbsorptions[uniqueDeviceIds[i]] = minPoint[Step2Layout.AbsIndex(i, absorptionCount)];
 
         var nodeAzimuths = new NodeAzimuthMap();
         var nodeElevations = new NodeElevationMap();
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < directionalCount; i++)
         {
-            if (allNodes.Any(m => m.Rx.Id == uniqueDeviceIds[i] && m.Rx.IsNode && m.Rx.HasDirectionalAntenna))
-            {
-                double azRad = Step2Layout.GetAzimuthRad(minPoint, i, N);
-                double elRad = Step2Layout.GetElevationRad(minPoint, i, N);
-                double azDeg = azRad * 180.0 / Math.PI;
-                if (azDeg < 0) azDeg += 360.0;
-                double elDeg = elRad * 180.0 / Math.PI;
-                nodeAzimuths[uniqueDeviceIds[i]] = azDeg;
-                nodeElevations[uniqueDeviceIds[i]] = elDeg;
-            }
+            double azRad = Step2Layout.GetAzimuthRad(minPoint, i, absorptionCount, directionalCount);
+            double elRad = Step2Layout.GetElevationRad(minPoint, i, absorptionCount, directionalCount);
+            double azDeg = azRad * 180.0 / Math.PI;
+            if (azDeg < 0) azDeg += 360.0;
+            double elDeg = elRad * 180.0 / Math.PI;
+            nodeAzimuths[directionalDeviceIds[i]] = azDeg;
+            nodeElevations[directionalDeviceIds[i]] = elDeg;
         }
-        return (Absorptions: nodeAbsorptions, Azimuths: nodeAzimuths, Elevations: nodeElevations);
+        return (Absorptions: nodeAbsorptions, Azimuths: nodeAzimuths, Elevations: nodeElevations, Error: result.FunctionInfoAtMinimum.Value);
     }
 
     private double CalculateError(List<Measure> nodes, Dictionary<string, double> rxAdjRssiDict,
-        Dictionary<string, double> nodeAbsorptionDict = null, Dictionary<(string, string), double> pathAbsorptionDict = null)
+        Dictionary<string, double>? nodeAbsorptionDict = null, Dictionary<(string, string), double>? pathAbsorptionDict = null)
     {
         return nodes.Select(n =>
         {

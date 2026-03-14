@@ -46,6 +46,12 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
             scenario.Fixes = pos.Length;
             scenario.Error = pos.Select((p, i) => Math.Pow(Error(result.ToPoint3D(), p.ToPoint3D(), ranges[i]), 2)).Average();
             scenario.Iterations = gaussNewton.Iterations;
+            if (!gaussNewton.Converged)
+            {
+                scenario.ReasonForExit = ExitCondition.ExceedIterations;
+                return null;
+            }
+
             scenario.ReasonForExit = ExitCondition.Converged;
 
             return new Point3D(result.X, result.Y, result.Z);
@@ -122,6 +128,8 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         }
 
         public int? Iterations { get; set; }
+        public int MaxIterations { get; } = 100;
+        public bool Converged { get; private set; }
 
         private double Error(Vector3 x, Vector3 dnLocation, float dnDistance)
         {
@@ -132,9 +140,13 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         {
             var guess = initialGuess;
             var lambda = 1e-3; // Regularization parameter
+            Converged = false;
+            Iterations = 0;
 
-            for (var iter = 0; iter < 100; ++iter)
+            for (var iter = 0; iter < MaxIterations; ++iter)
             {
+                Iterations = iter + 1;
+
                 // Construct the Jacobian matrix
                 var jacobian = DenseMatrix.OfArray(new double[_transmitters.Length, 3]);
                 for (var i = 0; i < _transmitters.Length; ++i)
@@ -156,7 +168,11 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
                 guess = Vector3.Max(_lowerBounds, Vector3.Min(_upperBounds, guess));
 
                 // If the step size is small enough, stop iterating
-                if (step.L2Norm() < 1e-5) break;
+                if (step.L2Norm() < 1e-5)
+                {
+                    Converged = true;
+                    break;
+                }
             }
 
             return guess;

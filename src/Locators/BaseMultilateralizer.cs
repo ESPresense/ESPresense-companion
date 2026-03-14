@@ -44,6 +44,7 @@ public abstract class BaseMultilateralizer : ILocate
             return false;
 
         int confidence = scenario.Confidence ?? 0;
+        var enriched = false;
         try
         {
             if (nodes.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
@@ -55,6 +56,7 @@ public abstract class BaseMultilateralizer : ILocate
             {
                 // Enrich nodes with calibration data before iterative solve
                 EnrichNodes(nodes);
+                enriched = true;
 
                 Point3D? result = null;
                 for (int iteration = 0; iteration < 3; iteration++)
@@ -66,14 +68,12 @@ public abstract class BaseMultilateralizer : ILocate
                     result = Solve(scenario, nodes, guess);
                     if (result == null)
                     {
-                        ResetEnrichment(nodes);
                         confidence = 1;
                         scenario.UpdateLocation(guess);
-                        goto finalize;
+                        return FinalizeScenario(scenario, confidence);
                     }
                 }
 
-                ResetEnrichment(nodes);
                 scenario.UpdateLocation(result!.Value);
                 CalculateAndSetPearsonCorrelation(scenario, nodes);
 
@@ -92,8 +92,12 @@ public abstract class BaseMultilateralizer : ILocate
         {
             confidence = HandleLocatorException(ex, scenario, guess);
         }
+        finally
+        {
+            if (enriched)
+                ResetEnrichment(nodes);
+        }
 
-        finalize:
         return FinalizeScenario(scenario, confidence);
     }
 
@@ -113,17 +117,20 @@ public abstract class BaseMultilateralizer : ILocate
 
             dn.NodeAbsorption = ns?.Calibration?.Absorption ?? 3.0;
             dn.NodeRxAdjRssi = ns?.Calibration?.RxAdjRssi ?? 0;
-            var azDeg = ns?.Calibration?.Azimuth ?? 0.0;
-            var elDeg = ns?.Calibration?.Elevation ?? 90.0;
-            dn.NodeAzimuthRad = azDeg * Math.PI / 180.0;
-            dn.NodeElevationRad = elDeg * Math.PI / 180.0;
+            var azDeg = ns?.Calibration?.Azimuth;
+            var elDeg = ns?.Calibration?.Elevation;
+            dn.NodeAzimuthRad = azDeg is double az ? az * Math.PI / 180.0 : null;
+            dn.NodeElevationRad = elDeg is double el ? el * Math.PI / 180.0 : null;
 
             // Resolve antenna profile from config (profile name → built-in → null).
             // Null means no antenna configured → NodeGMaxDb stays null
             // → CorrectedDistance returns null → Distance falls back to firmware (backward-compatible).
             var configNode = State.Config?.Nodes?.FirstOrDefault(n => n.GetId() == nodeId);
             var antenna = State.Config?.ResolveAntenna(configNode?.Antenna);
-            if (antenna != null)
+            dn.NodeGMaxDb = null;
+            dn.NodePatternExponent = 0;
+            dn.NodeBackLossDb = 0;
+            if (antenna != null && azDeg.HasValue && elDeg.HasValue)
             {
                 dn.NodeGMaxDb = antenna.GMaxDb;
                 dn.NodePatternExponent = antenna.PatternExponent;
@@ -182,6 +189,8 @@ public abstract class BaseMultilateralizer : ILocate
         {
             dn.NodeGMaxDb = null;
             dn.NodeCosTheta = null;
+            dn.NodeAzimuthRad = null;
+            dn.NodeElevationRad = null;
             dn.NodePatternExponent = 0;
             dn.NodeBackLossDb = 0;
         }

@@ -37,7 +37,7 @@ public class DeviceTrackerAnchorRestoreTests
         _mockMqttCoordinator.Setup(m => m.EnqueueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
 
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
-        var mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, (ILogger<NodeSettingsStore>)null!);
+        var mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, NullLogger<NodeSettingsStore>.Instance);
         // Use a closure so that lazyDss can be passed to State before _mockDeviceSettingsStore is created,
         // while still supplying the correct State instance to DeviceSettingsStore.
         Mock<DeviceSettingsStore>? dssRef = null;

@@ -68,7 +68,7 @@ class Program
     private const int BaseSeed = 12345;
     private const double SuccessThresholdMeters = 1.0;
 
-    private static (Config Config, Floor Floor, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore)
+    private static (Config Config, Floor Floor, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore, MockNodeSettingsStore NodeSettingsStore, MockDeviceSettingsStore DeviceSettingsStore)
         CreateSimulationContext()
     {
         var floor = new Floor();
@@ -90,7 +90,7 @@ class Program
         var device = new Device("sim-device", "test-discovery", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
 
-        return (config, floor, state, device, nodeTelemetryStore);
+        return (config, floor, state, device, nodeTelemetryStore, mockNss, mockDss);
     }
 
     private static int SeedFor(string nodeConfigName, string scenarioName)
@@ -144,13 +144,13 @@ class Program
         };
         
         // Locators to test
-        var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, ILocate> Factory)[]
+        var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, NodeSettingsStore, DeviceSettingsStore, ILocate> Factory)[]
         {
-            ("Gauss-Newton", (d, f, s, nts) => new GaussNewtonMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
-            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
-            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
-            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
-            ("Nadaraya-Watson", (d, f, s, nts) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
+            ("Gauss-Newton", (d, f, s, nts, nss, dss) => new GaussNewtonMultilateralizer(d, f, s, nss, dss)),
+            ("Nelder-Mead", (d, f, s, nts, nss, dss) => new NelderMeadMultilateralizer(d, f, s, nss, dss)),
+            ("BFGS", (d, f, s, nts, nss, dss) => new BfgsMultilateralizer(d, f, s, nss, dss)),
+            ("MLE", (d, f, s, nts, nss, dss) => new MLEMultilateralizer(d, f, s, nss, dss)),
+            ("Nadaraya-Watson", (d, f, s, nts, nss, dss) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
         };
         
         int iterations = 100;
@@ -180,7 +180,9 @@ class Program
                             context.Device,
                             context.Floor,
                             context.State,
-                            context.NodeTelemetryStore);
+                            context.NodeTelemetryStore,
+                            context.NodeSettingsStore,
+                            context.DeviceSettingsStore);
                         var report = sim.RunMonteCarlo(
                             iterations,
                             locator,

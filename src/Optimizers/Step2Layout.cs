@@ -40,7 +40,14 @@ public static class Step2Layout
     /// <summary>
     /// Returns the total length of the Step-2 parameter vector for <paramref name="nodeCount"/> nodes.
     /// </summary>
-    public static int VectorLength(int nodeCount) => BlockCount * nodeCount;
+    public static int VectorLength(int nodeCount) => VectorLength(nodeCount, nodeCount);
+
+    /// <summary>
+    /// Returns the total length of the Step-2 parameter vector when absorption is optimized
+    /// for <paramref name="absorptionCount"/> ids and pointing is optimized only for
+    /// <paramref name="directionalCount"/> directional ids.
+    /// </summary>
+    public static int VectorLength(int absorptionCount, int directionalCount) => absorptionCount + (3 * directionalCount);
 
     // -----------------------------------------------------------------------
     // Block start offsets
@@ -52,11 +59,20 @@ public static class Step2Layout
     /// <summary>Index of the first element of the sinAz block.</summary>
     public static int SinAzOffset(int nodeCount) => nodeCount;
 
+    /// <summary>Index of the first element of the sinAz block.</summary>
+    public static int SinAzOffset(int absorptionCount, int directionalCount) => absorptionCount;
+
     /// <summary>Index of the first element of the cosAz block.</summary>
     public static int CosAzOffset(int nodeCount) => 2 * nodeCount;
 
+    /// <summary>Index of the first element of the cosAz block.</summary>
+    public static int CosAzOffset(int absorptionCount, int directionalCount) => absorptionCount + directionalCount;
+
     /// <summary>Index of the first element of the sinEl block.</summary>
     public static int SinElOffset(int nodeCount) => 3 * nodeCount;
+
+    /// <summary>Index of the first element of the sinEl block.</summary>
+    public static int SinElOffset(int absorptionCount, int directionalCount) => absorptionCount + (2 * directionalCount);
 
     // -----------------------------------------------------------------------
     // Per-node element indices
@@ -74,14 +90,29 @@ public static class Step2Layout
     public static int SinAzIndex(int nodeIndex, int nodeCount) => SinAzOffset(nodeCount) + nodeIndex;
 
     /// <summary>
+    /// Returns the flat-vector index for sin(azimuth) of directional node <paramref name="nodeIndex"/>.
+    /// </summary>
+    public static int SinAzIndex(int nodeIndex, int absorptionCount, int directionalCount) => SinAzOffset(absorptionCount, directionalCount) + nodeIndex;
+
+    /// <summary>
     /// Returns the flat-vector index for cos(azimuth) of node <paramref name="nodeIndex"/>.
     /// </summary>
     public static int CosAzIndex(int nodeIndex, int nodeCount) => CosAzOffset(nodeCount) + nodeIndex;
 
     /// <summary>
+    /// Returns the flat-vector index for cos(azimuth) of directional node <paramref name="nodeIndex"/>.
+    /// </summary>
+    public static int CosAzIndex(int nodeIndex, int absorptionCount, int directionalCount) => CosAzOffset(absorptionCount, directionalCount) + nodeIndex;
+
+    /// <summary>
     /// Returns the flat-vector index for sin(elevation) of node <paramref name="nodeIndex"/>.
     /// </summary>
     public static int SinElIndex(int nodeIndex, int nodeCount) => SinElOffset(nodeCount) + nodeIndex;
+
+    /// <summary>
+    /// Returns the flat-vector index for sin(elevation) of directional node <paramref name="nodeIndex"/>.
+    /// </summary>
+    public static int SinElIndex(int nodeIndex, int absorptionCount, int directionalCount) => SinElOffset(absorptionCount, directionalCount) + nodeIndex;
 
     // -----------------------------------------------------------------------
     // Convenience: extract per-node values from a populated vector
@@ -97,12 +128,30 @@ public static class Step2Layout
     }
 
     /// <summary>
+    /// Decodes the reparameterised azimuth for directional node <paramref name="i"/> from the flat vector.
+    /// Returns azimuth in radians via atan2(sinAz, cosAz).
+    /// </summary>
+    public static double GetAzimuthRad(IReadOnlyList<double> x, int i, int absorptionCount, int directionalCount)
+    {
+        return Math.Atan2(x[SinAzIndex(i, absorptionCount, directionalCount)], x[CosAzIndex(i, absorptionCount, directionalCount)]);
+    }
+
+    /// <summary>
     /// Decodes the reparameterised elevation for node <paramref name="i"/> from the flat vector.
     /// Returns elevation in radians via asin(clamp(sinEl, -1, 1)).
     /// </summary>
     public static double GetElevationRad(IReadOnlyList<double> x, int i, int nodeCount)
     {
         return Math.Asin(Math.Clamp(x[SinElIndex(i, nodeCount)], -1.0, 1.0));
+    }
+
+    /// <summary>
+    /// Decodes the reparameterised elevation for directional node <paramref name="i"/> from the flat vector.
+    /// Returns elevation in radians via asin(clamp(sinEl, -1, 1)).
+    /// </summary>
+    public static double GetElevationRad(IReadOnlyList<double> x, int i, int absorptionCount, int directionalCount)
+    {
+        return Math.Asin(Math.Clamp(x[SinElIndex(i, absorptionCount, directionalCount)], -1.0, 1.0));
     }
 
     /// <summary>
@@ -114,6 +163,17 @@ public static class Step2Layout
     {
         double sa = x[SinAzIndex(i, nodeCount)];
         double ca = x[CosAzIndex(i, nodeCount)];
+        double dev = sa * sa + ca * ca - 1.0;
+        return 0.1 * dev * dev;
+    }
+
+    /// <summary>
+    /// Returns the unit-circle regularisation penalty for directional node <paramref name="i"/>.
+    /// </summary>
+    public static double UnitCirclePenalty(IReadOnlyList<double> x, int i, int absorptionCount, int directionalCount)
+    {
+        double sa = x[SinAzIndex(i, absorptionCount, directionalCount)];
+        double ca = x[CosAzIndex(i, absorptionCount, directionalCount)];
         double dev = sa * sa + ca * ca - 1.0;
         return 0.1 * dev * dev;
     }

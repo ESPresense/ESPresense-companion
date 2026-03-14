@@ -290,6 +290,17 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         {
             if (!idxMap.TryGetValue(m.Rx.Id, out var baseIdx)) return 0.0;
             double sinAz = xa[baseIdx], cosAz = xa[baseIdx + 1], sinEl = xa[baseIdx + 2];
+            double azNorm = Math.Sqrt(sinAz * sinAz + cosAz * cosAz);
+            if (azNorm < 1e-9)
+            {
+                sinAz = 0.0;
+                cosAz = 1.0;
+            }
+            else
+            {
+                sinAz /= azNorm;
+                cosAz /= azNorm;
+            }
             double cosEl = Math.Sqrt(Math.Max(1.0 - sinEl * sinEl, 0.0));
 
             return MathUtils.ComputeGainDb(
@@ -394,6 +405,7 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
                 var n = or.Nodes.GetOrAdd(directionalRxIds[i]);
                 n.Azimuth = azDeg;
                 n.Elevation = elRad * 180.0 / Math.PI;
+                n.Error = result.FunctionInfoAtMinimum.Value;
             }
 
             Log.Debug(Name + " Phase 2 (antenna) completed with error: {0}", result.FunctionInfoAtMinimum.Value);

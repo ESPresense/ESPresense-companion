@@ -13,6 +13,16 @@ namespace ESPresense.Companion.Tests;
 
 public class MultiScenarioLocatorTests
 {
+    private static (State State, DeviceSettingsStore DeviceSettingsStore) CreateStateAndStores(ConfigLoader configLoader, Mock<MqttCoordinator> mqttMock)
+    {
+        DeviceSettingsStore? deviceSettingsStore = null;
+        var nodeSettingsStore = new Mock<NodeSettingsStore>(mqttMock.Object, NullLogger<NodeSettingsStore>.Instance);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore!);
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), nodeSettingsStore.Object, lazyDss);
+        deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
+        return (state, deviceSettingsStore);
+    }
+
     private class DummyLocator : ILocate
     {
         public bool Locate(Scenario scenario) => true;
@@ -33,12 +43,8 @@ public class MultiScenarioLocatorTests
             new MqttNetLogger(),
             supervisor);
 
-        var mockNss = new Mock<NodeSettingsStore>(mqttMock.Object, (ILogger<NodeSettingsStore>)null!);
-        var mockDss = new Mock<DeviceSettingsStore>(mqttMock.Object, (State)null!);
-        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss.Object);
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), mockNss.Object, lazyDss);
+        var (state, deviceSettingsStore) = CreateStateAndStores(configLoader, mqttMock);
         var tele = new TelemetryService(mqttMock.Object);
-        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
@@ -83,12 +89,8 @@ public class MultiScenarioLocatorTests
             supervisor)
         { CallBase = true };
 
-        var mockNss2 = new Mock<NodeSettingsStore>(mqttMock.Object, (ILogger<NodeSettingsStore>)null!);
-        var mockDss2 = new Mock<DeviceSettingsStore>(mqttMock.Object, (State)null!);
-        var lazyDss2 = new Lazy<DeviceSettingsStore>(() => mockDss2.Object);
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), mockNss2.Object, lazyDss2);
+        var (state, deviceSettingsStore) = CreateStateAndStores(configLoader, mqttMock);
         var tele = new TelemetryService(mqttMock.Object);
-        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();

@@ -12,8 +12,8 @@ namespace ESPresense.Models
         {
             return new Config
             {
-                Mqtt = Mqtt?.Clone(),
-                Bounds = Bounds?.Select(b => b.ToArray()).ToArray(),
+                Mqtt = Mqtt?.Clone() ?? new ConfigMqtt(),
+                Bounds = Bounds?.Select(b => b.ToArray()).ToArray() ?? Array.Empty<double[]>(),
                 Timeout = Timeout,
                 AwayTimeout = AwayTimeout,
                 Gps = Gps.Clone(),

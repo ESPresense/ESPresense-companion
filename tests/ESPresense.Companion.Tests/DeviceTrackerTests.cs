@@ -36,10 +36,10 @@ public class DeviceTrackerTests
         // Create the NodeTelemetryStore instance that's now required by State constructor
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt); // Use the existing mqtt instance
         var mockNss = new Mock<NodeSettingsStore>((IMqttCoordinator)mqtt, (ILogger<NodeSettingsStore>)null!);
-        var mockDss = new Mock<DeviceSettingsStore>((IMqttCoordinator)mqtt, (State)null!);
-        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss.Object);
+        DeviceSettingsStore? deviceSettingsStore = null;
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore!);
         var state = new State(configLoader, nodeTelemetryStore, mockNss.Object, lazyDss);
-        var deviceSettingsStore = new DeviceSettingsStore(mqtt, state);
+        deviceSettingsStore = new DeviceSettingsStore(mqtt, state);
 
         var locator = new DeviceTracker(state, mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher(), deviceSettingsStore);
         // Use testData to test locator...

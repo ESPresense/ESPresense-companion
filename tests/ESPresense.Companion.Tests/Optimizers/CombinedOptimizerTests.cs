@@ -127,7 +127,13 @@ public class CombinedOptimizerTests
         var results = optimizer.Optimize(os, existingSettings);
 
         // Assert: all nodes should have proposed absorption values within [2.5, 3.5]
-        Assert.That(results.Nodes.Count, Is.GreaterThan(0), "Optimizer should produce results");
+        Assert.Multiple(() =>
+        {
+            Assert.That(results.Nodes, Contains.Key("node_a"));
+            Assert.That(results.Nodes, Contains.Key("node_b"));
+            Assert.That(results.Nodes, Contains.Key("node_c"));
+            Assert.That(results.Nodes, Contains.Key("node_d"));
+        });
         foreach (var (id, proposed) in results.Nodes)
         {
             Assert.That(proposed.Absorption, Is.InRange(2.5, 3.5),
@@ -163,32 +169,26 @@ public class CombinedOptimizerTests
         var results = optimizer.Optimize(os, existingSettings);
 
         // Assert: directional nodes should have azimuth and elevation
-        if (results.Nodes.TryGetValue("dir_node_a", out var proposedA))
-        {
-            Assert.That(proposedA.Azimuth, Is.Not.Null, "Directional node_a should have Azimuth");
-            Assert.That(proposedA.Elevation, Is.Not.Null, "Directional node_a should have Elevation");
-            Assert.That(proposedA.Azimuth, Is.InRange(0.0, 360.0), "Azimuth should be [0, 360) degrees");
-            Assert.That(proposedA.Elevation, Is.InRange(-90.0, 90.0), "Elevation should be [-90, 90] degrees");
-        }
+        Assert.That(results.Nodes, Contains.Key("dir_node_a"));
+        Assert.That(results.Nodes, Contains.Key("dir_node_b"));
+        Assert.That(results.Nodes, Contains.Key("omni_node_c"));
+        Assert.That(results.Nodes, Contains.Key("omni_node_d"));
 
-        if (results.Nodes.TryGetValue("dir_node_b", out var proposedB))
-        {
-            Assert.That(proposedB.Azimuth, Is.Not.Null, "Directional node_b should have Azimuth");
-            Assert.That(proposedB.Elevation, Is.Not.Null, "Directional node_b should have Elevation");
-        }
+        var proposedA = results.Nodes["dir_node_a"];
+        var proposedB = results.Nodes["dir_node_b"];
+        var proposedC = results.Nodes["omni_node_c"];
+        var proposedD = results.Nodes["omni_node_d"];
 
-        // Omnidirectional nodes should NOT have azimuth or elevation
-        if (results.Nodes.TryGetValue("omni_node_c", out var proposedC))
-        {
-            Assert.That(proposedC.Azimuth, Is.Null, "Omnidirectional node_c should NOT have Azimuth");
-            Assert.That(proposedC.Elevation, Is.Null, "Omnidirectional node_c should NOT have Elevation");
-        }
-
-        if (results.Nodes.TryGetValue("omni_node_d", out var proposedD))
-        {
-            Assert.That(proposedD.Azimuth, Is.Null, "Omnidirectional node_d should NOT have Azimuth");
-            Assert.That(proposedD.Elevation, Is.Null, "Omnidirectional node_d should NOT have Elevation");
-        }
+        Assert.That(proposedA.Azimuth, Is.Not.Null, "Directional node_a should have Azimuth");
+        Assert.That(proposedA.Elevation, Is.Not.Null, "Directional node_a should have Elevation");
+        Assert.That(proposedA.Azimuth, Is.InRange(0.0, 360.0), "Azimuth should be [0, 360) degrees");
+        Assert.That(proposedA.Elevation, Is.InRange(-90.0, 90.0), "Elevation should be [-90, 90] degrees");
+        Assert.That(proposedB.Azimuth, Is.Not.Null, "Directional node_b should have Azimuth");
+        Assert.That(proposedB.Elevation, Is.Not.Null, "Directional node_b should have Elevation");
+        Assert.That(proposedC.Azimuth, Is.Null, "Omnidirectional node_c should NOT have Azimuth");
+        Assert.That(proposedC.Elevation, Is.Null, "Omnidirectional node_c should NOT have Elevation");
+        Assert.That(proposedD.Azimuth, Is.Null, "Omnidirectional node_d should NOT have Azimuth");
+        Assert.That(proposedD.Elevation, Is.Null, "Omnidirectional node_d should NOT have Elevation");
     }
 
     [Test]
@@ -232,13 +232,25 @@ public class CombinedOptimizerTests
         nodeB.Update(_state.Config!, configNodeB, new[] { floor });
         _state.Nodes["node_b"] = nodeB;
 
+        var rxFromTx = new RxNode
+        {
+            Tx = nodeA,
+            Rx = nodeB,
+            Distance = 5.0,
+            Rssi = -70,
+            RefRssi = -59,
+            LastHit = DateTime.UtcNow
+        };
+        nodeA.RxNodes["node_b"] = rxFromTx;
+
         // Act
         var snapshot = _state.TakeOptimizationSnapshot();
 
-        // We can only verify IsNode/GMax if there are actual RxNode measurements.
-        // Without measurements, no OptNodes are created. This test verifies the
-        // snapshot is returned without errors.
-        Assert.That(snapshot, Is.Not.Null);
-        Assert.That(snapshot.Measures, Is.Empty, "No measures without RxNode data");
+        Assert.That(snapshot.Measures, Has.Count.EqualTo(1), "Should create measures from node-to-node data");
+        var measure = snapshot.Measures.Single();
+        Assert.That(measure.Tx.IsNode, Is.True, "Config-backed transmitter should be marked as node");
+        Assert.That(measure.Rx.IsNode, Is.True, "Config-backed receiver should be marked as node");
+        Assert.That(measure.Tx.HasDirectionalAntenna, Is.True, "Configured antenna should mark transmitter directional");
+        Assert.That(measure.Tx.GMax, Is.GreaterThan(1.0), "Directional nodes should carry antenna gain");
     }
 }

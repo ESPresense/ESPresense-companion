@@ -39,15 +39,22 @@ public class MLEMultilateralizer : BaseMultilateralizer
         var weightSum = weights.Sum();
         if (weightSum <= 0) weightSum = 1;
 
-        var lowerBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds![0].X, Floor.Bounds[0].Y, Floor.Bounds[0].Z, 0.5 });
-        var upperBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[1].X, Floor.Bounds[1].Y, Floor.Bounds[1].Z, 1.5 });
+        Vector<double>? lowerBound = null;
+        Vector<double>? upperBound = null;
+        if (Floor.Bounds != null && Floor.Bounds.Length >= 2)
+        {
+            lowerBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[0].X, Floor.Bounds[0].Y, Floor.Bounds[0].Z, 0.5 });
+            upperBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[1].X, Floor.Bounds[1].Y, Floor.Bounds[1].Z, 1.5 });
+        }
         var obj = ObjectiveFunction.Value(
             x =>
             {
-                var distanceFromBoundingBox = lowerBound.Subtract(x)
-                    .PointwiseMaximum(x.Subtract(upperBound))
-                    .PointwiseMaximum(0)
-                    .L2Norm();
+                var distanceFromBoundingBox = lowerBound == null || upperBound == null
+                    ? 0
+                    : lowerBound.Subtract(x)
+                        .PointwiseMaximum(x.Subtract(upperBound))
+                        .PointwiseMaximum(0)
+                        .L2Norm();
                 return (distanceFromBoundingBox > 0 ? Math.Pow(5, 1 + distanceFromBoundingBox) : 0) + Math.Pow(5 * (1 - x[3]), 2) + nodes
                     .Select((dn, i) => new { err = Error(x, dn), weight = weights[i] })
                     .Sum(a => a.weight * a.err) / weightSum;
@@ -61,16 +68,19 @@ public class MLEMultilateralizer : BaseMultilateralizer
             clampedGuess.Z,
             scenario.Scale ?? 1.0
         });
-        var centroid = Point3D.Centroid(nodes.Select(n => n.Node!.Location).Take(3)).ToVector();
-        var vectorToCentroid = centroid.Subtract(initialGuess.SubVector(0, 3)).Normalize(2);
-        var scaleDelta = 0.05 * initialGuess[3];
-        var initialPerturbation = Vector<double>.Build.DenseOfEnumerable(vectorToCentroid.Append(scaleDelta));
+        double xDelta = Floor.Bounds == null ? 0.1 : Math.Max((Floor.Bounds[1].X - Floor.Bounds[0].X) * 0.05, 0.1);
+        double yDelta = Floor.Bounds == null ? 0.1 : Math.Max((Floor.Bounds[1].Y - Floor.Bounds[0].Y) * 0.05, 0.1);
+        double zDelta = Floor.Bounds == null ? 0.1 : Math.Max((Floor.Bounds[1].Z - Floor.Bounds[0].Z) * 0.05, 0.1);
+        double scaleDelta = Math.Max(Math.Abs(initialGuess[3]) * 0.05, 0.05);
+        var initialPerturbation = Vector<double>.Build.DenseOfArray([xDelta, yDelta, zDelta, scaleDelta]);
         var solver = new NelderMeadSimplex(1e-7, 10000);
 
         try
         {
             var result = solver.FindMinimum(obj, initialGuess, initialPerturbation);
-            var minimizingPoint = result.MinimizingPoint.PointwiseMinimum(upperBound).PointwiseMaximum(lowerBound);
+            var minimizingPoint = lowerBound == null || upperBound == null
+                ? result.MinimizingPoint
+                : result.MinimizingPoint.PointwiseMinimum(upperBound).PointwiseMaximum(lowerBound);
             scenario.Scale = minimizingPoint[3];
             scenario.Fixes = nodes.Length;
             scenario.Error = result.FunctionInfoAtMinimum.Value;

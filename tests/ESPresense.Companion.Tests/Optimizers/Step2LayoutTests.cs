@@ -238,4 +238,19 @@ public class Step2LayoutTests
         Assert.That(Step2Layout.SinElBlock, Is.EqualTo(3));
         Assert.That(Step2Layout.BlockCount, Is.EqualTo(4));
     }
+
+    [Test]
+    public void DirectionalLayout_UsesOnlyDirectionalCountForAngleBlocks()
+    {
+        const int absorptionCount = 4;
+        const int directionalCount = 2;
+
+        Assert.That(Step2Layout.VectorLength(absorptionCount, directionalCount), Is.EqualTo(10));
+        Assert.That(Step2Layout.SinAzOffset(absorptionCount, directionalCount), Is.EqualTo(4));
+        Assert.That(Step2Layout.CosAzOffset(absorptionCount, directionalCount), Is.EqualTo(6));
+        Assert.That(Step2Layout.SinElOffset(absorptionCount, directionalCount), Is.EqualTo(8));
+        Assert.That(Step2Layout.SinAzIndex(1, absorptionCount, directionalCount), Is.EqualTo(5));
+        Assert.That(Step2Layout.CosAzIndex(1, absorptionCount, directionalCount), Is.EqualTo(7));
+        Assert.That(Step2Layout.SinElIndex(1, absorptionCount, directionalCount), Is.EqualTo(9));
+    }
 }

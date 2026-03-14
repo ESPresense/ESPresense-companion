@@ -314,7 +314,10 @@ public class BaseMultilateralizerTests
 
         _mockNodeSettingsStore
             .Setup(x => x.Get(It.IsAny<string>()))
-            .Returns(new NodeSettings());
+            .Returns(new NodeSettings
+            {
+                Calibration = new CalibrationSettings { Azimuth = 45.0, Elevation = 30.0 }
+            });
         _mockDeviceSettingsStore
             .Setup(x => x.Get(It.IsAny<string>()))
             .Returns(new DeviceSettings());
@@ -351,7 +354,10 @@ public class BaseMultilateralizerTests
 
         _mockNodeSettingsStore
             .Setup(x => x.Get(It.IsAny<string>()))
-            .Returns(new NodeSettings());
+            .Returns(new NodeSettings
+            {
+                Calibration = new CalibrationSettings { Azimuth = 45.0, Elevation = 30.0 }
+            });
         _mockDeviceSettingsStore
             .Setup(x => x.Get(It.IsAny<string>()))
             .Returns(new DeviceSettings());
@@ -421,12 +427,12 @@ public class BaseMultilateralizerTests
     }
 
     [Test]
-    public async Task EnrichNodes_DefaultAngles_WhenCalibrationMissing()
+    public async Task EnrichNodes_MissingAngles_LeavesDirectionalFieldsNull()
     {
         // Await initial config load so no ConfigChanged races.
         await _configLoader.ConfigAsync();
 
-        // Arrange: no calibration → defaults are azimuth=0°, elevation=90°
+        // Arrange: no calibration → node remains isotropic until angles are saved.
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
         PinStateConfig(device, antenna: "pcb_ifa");
@@ -449,17 +455,12 @@ public class BaseMultilateralizerTests
         // Act
         capturer.Locate(scenario);
 
-        // Assert: default azimuth = 0 rad, default elevation = π/2 rad (90°)
-        double defaultAzRad = 0.0 * Math.PI / 180.0;   // 0°
-        double defaultElRad = 90.0 * Math.PI / 180.0;  // 90°
-
-        Assert.That(capturer.CapturedAzimuthRad, Is.Not.Empty);
-        foreach (var az in capturer.CapturedAzimuthRad)
-            Assert.That(az, Is.EqualTo(defaultAzRad).Within(1e-9),
-                "Default azimuth should be 0 degrees (0 rad)");
-        foreach (var el in capturer.CapturedElevationRad)
-            Assert.That(el, Is.EqualTo(defaultElRad).Within(1e-9),
-                "Default elevation should be 90 degrees (π/2 rad)");
+        Assert.That(capturer.CapturedAzimuthRad, Has.All.Null,
+            "Azimuth should remain null until calibration is saved");
+        Assert.That(capturer.CapturedElevationRad, Has.All.Null,
+            "Elevation should remain null until calibration is saved");
+        Assert.That(capturer.CapturedGMaxDb, Has.All.Null,
+            "Directional gain should remain disabled until both angles are calibrated");
     }
 
     // -----------------------------------------------------------------------
@@ -478,7 +479,10 @@ public class BaseMultilateralizerTests
         var device = CreateDeviceWithThreeRssiNodes(floor);
         PinStateConfig(device, antenna: "pcb_ifa");
 
-        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
+        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings
+        {
+            Calibration = new CalibrationSettings { Azimuth = 45.0, Elevation = 30.0 }
+        });
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
 
         var counter = new CountingMultilateralizer(
@@ -509,7 +513,10 @@ public class BaseMultilateralizerTests
         var device = CreateDeviceWithThreeRssiNodes(floor);
         PinStateConfig(device, antenna: "pcb_ifa");
 
-        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
+        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings
+        {
+            Calibration = new CalibrationSettings { Azimuth = 45.0, Elevation = 30.0 }
+        });
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
 
         var counter = new CountingMultilateralizer(
@@ -549,7 +556,10 @@ public class BaseMultilateralizerTests
         var device = CreateDeviceWithThreeRssiNodes(floor);
         PinStateConfig(device, antenna: "pcb_ifa");
 
-        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
+        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings
+        {
+            Calibration = new CalibrationSettings { Azimuth = 45.0, Elevation = 30.0 }
+        });
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
 
         var counter = new CountingMultilateralizer(
@@ -584,7 +594,10 @@ public class BaseMultilateralizerTests
         var device = CreateDeviceWithThreeRssiNodes(floor);
         PinStateConfig(device, antenna: "pcb_ifa");
 
-        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
+        _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings
+        {
+            Calibration = new CalibrationSettings { Azimuth = 45.0, Elevation = 30.0 }
+        });
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
 
         // Return null on iteration 1 (0-indexed) so the loop stops after 2 calls

@@ -104,14 +104,14 @@ namespace ESPresense.Services
             if (ds.Calibration.Azimuth != null && ds.Calibration.Azimuth != old.Calibration.Azimuth)
             {
                 storeUpdated = true;
-                Log.Information("Updating {NodeId} azimuth: {OldValue} -> {NewValue}", id,
+                logger.LogInformation("Updating {NodeId} azimuth: {OldValue} -> {NewValue}", id,
                     old.Calibration.Azimuth?.ToString("0.0") ?? "(empty)", ds.Calibration.Azimuth.Value.ToString("0.0"));
             }
 
             if (ds.Calibration.Elevation != null && ds.Calibration.Elevation != old.Calibration.Elevation)
             {
                 storeUpdated = true;
-                Log.Information("Updating {NodeId} elevation: {OldValue} -> {NewValue}", id,
+                logger.LogInformation("Updating {NodeId} elevation: {OldValue} -> {NewValue}", id,
                     old.Calibration.Elevation?.ToString("0.0") ?? "(empty)", ds.Calibration.Elevation.Value.ToString("0.0"));
             }
 
