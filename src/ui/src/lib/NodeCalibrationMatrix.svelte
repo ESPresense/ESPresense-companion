@@ -217,7 +217,13 @@
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}
-										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}${$calibration?.nodes?.[id1]?.antenna ? `\nTx Antenna: ${$calibration.nodes[id1].antenna}` : ''}${$calibration?.nodes?.[id2]?.antenna ? `\nRx Antenna: ${$calibration.nodes[id2].antenna}` : ''}` : 'No beacon Received in last 30 seconds'}
+										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? [
+										`Map: ${Number(n1[id2].mapDistance?.toPrecision(3))}m  Measured: ${Number(n1[id2]?.distance?.toPrecision(3))}m`,
+										`Error: ${Number(n1[id2]?.diff?.toPrecision(3))}m (${Number(Math.round(n1[id2].percent * 100))}%)`,
+										n1[id2]?.var != null ? `Variance: ${Number(n1[id2].var.toPrecision(3))}` : '',
+										$calibration?.nodes?.[id1]?.antenna ? `Tx: ${$calibration.nodes[id1].antenna}` : '',
+										$calibration?.nodes?.[id2]?.antenna ? `Rx: ${$calibration.nodes[id2].antenna}` : ''
+									].filter(Boolean).join('\n') : 'No beacon received in last 30 seconds'}
 											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
 										>
 									{/each}
