@@ -168,15 +168,18 @@ public class State
             }
         }
 
-        // Mark ESPresense infrastructure nodes and populate GMax from Node.GMaxDb
+        // Mark ESPresense infrastructure nodes and populate antenna parameters
         foreach (var (nodeId, infraNode) in Nodes)
         {
             if (!nodes.TryGetValue(nodeId, out var optNode)) continue;
             optNode.IsNode = true;
-            if (infraNode.GMaxDb.HasValue)
+            var antenna = Config?.ResolveAntenna(infraNode.AntennaProfile);
+            if (antenna != null)
             {
                 optNode.HasDirectionalAntenna = true;
-                optNode.GMax = Math.Pow(10.0, infraNode.GMaxDb.Value / 10.0);
+                optNode.GMax = Math.Pow(10.0, antenna.GMaxDb / 10.0);
+                optNode.PatternExponent = antenna.PatternExponent;
+                optNode.BackLossDb = antenna.BackLoss;
             }
         }
 

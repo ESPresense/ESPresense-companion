@@ -1,4 +1,5 @@
 using ESPresense.Models;
+using ESPresense.Utils;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using Serilog;
@@ -356,28 +357,15 @@ public class CombinedOptimizer : IOptimizer
 
     private static double ComputeGainDb(OptNode rxNode, OptNode txNode, double azRad, double elRad)
     {
-        // Pointing vector from (azRad, elRad): Px=sin(az)*cos(el), Py=cos(az)*cos(el), Pz=sin(el)
         double px = Math.Sin(azRad) * Math.Cos(elRad);
         double py = Math.Cos(azRad) * Math.Cos(elRad);
         double pz = Math.Sin(elRad);
 
-        // Vector from Rx to Tx
-        double dx = txNode.Location.X - rxNode.Location.X;
-        double dy = txNode.Location.Y - rxNode.Location.Y;
-        double dz = txNode.Location.Z - rxNode.Location.Z;
-        double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-
-        double cosTheta;
-        if (len < 1e-9)
-            cosTheta = 1.0; // zero-length vector → θ=0°, max gain
-        else
-            cosTheta = (px * dx + py * dy + pz * dz) / len;
-
-        // Asymmetric: max(cosθ, 0) models PCB ground plane blocking backside signals
-        double cosClamped = Math.Max(cosTheta, 0.0);
-        const double epsilon = 1e-3;
-        double cos2 = Math.Max(cosClamped * cosClamped, epsilon);
-        return 10.0 * Math.Log10(rxNode.GMax * cos2);
+        return MathUtils.ComputeGainDb(px, py, pz,
+            txNode.Location.X - rxNode.Location.X,
+            txNode.Location.Y - rxNode.Location.Y,
+            txNode.Location.Z - rxNode.Location.Z,
+            10.0 * Math.Log10(rxNode.GMax), rxNode.PatternExponent, rxNode.BackLossDb);
     }
 
     private static string Min(string a, string b) => string.Compare(a, b) < 0 ? a : b;

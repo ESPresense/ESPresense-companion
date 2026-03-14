@@ -118,11 +118,17 @@ public abstract class BaseMultilateralizer : ILocate
             dn.NodeAzimuthRad = azDeg * Math.PI / 180.0;
             dn.NodeElevationRad = elDeg * Math.PI / 180.0;
 
-            // GMaxDb from ConfigNode (top-level config, looked up by node id).
-            // Null GMaxDb means no directional antenna configured → NodeGMaxDb stays null
+            // Resolve antenna profile from config (profile name → built-in → null).
+            // Null means no antenna configured → NodeGMaxDb stays null
             // → CorrectedDistance returns null → Distance falls back to firmware (backward-compatible).
             var configNode = State.Config?.Nodes?.FirstOrDefault(n => n.GetId() == nodeId);
-            dn.NodeGMaxDb = configNode?.GMaxDb;
+            var antenna = State.Config?.ResolveAntenna(configNode?.Antenna);
+            if (antenna != null)
+            {
+                dn.NodeGMaxDb = antenna.GMaxDb;
+                dn.NodePatternExponent = antenna.PatternExponent;
+                dn.NodeBackLossDb = antenna.BackLoss;
+            }
 
             // TxAdjRssi: device transmit adjustment from DeviceSettingsStore
             dn.TxAdjRssi = ds?.RefRssi ?? 0;
@@ -163,9 +169,9 @@ public abstract class BaseMultilateralizer : ILocate
                 dn.NodeCosTheta = 1.0; // co-located → θ=0°, max gain
             else
             {
-                // Asymmetric: max(cosθ, 0) models PCB ground plane blocking backside signals
+                // Raw signed cosθ: sign determines front vs back hemisphere in CorrectedDistance
                 double cosTheta = (px * dx + py * dy + pz * dz) / len;
-                dn.NodeCosTheta = Math.Max(cosTheta, 0.0);
+                dn.NodeCosTheta = cosTheta;
             }
         }
     }
@@ -176,6 +182,8 @@ public abstract class BaseMultilateralizer : ILocate
         {
             dn.NodeGMaxDb = null;
             dn.NodeCosTheta = null;
+            dn.NodePatternExponent = 0;
+            dn.NodeBackLossDb = 0;
         }
     }
 

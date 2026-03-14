@@ -1,8 +1,6 @@
 using ESPresense.Services;
 using ESPresense.Utils;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ESPresense.Models;
 
@@ -35,10 +33,31 @@ public class OptimizationResults
                 double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;
                 double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
 
-                // Note: Antenna gain correction is intentionally NOT applied in Evaluate.
-                // The optimizer tunes antenna angles in its own objective function; the scoring
-                // here uses the standard isotropic path-loss model for stable convergence.
-                double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
+                // Apply antenna gain correction when the Rx node has a directional antenna
+                // AND existing calibration already has az/el. This ensures symmetric scoring:
+                // both baseline and proposed use gain correction once angles are established.
+                // On the first run (no existing az/el), gain is skipped for fair comparison.
+                double gainDb = 0.0;
+                double? existingAz = rx.Calibration.Azimuth;
+                double? existingEl = rx.Calibration.Elevation;
+                double? azDeg = rxPv?.Azimuth ?? existingAz;
+                double? elDeg = rxPv?.Elevation ?? existingEl;
+                if (m.Rx.HasDirectionalAntenna && existingAz != null && existingEl != null && azDeg != null && elDeg != null)
+                {
+                    double azRad = azDeg.Value * Math.PI / 180.0;
+                    double elRad = elDeg.Value * Math.PI / 180.0;
+                    double px = Math.Sin(azRad) * Math.Cos(elRad);
+                    double py = Math.Cos(azRad) * Math.Cos(elRad);
+                    double pz = Math.Sin(elRad);
+
+                    gainDb = MathUtils.ComputeGainDb(px, py, pz,
+                        m.Tx.Location.X - m.Rx.Location.X,
+                        m.Tx.Location.Y - m.Rx.Location.Y,
+                        m.Tx.Location.Z - m.Rx.Location.Z,
+                        10.0 * Math.Log10(m.Rx.GMax), m.Rx.PatternExponent, m.Rx.BackLossDb);
+                }
+
+                double predictedRssi = txRefRssi + gainDb - 10 * pathLossExponent * Math.Log10(mapDistance);
                 double measuredRssi = m.GetAdjustedRssi(rxAdjRssi);
 
                 predictedValues.Add(predictedRssi);

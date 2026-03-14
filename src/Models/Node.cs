@@ -24,7 +24,7 @@ public class Node(string id, NodeSourceType sourceType)
     public double? Z { get; private set; }
     public bool HasLocation => X.HasValue && Y.HasValue && Z.HasValue;
     public bool Stationary { get; private set; }
-    public double? GMaxDb { get; private set; }
+    public string? AntennaProfile { get; private set; }
 
     [JsonConverter(typeof(NodeToNodeConverter))]
     public ConcurrentDictionary<string, NodeToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
@@ -59,7 +59,7 @@ public class Node(string id, NodeSourceType sourceType)
         double[]? point = cn.Point?.EnsureLength(3);
         Location = new Point3D(point?[0] ?? 0, point?[1] ?? 0, point?[2] ?? 0);
         Stationary = cn.Stationary;
-        GMaxDb = cn.GMaxDb;
+        AntennaProfile = cn.Antenna;
         SourceType = NodeSourceType.Config;
     }
 

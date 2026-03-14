@@ -221,8 +221,8 @@ public class CombinedOptimizerTests
         floor.Update(_state.Config!, configFloor);
         _state.Floors["test_floor"] = floor;
 
-        var configNodeA = new ConfigNode { Name = "node_a", Point = new double[] { 0, 0, 0 }, GMaxDb = 5.0 };
-        var configNodeB = new ConfigNode { Name = "node_b", Point = new double[] { 5, 0, 0 }, GMaxDb = null };
+        var configNodeA = new ConfigNode { Name = "node_a", Point = new double[] { 0, 0, 0 }, Antenna = "external_dipole" };
+        var configNodeB = new ConfigNode { Name = "node_b", Point = new double[] { 5, 0, 0 } };
 
         var nodeA = new Node("node_a", NodeSourceType.Config);
         nodeA.Update(_state.Config!, configNodeA, new[] { floor });

@@ -253,15 +253,18 @@ public class StateOptimizationAnchorTests
     [Test]
     public void TakeOptimizationSnapshot_SetsIsNodeAndGMaxForEsPresenseNodes()
     {
-        // Arrange - create infrastructure node with g_max_db configured
+        // Arrange - create infrastructure node with antenna profile configured
+        // Ensure State.Config is non-null so ResolveAntenna works in TakeOptimizationSnapshot
+        if (_state.Config == null) _state.Config = new Config();
+
         var node1 = new Node("node1", NodeSourceType.Config);
-        var configNode1 = new ConfigNode { Name = "Node 1", Point = new double[] { 0, 0, 0 }, GMaxDb = 3.0 };
-        node1.Update(_configLoader.Config!, configNode1, Enumerable.Empty<Floor>());
+        var configNode1 = new ConfigNode { Name = "Node 1", Point = new double[] { 0, 0, 0 }, Antenna = "pcb_ifa" };
+        node1.Update(_state.Config, configNode1, Enumerable.Empty<Floor>());
         _state.Nodes["node1"] = node1;
 
         var node2 = new Node("node2", NodeSourceType.Config);
         var configNode2 = new ConfigNode { Name = "Node 2", Point = new double[] { 5, 0, 0 } };
-        node2.Update(_configLoader.Config!, configNode2, Enumerable.Empty<Floor>());
+        node2.Update(_state.Config, configNode2, Enumerable.Empty<Floor>());
         _state.Nodes["node2"] = node2;
 
         var device = new Device("anchored-device", null, TimeSpan.FromSeconds(30));
@@ -278,14 +281,14 @@ public class StateOptimizationAnchorTests
         var rxNode1 = snapshot.Measures.FirstOrDefault(m => m.Rx.Id == "node1")?.Rx;
         Assert.That(rxNode1, Is.Not.Null, "node1 should appear as Rx");
         Assert.That(rxNode1!.IsNode, Is.True, "ESPresense node1 should have IsNode=true");
-        // GMaxDb=3.0 dB → linear GMax = 10^(3/10) ≈ 2.0
-        Assert.That(rxNode1.GMax, Is.EqualTo(Math.Pow(10.0, 3.0 / 10.0)).Within(1e-9), "GMax should be set from GMaxDb");
+        // pcb_ifa: GMaxDb=3.4 dB → linear GMax = 10^(3.4/10)
+        Assert.That(rxNode1.GMax, Is.EqualTo(Math.Pow(10.0, 3.4 / 10.0)).Within(1e-9), "GMax should be set from antenna profile");
 
         var rxNode2 = snapshot.Measures.FirstOrDefault(m => m.Rx.Id == "node2")?.Rx;
         Assert.That(rxNode2, Is.Not.Null, "node2 should appear as Rx");
         Assert.That(rxNode2!.IsNode, Is.True, "ESPresense node2 should have IsNode=true");
-        // No GMaxDb configured → GMax stays at default 1.0
-        Assert.That(rxNode2.GMax, Is.EqualTo(1.0), "GMax should stay at 1.0 when GMaxDb is null");
+        // No antenna configured → GMax stays at default 1.0
+        Assert.That(rxNode2.GMax, Is.EqualTo(1.0), "GMax should stay at 1.0 when no antenna is configured");
 
         // The anchored device (Tx) should NOT be marked as IsNode
         var txDevice = snapshot.Measures.FirstOrDefault(m => m.Tx.Id == "anchored-device")?.Tx;

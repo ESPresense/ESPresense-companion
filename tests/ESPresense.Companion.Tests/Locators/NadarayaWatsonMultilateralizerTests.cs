@@ -82,10 +82,10 @@ public class NadarayaWatsonMultilateralizerTests
         return floor;
     }
 
-    private Node CreateTestNode(string id, double x, double y, double z, Floor floor, double? gMaxDb = null)
+    private Node CreateTestNode(string id, double x, double y, double z, Floor floor, string? antenna = null)
     {
         var node = new Node(id, NodeSourceType.Config);
-        var configNode = new ConfigNode { Name = id, Point = new double[] { x, y, z }, GMaxDb = gMaxDb };
+        var configNode = new ConfigNode { Name = id, Point = new double[] { x, y, z }, Antenna = antenna };
         node.Update(_configLoader.Config!, configNode, new[] { floor });
         _state.Nodes[id] = node;
         return node;

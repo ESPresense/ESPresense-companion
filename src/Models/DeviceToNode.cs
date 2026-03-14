@@ -1,4 +1,6 @@
-﻿namespace ESPresense.Models;
+﻿using ESPresense.Utils;
+
+namespace ESPresense.Models;
 
 public class DeviceToNode(Device device, Node node)
 {
@@ -15,7 +17,8 @@ public class DeviceToNode(Device device, Node node)
     public double? NodeCosTheta { get; set; }
 
     /// <summary>
-    /// Computed gain-corrected distance recomputed from RSSI using the cosine gain model G_max·cos²(θ).
+    /// Computed gain-corrected distance recomputed from RSSI using a parametric cos^n(θ) gain model
+    /// with configurable back-hemisphere attenuation.
     /// Returns null (→ Distance falls back to raw payload) when <see cref="NodeGMaxDb"/> is not set
     /// (not enriched) or when <see cref="NodeAbsorption"/> is zero.
     /// When enriched but <see cref="NodeCosTheta"/> is null, an isotropic pass is used (gainDb = 0).
@@ -24,19 +27,22 @@ public class DeviceToNode(Device device, Node node)
     {
         get
         {
-            if (NodeGMaxDb is null || NodeAbsorption == 0.0)
+            // Capture nullable fields once to avoid race conditions with parallel locators
+            var gMaxDb = NodeGMaxDb;
+            var cosTheta = NodeCosTheta;
+
+            if (gMaxDb is null || NodeAbsorption == 0.0)
                 return null;
 
             double gainDb;
-            if (NodeCosTheta is null)
+            if (cosTheta is null)
             {
                 // Isotropic pass: enriched but no directional angle yet
                 gainDb = 0.0;
             }
             else
             {
-                // Directional: G_max·cos²(θ)
-                gainDb = NodeGMaxDb.Value + 10.0 * Math.Log10(Math.Max(NodeCosTheta.Value * NodeCosTheta.Value, 1e-3));
+                gainDb = MathUtils.ComputeGainDb(cosTheta.Value, gMaxDb.Value, NodePatternExponent, NodeBackLossDb);
             }
 
             var dist = Math.Pow(10.0, (-59.0 + NodeRxAdjRssi + gainDb + RefRssi + TxAdjRssi - Rssi) / (10.0 * NodeAbsorption));
@@ -71,6 +77,8 @@ public class DeviceToNode(Device device, Node node)
     public double? NodeAzimuthRad { get; set; }
     public double? NodeElevationRad { get; set; }
     public double? NodeGMaxDb { get; set; }
+    public double NodePatternExponent { get; set; }
+    public double NodeBackLossDb { get; set; }
     public double TxAdjRssi { get; set; }
 
     public bool Current => DateTime.UtcNow - LastHit < Device!.Timeout;

@@ -78,7 +78,7 @@ public class NearestNodeTests
         };
     }
 
-    private Node CreateTestNode(string id, string? name, Point3D location, double? gMaxDb = null, params Floor[] floors)
+    private Node CreateTestNode(string id, string? name, Point3D location, string? antenna = null, params Floor[] floors)
     {
         var node = new Node(id, NodeSourceType.Config);
         var configNode = new ConfigNode
@@ -86,7 +86,7 @@ public class NearestNodeTests
             Id = id,
             Name = name,
             Point = new[] { location.X, location.Y, location.Z },
-            GMaxDb = gMaxDb
+            Antenna = null
         };
 
         node.Update(_configLoader.Config!, configNode, floors);

@@ -19,10 +19,10 @@ public class MappingServiceTests
         return f;
     }
 
-    private static Node MakeNode(string id, string name, IEnumerable<Floor> floors, double? gMaxDb = null)
+    private static Node MakeNode(string id, string name, IEnumerable<Floor> floors, string? antenna = null)
     {
         var n = new Node(id, NodeSourceType.Config);
-        n.Update(new Config(), new ConfigNode { Id = id, Name = name, Point = new[] { 1.0, 2.0, 3.0 }, Floors = floors.Select(f => f.Id!).ToArray(), Stationary = true, GMaxDb = gMaxDb }, floors);
+        n.Update(new Config(), new ConfigNode { Id = id, Name = name, Point = new[] { 1.0, 2.0, 3.0 }, Floors = floors.Select(f => f.Id!).ToArray(), Stationary = true, Antenna = antenna }, floors);
         return n;
     }
 

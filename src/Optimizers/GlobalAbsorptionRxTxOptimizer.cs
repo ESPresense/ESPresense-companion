@@ -1,4 +1,5 @@
 using ESPresense.Models;
+using ESPresense.Utils;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using Serilog;
@@ -51,6 +52,7 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
 
         // Phase 2: Optimize antenna angles only, holding Phase 1 results fixed
         var directionalRxIds = uniqueRxIds.Where(id => allRxNodes.Any(m => m.Rx.Id == id && m.Rx.IsNode && m.Rx.HasDirectionalAntenna)).ToList();
+        Log.Debug("Phase 2 check: {Count} directional nodes out of {Total} Rx nodes", directionalRxIds.Count, uniqueRxIds.Count);
         if (directionalRxIds.Count > 0)
             Phase2_OptimizeAntennaAngles(or, allRxNodes, directionalRxIds, nodeWeights, optimization, existingSettings);
 
@@ -265,12 +267,16 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
             if (pv.Absorption != null) fixedAbsorption = pv.Absorption.Value;
         }
 
-        // Build GMax lookup
+        // Build per-node antenna parameter lookup
         var rxGMaxMap = new Dictionary<string, double>();
+        var rxPatternExpMap = new Dictionary<string, double>();
+        var rxBackLossMap = new Dictionary<string, double>();
         foreach (var rxId in directionalRxIds)
         {
             var rxNode = allRxNodes.First(m => m.Rx.Id == rxId).Rx;
             rxGMaxMap[rxId] = rxNode.GMax;
+            rxPatternExpMap[rxId] = rxNode.PatternExponent;
+            rxBackLossMap[rxId] = rxNode.BackLossDb;
         }
 
         // Parameter layout: [sinAz_0, cosAz_0, sinEl_0, sinAz_1, cosAz_1, sinEl_1, ...]
@@ -286,17 +292,14 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
             double sinAz = xa[baseIdx], cosAz = xa[baseIdx + 1], sinEl = xa[baseIdx + 2];
             double cosEl = Math.Sqrt(Math.Max(1.0 - sinEl * sinEl, 0.0));
 
-            double bx = sinAz * cosEl, by = cosAz * cosEl, bz = sinEl;
-            double dx = m.Tx.Location.X - m.Rx.Location.X;
-            double dy = m.Tx.Location.Y - m.Rx.Location.Y;
-            double dz = m.Tx.Location.Z - m.Rx.Location.Z;
-            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-            if (len < 1e-9) return 10.0 * Math.Log10(rxGMaxMap[m.Rx.Id]);
-
-            double cosTheta = (bx * dx + by * dy + bz * dz) / len;
-            double cosClamped = Math.Max(cosTheta, 0.0); // Asymmetric: backside null
-            double cos2 = Math.Max(cosClamped * cosClamped, 1e-3);
-            return 10.0 * Math.Log10(rxGMaxMap[m.Rx.Id] * cos2);
+            return MathUtils.ComputeGainDb(
+                sinAz * cosEl, cosAz * cosEl, sinEl,
+                m.Tx.Location.X - m.Rx.Location.X,
+                m.Tx.Location.Y - m.Rx.Location.Y,
+                m.Tx.Location.Z - m.Rx.Location.Z,
+                10.0 * Math.Log10(rxGMaxMap[m.Rx.Id]),
+                rxPatternExpMap[m.Rx.Id],
+                rxBackLossMap[m.Rx.Id]);
         }
 
         double EvalPhase2(double[] xa)

@@ -72,17 +72,17 @@ public class BaseMultilateralizerTests
         return floor;
     }
 
-    private Node CreateTestNode(string id, double x, double y, double z, Floor floor, double? gMaxDb = null)
+    private Node CreateTestNode(string id, double x, double y, double z, Floor floor, string? antenna = null)
     {
         var node = new Node(id, NodeSourceType.Config);
         // Set Id explicitly so ConfigNode.GetId() == id without ToSnakeCase transformation
-        var configNode = new ConfigNode { Id = id, Name = id, Point = new double[] { x, y, z }, GMaxDb = gMaxDb };
-        // Ensure State.Config is non-null so EnrichNodes can look up GMaxDb
+        var configNode = new ConfigNode { Id = id, Name = id, Point = new double[] { x, y, z }, Antenna = antenna };
+        // Ensure State.Config is non-null so EnrichNodes can look up antenna profile
         if (_state.Config == null)
             _state.Config = new Config();
         node.Update(_state.Config, configNode, new[] { floor });
         _state.Nodes[id] = node;
-        // Register the ConfigNode in State.Config.Nodes so EnrichNodes can look up GMaxDb
+        // Register the ConfigNode in State.Config.Nodes so EnrichNodes can look up antenna profile
         _state.Config.Nodes = (_state.Config.Nodes ?? Array.Empty<ConfigNode>())
             .Append(configNode).ToArray();
         return node;
@@ -287,30 +287,30 @@ public class BaseMultilateralizerTests
 
     /// <summary>
     /// Pins State.Config to a fresh Config whose Nodes array is built from
-    /// <paramref name="device"/>'s nodes with the given <paramref name="gMaxDb"/>.
+    /// <paramref name="device"/>'s nodes with the given <paramref name="antenna"/> profile.
     /// Call AFTER awaiting ConfigAsync() to avoid ConfigChanged races.
     /// </summary>
-    private void PinStateConfig(Device device, double? gMaxDb)
+    private void PinStateConfig(Device device, string? antenna)
     {
         _state.Config = new Config
         {
             Nodes = device.Nodes.Values
-                .Select(dn => new ConfigNode { Id = dn.Node!.Id, GMaxDb = gMaxDb })
+                .Select(dn => new ConfigNode { Id = dn.Node!.Id, Antenna = antenna })
                 .ToArray()
         };
     }
 
     [Test]
-    public async Task EnrichNodes_NullGMaxDb_SetsNodeGMaxDbToNull_BackwardCompatibility()
+    public async Task EnrichNodes_NullAntenna_SetsNodeGMaxDbToNull_BackwardCompatibility()
     {
         // Await initial config load so ConfigChanged has fired; no more fires after this.
         await _configLoader.ConfigAsync();
 
-        // Arrange: nodes without GMaxDb configured → NodeGMaxDb must remain null
+        // Arrange: nodes without antenna configured → NodeGMaxDb must remain null
         // so Distance falls back to firmware (_payloadDistance).
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: null);   // sets State.Config with null GMaxDb nodes
+        PinStateConfig(device, antenna: null);   // sets State.Config with no antenna nodes
 
         _mockNodeSettingsStore
             .Setup(x => x.Get(It.IsAny<string>()))
@@ -334,20 +334,20 @@ public class BaseMultilateralizerTests
         Assert.That(capturer.CapturedGMaxDb, Is.Not.Empty,
             "CapturingMultilateralizer should have captured enriched nodes");
         Assert.That(capturer.CapturedGMaxDb, Has.All.Null,
-            "Nodes with null ConfigNode.GMaxDb must yield null NodeGMaxDb so " +
+            "Nodes with null antenna must yield null NodeGMaxDb so " +
             "Distance falls back to firmware payload distance");
     }
 
     [Test]
-    public async Task EnrichNodes_WithGMaxDb_SetsNodeGMaxDb()
+    public async Task EnrichNodes_WithAntenna_SetsNodeGMaxDb()
     {
         // Await initial config load so ConfigChanged has fired; no more fires after this.
         await _configLoader.ConfigAsync();
 
-        // Arrange: nodes WITH GMaxDb=3.0 configured → NodeGMaxDb must equal 3.0
+        // Arrange: nodes WITH antenna=pcb_ifa configured → NodeGMaxDb must equal 3.4
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: 3.0);    // sets State.Config with GMaxDb=3.0 nodes
+        PinStateConfig(device, antenna: "pcb_ifa");    // sets State.Config with pcb_ifa antenna nodes
 
         _mockNodeSettingsStore
             .Setup(x => x.Get(It.IsAny<string>()))
@@ -367,10 +367,10 @@ public class BaseMultilateralizerTests
         // Act
         capturer.Locate(scenario);
 
-        // Assert: every node should have NodeGMaxDb == 3.0
+        // Assert: every node should have NodeGMaxDb == 3.4 (pcb_ifa profile)
         Assert.That(capturer.CapturedGMaxDb, Is.Not.Empty);
-        Assert.That(capturer.CapturedGMaxDb, Has.All.EqualTo(3.0),
-            "Nodes with ConfigNode.GMaxDb=3.0 must yield NodeGMaxDb=3.0");
+        Assert.That(capturer.CapturedGMaxDb, Has.All.EqualTo(3.4),
+            "Nodes with antenna=pcb_ifa must yield NodeGMaxDb=3.4");
     }
 
     [Test]
@@ -383,7 +383,7 @@ public class BaseMultilateralizerTests
         // After EnrichNodes these must be converted to radians and stored.
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: 3.0);
+        PinStateConfig(device, antenna: "pcb_ifa");
 
         var calSettings = new NodeSettings
         {
@@ -429,7 +429,7 @@ public class BaseMultilateralizerTests
         // Arrange: no calibration → defaults are azimuth=0°, elevation=90°
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: 3.0);
+        PinStateConfig(device, antenna: "pcb_ifa");
 
         _mockNodeSettingsStore
             .Setup(x => x.Get(It.IsAny<string>()))
@@ -476,7 +476,7 @@ public class BaseMultilateralizerTests
 
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: 3.0);
+        PinStateConfig(device, antenna: "pcb_ifa");
 
         _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
@@ -507,7 +507,7 @@ public class BaseMultilateralizerTests
 
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: 3.0);
+        PinStateConfig(device, antenna: "pcb_ifa");
 
         _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
@@ -547,7 +547,7 @@ public class BaseMultilateralizerTests
 
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: 3.0);
+        PinStateConfig(device, antenna: "pcb_ifa");
 
         _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
@@ -582,7 +582,7 @@ public class BaseMultilateralizerTests
 
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
-        PinStateConfig(device, gMaxDb: 3.0);
+        PinStateConfig(device, antenna: "pcb_ifa");
 
         _mockNodeSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new NodeSettings());
         _mockDeviceSettingsStore.Setup(x => x.Get(It.IsAny<string>())).Returns(new DeviceSettings());
