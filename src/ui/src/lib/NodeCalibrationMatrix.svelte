@@ -143,14 +143,14 @@
 		</div>
 		{/if}
 
-		<div class="flex bg-slate-600 rounded-full p-1 w-fit mb-4">
+		<div class="flex justify-center mb-4"><div class="flex bg-slate-600 rounded-full p-1">
 			<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {nodeView === 'matrix' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (nodeView = 'matrix')}>
 				Matrix
 			</button>
 			<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {nodeView === 'settings' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (nodeView = 'settings')}>
 				Settings
 			</button>
-		</div>
+		</div></div>
 
 		{#if nodeView === 'settings' && $calibration?.nodes && Object.keys($calibration.nodes).length > 0}
 		<div class="card mb-4">
@@ -218,7 +218,7 @@
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}
-										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}${$calibration?.nodes?.[id2]?.antenna ? `\nRx Antenna: ${$calibration.nodes[id2].antenna}` : ''}` : 'No beacon Received in last 30 seconds'}
+										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}${$calibration?.nodes?.[id1]?.antenna ? `\nTx Antenna: ${$calibration.nodes[id1].antenna}` : ''}${$calibration?.nodes?.[id2]?.antenna ? `\nRx Antenna: ${$calibration.nodes[id2].antenna}` : ''}` : 'No beacon Received in last 30 seconds'}
 											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
 										>
 									{/each}
