@@ -117,10 +117,6 @@ public abstract class BaseMultilateralizer : ILocate
 
             dn.NodeAbsorption = ns?.Calibration?.Absorption ?? 3.0;
             dn.NodeRxAdjRssi = ns?.Calibration?.RxAdjRssi ?? 0;
-            var azDeg = ns?.Calibration?.Azimuth;
-            var elDeg = ns?.Calibration?.Elevation;
-            dn.NodeAzimuthRad = azDeg is double az ? az * Math.PI / 180.0 : null;
-            dn.NodeElevationRad = elDeg is double el ? el * Math.PI / 180.0 : null;
 
             // Resolve antenna profile from config (profile name → built-in → null).
             // Null means no antenna configured → NodeGMaxDb stays null
@@ -130,11 +126,21 @@ public abstract class BaseMultilateralizer : ILocate
             dn.NodeGMaxDb = null;
             dn.NodePatternExponent = 0;
             dn.NodeBackLossDb = 0;
-            if (antenna != null && azDeg.HasValue && elDeg.HasValue)
+            if (antenna != null)
             {
                 dn.NodeGMaxDb = antenna.GMaxDb;
                 dn.NodePatternExponent = antenna.PatternExponent;
                 dn.NodeBackLossDb = antenna.BackLoss;
+                // Use calibrated angles if available, otherwise default to 0°/0° (horizontal, forward)
+                double azDeg = ns?.Calibration?.Azimuth ?? 0.0;
+                double elDeg = ns?.Calibration?.Elevation ?? 0.0;
+                dn.NodeAzimuthRad = azDeg * Math.PI / 180.0;
+                dn.NodeElevationRad = elDeg * Math.PI / 180.0;
+            }
+            else
+            {
+                dn.NodeAzimuthRad = null;
+                dn.NodeElevationRad = null;
             }
 
             // TxAdjRssi: device transmit adjustment from DeviceSettingsStore

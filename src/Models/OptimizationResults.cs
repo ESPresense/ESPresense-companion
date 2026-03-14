@@ -33,19 +33,13 @@ public class OptimizationResults
                 double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;
                 double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
 
-                // Apply antenna gain correction when the Rx node has a directional antenna
-                // AND existing calibration already has az/el. This ensures symmetric scoring:
-                // both baseline and proposed use gain correction once angles are established.
-                // On the first run (no existing az/el), gain is skipped for fair comparison.
+                // Apply antenna gain correction when the Rx node has a directional antenna.
+                // Use proposed az/el if available, otherwise existing calibration, otherwise 0°/0°.
                 double gainDb = 0.0;
-                double? existingAz = rx.Calibration.Azimuth;
-                double? existingEl = rx.Calibration.Elevation;
-                double? azDeg = rxPv?.Azimuth ?? existingAz;
-                double? elDeg = rxPv?.Elevation ?? existingEl;
-                if (m.Rx.HasDirectionalAntenna && existingAz != null && existingEl != null && azDeg != null && elDeg != null)
+                if (m.Rx.HasDirectionalAntenna)
                 {
-                    double azRad = azDeg.Value * Math.PI / 180.0;
-                    double elRad = elDeg.Value * Math.PI / 180.0;
+                    double azRad = (rxPv?.Azimuth ?? rx.Calibration.Azimuth ?? 0.0) * Math.PI / 180.0;
+                    double elRad = (rxPv?.Elevation ?? rx.Calibration.Elevation ?? 0.0) * Math.PI / 180.0;
                     double px = Math.Sin(azRad) * Math.Cos(elRad);
                     double py = Math.Cos(azRad) * Math.Cos(elRad);
                     double pz = Math.Sin(elRad);

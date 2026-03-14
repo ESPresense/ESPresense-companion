@@ -427,12 +427,12 @@ public class BaseMultilateralizerTests
     }
 
     [Test]
-    public async Task EnrichNodes_MissingAngles_LeavesDirectionalFieldsNull()
+    public async Task EnrichNodes_MissingAngles_UsesDefaultZeroAngles()
     {
         // Await initial config load so no ConfigChanged races.
         await _configLoader.ConfigAsync();
 
-        // Arrange: no calibration → node remains isotropic until angles are saved.
+        // Arrange: no calibration → antenna profile still active with default 0°/0° angles.
         var floor  = CreateTestFloor();
         var device = CreateDeviceWithThreeRssiNodes(floor);
         PinStateConfig(device, antenna: "pcb_ifa");
@@ -455,12 +455,13 @@ public class BaseMultilateralizerTests
         // Act
         capturer.Locate(scenario);
 
-        Assert.That(capturer.CapturedAzimuthRad, Has.All.Null,
-            "Azimuth should remain null until calibration is saved");
-        Assert.That(capturer.CapturedElevationRad, Has.All.Null,
-            "Elevation should remain null until calibration is saved");
-        Assert.That(capturer.CapturedGMaxDb, Has.All.Null,
-            "Directional gain should remain disabled until both angles are calibrated");
+        // Antenna profile is active even without calibration — defaults to az=0°, el=0°
+        Assert.That(capturer.CapturedAzimuthRad, Has.All.EqualTo(0.0).Within(1e-9),
+            "Azimuth should default to 0° when no calibration is saved");
+        Assert.That(capturer.CapturedElevationRad, Has.All.EqualTo(0.0).Within(1e-9),
+            "Elevation should default to 0° when no calibration is saved");
+        Assert.That(capturer.CapturedGMaxDb, Has.All.EqualTo(3.4),
+            "Directional gain should be active with pcb_ifa profile (GMaxDb=3.4)");
     }
 
     // -----------------------------------------------------------------------
