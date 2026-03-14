@@ -34,7 +34,7 @@
 			if (diff == null) return 'n/a';
 			const base = diff.toFixed(1);
 			if (n1?.var != null) {
-				return `${base}\u00B1${Math.sqrt(n1.var).toFixed(1)}`;
+				return `${base}\u00A0\u00B1${Math.sqrt(n1.var).toFixed(1)}`;
 			}
 			return base;
 		}
@@ -144,7 +144,7 @@
 					<thead>
 						<tr>
 							<th class="text-left" style="color: oklch(1 0 none);">Node</th>
-							<th class="text-center" style="color: oklch(1 0 none);">Antenna</th>
+							<th class="text-left" style="color: oklch(1 0 none);">Antenna</th>
 							<th class="text-right" style="color: oklch(1 0 none);">Azimuth</th>
 							<th class="text-right" style="color: oklch(1 0 none);">Elevation</th>
 							<th class="text-right" style="color: oklch(1 0 none);">Absorption</th>
@@ -155,7 +155,7 @@
 						{#each Object.entries($calibration.nodes).sort((a, b) => a[0].localeCompare(b[0])) as [name, node] (name)}
 							<tr>
 								<td class="font-medium">{name}</td>
-								<td class="text-center">{#if node.antenna}<span class="badge preset-filled-surface-500 text-xs">{node.antenna}</span>{:else}<span class="text-surface-400">-</span>{/if}</td>
+								<td class="text-left">{#if node.antenna}<span class="badge preset-filled-surface-500 text-xs">{node.antenna}</span>{:else}<span class="text-surface-400">-</span>{/if}</td>
 								<td class="text-right tabular-nums">{node.azimuth != null ? node.azimuth.toFixed(1) + '°' : '-'}</td>
 								<td class="text-right tabular-nums">{node.elevation != null ? node.elevation.toFixed(1) + '°' : '-'}</td>
 								<td class="text-right tabular-nums">{node.absorption != null ? node.absorption.toFixed(2) : '-'}</td>
