@@ -35,6 +35,9 @@ public class OptimizationResults
                 double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;
                 double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
 
+                // Note: Antenna gain correction is intentionally NOT applied in Evaluate.
+                // The optimizer tunes antenna angles in its own objective function; the scoring
+                // here uses the standard isotropic path-loss model for stable convergence.
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
                 double measuredRssi = m.GetAdjustedRssi(rxAdjRssi);
 

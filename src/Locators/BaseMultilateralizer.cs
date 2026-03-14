@@ -1,5 +1,6 @@
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Services;
 using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
 using Serilog;
@@ -14,15 +15,169 @@ public abstract class BaseMultilateralizer : ILocate
     protected readonly Device Device;
     protected readonly Floor Floor;
     protected readonly State State;
+    protected readonly NodeSettingsStore NodeSettings;
+    protected readonly DeviceSettingsStore DeviceSettings;
 
-    protected BaseMultilateralizer(Device device, Floor floor, State state)
+    protected BaseMultilateralizer(Device device, Floor floor, State state, NodeSettingsStore nodeSettings, DeviceSettingsStore deviceSettings)
     {
         Device = device;
         Floor = floor;
         State = state;
+        NodeSettings = nodeSettings;
+        DeviceSettings = deviceSettings;
     }
 
-    public abstract bool Locate(Scenario scenario);
+    /// <summary>
+    /// Solves for the device position given valid nodes and an initial guess.
+    /// Returns null to indicate a soft failure (template will fall back to using the guess with confidence=1).
+    /// Implementations may update scenario fields such as Error, Fixes, Iterations, ReasonForExit, and Scale.
+    /// </summary>
+    protected abstract Point3D? Solve(Scenario scenario, DeviceToNode[] nodes, Point3D guess);
+
+    /// <summary>
+    /// Template method: initialises scenario, calls <see cref="Solve"/> in a 3-iteration
+    /// gain-correction loop, then finalises confidence and room assignment.
+    /// </summary>
+    public bool Locate(Scenario scenario)
+    {
+        if (!InitializeScenario(scenario, out var nodes, out var guess))
+            return false;
+
+        int confidence = scenario.Confidence ?? 0;
+        try
+        {
+            if (nodes.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
+            {
+                confidence = 1;
+                scenario.UpdateLocation(guess);
+            }
+            else
+            {
+                // Enrich nodes with calibration data before iterative solve
+                EnrichNodes(nodes);
+
+                Point3D? result = null;
+                for (int iteration = 0; iteration < 3; iteration++)
+                {
+                    // On iterations 1+, compute cos(θ) for gain correction
+                    if (iteration > 0 && result.HasValue)
+                        UpdateNodeCosTheta(nodes, result.Value);
+
+                    result = Solve(scenario, nodes, guess);
+                    if (result == null)
+                    {
+                        ResetEnrichment(nodes);
+                        confidence = 1;
+                        scenario.UpdateLocation(guess);
+                        goto finalize;
+                    }
+                }
+
+                ResetEnrichment(nodes);
+                scenario.UpdateLocation(result!.Value);
+                CalculateAndSetPearsonCorrelation(scenario, nodes);
+
+                int nodesPossibleOnline = State.Nodes.Values
+                    .Count(n => n.Floors?.Contains(Floor) ?? false);
+
+                confidence = MathUtils.CalculateConfidence(
+                    scenario.Error,
+                    scenario.PearsonCorrelation,
+                    nodes.Length,
+                    nodesPossibleOnline
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            confidence = HandleLocatorException(ex, scenario, guess);
+        }
+
+        finalize:
+        return FinalizeScenario(scenario, confidence);
+    }
+
+    private void EnrichNodes(DeviceToNode[] nodes)
+    {
+        foreach (var dn in nodes)
+        {
+            // Only activate RSSI-based distance recomputation when real RSSI data is present.
+            // Tests and legacy call sites that set Distance directly (without ReadMessage) have Rssi==0;
+            // real BLE measurements always have a non-zero RSSI (typically -40 to -100 dBm).
+            if (dn.Rssi == 0.0) continue;
+
+            var nodeId = dn.Node?.Id;
+            var ns = nodeId != null ? NodeSettings.Get(nodeId) : null;
+            var deviceId = dn.Device?.Id;
+            var ds = deviceId != null ? DeviceSettings.Get(deviceId) : null;
+
+            dn.NodeAbsorption = ns?.Calibration?.Absorption ?? 3.0;
+            dn.NodeRxAdjRssi = ns?.Calibration?.RxAdjRssi ?? 0;
+            var azDeg = ns?.Calibration?.Azimuth ?? 0.0;
+            var elDeg = ns?.Calibration?.Elevation ?? 90.0;
+            dn.NodeAzimuthRad = azDeg * Math.PI / 180.0;
+            dn.NodeElevationRad = elDeg * Math.PI / 180.0;
+
+            // GMaxDb from ConfigNode (top-level config, looked up by node id).
+            // Null GMaxDb means no directional antenna configured → NodeGMaxDb stays null
+            // → CorrectedDistance returns null → Distance falls back to firmware (backward-compatible).
+            var configNode = State.Config?.Nodes?.FirstOrDefault(n => n.GetId() == nodeId);
+            dn.NodeGMaxDb = configNode?.GMaxDb;
+
+            // TxAdjRssi: device transmit adjustment from DeviceSettingsStore
+            dn.TxAdjRssi = ds?.RefRssi ?? 0;
+        }
+    }
+
+    private static void UpdateNodeCosTheta(DeviceToNode[] nodes, Point3D devicePos)
+    {
+        foreach (var dn in nodes)
+        {
+            if (dn.NodeAzimuthRad is null || dn.NodeElevationRad is null)
+            {
+                dn.NodeCosTheta = null;
+                continue;
+            }
+
+            double azRad = dn.NodeAzimuthRad.Value;
+            double elRad = dn.NodeElevationRad.Value;
+
+            // Pointing vector: Px=sin(az)*cos(el), Py=cos(az)*cos(el), Pz=sin(el)
+            double px = Math.Sin(azRad) * Math.Cos(elRad);
+            double py = Math.Cos(azRad) * Math.Cos(elRad);
+            double pz = Math.Sin(elRad);
+
+            // Vector from node to device
+            if (dn.Node?.HasLocation != true)
+            {
+                dn.NodeCosTheta = null;
+                continue;
+            }
+            var nodePos = dn.Node.Location;
+            double dx = devicePos.X - nodePos.X;
+            double dy = devicePos.Y - nodePos.Y;
+            double dz = devicePos.Z - nodePos.Z;
+            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+            if (len < 1e-9)
+                dn.NodeCosTheta = 1.0; // co-located → θ=0°, max gain
+            else
+            {
+                // Asymmetric: max(cosθ, 0) models PCB ground plane blocking backside signals
+                double cosTheta = (px * dx + py * dy + pz * dz) / len;
+                dn.NodeCosTheta = Math.Max(cosTheta, 0.0);
+            }
+        }
+    }
+
+    private static void ResetEnrichment(DeviceToNode[] nodes)
+    {
+        foreach (var dn in nodes)
+        {
+            dn.NodeGMaxDb = null;
+            dn.NodeCosTheta = null;
+        }
+    }
 
     /// <summary>
     /// Initializes scenario with valid nodes and performs initial validation

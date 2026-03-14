@@ -264,7 +264,8 @@ namespace ESPresense.Models
                 Point = Point?.ToArray(),
                 Floors = Floors?.ToArray(),
                 Enabled = Enabled,
-                Stationary = Stationary
+                Stationary = Stationary,
+                GMaxDb = GMaxDb
             };
         }
     }

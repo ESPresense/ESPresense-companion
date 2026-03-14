@@ -11,7 +11,9 @@
 		Absorption = 2,
 		RxRssiAdj = 3,
 		TxRssiRef = 4,
-		VarianceMeters = 5
+		VarianceMeters = 5,
+		Azimuth = 6,
+		Elevation = 7
 	}
 
 	function coloring(percent: number | null): string {
@@ -32,7 +34,7 @@
 	function value(n1: any, data_point: number) {
 		if (data_point === DataPoint.ErrorPercent) {
 			return n1 ? Number(Math.round(n1.percent * 100)) + '%' : null;
-		} else if (data_point >= 1 && data_point <= 5) {
+		} else {
 			let num;
 			switch (data_point) {
 				case DataPoint.ErrorMeters:
@@ -50,6 +52,12 @@
 				case DataPoint.VarianceMeters:
 					num = n1?.var;
 					break;
+				case DataPoint.Azimuth:
+					num = n1?.azimuth;
+					return num !== null && num !== undefined ? Number(num.toFixed(1)) + '°' : 'n/a';
+				case DataPoint.Elevation:
+					num = n1?.elevation;
+					return num !== null && num !== undefined ? Number(num.toFixed(1)) + '°' : 'n/a';
 			}
 			return num !== null && num !== undefined ? Number(num.toPrecision(3)) : 'n/a';
 		}
@@ -155,6 +163,8 @@
 							<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
 							<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
 							<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
+							<button class="btn {data_point === 6 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 6)}>Azimuth (°)</button>
+							<button class="btn {data_point === 7 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 7)}>Elevation (°)</button>
 						</div>
 						<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
 					</div>

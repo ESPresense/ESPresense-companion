@@ -41,6 +41,26 @@ class MockNodeTelemetryStore : NodeTelemetryStore
 }
 
 /// <summary>
+/// Mock NodeSettingsStore for simulation - no background service needed
+/// </summary>
+class MockNodeSettingsStore : NodeSettingsStore
+{
+    public MockNodeSettingsStore() : base(null!, null!)
+    {
+    }
+}
+
+/// <summary>
+/// Mock DeviceSettingsStore for simulation - no background service needed
+/// </summary>
+class MockDeviceSettingsStore : DeviceSettingsStore
+{
+    public MockDeviceSettingsStore() : base(null!, null!)
+    {
+    }
+}
+
+/// <summary>
 /// Compares actual multilateration algorithms from ESPresense.Companion
 /// </summary>
 class Program
@@ -62,7 +82,10 @@ class Program
 
         var mockConfigLoader = new MockConfigLoader(config);
         var nodeTelemetryStore = new MockNodeTelemetryStore();
-        var state = new State(mockConfigLoader, nodeTelemetryStore);
+        var mockNss = new MockNodeSettingsStore();
+        var mockDss = new MockDeviceSettingsStore();
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss);
+        var state = new State(mockConfigLoader, nodeTelemetryStore, mockNss, lazyDss);
 
         var device = new Device("sim-device", "test-discovery", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
@@ -123,10 +146,10 @@ class Program
         // Locators to test
         var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, ILocate> Factory)[]
         {
-            ("Gauss-Newton", (d, f, s, nts) => new GaussNewtonMultilateralizer(d, f, s)),
-            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s)),
-            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s)),
-            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s)),
+            ("Gauss-Newton", (d, f, s, nts) => new GaussNewtonMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
+            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
+            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
+            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
             ("Nadaraya-Watson", (d, f, s, nts) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
         };
         

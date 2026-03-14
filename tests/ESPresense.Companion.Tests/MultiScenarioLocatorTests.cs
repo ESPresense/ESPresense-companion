@@ -3,6 +3,7 @@ using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Utils;
 using ESPresense.Controllers;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SQLite;
@@ -32,7 +33,10 @@ public class MultiScenarioLocatorTests
             new MqttNetLogger(),
             supervisor);
 
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var mockNss = new Mock<NodeSettingsStore>(mqttMock.Object, (ILogger<NodeSettingsStore>)null!);
+        var mockDss = new Mock<DeviceSettingsStore>(mqttMock.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss.Object);
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), mockNss.Object, lazyDss);
         var tele = new TelemetryService(mqttMock.Object);
         var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
@@ -79,7 +83,10 @@ public class MultiScenarioLocatorTests
             supervisor)
         { CallBase = true };
 
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var mockNss2 = new Mock<NodeSettingsStore>(mqttMock.Object, (ILogger<NodeSettingsStore>)null!);
+        var mockDss2 = new Mock<DeviceSettingsStore>(mqttMock.Object, (State)null!);
+        var lazyDss2 = new Lazy<DeviceSettingsStore>(() => mockDss2.Object);
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), mockNss2.Object, lazyDss2);
         var tele = new TelemetryService(mqttMock.Object);
         var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);

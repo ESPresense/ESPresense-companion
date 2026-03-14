@@ -311,6 +311,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "stationary")]
         public bool Stationary { get; set; } = true;
 
+        [YamlMember(Alias = "g_max_db")]
+        public double? GMaxDb { get; set; }
+
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 

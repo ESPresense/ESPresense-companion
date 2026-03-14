@@ -63,7 +63,10 @@ class CompareWeightings
 
         var mockConfigLoader = new MockConfigLoader(config);
         var nodeTelemetryStore = new MockNodeTelemetryStore();
-        var state = new State(mockConfigLoader, nodeTelemetryStore);
+        var mockNss = new MockNodeSettingsStore();
+        var mockDss = new MockDeviceSettingsStore();
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss);
+        var state = new State(mockConfigLoader, nodeTelemetryStore, mockNss, lazyDss);
 
         var device = new Device("sim-device", "test-discovery", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
@@ -105,9 +108,9 @@ class CompareWeightings
         // Locators to test (that support weighting)
         var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, ILocate> Factory)[]
         {
-            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s)),
-            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s)),
-            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s)),
+            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
+            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
+            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s, new MockNodeSettingsStore(), new MockDeviceSettingsStore())),
         };
 
         int iterations = 200;

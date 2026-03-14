@@ -2,6 +2,7 @@ using ESPresense.Locators;
 using ESPresense.Models;
 using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace ESPresense.Companion.Tests.Locators;
@@ -24,7 +25,10 @@ public class NearestNodeTests
 
         _configLoader = new ConfigLoader(_configDir);
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
-        _state = new State(_configLoader, _nodeTelemetryStore);
+        var mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, (ILogger<NodeSettingsStore>)null!);
+        var mockDss = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore, mockNss.Object, lazyDss);
     }
 
     [TearDown]
@@ -74,14 +78,15 @@ public class NearestNodeTests
         };
     }
 
-    private Node CreateTestNode(string id, string? name, Point3D location, params Floor[] floors)
+    private Node CreateTestNode(string id, string? name, Point3D location, double? gMaxDb = null, params Floor[] floors)
     {
         var node = new Node(id, NodeSourceType.Config);
         var configNode = new ConfigNode
         {
             Id = id,
             Name = name,
-            Point = new[] { location.X, location.Y, location.Z }
+            Point = new[] { location.X, location.Y, location.Z },
+            GMaxDb = gMaxDb
         };
 
         node.Update(_configLoader.Config!, configNode, floors);
@@ -127,7 +132,7 @@ public class NearestNodeTests
             room);
 
         var location = new Point3D(1.0, 1.0, 0.0);
-        var node = CreateTestNode("node1", "Node 1", location, outsideFloor, insideFloor);
+        var node = CreateTestNode("node1", "Node 1", location, null, outsideFloor, insideFloor);
         var device = CreateDeviceWithNode(node, 1.0);
 
         var locator = new NearestNode(device, _state);
@@ -166,7 +171,7 @@ public class NearestNodeTests
             room);
 
         var location = new Point3D(1.0, 1.0, 0.0);
-        var node = CreateTestNode("kitchen", "Kitchen Node", location, floor);
+        var node = CreateTestNode("kitchen", "Kitchen Node", location, null, floor);
         var device = CreateDeviceWithNode(node, 1.0);
 
         var locator = new NearestNode(device, _state);

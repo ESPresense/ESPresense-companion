@@ -69,6 +69,7 @@ builder.Services.AddSingleton<DeviceTracker>();
 builder.Services.AddSingleton<SupervisorConfigLoader>();
 builder.Services.AddSingleton<DeviceHistoryStore>();
 builder.Services.AddSingleton<DeviceSettingsStore>();
+builder.Services.AddSingleton(sp => new Lazy<DeviceSettingsStore>(() => sp.GetRequiredService<DeviceSettingsStore>()));
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();

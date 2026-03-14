@@ -116,6 +116,8 @@ export type NodeSetting = {
 		rxRefRssi: number | null;
 		rxAdjRssi: number | null;
 		txRefRssi: number | null;
+		azimuth: number | null;
+		elevation: number | null;
 	};
 };
 
@@ -205,6 +207,8 @@ export interface NodeCalibrationMatrix {
 			tx_ref_rssi?: number;
 			rx_adj_rssi?: number;
 			absorption?: number;
+			azimuth?: number;
+			elevation?: number;
 			mapDistance: number;
 			distance: number;
 			rssi: number;

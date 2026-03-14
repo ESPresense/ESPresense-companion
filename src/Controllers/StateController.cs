@@ -131,6 +131,8 @@ public class StateController : ControllerBase
                 if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
                 if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
                 if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
+                if (rxNs.Calibration.Azimuth is not null) rxM["azimuth"] = rxNs.Calibration.Azimuth.Value;
+                if (rxNs.Calibration.Elevation is not null) rxM["elevation"] = rxNs.Calibration.Elevation.Value;
                 rxM["mapDistance"] = rx.MapDistance;
                 rxM["distance"] = rx.Distance;
                 rxM["rssi"] = rx.Rssi;
@@ -162,6 +164,8 @@ public class StateController : ControllerBase
                 // Anchored devices don't have tx calibration settings, but receivers still have their settings
                 if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
                 if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
+                if (rxNs.Calibration.Azimuth is not null) rxM["azimuth"] = rxNs.Calibration.Azimuth.Value;
+                if (rxNs.Calibration.Elevation is not null) rxM["elevation"] = rxNs.Calibration.Elevation.Value;
 
                 // Calculate map distance from anchor to receiver
                 var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);

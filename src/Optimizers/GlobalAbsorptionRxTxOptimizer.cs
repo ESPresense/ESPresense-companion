@@ -43,104 +43,88 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         var uniqueRxIds = allRxNodes.Select(n => n.Rx.Id).Distinct().ToList();
         var uniqueTxIds = allRxNodes.Select(n => n.Tx.Id).Distinct().ToList();
 
-        // Map parameter indices
-        var rxIndexMap = new Dictionary<string, int>();
-        var txIndexMap = new Dictionary<string, int>();
-        int paramIndex = 0;
-
-        // Global absorption parameter is the first parameter
-        int globalAbsorptionIndex = paramIndex++;
-
-        // Each Rx node has one parameter: rxAdjRssi
-        foreach (var rxId in uniqueRxIds)
-        {
-            rxIndexMap[rxId] = paramIndex++;
-        }
-
-        // Each Tx node has one parameter: txRefRssi
-        foreach (var txId in uniqueTxIds)
-        {
-            txIndexMap[txId] = paramIndex++;
-        }
-
-        int totalParams = paramIndex;
-
         // Pre-calculate weights for each node based on RssiVar
+        var nodeWeights = PreCalculateWeights(allRxNodes);
+
+        // Phase 1: Optimize absorption, rxAdjRssi, txRefRssi (isotropic, proven path)
+        Phase1_OptimizeAbsorptionRxTx(or, allRxNodes, uniqueRxIds, uniqueTxIds, nodeWeights, optimization, existingSettings);
+
+        // Phase 2: Optimize antenna angles only, holding Phase 1 results fixed
+        var directionalRxIds = uniqueRxIds.Where(id => allRxNodes.Any(m => m.Rx.Id == id && m.Rx.IsNode && m.Rx.HasDirectionalAntenna)).ToList();
+        if (directionalRxIds.Count > 0)
+            Phase2_OptimizeAntennaAngles(or, allRxNodes, directionalRxIds, nodeWeights, optimization, existingSettings);
+
+        return or;
+    }
+
+    private Dictionary<Measure, double> PreCalculateWeights(List<Measure> allRxNodes)
+    {
         var nodeWeights = new Dictionary<Measure, double>();
         double totalWeight = 0;
 
         foreach (var node in allRxNodes)
         {
-            // Inverse variance weighting - use 1/variance as weight
             double weight = 1.0;
             if (node.RssiVar > 0)
-            {
-                weight = 1.0 / Math.Max(node.RssiVar.Value, 0.1); // Adding minimum to avoid extreme weights
-            }
-
+                weight = 1.0 / Math.Max(node.RssiVar.Value, 0.1);
             nodeWeights[node] = weight;
             totalWeight += weight;
         }
 
-        // Normalize weights if needed
         if (totalWeight > 0)
         {
             foreach (var node in allRxNodes)
-            {
                 nodeWeights[node] = nodeWeights[node] / totalWeight * allRxNodes.Count;
-            }
         }
+
+        return nodeWeights;
+    }
+
+    /// <summary>
+    /// Phase 1: Standard isotropic optimization of global absorption, per-Rx rxAdjRssi, per-Tx txRefRssi.
+    /// This is the proven optimization path that achieves good RMSE.
+    /// </summary>
+    private void Phase1_OptimizeAbsorptionRxTx(OptimizationResults or, List<Measure> allRxNodes,
+        List<string> uniqueRxIds, List<string> uniqueTxIds,
+        Dictionary<Measure, double> nodeWeights, ConfigOptimization optimization,
+        Dictionary<string, NodeSettings> existingSettings)
+    {
+        var rxIndexMap = new Dictionary<string, int>();
+        var txIndexMap = new Dictionary<string, int>();
+        int paramIndex = 0;
+        int globalAbsorptionIndex = paramIndex++;
+
+        foreach (var rxId in uniqueRxIds)
+            rxIndexMap[rxId] = paramIndex++;
+        foreach (var txId in uniqueTxIds)
+            txIndexMap[txId] = paramIndex++;
+
+        int totalParams = paramIndex;
 
         var objectiveFunction = ObjectiveFunction.Gradient(
             x =>
             {
                 double squaredErrorSum = 0;
                 double weightSum = 0;
-
-                // Get the global absorption value
                 double globalAbsorption = x[globalAbsorptionIndex];
 
                 foreach (var node in allRxNodes)
                 {
-                    if (node.Rx?.Location == null || node.Tx?.Location == null)
-                    {
-                        continue; // Skip measurements with missing locations
-                    }
+                    if (node.Rx?.Location == null || node.Tx?.Location == null) continue;
 
-                    int rxIndex = rxIndexMap[node.Rx.Id];
-                    int txIndex = txIndexMap[node.Tx.Id];
+                    double rxAdjRssi = x[rxIndexMap[node.Rx.Id]];
+                    double txRefRssi = x[txIndexMap[node.Tx.Id]];
+                    double mapDistance = Math.Max(node.Rx.Location.DistanceTo(node.Tx.Location), 0.1);
 
-                    double rxAdjRssi = x[rxIndex];
-                    double txRefRssi = x[txIndex];
-
-                    double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
-                    if (mapDistance <= 0)
-                    {
-                        mapDistance = 0.1; // Prevent log(0) error
-                    }
-
-                    // Calculate the predicted RSSI using the path loss model
                     double predictedRssi = txRefRssi - 10 * globalAbsorption * Math.Log10(mapDistance);
-                    double adjustedMeasuredRssi = node.GetAdjustedRssi(rxAdjRssi);
-                    // Compare with the adjusted measured RSSI
-                    double diff = predictedRssi - adjustedMeasuredRssi;
+                    double diff = predictedRssi - node.GetAdjustedRssi(rxAdjRssi);
 
-                    // Get the weight for this node
                     double weight = nodeWeights[node];
                     weightSum += weight;
 
-                    // Calculate error with asymmetric penalty
-                    double error;
-                    if (diff < 0)
-                    {
-                        // Predicted RSSI is less than the adjusted measured RSSI
-                        error = Math.Min(AsymmetricErrorFactor * Math.Pow(diff, 2), CappedError);
-                    }
-                    else
-                    {
-                        error = Math.Min(Math.Pow(diff, 2), CappedError);
-                    }
-
+                    double error = diff < 0
+                        ? Math.Min(AsymmetricErrorFactor * diff * diff, CappedError)
+                        : Math.Min(diff * diff, CappedError);
                     squaredErrorSum += weight * error;
                 }
 
@@ -152,190 +136,268 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
                 double h = 1e-6;
                 for (int i = 0; i < totalParams; i++)
                 {
-                    var xPlus = x.Clone();
-                    var xMinus = x.Clone();
-                    xPlus[i] = x[i] + h;
-                    xMinus[i] = x[i] - h;
+                    var xPlus = x.Clone(); xPlus[i] += h;
+                    var xMinus = x.Clone(); xMinus[i] -= h;
 
-                    double fPlus = 0;
-                    double fMinus = 0;
-                    double weightSumPlus = 0;
-                    double weightSumMinus = 0;
-
-                    foreach (var measure in allRxNodes)
-                    {
-                        if (measure.Rx?.Location == null || measure.Tx?.Location == null)
-                        {
-                            continue;
-                        }
-
-                        int rxIndex = rxIndexMap[measure.Rx.Id];
-                        int txIndex = txIndexMap[measure.Tx.Id];
-                        double weight = nodeWeights[measure];
-                        double mapDistance = measure.Rx.Location.DistanceTo(measure.Tx.Location);
-                        if (mapDistance <= 0)
-                        {
-                            mapDistance = 0.1;
-                        }
-
-                        // Plus calculation
-                        {
-                            double globalAbsorption = xPlus[globalAbsorptionIndex];
-                            double rxAdjRssi = xPlus[rxIndex];
-                            double txRefRssi = xPlus[txIndex];
-
-                            double predictedRssi = txRefRssi - 10 * globalAbsorption * Math.Log10(mapDistance);
-                            double diff = predictedRssi - measure.GetAdjustedRssi(rxAdjRssi);
-
-                            double error;
-                            if (diff < 0)
-                            {
-                                error = Math.Min(AsymmetricErrorFactor * Math.Pow(diff, 2), CappedError);
-                            }
-                            else
-                            {
-                                error = Math.Min(Math.Pow(diff, 2), CappedError);
-                            }
-
-                            fPlus += weight * error;
-                            weightSumPlus += weight;
-                        }
-
-                        // Minus calculation
-                        {
-                            double globalAbsorption = xMinus[globalAbsorptionIndex];
-                            double rxAdjRssi = xMinus[rxIndex];
-                            double txRefRssi = xMinus[txIndex];
-
-                            double predictedRssi = txRefRssi - 10 * globalAbsorption * Math.Log10(mapDistance);
-                            double diff = predictedRssi - measure.GetAdjustedRssi(rxAdjRssi);
-
-                            double error;
-                            if (diff < 0)
-                            {
-                                error = Math.Min(AsymmetricErrorFactor * Math.Pow(diff, 2), CappedError);
-                            }
-                            else
-                            {
-                                error = Math.Min(Math.Pow(diff, 2), CappedError);
-                            }
-
-                            fMinus += weight * error;
-                            weightSumMinus += weight;
-                        }
-                    }
-
-                    fPlus = weightSumPlus > 0 ? fPlus / weightSumPlus : fPlus;
-                    fMinus = weightSumMinus > 0 ? fMinus / weightSumMinus : fMinus;
+                    double fPlus = EvalPhase1(xPlus, allRxNodes, globalAbsorptionIndex, rxIndexMap, txIndexMap, nodeWeights);
+                    double fMinus = EvalPhase1(xMinus, allRxNodes, globalAbsorptionIndex, rxIndexMap, txIndexMap, nodeWeights);
                     grad[i] = (fPlus - fMinus) / (2 * h);
                 }
                 return grad;
             }
         );
 
-        // Build lower and upper bound vectors
         var lowerBound = Vector<double>.Build.Dense(totalParams);
         var upperBound = Vector<double>.Build.Dense(totalParams);
 
-        // Set bounds for global absorption
         lowerBound[globalAbsorptionIndex] = optimization.AbsorptionMin;
         upperBound[globalAbsorptionIndex] = optimization.AbsorptionMax;
 
-        // For Rx nodes: rxAdjRssi bounds
         foreach (var rxId in uniqueRxIds)
         {
             lowerBound[rxIndexMap[rxId]] = optimization.RxAdjRssiMin;
             upperBound[rxIndexMap[rxId]] = optimization.RxAdjRssiMax;
         }
-
-        // For Tx nodes: txRefRssi bounds
         foreach (var txId in uniqueTxIds)
         {
             lowerBound[txIndexMap[txId]] = optimization.TxRefRssiMin;
             upperBound[txIndexMap[txId]] = optimization.TxRefRssiMax;
         }
 
-        // Initialize with a reasonable guess (ensure within bounds)
         var initialGuess = Vector<double>.Build.Dense(totalParams);
 
-        // Calculate the average absorption from existing settings for initial guess
         var validAbsorptions = existingSettings.Values
-            .Select(ns => ns.Calibration?.Absorption)
-            .Where(a => a.HasValue)
-            .Select(a => a!.Value)
-            .ToList();
+            .Select(ns => ns.Calibration?.Absorption).Where(a => a.HasValue).Select(a => a!.Value).ToList();
+        initialGuess[globalAbsorptionIndex] = Math.Clamp(
+            validAbsorptions.Any() ? validAbsorptions.Average() : (optimization.AbsorptionMax + optimization.AbsorptionMin) / 2.0,
+            optimization.AbsorptionMin, optimization.AbsorptionMax);
 
-        double initialGlobalAbsorptionGuess;
-        if (validAbsorptions.Any())
-        {
-            initialGlobalAbsorptionGuess = validAbsorptions.Average();
-        }
-        else
-        {
-            // Fallback to midpoint if no nodes have absorption set
-            initialGlobalAbsorptionGuess = (optimization.AbsorptionMax + optimization.AbsorptionMin) / 2.0;
-        }
-        // Clamp the initial guess for global absorption
-        initialGuess[globalAbsorptionIndex] = Math.Clamp(initialGlobalAbsorptionGuess, optimization.AbsorptionMin, optimization.AbsorptionMax);
-
-        // Initialize Rx node parameters
         foreach (var rxId in uniqueRxIds)
         {
-            existingSettings.TryGetValue(rxId, out var nodeSettings);
-            // Clamp initial guess within global bounds
-            initialGuess[rxIndexMap[rxId]] = Math.Clamp(nodeSettings?.Calibration?.RxAdjRssi ?? 0, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
+            existingSettings.TryGetValue(rxId, out var ns);
+            initialGuess[rxIndexMap[rxId]] = Math.Clamp(ns?.Calibration?.RxAdjRssi ?? 0, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
         }
-
-        // Initialize Tx node parameters
         foreach (var txId in uniqueTxIds)
         {
-            existingSettings.TryGetValue(txId, out var nodeSettings);
-            // Clamp initial guess within global bounds
-            initialGuess[txIndexMap[txId]] = Math.Clamp(nodeSettings?.Calibration?.TxRefRssi ?? -59, optimization.TxRefRssiMin, optimization.TxRefRssiMax);
+            existingSettings.TryGetValue(txId, out var ns);
+            initialGuess[txIndexMap[txId]] = Math.Clamp(ns?.Calibration?.TxRefRssi ?? -59, optimization.TxRefRssiMin, optimization.TxRefRssiMax);
         }
 
         try
         {
-            // Use the bounded BFGS solver
             var solver = new BfgsBMinimizer(1e-8, 1e-8, 1e-8, 10000);
             var result = solver.FindMinimum(objectiveFunction, lowerBound, upperBound, initialGuess);
 
-            // Get the optimized global absorption value
-            double globalAbsorptionValue = result.MinimizingPoint[globalAbsorptionIndex];
-            globalAbsorptionValue = Math.Max(optimization.AbsorptionMin, Math.Min(globalAbsorptionValue, optimization.AbsorptionMax));
+            double globalAbsorptionValue = Math.Clamp(result.MinimizingPoint[globalAbsorptionIndex], optimization.AbsorptionMin, optimization.AbsorptionMax);
 
-            // Process Rx node results
             foreach (var rxId in uniqueRxIds)
             {
-                double rxAdjRssi = result.MinimizingPoint[rxIndexMap[rxId]];
-                rxAdjRssi = Math.Max(optimization.RxAdjRssiMin, Math.Min(rxAdjRssi, optimization.RxAdjRssiMax));
-
+                double rxAdjRssi = Math.Clamp(result.MinimizingPoint[rxIndexMap[rxId]], optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
                 var n = or.Nodes.GetOrAdd(rxId);
                 n.RxAdjRssi = rxAdjRssi;
                 n.Absorption = globalAbsorptionValue;
                 n.Error = result.FunctionInfoAtMinimum.Value;
             }
 
-            // Process Tx node results
             foreach (var txId in uniqueTxIds)
             {
-                double txRefRssi = result.MinimizingPoint[txIndexMap[txId]];
-                txRefRssi = Math.Max(optimization.TxRefRssiMin, Math.Min(txRefRssi, optimization.TxRefRssiMax));
-
+                double txRefRssi = Math.Clamp(result.MinimizingPoint[txIndexMap[txId]], optimization.TxRefRssiMin, optimization.TxRefRssiMax);
                 var n = or.Nodes.GetOrAdd(txId);
                 n.TxRefRssi = txRefRssi;
                 n.Error = result.FunctionInfoAtMinimum.Value;
             }
 
-            // Log the optimization results
-            Log.Debug(Name + " completed with error: {0}, global absorption: {1}",
+            Log.Debug(Name + " Phase 1 completed with error: {0}, global absorption: {1}",
                 result.FunctionInfoAtMinimum.Value, globalAbsorptionValue);
         }
         catch (Exception ex)
         {
-            Log.Error("Error optimizing: {0}", ex.Message);
+            Log.Error("Error in Phase 1 optimization: {0}", ex.Message);
+        }
+    }
+
+    private double EvalPhase1(Vector<double> x, List<Measure> allRxNodes, int globalAbsorptionIndex,
+        Dictionary<string, int> rxIndexMap, Dictionary<string, int> txIndexMap,
+        Dictionary<Measure, double> nodeWeights)
+    {
+        double squaredErrorSum = 0, weightSum = 0;
+        double globalAbsorption = x[globalAbsorptionIndex];
+
+        foreach (var node in allRxNodes)
+        {
+            if (node.Rx?.Location == null || node.Tx?.Location == null) continue;
+
+            double rxAdjRssi = x[rxIndexMap[node.Rx.Id]];
+            double txRefRssi = x[txIndexMap[node.Tx.Id]];
+            double mapDistance = Math.Max(node.Rx.Location.DistanceTo(node.Tx.Location), 0.1);
+
+            double predictedRssi = txRefRssi - 10 * globalAbsorption * Math.Log10(mapDistance);
+            double diff = predictedRssi - node.GetAdjustedRssi(rxAdjRssi);
+
+            double weight = nodeWeights[node];
+            weightSum += weight;
+            double error = diff < 0
+                ? Math.Min(AsymmetricErrorFactor * diff * diff, CappedError)
+                : Math.Min(diff * diff, CappedError);
+            squaredErrorSum += weight * error;
         }
 
-        return or;
+        return weightSum > 0 ? squaredErrorSum / weightSum : squaredErrorSum;
+    }
+
+    /// <summary>
+    /// Phase 2: Antenna-only optimization. Holds absorption/rxAdj/txRef fixed from Phase 1 results
+    /// and optimizes sinAz/cosAz/sinEl per directional node to minimize RSSI prediction error.
+    /// Models asymmetric PCB antenna pattern: max(cos(θ), 0)² with backside null.
+    /// </summary>
+    private void Phase2_OptimizeAntennaAngles(OptimizationResults or, List<Measure> allRxNodes,
+        List<string> directionalRxIds, Dictionary<Measure, double> nodeWeights,
+        ConfigOptimization optimization, Dictionary<string, NodeSettings> existingSettings)
+    {
+        // Build fixed parameter lookups from Phase 1 results
+        var fixedRxAdj = new Dictionary<string, double>();
+        var fixedTxRef = new Dictionary<string, double>();
+        double fixedAbsorption = 3.0;
+        foreach (var (id, pv) in or.Nodes)
+        {
+            if (pv.RxAdjRssi != null) fixedRxAdj[id] = pv.RxAdjRssi.Value;
+            if (pv.TxRefRssi != null) fixedTxRef[id] = pv.TxRefRssi.Value;
+            if (pv.Absorption != null) fixedAbsorption = pv.Absorption.Value;
+        }
+
+        // Build GMax lookup
+        var rxGMaxMap = new Dictionary<string, double>();
+        foreach (var rxId in directionalRxIds)
+        {
+            var rxNode = allRxNodes.First(m => m.Rx.Id == rxId).Rx;
+            rxGMaxMap[rxId] = rxNode.GMax;
+        }
+
+        // Parameter layout: [sinAz_0, cosAz_0, sinEl_0, sinAz_1, cosAz_1, sinEl_1, ...]
+        int N = directionalRxIds.Count;
+        int totalParams = N * 3;
+        var idxMap = new Dictionary<string, int>();
+        for (int i = 0; i < N; i++)
+            idxMap[directionalRxIds[i]] = i * 3; // base index; +0=sinAz, +1=cosAz, +2=sinEl
+
+        double ComputeGainDb(double[] xa, Measure m)
+        {
+            if (!idxMap.TryGetValue(m.Rx.Id, out var baseIdx)) return 0.0;
+            double sinAz = xa[baseIdx], cosAz = xa[baseIdx + 1], sinEl = xa[baseIdx + 2];
+            double cosEl = Math.Sqrt(Math.Max(1.0 - sinEl * sinEl, 0.0));
+
+            double bx = sinAz * cosEl, by = cosAz * cosEl, bz = sinEl;
+            double dx = m.Tx.Location.X - m.Rx.Location.X;
+            double dy = m.Tx.Location.Y - m.Rx.Location.Y;
+            double dz = m.Tx.Location.Z - m.Rx.Location.Z;
+            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            if (len < 1e-9) return 10.0 * Math.Log10(rxGMaxMap[m.Rx.Id]);
+
+            double cosTheta = (bx * dx + by * dy + bz * dz) / len;
+            double cosClamped = Math.Max(cosTheta, 0.0); // Asymmetric: backside null
+            double cos2 = Math.Max(cosClamped * cosClamped, 1e-3);
+            return 10.0 * Math.Log10(rxGMaxMap[m.Rx.Id] * cos2);
+        }
+
+        double EvalPhase2(double[] xa)
+        {
+            double squaredErrorSum = 0, weightSum = 0;
+            double penalty = 0;
+
+            // Unit-circle regularization
+            for (int i = 0; i < N; i++)
+            {
+                double sa = xa[i * 3], ca = xa[i * 3 + 1];
+                double dev = sa * sa + ca * ca - 1.0;
+                penalty += 0.1 * dev * dev;
+            }
+
+            foreach (var node in allRxNodes)
+            {
+                if (node.Rx?.Location == null || node.Tx?.Location == null) continue;
+
+                double rxAdj = fixedRxAdj.GetValueOrDefault(node.Rx.Id, 0);
+                double txRef = fixedTxRef.GetValueOrDefault(node.Tx.Id, -59);
+                double mapDistance = Math.Max(node.Rx.Location.DistanceTo(node.Tx.Location), 0.1);
+
+                double gainDb = ComputeGainDb(xa, node);
+                double predictedRssi = txRef + gainDb - 10 * fixedAbsorption * Math.Log10(mapDistance);
+                double diff = predictedRssi - node.GetAdjustedRssi(rxAdj);
+
+                double weight = nodeWeights[node];
+                weightSum += weight;
+                double error = diff < 0
+                    ? Math.Min(AsymmetricErrorFactor * diff * diff, CappedError)
+                    : Math.Min(diff * diff, CappedError);
+                squaredErrorSum += weight * error;
+            }
+
+            return (weightSum > 0 ? squaredErrorSum / weightSum : squaredErrorSum) + penalty;
+        }
+
+        var obj = ObjectiveFunction.Gradient(
+            x => EvalPhase2(x.ToArray()),
+            x =>
+            {
+                var xa = x.ToArray();
+                var grad = Vector<double>.Build.Dense(totalParams);
+                double h = 1e-5;
+                double baseVal = EvalPhase2(xa);
+                for (int i = 0; i < totalParams; i++)
+                {
+                    var xp = (double[])xa.Clone();
+                    xp[i] += h;
+                    grad[i] = (EvalPhase2(xp) - baseVal) / h;
+                }
+                return grad;
+            }
+        );
+
+        // Bounds and initial guess
+        var lower = new double[totalParams];
+        var upper = new double[totalParams];
+        var init = new double[totalParams];
+        for (int i = 0; i < N; i++)
+        {
+            existingSettings.TryGetValue(directionalRxIds[i], out var ns);
+            double azDeg = ns?.Calibration?.Azimuth ?? 0.0;
+            double elDeg = ns?.Calibration?.Elevation ?? 0.0;
+            double azRad = azDeg * Math.PI / 180.0;
+            double elRad = elDeg * Math.PI / 180.0;
+
+            int b = i * 3;
+            init[b] = Math.Sin(azRad); lower[b] = -2.0; upper[b] = 2.0;
+            init[b + 1] = Math.Cos(azRad); lower[b + 1] = -2.0; upper[b + 1] = 2.0;
+            init[b + 2] = Math.Sin(elRad); lower[b + 2] = -1.0; upper[b + 2] = 1.0;
+        }
+
+        try
+        {
+            var solver = new BfgsBMinimizer(1e-7, 1e-7, 1e-7, 5000);
+            var result = solver.FindMinimum(obj,
+                Vector<double>.Build.DenseOfArray(lower),
+                Vector<double>.Build.DenseOfArray(upper),
+                Vector<double>.Build.DenseOfArray(init));
+
+            var mp = result.MinimizingPoint.ToArray();
+            for (int i = 0; i < N; i++)
+            {
+                int b = i * 3;
+                double azRad = Math.Atan2(mp[b], mp[b + 1]);
+                double elRad = Math.Asin(Math.Clamp(mp[b + 2], -1.0, 1.0));
+                double azDeg = azRad * 180.0 / Math.PI;
+                if (azDeg < 0) azDeg += 360.0;
+
+                var n = or.Nodes.GetOrAdd(directionalRxIds[i]);
+                n.Azimuth = azDeg;
+                n.Elevation = elRad * 180.0 / Math.PI;
+            }
+
+            Log.Debug(Name + " Phase 2 (antenna) completed with error: {0}", result.FunctionInfoAtMinimum.Value);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Error in Phase 2 antenna optimization: {0}", ex.Message);
+        }
     }
 }

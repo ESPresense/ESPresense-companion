@@ -2,6 +2,7 @@ using ESPresense.Locators;
 using ESPresense.Models;
 using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace ESPresense.Companion.Tests.Locators;
@@ -14,6 +15,8 @@ public class BfgsMultilateralizerTests
     private string _configDir;
     private NodeTelemetryStore _nodeTelemetryStore;
     private Mock<IMqttCoordinator> _mockMqttCoordinator;
+    private Mock<NodeSettingsStore> _mockNss;
+    private Mock<DeviceSettingsStore> _mockDss;
 
     [SetUp]
     public void Setup()
@@ -24,7 +27,10 @@ public class BfgsMultilateralizerTests
 
         _configLoader = new ConfigLoader(_configDir);
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
-        _state = new State(_configLoader, _nodeTelemetryStore);
+        _mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, (ILogger<NodeSettingsStore>)null!);
+        _mockDss = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => _mockDss.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore, _mockNss.Object, lazyDss);
     }
 
     [TearDown]
@@ -67,10 +73,10 @@ public class BfgsMultilateralizerTests
         return floor;
     }
 
-    private Node CreateTestNode(string id, double x, double y, double z, Floor floor)
+    private Node CreateTestNode(string id, double x, double y, double z, Floor floor, double? gMaxDb = null)
     {
         var node = new Node(id, NodeSourceType.Config);
-        var configNode = new ConfigNode { Name = id, Point = new double[] { x, y, z } };
+        var configNode = new ConfigNode { Name = id, Point = new double[] { x, y, z }, GMaxDb = gMaxDb };
         node.Update(_configLoader.Config!, configNode, new[] { floor });
         _state.Nodes[id] = node;
         return node;
@@ -108,7 +114,7 @@ public class BfgsMultilateralizerTests
             LastHit = DateTime.UtcNow
         };
 
-        var multilateralizer = new BfgsMultilateralizer(device, floor, _state);
+        var multilateralizer = new BfgsMultilateralizer(device, floor, _state, _mockNss.Object, _mockDss.Object);
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "BFGS");
 
         // Act
@@ -142,7 +148,7 @@ public class BfgsMultilateralizerTests
             LastHit = DateTime.UtcNow
         };
 
-        var multilateralizer = new BfgsMultilateralizer(device, floor, _state);
+        var multilateralizer = new BfgsMultilateralizer(device, floor, _state, _mockNss.Object, _mockDss.Object);
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "BFGS");
 
         // Act
@@ -189,7 +195,7 @@ public class BfgsMultilateralizerTests
             LastHit = DateTime.UtcNow
         };
 
-        var multilateralizer = new BfgsMultilateralizer(device, floor, _state);
+        var multilateralizer = new BfgsMultilateralizer(device, floor, _state, _mockNss.Object, _mockDss.Object);
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "BFGS");
 
         // Act
@@ -236,7 +242,7 @@ public class BfgsMultilateralizerTests
             LastHit = DateTime.UtcNow
         };
 
-        var multilateralizer = new BfgsMultilateralizer(device, floor, _state);
+        var multilateralizer = new BfgsMultilateralizer(device, floor, _state, _mockNss.Object, _mockDss.Object);
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "BFGS");
 
         // Act
@@ -263,7 +269,7 @@ public class BfgsMultilateralizerTests
         device.Nodes["node2"] = new DeviceToNode(device, node2) { Distance = 2.5, LastHit = DateTime.UtcNow };
         device.Nodes["node3"] = new DeviceToNode(device, node3) { Distance = 2.5, LastHit = DateTime.UtcNow };
 
-        var multilateralizer = new BfgsMultilateralizer(device, floor, _state);
+        var multilateralizer = new BfgsMultilateralizer(device, floor, _state, _mockNss.Object, _mockDss.Object);
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "BFGS");
 
         // Act
@@ -320,7 +326,7 @@ public class BfgsMultilateralizerTests
             LastHit = DateTime.UtcNow
         };
 
-        var multilateralizer = new BfgsMultilateralizer(device, floor, _state);
+        var multilateralizer = new BfgsMultilateralizer(device, floor, _state, _mockNss.Object, _mockDss.Object);
         var scenario = new Scenario(_configLoader.Config, multilateralizer, "BFGS");
 
         // Act
