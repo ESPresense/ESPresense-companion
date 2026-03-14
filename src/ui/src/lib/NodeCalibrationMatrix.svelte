@@ -7,11 +7,7 @@
 
 	enum DataPoint {
 		ErrorPercent = 0,
-		ErrorMeters = 1,
-		Absorption = 2,
-		RxRssiAdj = 3,
-		TxRssiRef = 4,
-		VarianceMeters = 5
+		ErrorMeters = 1
 	}
 
 	function coloring(percent: number | null): string {
@@ -30,28 +26,17 @@
 	}
 
 	function value(n1: any, data_point: number) {
+		if (!n1) return null;
 		if (data_point === DataPoint.ErrorPercent) {
-			return n1 ? Number(Math.round(n1.percent * 100)) + '%' : null;
+			return Number(Math.round(n1.percent * 100)) + '%';
 		} else {
-			let num;
-			switch (data_point) {
-				case DataPoint.ErrorMeters:
-					num = n1?.diff;
-					break;
-				case DataPoint.Absorption:
-					num = n1?.absorption;
-					break;
-				case DataPoint.RxRssiAdj:
-					num = n1?.rx_adj_rssi;
-					break;
-				case DataPoint.TxRssiRef:
-					num = n1?.tx_ref_rssi;
-					break;
-				case DataPoint.VarianceMeters:
-					num = n1?.var;
-					break;
-				}
-			return num !== null && num !== undefined ? Number(num.toPrecision(3)) : 'n/a';
+			const diff = n1?.diff;
+			if (diff == null) return 'n/a';
+			const base = diff.toFixed(1);
+			if (n1?.var != null) {
+				return `${base}\u00B1${Math.sqrt(n1.var).toFixed(1)}`;
+			}
+			return base;
 		}
 	}
 
@@ -192,10 +177,6 @@
 						<div class="flex flex-wrap items-center gap-2">
 							<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 0)}>Error %</button>
 							<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 1)}>Error (m)</button>
-							<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 2)}>Absorption</button>
-							<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
-							<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
-							<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
 						</div>
 						<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
 					</div>
