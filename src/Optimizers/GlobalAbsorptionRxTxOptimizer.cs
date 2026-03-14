@@ -52,8 +52,15 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
 
         // Phase 2: Optimize antenna angles only, holding Phase 1 results fixed.
         // Only run if Phase 1 produced results (or.Nodes is non-empty).
-        var directionalRxIds = uniqueRxIds.Where(id => allRxNodes.Any(m => m.Rx.Id == id && m.Rx.IsNode && m.Rx.HasDirectionalAntenna)).ToList();
-        Log.Debug("Phase 2 check: {Count} directional nodes out of {Total} Rx nodes", directionalRxIds.Count, uniqueRxIds.Count);
+        var directionalRxIds = allRxNodes
+            .SelectMany(m => new[] {
+                (m.Rx.Id, m.Rx.IsNode, m.Rx.HasDirectionalAntenna),
+                (m.Tx.Id, m.Tx.IsNode, m.Tx.HasDirectionalAntenna) })
+            .Where(t => t.IsNode && t.HasDirectionalAntenna)
+            .Select(t => t.Id)
+            .Distinct()
+            .ToList();
+        Log.Debug("Phase 2 check: {Count} directional nodes", directionalRxIds.Count);
         if (directionalRxIds.Count > 0 && or.Nodes.Count > 0)
             Phase2_OptimizeAntennaAngles(or, allRxNodes, directionalRxIds, nodeWeights, optimization, existingSettings);
 
@@ -268,16 +275,16 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
             if (pv.Absorption != null) fixedAbsorption = pv.Absorption.Value;
         }
 
-        // Build per-node antenna parameter lookup
+        // Build per-node antenna parameter lookup (nodes can appear as Rx or Tx)
         var rxGMaxMap = new Dictionary<string, double>();
         var rxPatternExpMap = new Dictionary<string, double>();
         var rxBackLossMap = new Dictionary<string, double>();
-        foreach (var rxId in directionalRxIds)
+        foreach (var nodeId in directionalRxIds)
         {
-            var rxNode = allRxNodes.First(m => m.Rx.Id == rxId).Rx;
-            rxGMaxMap[rxId] = rxNode.GMax;
-            rxPatternExpMap[rxId] = rxNode.PatternExponent;
-            rxBackLossMap[rxId] = rxNode.BackLossDb;
+            var optNode = allRxNodes.Select(m => m.Rx.Id == nodeId ? m.Rx : m.Tx.Id == nodeId ? m.Tx : null).First(n => n != null)!;
+            rxGMaxMap[nodeId] = optNode.GMax;
+            rxPatternExpMap[nodeId] = optNode.PatternExponent;
+            rxBackLossMap[nodeId] = optNode.BackLossDb;
         }
 
         // Parameter layout: [sinAz_0, cosAz_0, sinEl_0, sinAz_1, cosAz_1, sinEl_1, ...]
@@ -287,31 +294,32 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         for (int i = 0; i < N; i++)
             idxMap[directionalRxIds[i]] = i * 3; // base index; +0=sinAz, +1=cosAz, +2=sinEl
 
-        double ComputeGainDb(double[] xa, Measure m)
+        double ComputeNodeGainDb(double[] xa, string nodeId, double dx, double dy, double dz)
         {
-            if (!idxMap.TryGetValue(m.Rx.Id, out var baseIdx)) return 0.0;
+            if (!idxMap.TryGetValue(nodeId, out var baseIdx)) return 0.0;
             double sinAz = xa[baseIdx], cosAz = xa[baseIdx + 1], sinEl = xa[baseIdx + 2];
             double azNorm = Math.Sqrt(sinAz * sinAz + cosAz * cosAz);
-            if (azNorm < 1e-9)
-            {
-                sinAz = 0.0;
-                cosAz = 1.0;
-            }
-            else
-            {
-                sinAz /= azNorm;
-                cosAz /= azNorm;
-            }
+            if (azNorm < 1e-9) { sinAz = 0.0; cosAz = 1.0; }
+            else { sinAz /= azNorm; cosAz /= azNorm; }
             double cosEl = Math.Sqrt(Math.Max(1.0 - sinEl * sinEl, 0.0));
 
             return MathUtils.ComputeGainDb(
-                sinAz * cosEl, cosAz * cosEl, sinEl,
-                m.Tx.Location.X - m.Rx.Location.X,
-                m.Tx.Location.Y - m.Rx.Location.Y,
-                m.Tx.Location.Z - m.Rx.Location.Z,
-                10.0 * Math.Log10(rxGMaxMap[m.Rx.Id]),
-                rxPatternExpMap[m.Rx.Id],
-                rxBackLossMap[m.Rx.Id]);
+                sinAz * cosEl, cosAz * cosEl, sinEl, dx, dy, dz,
+                10.0 * Math.Log10(rxGMaxMap[nodeId]),
+                rxPatternExpMap[nodeId],
+                rxBackLossMap[nodeId]);
+        }
+
+        double ComputeGainDb(double[] xa, Measure m)
+        {
+            double dx = m.Tx.Location.X - m.Rx.Location.X;
+            double dy = m.Tx.Location.Y - m.Rx.Location.Y;
+            double dz = m.Tx.Location.Z - m.Rx.Location.Z;
+            // Rx gain: boresight → Tx direction
+            double gain = ComputeNodeGainDb(xa, m.Rx.Id, dx, dy, dz);
+            // Tx gain: boresight → Rx direction (negated vector)
+            gain += ComputeNodeGainDb(xa, m.Tx.Id, -dx, -dy, -dz);
+            return gain;
         }
 
         double EvalPhase2(double[] xa)

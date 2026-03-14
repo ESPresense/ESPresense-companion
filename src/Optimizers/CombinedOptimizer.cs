@@ -139,8 +139,13 @@ public class CombinedOptimizer : IOptimizer
         Dictionary<string, double> rxAdjRssiDict, Dictionary<(string, string), double> pathAbsorptionDict, ConfigOptimization optimization, Dictionary<string, NodeSettings> existingSettings)
     {
         int absorptionCount = uniqueDeviceIds.Count;
-        var directionalDeviceIds = uniqueDeviceIds
-            .Where(id => allNodes.Any(m => m.Rx.Id == id && m.Rx.IsNode && m.Rx.HasDirectionalAntenna))
+        var directionalDeviceIds = allNodes
+            .SelectMany(m => new[] {
+                (m.Rx.Id, m.Rx.IsNode, m.Rx.HasDirectionalAntenna),
+                (m.Tx.Id, m.Tx.IsNode, m.Tx.HasDirectionalAntenna) })
+            .Where(t => t.IsNode && t.HasDirectionalAntenna)
+            .Select(t => t.Id)
+            .Distinct()
             .ToList();
         int directionalCount = directionalDeviceIds.Count;
         int vecLen = Step2Layout.VectorLength(absorptionCount, directionalCount);
@@ -353,7 +358,9 @@ public class CombinedOptimizer : IOptimizer
 
             double gainDb = 0.0;
             if (n.Rx.IsNode && n.Rx.HasDirectionalAntenna && dirDict.TryGetValue(n.Rx.Id, out var rxDir))
-                gainDb = ComputeGainDb(n.Rx, n.Tx, rxDir.azRad, rxDir.elRad);
+                gainDb += ComputeGainDb(n.Rx, n.Tx, rxDir.azRad, rxDir.elRad);
+            if (n.Tx.IsNode && n.Tx.HasDirectionalAntenna && dirDict.TryGetValue(n.Tx.Id, out var txDir))
+                gainDb += ComputeGainDb(n.Tx, n.Rx, txDir.azRad, txDir.elRad);
 
             var calculatedDistance = Math.Pow(10, (-59 + rxAdjRssi + gainDb + txAdjRssi - n.Rssi) / (10.0d * absorption));
             return Math.Pow(distance - calculatedDistance, 2);

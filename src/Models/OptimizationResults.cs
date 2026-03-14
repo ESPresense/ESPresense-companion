@@ -33,9 +33,12 @@ public class OptimizationResults
                 double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;
                 double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
 
-                // Apply antenna gain correction when the Rx node has a directional antenna.
-                // Use proposed az/el if available, otherwise existing calibration, otherwise 0°/0°.
+                // Apply antenna gain correction for both Rx and Tx directional antennas.
+                // For node-to-node paths, both antennas affect the signal.
                 double gainDb = 0.0;
+                double dx = m.Tx.Location.X - m.Rx.Location.X;
+                double dy = m.Tx.Location.Y - m.Rx.Location.Y;
+                double dz = m.Tx.Location.Z - m.Rx.Location.Z;
                 if (m.Rx.HasDirectionalAntenna)
                 {
                     double azRad = (rxPv?.Azimuth ?? rx.Calibration.Azimuth ?? 0.0) * Math.PI / 180.0;
@@ -43,12 +46,20 @@ public class OptimizationResults
                     double px = Math.Sin(azRad) * Math.Cos(elRad);
                     double py = Math.Cos(azRad) * Math.Cos(elRad);
                     double pz = Math.Sin(elRad);
-
-                    gainDb = MathUtils.ComputeGainDb(px, py, pz,
-                        m.Tx.Location.X - m.Rx.Location.X,
-                        m.Tx.Location.Y - m.Rx.Location.Y,
-                        m.Tx.Location.Z - m.Rx.Location.Z,
+                    gainDb += MathUtils.ComputeGainDb(px, py, pz, dx, dy, dz,
                         10.0 * Math.Log10(m.Rx.GMax), m.Rx.PatternExponent, m.Rx.BackLossDb);
+                }
+                if (m.Tx.HasDirectionalAntenna)
+                {
+                    Nodes.TryGetValue(m.Tx.Id, out var txPvLocal);
+                    double azRad = (txPvLocal?.Azimuth ?? tx.Calibration.Azimuth ?? 0.0) * Math.PI / 180.0;
+                    double elRad = (txPvLocal?.Elevation ?? tx.Calibration.Elevation ?? 0.0) * Math.PI / 180.0;
+                    double px = Math.Sin(azRad) * Math.Cos(elRad);
+                    double py = Math.Cos(azRad) * Math.Cos(elRad);
+                    double pz = Math.Sin(elRad);
+                    // Tx→Rx: direction vector is negated (Rx - Tx)
+                    gainDb += MathUtils.ComputeGainDb(px, py, pz, -dx, -dy, -dz,
+                        10.0 * Math.Log10(m.Tx.GMax), m.Tx.PatternExponent, m.Tx.BackLossDb);
                 }
 
                 double predictedRssi = txRefRssi + gainDb - 10 * pathLossExponent * Math.Log10(mapDistance);

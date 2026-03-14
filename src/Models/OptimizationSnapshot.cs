@@ -39,7 +39,7 @@ public class OptNode
     public bool HasDirectionalAntenna { get; set; }
     public double GMax { get; set; } = 1.0;
     public double PatternExponent { get; set; } = 2.0;
-    public double BackLossDb { get; set; } = 30.0;
+    public double BackLossDb { get; set; } = 15.0;
     public double AzimuthRad { get; set; }
     public double ElevationRad { get; set; }
 }
