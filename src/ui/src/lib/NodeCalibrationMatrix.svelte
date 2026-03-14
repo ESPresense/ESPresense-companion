@@ -149,6 +149,7 @@
 							<th class="text-right" style="color: oklch(1 0 none);">Elevation</th>
 							<th class="text-right" style="color: oklch(1 0 none);">Absorption</th>
 							<th class="text-right" style="color: oklch(1 0 none);">Rx Adj RSSI</th>
+							<th class="text-right" style="color: oklch(1 0 none);">Tx Ref RSSI</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -160,6 +161,7 @@
 								<td class="text-right tabular-nums">{node.elevation != null ? node.elevation.toFixed(1) + '°' : '-'}</td>
 								<td class="text-right tabular-nums">{node.absorption != null ? node.absorption.toFixed(2) : '-'}</td>
 								<td class="text-right tabular-nums">{node.rxAdjRssi != null ? node.rxAdjRssi.toFixed(0) : '-'}</td>
+								<td class="text-right tabular-nums">{node.txRefRssi != null ? node.txRefRssi.toFixed(0) : '-'}</td>
 							</tr>
 						{/each}
 					</tbody>

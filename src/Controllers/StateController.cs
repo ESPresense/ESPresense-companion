@@ -198,6 +198,7 @@ public class StateController : ControllerBase
                 Elevation = ns.Calibration.Elevation,
                 Absorption = ns.Calibration.Absorption,
                 RxAdjRssi = ns.Calibration.RxAdjRssi,
+                TxRefRssi = ns.Calibration.TxRefRssi,
             };
         }
 

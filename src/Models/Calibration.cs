@@ -17,4 +17,5 @@ public class NodeCalibrationSummary
     public double? Elevation { get; set; }
     public double? Absorption { get; set; }
     public double? RxAdjRssi { get; set; }
+    public double? TxRefRssi { get; set; }
 }
