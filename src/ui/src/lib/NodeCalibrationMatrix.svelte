@@ -78,6 +78,7 @@
 	}
 
 	let data_point: DataPoint = 0;
+	let nodeView: 'matrix' | 'settings' = 'matrix';
 
 	const toastStore = getToastStore();
 
@@ -142,7 +143,16 @@
 		</div>
 		{/if}
 
-		{#if $calibration?.nodes && Object.keys($calibration.nodes).length > 0}
+		<div class="flex bg-slate-600 rounded-full p-1 w-fit mb-4">
+			<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {nodeView === 'matrix' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (nodeView = 'matrix')}>
+				Matrix
+			</button>
+			<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {nodeView === 'settings' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (nodeView = 'settings')}>
+				Settings
+			</button>
+		</div>
+
+		{#if nodeView === 'settings' && $calibration?.nodes && Object.keys($calibration.nodes).length > 0}
 		<div class="card mb-4">
 			<header class="text-lg font-semibold mb-4">Node Settings</header>
 			<div class="overflow-x-auto">
@@ -174,7 +184,7 @@
 		</div>
 		{/if}
 
-		{#if $calibration?.matrix}
+		{#if nodeView === 'matrix' && $calibration?.matrix}
 		<div class="card">
 			<header class="text-lg font-semibold mb-4">Node Calibration</header>
 			<div class="space-y-4">
