@@ -82,6 +82,8 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
                     penalty += 1000.0 * Math.Pow(optimization.RxAdjRssiMin - rxAdj, 2);
                 if (rxAdj > optimization.RxAdjRssiMax)
                     penalty += 1000.0 * Math.Pow(rxAdj - optimization.RxAdjRssiMax, 2);
+                // Penalize non-zero rxAdj to prevent it from absorbing antenna gain
+                penalty += 0.1 * rxAdj * rxAdj;
             }
 
             foreach (var nodeId in directionalNodeIds)
@@ -207,8 +209,9 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
                 if (azDeg < 0) azDeg += 360.0;
 
                 var n = results.Nodes.GetOrAdd(nodeId);
-                n.Azimuth = azDeg;
-                n.Elevation = elRad * 180.0 / Math.PI;
+                // Quantize angles to 15° steps
+                n.Azimuth = Math.Round(azDeg / 15.0) * 15.0 % 360.0;
+                n.Elevation = Math.Round(elRad * 180.0 / Math.PI / 15.0) * 15.0;
                 n.Error = result.FunctionInfoAtMinimum.Value;
                 if (n.Absorption == null)
                     n.Absorption = absorption;
