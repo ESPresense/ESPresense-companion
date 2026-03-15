@@ -25,9 +25,8 @@ public class DistanceCalculator
     {
         var ns = _nodeSettings.Get(nodeId);
         double absorption = ns.Calibration?.Absorption ?? 3.0;
-        double rxAdj = ns.Calibration?.RxAdjRssi ?? 0;
 
-        return ComputeDistance(rssi, refRssi, absorption, rxAdj, 0.0);
+        return ComputeDistance(rssi, refRssi, absorption, 0.0);
     }
 
     /// <summary>
@@ -39,8 +38,6 @@ public class DistanceCalculator
         var rxNs = _nodeSettings.Get(rxNode.Id);
         var txNs = _nodeSettings.Get(txNode.Id);
         double absorption = rxNs.Calibration?.Absorption ?? 3.0;
-        double rxAdj = rxNs.Calibration?.RxAdjRssi ?? 0;
-        double txRef = txNs.Calibration?.TxRefRssi ?? refRssi;
 
         // Compute antenna gain for both nodes
         double gainDb = 0.0;
@@ -54,13 +51,18 @@ public class DistanceCalculator
             gainDb += ComputeNodeGain(txNode, txNs, -dx, -dy, -dz);
         }
 
-        return ComputeDistance(rssi, txRef, absorption, rxAdj, gainDb);
+        return ComputeDistance(rssi, refRssi, absorption, gainDb);
     }
 
-    private static double ComputeDistance(double rssi, double refRssi, double absorption, double rxAdj, double gainDb)
+    /// <summary>
+    /// Distance from RSSI using log-distance path loss model.
+    /// rxAdj/txRef are NOT included — those are RSSI-domain corrections
+    /// used by the optimizer, not the distance formula.
+    /// </summary>
+    private static double ComputeDistance(double rssi, double refRssi, double absorption, double gainDb)
     {
         if (absorption == 0.0) absorption = 3.0;
-        double dist = Math.Pow(10.0, (-59.0 + rxAdj + gainDb + refRssi - rssi) / (10.0 * absorption));
+        double dist = Math.Pow(10.0, (refRssi + gainDb - rssi) / (10.0 * absorption));
         return double.IsNaN(dist) || double.IsInfinity(dist) ? 0.0 : dist;
     }
 
