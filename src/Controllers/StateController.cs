@@ -395,9 +395,11 @@ public class StateController : ControllerBase
             foreach (var node in _state.Nodes.Values)
             {
                 var nodeSettings = _nsd.Get(node.Id);
-                nodeSettings.Calibration.TxRefRssi = 0;
-                nodeSettings.Calibration.RxAdjRssi = 0;
-                nodeSettings.Calibration.Absorption = 0;
+                nodeSettings.Calibration.TxRefRssi = null;
+                nodeSettings.Calibration.RxAdjRssi = null;
+                nodeSettings.Calibration.Absorption = null;
+                nodeSettings.Calibration.Azimuth = null;
+                nodeSettings.Calibration.Elevation = null;
                 await _nsd.Set(node.Id, nodeSettings);
             }
 
