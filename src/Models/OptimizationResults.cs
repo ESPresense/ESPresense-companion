@@ -30,7 +30,7 @@ public class OptimizationResults
                 double mapDistance = m.Rx.Location.DistanceTo(m.Tx.Location);
 
                 double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
-                double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;
+                double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? m.RefRssi;
                 double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
 
                 // Apply antenna gain correction for both Rx and Tx directional antennas.
