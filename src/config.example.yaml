@@ -275,11 +275,6 @@ antennas:
     pattern_exponent: 0.2
     back_loss: 2
 
-  switchbot_cramped:
-    # SwitchBot Plug Mini (W1901400) — ultra-tiny PCB
-    g_max_db: -0.63
-    pattern_exponent: 0.35
-    back_loss: 18
 
 # Locations of espresense nodes in meters
 nodes:

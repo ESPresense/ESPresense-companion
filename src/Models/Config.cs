@@ -333,7 +333,6 @@ namespace ESPresense.Models
             ["3d_pifa"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 0.03, BackLoss = 5.5 },
             ["3d_pifa_pro"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 0.03, BackLoss = 5.5 },
             ["external_dipole"] = new ConfigAntenna { GMaxDb = 4.0, PatternExponent = 0.2, BackLoss = 2 },
-            ["switchbot_cramped"] = new ConfigAntenna { GMaxDb = -0.63, PatternExponent = 0.35, BackLoss = 18 },
         };
     }
 
