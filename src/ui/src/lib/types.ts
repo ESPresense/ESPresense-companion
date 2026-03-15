@@ -225,8 +225,18 @@ export interface OptimizerState {
 	bestR?: number;
 }
 
+export interface NodeCalibration {
+	antenna?: string;
+	azimuth?: number;
+	elevation?: number;
+	absorption?: number;
+	rxAdjRssi?: number;
+	txRefRssi?: number;
+}
+
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
+	nodes?: Record<string, NodeCalibration>;
 	rmse?: number;
 	r?: number;
 	optimizerState?: OptimizerState;
