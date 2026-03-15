@@ -69,6 +69,7 @@ builder.Services.AddSingleton<DeviceTracker>();
 builder.Services.AddSingleton<SupervisorConfigLoader>();
 builder.Services.AddSingleton<DeviceHistoryStore>();
 builder.Services.AddSingleton<DeviceSettingsStore>();
+builder.Services.AddSingleton(sp => new Lazy<DeviceSettingsStore>(() => sp.GetRequiredService<DeviceSettingsStore>()));
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();
@@ -111,8 +112,13 @@ app.UseWebSockets(new WebSocketOptions
 
 app.UseSerilogRequestLogging(o =>
 {
-    o.EnrichDiagnosticContext = (dc, ctx) => dc.Set("UserAgent", ctx?.Request.Headers.UserAgent);
-    o.GetLevel = (ctx, ms, ex) => ex != null ? LogEventLevel.Error : ctx.Response.StatusCode > 499 ? LogEventLevel.Error : ms > 500 ? LogEventLevel.Warning : ctx.Request.Path.Value.IndexOf("/state", StringComparison.OrdinalIgnoreCase) > 0 ? LogEventLevel.Verbose : LogEventLevel.Debug;
+    o.EnrichDiagnosticContext = (dc, ctx) => dc.Set("UserAgent", ctx?.Request?.Headers?.UserAgent.ToString() ?? string.Empty);
+    o.GetLevel = (ctx, ms, ex) =>
+        ex != null ? LogEventLevel.Error :
+        (ctx?.Response?.StatusCode ?? 0) > 499 ? LogEventLevel.Error :
+        ms > 500 ? LogEventLevel.Warning :
+        (ctx?.Request?.Path.Value ?? string.Empty).IndexOf("/state", StringComparison.OrdinalIgnoreCase) > 0 ? LogEventLevel.Verbose :
+        LogEventLevel.Debug;
 });
 
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");

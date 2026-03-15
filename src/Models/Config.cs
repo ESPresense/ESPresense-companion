@@ -47,6 +47,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "floors")]
         public ConfigFloor[] Floors { get; set; } = Array.Empty<ConfigFloor>();
 
+        [YamlMember(Alias = "antennas")]
+        public Dictionary<string, ConfigAntenna>? Antennas { get; set; }
+
         [YamlMember(Alias = "nodes")]
         public ConfigNode[] Nodes { get; set; } = Array.Empty<ConfigNode>();
 
@@ -55,6 +58,25 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "exclude_devices")]
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
+    }
+
+    public partial class Config
+    {
+        /// <summary>
+        /// Resolves an antenna profile by name (user antennas → built-ins).
+        /// Returns null when no antenna is configured (isotropic).
+        /// </summary>
+        public ConfigAntenna? ResolveAntenna(string? profileName)
+        {
+            if (profileName == null) return null;
+
+            if (Antennas != null && Antennas.TryGetValue(profileName, out var userAnt))
+                return userAnt;
+            if (ConfigAntenna.BuiltInAntennas.TryGetValue(profileName, out var builtIn))
+                return builtIn;
+
+            return null;
+        }
     }
 
     public partial class ConfigLocators
@@ -291,6 +313,30 @@ namespace ESPresense.Models
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
+    public partial class ConfigAntenna
+    {
+        [YamlMember(Alias = "g_max_db")]
+        public double GMaxDb { get; set; }
+
+        [YamlMember(Alias = "pattern_exponent")]
+        public double PatternExponent { get; set; } = 2.0;
+
+        [YamlMember(Alias = "back_loss")]
+        public double BackLoss { get; set; } = 15.0;
+
+        public ConfigAntenna Clone() => (ConfigAntenna)MemberwiseClone();
+
+        public static readonly Dictionary<string, ConfigAntenna> BuiltInAntennas = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["pcb_ifa"] = new ConfigAntenna { GMaxDb = 3.4, PatternExponent = 2.4, BackLoss = 15 },
+            ["dev_board"] = new ConfigAntenna { GMaxDb = 2.5, PatternExponent = 2.0, BackLoss = 12 },
+            ["3d_pifa"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 1.2, BackLoss = 6 },
+            ["3d_pifa_pro"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 1.0, BackLoss = 5 },
+            ["external_dipole"] = new ConfigAntenna { GMaxDb = 4.0, PatternExponent = 1.5, BackLoss = 3 },
+            ["switchbot_cramped"] = new ConfigAntenna { GMaxDb = -0.63, PatternExponent = 2.8, BackLoss = 18 },
+        };
+    }
+
     public partial class ConfigNode
     {
         [YamlMember(Alias = "name")]
@@ -310,6 +356,9 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "stationary")]
         public bool Stationary { get; set; } = true;
+
+        [YamlMember(Alias = "antenna")]
+        public string? Antenna { get; set; }
 
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }

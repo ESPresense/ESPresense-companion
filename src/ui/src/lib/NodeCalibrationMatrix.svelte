@@ -7,11 +7,7 @@
 
 	enum DataPoint {
 		ErrorPercent = 0,
-		ErrorMeters = 1,
-		Absorption = 2,
-		RxRssiAdj = 3,
-		TxRssiRef = 4,
-		VarianceMeters = 5
+		ErrorMeters = 1
 	}
 
 	function coloring(percent: number | null): string {
@@ -30,28 +26,17 @@
 	}
 
 	function value(n1: any, data_point: number) {
+		if (!n1) return null;
 		if (data_point === DataPoint.ErrorPercent) {
-			return n1 ? Number(Math.round(n1.percent * 100)) + '%' : null;
-		} else if (data_point >= 1 && data_point <= 5) {
-			let num;
-			switch (data_point) {
-				case DataPoint.ErrorMeters:
-					num = n1?.diff;
-					break;
-				case DataPoint.Absorption:
-					num = n1?.absorption;
-					break;
-				case DataPoint.RxRssiAdj:
-					num = n1?.rx_adj_rssi;
-					break;
-				case DataPoint.TxRssiRef:
-					num = n1?.tx_ref_rssi;
-					break;
-				case DataPoint.VarianceMeters:
-					num = n1?.var;
-					break;
+			return Number(Math.round(n1.percent * 100)) + '%';
+		} else {
+			const diff = n1?.diff;
+			if (diff == null) return 'n/a';
+			const base = diff.toFixed(1);
+			if (n1?.var != null) {
+				return `${base}\u00A0\u00B1${Math.sqrt(n1.var).toFixed(1)}`;
 			}
-			return num !== null && num !== undefined ? Number(num.toPrecision(3)) : 'n/a';
+			return base;
 		}
 	}
 
@@ -78,6 +63,7 @@
 	}
 
 	let data_point: DataPoint = 0;
+	let nodeView: 'matrix' | 'settings' = 'matrix';
 
 	const toastStore = getToastStore();
 
@@ -142,7 +128,49 @@
 		</div>
 		{/if}
 
-		{#if $calibration?.matrix}
+		<div class="flex justify-center mb-4"><div class="flex bg-slate-600 rounded-full p-1">
+			<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {nodeView === 'matrix' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (nodeView = 'matrix')}>
+				Matrix
+			</button>
+			<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {nodeView === 'settings' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (nodeView = 'settings')}>
+				Settings
+			</button>
+		</div></div>
+
+		{#if nodeView === 'settings' && $calibration?.nodes && Object.keys($calibration.nodes).length > 0}
+		<div class="card mb-4">
+			<div class="overflow-x-auto">
+				<table class="table table-compact">
+					<thead>
+						<tr>
+							<th class="text-left" style="color: oklch(1 0 none);">Node</th>
+							<th class="text-left" style="color: oklch(1 0 none);">Antenna</th>
+							<th class="text-right" style="color: oklch(1 0 none);">Azimuth</th>
+							<th class="text-right" style="color: oklch(1 0 none);">Elevation</th>
+							<th class="text-right" style="color: oklch(1 0 none);">Absorption</th>
+							<th class="text-right" style="color: oklch(1 0 none);">Rx Adj RSSI</th>
+							<th class="text-right" style="color: oklch(1 0 none);">Tx Ref RSSI</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each Object.entries($calibration.nodes).sort((a, b) => a[0].localeCompare(b[0])) as [name, node] (name)}
+							<tr>
+								<td class="font-medium">{name}</td>
+								<td class="text-left">{#if node.antenna}<span class="badge preset-filled-surface-500 text-xs">{node.antenna}</span>{:else}<span class="text-surface-400">-</span>{/if}</td>
+								<td class="text-right tabular-nums">{node.azimuth != null ? node.azimuth.toFixed(1) + '°' : '-'}</td>
+								<td class="text-right tabular-nums">{node.elevation != null ? node.elevation.toFixed(1) + '°' : '-'}</td>
+								<td class="text-right tabular-nums">{node.absorption != null ? node.absorption.toFixed(2) : '-'}</td>
+								<td class="text-right tabular-nums">{node.rxAdjRssi != null ? node.rxAdjRssi.toFixed(0) : '-'}</td>
+								<td class="text-right tabular-nums">{node.txRefRssi != null ? node.txRefRssi.toFixed(0) : '-'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+		{/if}
+
+		{#if nodeView === 'matrix' && $calibration?.matrix}
 		<div class="card">
 			<header class="text-lg font-semibold mb-4">Node Calibration</header>
 			<div class="space-y-4">
@@ -151,10 +179,6 @@
 						<div class="flex flex-wrap items-center gap-2">
 							<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 0)}>Error %</button>
 							<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 1)}>Error (m)</button>
-							<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 2)}>Absorption</button>
-							<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
-							<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
-							<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
 						</div>
 						<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
 					</div>
@@ -176,7 +200,12 @@
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}
-										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'}
+										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? [
+										`Map: ${Number(n1[id2].mapDistance?.toPrecision(3))}m  Measured: ${Number(n1[id2]?.distance?.toPrecision(3))}m`,
+										`Error: ${n1[id2]?.diff?.toFixed(1)}m${n1[id2]?.var != null ? ' \u00A0\u00B1' + Math.sqrt(n1[id2].var).toFixed(1) + 'm' : ''} (${Math.round(n1[id2].percent * 100)}%)`,
+										$calibration?.nodes?.[id1]?.antenna ? `Tx: ${$calibration.nodes[id1].antenna}` : '',
+										$calibration?.nodes?.[id2]?.antenna ? `Rx: ${$calibration.nodes[id2].antenna}` : ''
+									].filter(Boolean).join('\n') : 'No beacon received in last 30 seconds'}
 											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
 										>
 									{/each}

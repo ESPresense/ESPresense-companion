@@ -97,6 +97,33 @@ namespace ESPresense.Services
 
             if (ds.Calibration.RxRefRssi != null && ds.Calibration.RxRefRssi != old.Calibration.RxRefRssi)
                 await mqtt.UpdateSetting(id, "ref_rssi", ds.Calibration.RxRefRssi, retain, old.Calibration.RxRefRssi);
+
+            // Azimuth and elevation are companion-only settings (not handled by ESPresense firmware),
+            // so we update the in-memory store directly instead of relying on MQTT round-trip.
+            bool storeUpdated = false;
+            if (ds.Calibration.Azimuth != null && ds.Calibration.Azimuth != old.Calibration.Azimuth)
+            {
+                storeUpdated = true;
+                logger.LogInformation("Updating {NodeId} azimuth: {OldValue} -> {NewValue}", id,
+                    old.Calibration.Azimuth?.ToString("0.0") ?? "(empty)", ds.Calibration.Azimuth.Value.ToString("0.0"));
+            }
+
+            if (ds.Calibration.Elevation != null && ds.Calibration.Elevation != old.Calibration.Elevation)
+            {
+                storeUpdated = true;
+                logger.LogInformation("Updating {NodeId} elevation: {OldValue} -> {NewValue}", id,
+                    old.Calibration.Elevation?.ToString("0.0") ?? "(empty)", ds.Calibration.Elevation.Value.ToString("0.0"));
+            }
+
+            if (storeUpdated)
+            {
+                _storeById.AddOrUpdate(id, _ => ds, (_, existing) =>
+                {
+                    if (ds.Calibration.Azimuth != null) existing.Calibration.Azimuth = ds.Calibration.Azimuth;
+                    if (ds.Calibration.Elevation != null) existing.Calibration.Elevation = ds.Calibration.Elevation;
+                    return existing;
+                });
+            }
         }
 
         /// <summary>
@@ -173,6 +200,12 @@ namespace ESPresense.Services
                             break;
                         case "ref_rssi":
                             ns.Calibration.RxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                            break;
+                        case "azimuth":
+                            ns.Calibration.Azimuth = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                            break;
+                        case "elevation":
+                            ns.Calibration.Elevation = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
                             break;
 
                         default:
