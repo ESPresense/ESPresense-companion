@@ -13,6 +13,7 @@ namespace ESPresense.Optimizers;
 
 public class CombinedOptimizer : IOptimizer
 {
+    private const double BaseTxRefRssi = -59.0;
     private readonly State _state;
 
     public CombinedOptimizer(State state)
@@ -37,7 +38,7 @@ public class CombinedOptimizer : IOptimizer
             if (optimization == null) return results;
 
             // Step 1: Optimize RxAdjRssi and path-specific absorptions
-            var (rxAdjRssiDict, pathAbsorptionDict, _) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
+            var (rxAdjRssiDict, pathAbsorptionDict, txRefRssiDict, _) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
 
             // Step 2: Optimize node-specific absorptions and antenna pointing (sinAz/cosAz/sinEl) while keeping RxAdjRssi constant
             var (nodeAbsorptions, nodeAzimuths, nodeElevations, nodeError) = OptimizeNodeAbsorptions(allNodes, uniqueDeviceIds, rxAdjRssiDict, pathAbsorptionDict, optimization, existingSettings);
@@ -54,6 +55,7 @@ public class CombinedOptimizer : IOptimizer
                         Absorption = absorption,
                         Error = nodeError
                     };
+                    if (txRefRssiDict.TryGetValue(deviceId, out var txRefRssi)) proposed.TxRefRssi = txRefRssi;
                     if (nodeAzimuths.TryGetValue(deviceId, out var az)) proposed.Azimuth = az;
                     if (nodeElevations.TryGetValue(deviceId, out var el)) proposed.Elevation = el;
                     results.Nodes[deviceId] = proposed;
@@ -68,7 +70,7 @@ public class CombinedOptimizer : IOptimizer
         return results;
     }
 
-    private (Dictionary<string, double> RxAdjRssi, Dictionary<(string, string), double> PathAbsorption, double Error)
+    private (Dictionary<string, double> RxAdjRssi, Dictionary<(string, string), double> PathAbsorption, Dictionary<string, double> TxRefRssi, double Error)
         OptimizeRxAdjRssiAndPathAbsorption(List<Measure> allNodes, List<string> uniqueDeviceIds, ConfigOptimization optimization, Dictionary<string, NodeSettings> existingSettings)
     {
         var pathPairs = new HashSet<(string, string)>(allNodes.Select(n => (Min(n.Rx.Id, n.Tx.Id), Max(n.Rx.Id, n.Tx.Id))));
@@ -132,7 +134,9 @@ public class CombinedOptimizer : IOptimizer
             pathAbsorptionDict[pair] = result.MinimizingPoint[pathOffset++];
         }
 
-        return (rxAdjRssiDict, pathAbsorptionDict, result.FunctionInfoAtMinimum.Value);
+        var txRefRssiDict = rxAdjRssiDict.ToDictionary(kvp => kvp.Key, kvp => BaseTxRefRssi + kvp.Value);
+
+        return (rxAdjRssiDict, pathAbsorptionDict, txRefRssiDict, result.FunctionInfoAtMinimum.Value);
     }
 
     private (NodeAbsorptionMap Absorptions, NodeAzimuthMap Azimuths, NodeElevationMap Elevations, double Error) OptimizeNodeAbsorptions(List<Measure> allNodes, List<string> uniqueDeviceIds,
@@ -341,7 +345,7 @@ public class CombinedOptimizer : IOptimizer
                 throw new ArgumentException("Either nodeAbsorptionDict or pathAbsorptionDict must be provided");
             }
 
-            var calculatedDistance = Math.Pow(10, (-59 + rxAdjRssi + txAdjRssi - n.Rssi) / (10.0d * absorption));
+            var calculatedDistance = Math.Pow(10, (BaseTxRefRssi + rxAdjRssi + txAdjRssi - n.Rssi) / (10.0d * absorption));
             return Math.Pow(distance - calculatedDistance, 2);
         }).Average();
     }
@@ -362,7 +366,7 @@ public class CombinedOptimizer : IOptimizer
             if (n.Tx.IsNode && n.Tx.HasDirectionalAntenna && dirDict.TryGetValue(n.Tx.Id, out var txDir))
                 gainDb += ComputeGainDb(n.Tx, n.Rx, txDir.azRad, txDir.elRad);
 
-            var calculatedDistance = Math.Pow(10, (-59 + rxAdjRssi + gainDb + txAdjRssi - n.Rssi) / (10.0d * absorption));
+            var calculatedDistance = Math.Pow(10, (BaseTxRefRssi + rxAdjRssi + gainDb + txAdjRssi - n.Rssi) / (10.0d * absorption));
             return Math.Pow(distance - calculatedDistance, 2);
         }).Average();
     }

@@ -192,6 +192,34 @@ public class CombinedOptimizerTests
     }
 
     [Test]
+    public void Optimize_PersistsTxRefRssiFromCombinedFit()
+    {
+        var nodeA = MakeNode("node_a", 0, 0, 0, isNode: true, gMaxDb: 5.0);
+        var nodeB = MakeNode("node_b", 5, 0, 0, isNode: true, gMaxDb: 5.0);
+        var nodeC = MakeNode("node_c", 5, 5, 0, isNode: true, gMaxDb: null);
+        var nodeD = MakeNode("node_d", 0, 5, 0, isNode: true, gMaxDb: null);
+
+        var os = new OptimizationSnapshot();
+        os.Measures.Add(MakeMeasure(nodeA, nodeB));
+        os.Measures.Add(MakeMeasure(nodeB, nodeA));
+        os.Measures.Add(MakeMeasure(nodeB, nodeC));
+        os.Measures.Add(MakeMeasure(nodeC, nodeB));
+        os.Measures.Add(MakeMeasure(nodeC, nodeD));
+        os.Measures.Add(MakeMeasure(nodeD, nodeC));
+        os.Measures.Add(MakeMeasure(nodeD, nodeA));
+        os.Measures.Add(MakeMeasure(nodeA, nodeD));
+
+        var optimizer = new CombinedOptimizer(_state);
+        var results = optimizer.Optimize(os, new Dictionary<string, NodeSettings>());
+
+        foreach (var (id, proposed) in results.Nodes)
+        {
+            Assert.That(proposed.TxRefRssi, Is.Not.Null, $"Node {id} should emit a TxRef proposal");
+            Assert.That(proposed.TxRefRssi, Is.InRange(-64.0, -54.0), $"Node {id} TxRefRssi should stay near the modeled baseline");
+        }
+    }
+
+    [Test]
     public void Optimize_InsufficientMeasurements_ReturnsEmptyResults()
     {
         // Arrange: only 2 measures (below the minimum of 3)
