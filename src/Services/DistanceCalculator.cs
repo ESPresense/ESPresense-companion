@@ -18,18 +18,6 @@ public class DistanceCalculator
     }
 
     /// <summary>
-    /// Compute distance from RSSI for a device-to-node measurement.
-    /// No directional gain applied (device position unknown at message time).
-    /// </summary>
-    public double ComputeDeviceDistance(string nodeId, double rssi, double refRssi)
-    {
-        var ns = _nodeSettings.Get(nodeId);
-        double absorption = ns.Calibration?.Absorption ?? 3.0;
-
-        return ComputeDistance(rssi, refRssi, absorption, 0.0);
-    }
-
-    /// <summary>
     /// Compute distance from RSSI for a node-to-node measurement.
     /// Applies antenna gain correction for both Tx and Rx nodes if configured.
     /// </summary>

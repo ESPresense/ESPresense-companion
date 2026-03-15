@@ -83,15 +83,16 @@ public class DeviceToNode(Device device, Node node)
 
     public bool Current => DateTime.UtcNow - LastHit < Device!.Timeout;
 
-    public bool ReadMessage(DeviceMessage payload, double computedDistance)
+    public bool ReadMessage(DeviceMessage payload)
     {
         Rssi = payload.Rssi;
         RssiVar = payload.RssiVar;
         RefRssi = payload.RefRssi;
         NewName(payload.Name);
-        var moved = Math.Abs(LastDistance - computedDistance) > 0.25;
-        if (moved) LastDistance = computedDistance;
-        _payloadDistance = computedDistance;
+        // Use firmware distance only for movement detection
+        var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;
+        if (moved) LastDistance = payload.Distance;
+        _payloadDistance = payload.Distance;
         DistVar = payload.DistVar;
         LastHit = DateTime.UtcNow;
         Hits++;

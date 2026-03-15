@@ -109,8 +109,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                         return d;
                     });
                     tele.UpdateDevicesCount(state.Devices.Count);
-                    var devDist = distanceCalculator.ComputeDeviceDistance(arg.NodeId, arg.Payload.Rssi, arg.Payload.RefRssi);
-                    var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload, devDist);
+                    var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
                     if (moved) tele.IncrementMoved();
                     await _toProcessChannel.Writer.WriteAsync(device, stoppingToken);
                 }
