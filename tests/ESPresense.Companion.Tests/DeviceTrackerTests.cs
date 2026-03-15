@@ -41,7 +41,8 @@ public class DeviceTrackerTests
         var state = new State(configLoader, nodeTelemetryStore, mockNss.Object, lazyDss);
         deviceSettingsStore = new DeviceSettingsStore(mqtt, state);
 
-        var locator = new DeviceTracker(state, mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher(), deviceSettingsStore);
+        var distCalc = new DistanceCalculator(mockNss.Object, state);
+        var locator = new DeviceTracker(state, mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher(), deviceSettingsStore, distCalc);
         // Use testData to test locator...
         // Assert.That(result, Is.EqualTo(expectedResult));
     }

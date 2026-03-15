@@ -48,12 +48,14 @@ public class DeviceTrackerAnchorRestoreTests
         _telemetryService = new TelemetryService(_mockMqttCoordinator.Object);
         _eventDispatcher = new GlobalEventDispatcher();
 
+        var distCalc = new DistanceCalculator(mockNss.Object, _state);
         _deviceTracker = new DeviceTracker(
             _state,
             _mockMqttCoordinator.Object,
             _telemetryService,
             _eventDispatcher,
-            _mockDeviceSettingsStore.Object);
+            _mockDeviceSettingsStore.Object,
+            distCalc);
     }
 
     [TearDown]

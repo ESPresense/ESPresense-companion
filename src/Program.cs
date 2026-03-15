@@ -65,6 +65,7 @@ builder.Services.AddSingleton<MqttCoordinator>();
 builder.Services.AddSingleton<IMqttCoordinator>(provider => provider.GetRequiredService<MqttCoordinator>());
 builder.Services.AddSingleton<TelemetryService>();
 builder.Services.AddSingleton<GlobalEventDispatcher>();
+builder.Services.AddSingleton<DistanceCalculator>();
 builder.Services.AddSingleton<DeviceTracker>();
 builder.Services.AddSingleton<SupervisorConfigLoader>();
 builder.Services.AddSingleton<DeviceHistoryStore>();
