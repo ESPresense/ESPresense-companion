@@ -328,12 +328,12 @@ namespace ESPresense.Models
 
         public static readonly Dictionary<string, ConfigAntenna> BuiltInAntennas = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["pcb_ifa"] = new ConfigAntenna { GMaxDb = 3.4, PatternExponent = 2.4, BackLoss = 15 },
-            ["dev_board"] = new ConfigAntenna { GMaxDb = 2.5, PatternExponent = 2.0, BackLoss = 12 },
-            ["3d_pifa"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 1.2, BackLoss = 6 },
-            ["3d_pifa_pro"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 1.0, BackLoss = 5 },
-            ["external_dipole"] = new ConfigAntenna { GMaxDb = 4.0, PatternExponent = 1.5, BackLoss = 3 },
-            ["switchbot_cramped"] = new ConfigAntenna { GMaxDb = -0.63, PatternExponent = 2.8, BackLoss = 18 },
+            ["pcb_ifa"] = new ConfigAntenna { GMaxDb = 3.4, PatternExponent = 0.28, BackLoss = 14.3 },
+            ["dev_board"] = new ConfigAntenna { GMaxDb = 2.5, PatternExponent = 0.25, BackLoss = 12 },
+            ["3d_pifa"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 0.03, BackLoss = 5.5 },
+            ["3d_pifa_pro"] = new ConfigAntenna { GMaxDb = 2.0, PatternExponent = 0.03, BackLoss = 5.5 },
+            ["external_dipole"] = new ConfigAntenna { GMaxDb = 4.0, PatternExponent = 0.2, BackLoss = 2 },
+            ["switchbot_cramped"] = new ConfigAntenna { GMaxDb = -0.63, PatternExponent = 0.35, BackLoss = 18 },
         };
     }
 

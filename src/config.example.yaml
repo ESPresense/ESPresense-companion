@@ -248,37 +248,37 @@ antennas:
   pcb_ifa:
     # ESP-WROOM-32E module, clean custom boards
     g_max_db: 3.4
-    pattern_exponent: 2.4
-    back_loss: 15
+    pattern_exponent: 0.28
+    back_loss: 14.3
 
   dev_board:
     # ESP32 dev boards (DevKitC, NodeMCU, etc.)
     g_max_db: 2.5
-    pattern_exponent: 2.0
+    pattern_exponent: 0.25
     back_loss: 12
 
   3d_pifa:
     # M5Atom standard
     g_max_db: 2.0
-    pattern_exponent: 1.2
-    back_loss: 6
+    pattern_exponent: 0.03
+    back_loss: 5.5
 
   3d_pifa_pro:
     # M5Atom PRO-OB-440 (the "enhanced" one)
     g_max_db: 2.0
-    pattern_exponent: 1.0
-    back_loss: 5
+    pattern_exponent: 0.03
+    back_loss: 5.5
 
   external_dipole:
     # External 2.4 GHz dipole (rubber ducky style)
     g_max_db: 4.0
-    pattern_exponent: 1.5
-    back_loss: 3
+    pattern_exponent: 0.2
+    back_loss: 2
 
   switchbot_cramped:
     # SwitchBot Plug Mini (W1901400) — ultra-tiny PCB
     g_max_db: -0.63
-    pattern_exponent: 2.8
+    pattern_exponent: 0.35
     back_loss: 18
 
 # Locations of espresense nodes in meters
