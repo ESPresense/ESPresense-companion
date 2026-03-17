@@ -163,6 +163,8 @@
 	onMount(fetchAutoOptimizationState);
 </script>
 
+<!-- Retrigger CI on $(date) -->
+
 <div class="h-full overflow-y-auto">
 	<div class="w-full px-4 py-2">
 		<!-- Active Optimizers -->
