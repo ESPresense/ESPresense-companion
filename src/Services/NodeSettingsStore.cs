@@ -41,6 +41,7 @@ namespace ESPresense.Services
         {
             var retain = id == "*";
             var old = Get(id);
+            var safeId = id.Replace("\r", "").Replace("\n", "");
 
             if (ds.Name != null && ds.Name != old.Name)
                 await mqtt.UpdateSetting(id, "name", ds.Name, retain, old.Name);
@@ -104,14 +105,14 @@ namespace ESPresense.Services
             if (ds.Calibration.Azimuth != null && ds.Calibration.Azimuth != old.Calibration.Azimuth)
             {
                 storeUpdated = true;
-                logger.LogInformation("Updating {NodeId} azimuth: {OldValue} -> {NewValue}", id,
+                logger.LogInformation("Updating {NodeId} azimuth: {OldValue} -> {NewValue}", safeId,
                     old.Calibration.Azimuth?.ToString("0.0") ?? "(empty)", ds.Calibration.Azimuth.Value.ToString("0.0"));
             }
 
             if (ds.Calibration.Elevation != null && ds.Calibration.Elevation != old.Calibration.Elevation)
             {
                 storeUpdated = true;
-                logger.LogInformation("Updating {NodeId} elevation: {OldValue} -> {NewValue}", id,
+                logger.LogInformation("Updating {NodeId} elevation: {OldValue} -> {NewValue}", safeId,
                     old.Calibration.Elevation?.ToString("0.0") ?? "(empty)", ds.Calibration.Elevation.Value.ToString("0.0"));
             }
 
