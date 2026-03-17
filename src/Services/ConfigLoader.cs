@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using ESPresense.Models;
 using Serilog;
 using YamlDotNet.Serialization;
@@ -77,6 +78,36 @@ public class ConfigLoader : BackgroundService
         // Colors now handled in AssignRoomColors()
 
         return config;
+    }
+
+    private static readonly HashSet<string> ProtectedSections = new(StringComparer.OrdinalIgnoreCase) { "map" };
+
+    private readonly ISerializer _serializer = new SerializerBuilder()
+        .WithNamingConvention(UnderscoredNamingConvention.Instance)
+        .Build();
+
+    public async Task SaveSectionAsync(string sectionName, object value)
+    {
+        if (ProtectedSections.Contains(sectionName))
+            throw new InvalidOperationException($"Section '{sectionName}' cannot be saved via API");
+
+        var sectionYaml = _serializer.Serialize(
+            new Dictionary<string, object> { { sectionName, value } }
+        ).TrimEnd('\r', '\n');
+
+        var text = await File.ReadAllTextAsync(_configPath);
+
+        // Match from ^sectionName: through all indented/blank lines until next top-level key or EOF
+        var pattern = $@"^{Regex.Escape(sectionName)}:.*(\n([ \t]+.*)|\n\s*)*";
+        var match = Regex.Match(text, pattern, RegexOptions.Multiline);
+
+        string replaced;
+        if (match.Success)
+            replaced = text[..match.Index] + sectionYaml + text[(match.Index + match.Length)..];
+        else
+            replaced = text.TrimEnd() + "\n\n" + sectionYaml + "\n";
+
+        await File.WriteAllTextAsync(_configPath, replaced);
     }
 
     public event EventHandler<Config>? ConfigChanged;

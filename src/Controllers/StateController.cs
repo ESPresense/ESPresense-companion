@@ -8,6 +8,7 @@ using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
+using Serilog;
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
@@ -387,6 +388,32 @@ public class StateController : ControllerBase
         {
             _logger.LogError(ex, "Error resetting calibration");
             return StatusCode(500, new { error = "An error occurred while resetting calibration" });
+        }
+    }
+
+    [HttpGet("api/state/calibration/auto-optimize")]
+    public IActionResult GetAutoOptimize()
+    {
+        var c = _config.Config;
+        return Ok(new { autoOptimize = c?.Optimization.Enabled ?? false });
+    }
+
+    [HttpPost("api/state/calibration/auto-optimize")]
+    public async Task<IActionResult> ToggleAutoOptimize([FromBody] bool enable)
+    {
+        try
+        {
+            var c = _config.Config;
+            if (c == null) return StatusCode(500, new { error = "Config not loaded" });
+
+            c.Optimization.Enabled = enable;
+            await _config.SaveSectionAsync("optimization", c.Optimization);
+            return Ok(new { autoOptimize = enable });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to save auto-optimize setting");
+            return StatusCode(500, new { error = "Failed to save auto-optimize setting" });
         }
     }
 }
