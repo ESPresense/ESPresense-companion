@@ -16,15 +16,16 @@ namespace ESPresense.Models
                 Bounds = Bounds?.Select(b => b.ToArray()).ToArray(),
                 Timeout = Timeout,
                 AwayTimeout = AwayTimeout,
-                Gps = Gps.Clone(),
-                Map = Map.Clone(),
-                Floors = Floors.Select(f => f.Clone()).ToArray(),
-                Nodes = Nodes.Select(n => n.Clone()).ToArray(),
-                Devices = Devices.Select(d => d.Clone()).ToArray(),
-                ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
-                History = History.Clone(),
-                Locators = Locators.Clone(),
-                Optimization = Optimization.Clone()
+                Gps = Gps?.Clone(),
+                Map = Map?.Clone(),
+                Floors = Floors?.Select(f => f.Clone()).ToArray(),
+                Nodes = Nodes?.Select(n => n.Clone()).ToArray(),
+                Devices = Devices?.Select(d => d.Clone()).ToArray(),
+                ExcludeDevices = ExcludeDevices?.Select(d => d.Clone()).ToArray(),
+                History = History?.Clone(),
+                Locators = Locators?.Clone(),
+                Optimization = Optimization?.Clone(),
+                BayesianProbabilities = BayesianProbabilities?.Clone()
             };
         }
     }
@@ -35,12 +36,9 @@ namespace ESPresense.Models
         {
             return new ConfigLocators
             {
-                NadarayaWatson = NadarayaWatson.Clone(),
-                NelderMead = NelderMead.Clone(),
-                Bfgs = Bfgs.Clone(),
-                Mle = Mle.Clone(),
-                MultiFloor = MultiFloor.Clone(),
-                NearestNode = NearestNode.Clone()
+                NadarayaWatson = NadarayaWatson?.Clone(),
+                NelderMead = NelderMead?.Clone(),
+                NearestNode = NearestNode?.Clone()
             };
         }
     }
@@ -67,45 +65,7 @@ namespace ESPresense.Models
             {
                 Enabled = Enabled,
                 Floors = Floors?.ToArray(),
-                Weighting = Weighting.Clone()
-            };
-        }
-    }
-
-    public partial class BfgsConfig
-    {
-        public BfgsConfig Clone()
-        {
-            return new BfgsConfig
-            {
-                Enabled = Enabled,
-                Floors = Floors?.ToArray(),
-                Weighting = Weighting.Clone()
-            };
-        }
-    }
-
-    public partial class MleConfig
-    {
-        public MleConfig Clone()
-        {
-            return new MleConfig
-            {
-                Enabled = Enabled,
-                Floors = Floors?.ToArray(),
-                Weighting = Weighting.Clone()
-            };
-        }
-    }
-
-    public partial class MultiFloorConfig
-    {
-        public MultiFloorConfig Clone()
-        {
-            return new MultiFloorConfig
-            {
-                Enabled = Enabled,
-                Weighting = Weighting.Clone()
+                Weighting = Weighting?.Clone()
             };
         }
     }
@@ -153,6 +113,19 @@ namespace ESPresense.Models
                 IntervalSecs = IntervalSecs,
                 KeepSnapshotMins = KeepSnapshotMins,
                 Limits = new Dictionary<string, double>(Limits)
+            };
+        }
+    }
+
+    public partial class ConfigBayesianProbabilities
+    {
+        public ConfigBayesianProbabilities Clone()
+        {
+            return new ConfigBayesianProbabilities
+            {
+                Enabled = Enabled,
+                DiscoveryThreshold = DiscoveryThreshold,
+                Retain = Retain
             };
         }
     }
