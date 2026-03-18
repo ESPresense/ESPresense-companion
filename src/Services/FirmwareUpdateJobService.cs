@@ -43,12 +43,17 @@ public class FirmwareUpdateJobService
         return _jobs.TryGetValue(jobId, out var job) ? job : null;
     }
 
-    public bool IsTrustedFirmwareUrl(string url)
+    public bool IsTrustedFirmwareUrl(string? url)
     {
         if (string.IsNullOrWhiteSpace(url))
             return false;
 
-        return TrustedFirmwarePrefixes.Any(url.StartsWith);
+        return TrustedFirmwarePrefixes.Any(prefix => url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public bool IsValidNodeUpdateUrl(string? url)
+    {
+        return string.IsNullOrWhiteSpace(url) || IsTrustedFirmwareUrl(url);
     }
 
     public (FirmwareUpdateJob? Job, string? Error) Start(string nodeId, string url)
