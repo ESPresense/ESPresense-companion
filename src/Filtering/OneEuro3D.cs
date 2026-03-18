@@ -1,11 +1,13 @@
 using MathNet.Spatial.Euclidean;
 using System;
 
+namespace ESPresense.Filtering;
+
 public class OneEuroFilter3D
 {
-    private OneEuroFilter _filterX;
-    private OneEuroFilter _filterY;
-    private OneEuroFilter _filterZ;
+    private readonly OneEuroFilter _filterX;
+    private readonly OneEuroFilter _filterY;
+    private readonly OneEuroFilter _filterZ;
 
     public OneEuroFilter3D(double minCutoff = 1.0, double beta = 0.0, double dCutoff = 1.0)
     {
