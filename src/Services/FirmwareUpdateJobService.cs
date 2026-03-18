@@ -151,7 +151,6 @@ public class FirmwareUpdateJobService
         }
         finally
         {
-            job.CompletedAt = DateTime.UtcNow;
             _tokens.TryRemove(job.JobId, out var cts);
             cts?.Dispose();
             _activeJobByNode.TryRemove(job.NodeId, out _);
