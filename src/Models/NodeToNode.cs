@@ -18,15 +18,15 @@ public class NodeToNode(Node tx, Node rx)
     public double LastDistance { get; set; }
     public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(30);
 
-    public bool ReadMessage(DeviceMessage payload)
+    public bool ReadMessage(DeviceMessage payload, double computedDistance)
     {
         Rssi = payload.Rssi;
         RssiVar = payload.RssiVar;
         RefRssi = payload.RefRssi;
         DistVar = payload.DistVar;
-        var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;
-        if (moved) LastDistance = payload.Distance;
-        Distance = payload.Distance;
+        var moved = Math.Abs(LastDistance - computedDistance) > 0.25;
+        if (moved) LastDistance = computedDistance;
+        Distance = computedDistance;
         LastHit = DateTime.UtcNow;
         Hits++;
         return moved;

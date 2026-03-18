@@ -214,5 +214,42 @@ namespace ESPresense.Utils
         }
 
         private readonly record struct Block(int Start, int End, double Weight, double Value);
+
+        private const double GainEpsilon = 1e-3;
+
+        /// <summary>
+        /// Computes directional antenna gain in dB from a raw cosTheta value.
+        /// </summary>
+        /// <param name="cosTheta">Cosine of the angle between boresight and direction to target (signed).</param>
+        /// <param name="gMaxDb">Peak antenna gain in dBi.</param>
+        /// <param name="patternExponent">Exponent for the cos^n(θ) pattern.</param>
+        /// <param name="backLossDb">Additional attenuation in dB for back hemisphere.</param>
+        public static double ComputeGainDb(double cosTheta, double gMaxDb, double patternExponent, double backLossDb)
+        {
+            if (patternExponent == 0.0)
+                return gMaxDb;
+
+            if (cosTheta >= 0.0)
+                return gMaxDb + patternExponent * 10.0 * Math.Log10(Math.Max(cosTheta, GainEpsilon));
+            else
+                return gMaxDb + patternExponent * 10.0 * Math.Log10(Math.Max(Math.Abs(cosTheta), GainEpsilon)) - backLossDb;
+        }
+
+        /// <summary>
+        /// Computes directional antenna gain in dB given boresight direction and Rx→Tx vector.
+        /// Returns gMaxDb when the nodes are co-located or the antenna is isotropic.
+        /// </summary>
+        public static double ComputeGainDb(
+            double boresightX, double boresightY, double boresightZ,
+            double dx, double dy, double dz,
+            double gMaxDb, double patternExponent, double backLossDb)
+        {
+            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            if (len < 1e-9 || patternExponent == 0.0)
+                return gMaxDb;
+
+            double cosTheta = (boresightX * dx + boresightY * dy + boresightZ * dz) / len;
+            return ComputeGainDb(cosTheta, gMaxDb, patternExponent, backLossDb);
+        }
     }
 }

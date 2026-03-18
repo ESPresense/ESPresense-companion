@@ -29,15 +29,15 @@ public class RxNode
     /// <returns>
     /// True if the absolute difference between the last recorded distance and the new distance exceeds 0.25 units; otherwise, false.
     /// </returns>
-    public bool ReadMessage(DeviceMessage payload)
+    public bool ReadMessage(DeviceMessage payload, double computedDistance)
     {
         Rssi = payload.Rssi;
         RssiRxAdj = payload.RssiRxAdj;
         RssiVar = payload.RssiVar;
         RefRssi = payload.RefRssi;
-        var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;
-        if (moved) LastDistance = payload.Distance;
-        Distance = payload.Distance;
+        var moved = Math.Abs(LastDistance - computedDistance) > 0.25;
+        if (moved) LastDistance = computedDistance;
+        Distance = computedDistance;
         DistVar = payload.DistVar;
         LastHit = DateTime.UtcNow;
         Hits++;

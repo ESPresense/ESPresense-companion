@@ -5,7 +5,7 @@ using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore) : BackgroundService
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore, DistanceCalculator distanceCalculator) : BackgroundService
 {
     private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
     private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
@@ -85,11 +85,12 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
 
             if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
             {
-                rx.Nodes.GetOrAdd(tx.Id, f => new NodeToNode(tx, rx)).ReadMessage(arg.Payload);
+                var nodeDist = distanceCalculator.ComputeNodeDistance(tx, rx, arg.Payload.Rssi, arg.Payload.RefRssi);
+                rx.Nodes.GetOrAdd(tx.Id, f => new NodeToNode(tx, rx)).ReadMessage(arg.Payload, nodeDist);
                 if (tx is { HasLocation: true, Stationary: true })
                 {
                     if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
-                        tx.RxNodes.GetOrAdd(arg.NodeId, f => new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
+                        tx.RxNodes.GetOrAdd(arg.NodeId, f => new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload, nodeDist);
                 }
                 else isNode = false; // if transmitter is not stationary, treat it as a device
             }

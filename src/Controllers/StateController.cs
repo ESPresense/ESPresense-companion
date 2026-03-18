@@ -131,6 +131,8 @@ public class StateController : ControllerBase
                 if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
                 if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
                 if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
+                if (rxNs.Calibration.Azimuth is not null) rxM["azimuth"] = rxNs.Calibration.Azimuth.Value;
+                if (rxNs.Calibration.Elevation is not null) rxM["elevation"] = rxNs.Calibration.Elevation.Value;
                 rxM["mapDistance"] = rx.MapDistance;
                 rxM["distance"] = rx.Distance;
                 rxM["rssi"] = rx.Rssi;
@@ -162,6 +164,8 @@ public class StateController : ControllerBase
                 // Anchored devices don't have tx calibration settings, but receivers still have their settings
                 if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
                 if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
+                if (rxNs.Calibration.Azimuth is not null) rxM["azimuth"] = rxNs.Calibration.Azimuth.Value;
+                if (rxNs.Calibration.Elevation is not null) rxM["elevation"] = rxNs.Calibration.Elevation.Value;
 
                 // Calculate map distance from anchor to receiver
                 var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);
@@ -182,6 +186,22 @@ public class StateController : ControllerBase
 
         c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
         c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
+
+        // Populate per-node calibration summary (antenna, azimuth, elevation, etc.)
+        foreach (var (nodeId, node) in _state.Nodes)
+        {
+            var ns = _nsd.Get(nodeId);
+            c.Nodes[node.Name ?? nodeId] = new NodeCalibrationSummary
+            {
+                Antenna = node.AntennaProfile,
+                Azimuth = ns.Calibration.Azimuth,
+                Elevation = ns.Calibration.Elevation,
+                Absorption = ns.Calibration.Absorption,
+                RxAdjRssi = ns.Calibration.RxAdjRssi,
+                TxRefRssi = ns.Calibration.TxRefRssi,
+            };
+        }
+
         return c;
     }
 
@@ -375,9 +395,11 @@ public class StateController : ControllerBase
             foreach (var node in _state.Nodes.Values)
             {
                 var nodeSettings = _nsd.Get(node.Id);
-                nodeSettings.Calibration.TxRefRssi = 0;
-                nodeSettings.Calibration.RxAdjRssi = 0;
-                nodeSettings.Calibration.Absorption = 0;
+                nodeSettings.Calibration.TxRefRssi = null;
+                nodeSettings.Calibration.RxAdjRssi = null;
+                nodeSettings.Calibration.Absorption = null;
+                nodeSettings.Calibration.Azimuth = null;
+                nodeSettings.Calibration.Elevation = null;
                 await _nsd.Set(node.Id, nodeSettings);
             }
 

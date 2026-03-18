@@ -54,6 +54,7 @@ internal class OptimizationRunner : BackgroundService
         {
             "global_absorption" => new List<IOptimizer> { new GlobalAbsorptionRxTxOptimizer(_state) },
             "per_node_absorption" => new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state) },
+            "combined" => new List<IOptimizer> { new CombinedOptimizer(_state) },
             _ => new List<IOptimizer>
             {
                 new RxAdjRssiOptimizer(_state),
@@ -141,8 +142,8 @@ internal class OptimizationRunner : BackgroundService
                             optimizer.Name, composite, bestScore, corr, rmse);
 
                         foreach (var (id, result) in results.Nodes)
-                            Log.Debug("Rejected {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
-                                id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
+                            Log.Debug("Rejected {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Az={4}, El={5}, Error={6}",
+                                id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Azimuth?.ToString("0.0") ?? "n/a", result.Elevation?.ToString("0.0") ?? "n/a", result.Error);
                         continue;
                     }
 
@@ -153,13 +154,15 @@ internal class OptimizationRunner : BackgroundService
 
                     foreach (var (id, result) in results.Nodes)
                     {
-                        Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
-                            id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
+                        Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Az={4}, El={5}, Error={6}",
+                            id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Azimuth?.ToString("0.0") ?? "n/a", result.Elevation?.ToString("0.0") ?? "n/a", result.Error);
 
                         var nodeSettings = _nsd.Get(id);
                         if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
                         if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
                         if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
+                        if (result.Azimuth != null) nodeSettings.Calibration.Azimuth = result.Azimuth;
+                        if (result.Elevation != null) nodeSettings.Calibration.Elevation = result.Elevation;
                         // Removed: nodeSettings.Calibration.Optimizer = optimizer.Name;
                         await _nsd.Set(id, nodeSettings);
                     }
