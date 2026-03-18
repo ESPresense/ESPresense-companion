@@ -165,6 +165,13 @@ public class McpResources
         [Description("Node identifier")] string nodeId,
         [Description("Optional firmware URL")] string? url = null)
     {
+        if (!_firmwareUpdateJobs.IsValidNodeUpdateUrl(url))
+        {
+            return JsonSerializer.Serialize(
+                new { ok = false, error = "Only ESPresense GitHub URLs are allowed" },
+                _jsonOptions);
+        }
+
         await _nsd.Update(nodeId, url);
         return JsonSerializer.Serialize(new { ok = true, nodeId, url }, _jsonOptions);
     }
