@@ -106,9 +106,20 @@ namespace ESPresense.Locators
             double weightedError = (totalWeight > 0) ? (weightedSumErrors / totalWeight) : 0;
             scenario.Error = weightedError;
 
-            scenario.Confidence = (int)Math.Clamp((((double)scenario.Fixes*3)) +( 100 - (Math.Pow(scenario.Error/10 ?? 1, 2) + Math.Pow(5*(1 - (scenario.Scale ?? 1)), 2))), 10, 100);
+            // Confidence formula components:
+            // - Base score from number of fixes (more fixes = higher confidence)
+            // - Penalty for error (normalized by dividing by 10)
+            // - Penalty for scale deviation from 1.0 (ideal scale)
+            double fixesScore = (double)scenario.Fixes * 3;
+            double errorValue = scenario.Error ?? 0;
+            double normalizedError = errorValue / 10.0;
+            double scaleDeviation = 1.0 - (scenario.Scale ?? 1.0);
+            double errorPenalty = Math.Pow(normalizedError, 2) + Math.Pow(5 * scaleDeviation, 2);
+            double rawConfidence = fixesScore + (100 - errorPenalty);
+            scenario.Confidence = (int)Math.Clamp(rawConfidence, 10, 100);
+
             if (_device.Id.Contains("android"))
-                Log.Information("Scenario {Scenario} confidence {Confidence}% fixes {fixes:0} error {Error:00.0} scale {Scale:0.0}", scenario.Name, scenario.Confidence,scenario.Fixes, scenario.Error, scenario.Scale);
+                Log.Information("Scenario {Scenario} confidence {Confidence}% fixes {fixes:0} error {Error:00.0} scale {Scale:0.0}", scenario.Name, scenario.Confidence, scenario.Fixes, scenario.Error, scenario.Scale);
             // 7. Decide whether to accept or reject
             if (scenario.Confidence <= 0) return false;
             if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;

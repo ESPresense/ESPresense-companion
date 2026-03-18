@@ -39,6 +39,11 @@ namespace ESPresense.Weighting
         /// <param name="distance">Distance from the center</param>
         public double Evaluate(double distance)
         {
+            if (distance < 0)
+            {
+                throw new ArgumentException("Distance must be non-negative.", nameof(distance));
+            }
+
             if (double.IsNaN(distance) || double.IsInfinity(distance))
             {
                 throw new ArgumentException("Distance must be a finite number.", nameof(distance));

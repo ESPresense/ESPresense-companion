@@ -224,27 +224,29 @@ public class State
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
                     yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
 
-            if (nadarayaWatson?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
+            var nw = nadarayaWatson;
+            if (nw?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(nw?.Floors))
                     yield return new Scenario(
                         Config,
-                        new NadarayaWatsonMultilateralizer(device, floor, this, _nts, nadarayaWatson.Kernel),
+                        new NadarayaWatsonMultilateralizer(device, floor, this, _nts, nw!.Kernel),
                         floor.Name
                     );
 
             if (nearestNode?.Enabled ?? false)
                 yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
 
-            if (iterativeNadarayaWatson?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(iterativeNadarayaWatson?.Floors))
+            var inw = iterativeNadarayaWatson;
+            if (inw?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(inw?.Floors))
                     yield return new Scenario(
                         Config,
                         new IterativeNadarayaWatsonMultilateralizer(
                             device,
                             floor,
                             this,
-                            iterativeNadarayaWatson.Kernel,
-                            iterativeNadarayaWatson.MaxIterations
+                            inw!.Kernel,
+                            inw.MaxIterations
                         ),
                         floor.Name
                     );

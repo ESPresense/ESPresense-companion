@@ -81,7 +81,7 @@ public class OneEuroFilter
     private static double ComputeAlpha(double cutoffFreq, double dt)
     {
         double tau = 1.0 / (2.0 * Math.PI * cutoffFreq);
-        return (float)(1.0 / (1.0 + tau / dt));
+        return 1.0 / (1.0 + tau / dt);
     }
 }
 
