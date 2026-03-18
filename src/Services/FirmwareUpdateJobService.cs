@@ -67,9 +67,6 @@ public class FirmwareUpdateJobService
         if (!IsTrustedFirmwareUrl(url))
             return (null, "Only ESPresense GitHub URLs are allowed");
 
-        if (_activeJobByNode.ContainsKey(nodeId))
-            return (null, $"A firmware update is already running for node '{nodeId}'");
-
         var jobId = Guid.NewGuid().ToString("N");
         var job = new FirmwareUpdateJob
         {
@@ -83,9 +80,20 @@ public class FirmwareUpdateJobService
         if (!_jobs.TryAdd(jobId, job))
             return (null, "Unable to create update job");
 
-        _activeJobByNode[nodeId] = jobId;
+        if (!_activeJobByNode.TryAdd(nodeId, jobId))
+        {
+            _jobs.TryRemove(jobId, out _);
+            return (null, $"A firmware update is already running for node '{nodeId}'");
+        }
+
         var cts = new CancellationTokenSource();
-        _tokens[jobId] = cts;
+        if (!_tokens.TryAdd(jobId, cts))
+        {
+            cts.Dispose();
+            _activeJobByNode.TryRemove(nodeId, out _);
+            _jobs.TryRemove(jobId, out _);
+            return (null, "Unable to create update job");
+        }
 
         _ = Task.Run(() => ExecuteAsync(job, cts.Token), CancellationToken.None);
         return (job, null);
