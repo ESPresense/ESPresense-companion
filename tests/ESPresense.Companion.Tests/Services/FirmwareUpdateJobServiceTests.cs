@@ -1,6 +1,10 @@
 using ESPresense.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
 
 namespace ESPresense.Companion.Tests.Services;
 
@@ -50,5 +54,50 @@ public class FirmwareUpdateJobServiceTests
 
         Assert.That(job, Is.Null);
         Assert.That(error, Is.EqualTo("Only ESPresense GitHub URLs are allowed"));
+    }
+
+    [Test]
+    public async Task GetFirmware_EmptyZip_ReturnsReadableStream()
+    {
+        var mqtt = new Mock<IMqttCoordinator>();
+        var nodeSettingsLogger = new Mock<ILogger<NodeSettingsStore>>();
+        var firmwareLogger = new Mock<ILogger<FirmwareUpdateJobService>>();
+
+        await using var zipStream = new MemoryStream();
+        using (var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+        }
+        zipStream.Position = 0;
+
+        var httpClient = new HttpClient(new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(zipStream)
+        }));
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "tests");
+
+        var sut = new FirmwareUpdateJobService(
+            new NodeSettingsStore(mqtt.Object, nodeSettingsLogger.Object),
+            new NodeTelemetryStore(mqtt.Object),
+            httpClient,
+            firmwareLogger.Object);
+
+        var getFirmware = typeof(FirmwareUpdateJobService)
+            .GetMethod("GetFirmware", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.That(getFirmware, Is.Not.Null);
+
+        var task = (Task<MemoryStream>)getFirmware!.Invoke(sut, new object[] { "https://github.com/ESPresense/ESPresense/releases/download/v1/test.zip", CancellationToken.None })!;
+        await using var result = await task;
+
+        Assert.That(result.CanRead, Is.True);
+        Assert.That(result.Length, Is.GreaterThan(0));
+    }
+
+    private sealed class StubHttpMessageHandler(HttpResponseMessage response) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(response);
+        }
     }
 }

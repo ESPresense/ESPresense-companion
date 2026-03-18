@@ -135,7 +135,7 @@ public class FirmwareController : Controller
         if (!isZip && mediaType != "application/zip")
             return ms1;
 
-        using (var zipArchive = new ZipArchive(ms1))
+        using (var zipArchive = new ZipArchive(ms1, ZipArchiveMode.Read, leaveOpen: true))
         {
             foreach (var entry in zipArchive.Entries)
             {
@@ -143,6 +143,7 @@ public class FirmwareController : Controller
                 await using var entryStream = entry.Open();
                 await entryStream.CopyToAsync(ms2);
                 ms2.Position = 0;
+                ms1.Dispose();
                 return ms2;
             }
         }
