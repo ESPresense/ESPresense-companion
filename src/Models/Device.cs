@@ -51,12 +51,21 @@ public class Device
     public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
     [STJ.JsonConverter(typeof(RoomConverter))]
-    public Room? Room => Anchor?.Room ?? BestScenario?.Room;
+    public Room? Room => Anchor?.Room ?? EnsembleRoom;
 
     [STJ.JsonConverter(typeof(FloorConverter))]
-    public Floor? Floor => Anchor?.Floor ?? BestScenario?.Floor;
+    public Floor? Floor => Anchor?.Floor ?? EnsembleFloor;
 
-    public double? Confidence => IsAnchored ? 1.0 : BestScenario?.Confidence;
+    public double? Confidence => IsAnchored ? 1.0 : FloorConfidence;
+
+    /// <summary>Winning floor from floor-level ensemble aggregation</summary>
+    [STJ.JsonIgnore] public Floor? EnsembleFloor { get; set; }
+
+    /// <summary>Room determined from blended (Kalman-filtered) position on the winning floor</summary>
+    [STJ.JsonIgnore] public Room? EnsembleRoom { get; set; }
+
+    /// <summary>Sum of scenario probabilities on the winning floor (0-1)</summary>
+    [STJ.JsonIgnore] public double? FloorConfidence { get; set; }
 
     public double? Scale => BestScenario?.Scale;
 
