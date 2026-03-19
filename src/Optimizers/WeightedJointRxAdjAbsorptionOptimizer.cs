@@ -55,6 +55,9 @@ public class WeightedJointRxAdjAbsorptionOptimizer : IOptimizer
             foreach (var (dn, i) in rxNodes.Select((dn, i) => (dn, i)))
                 Log.Debug("Node {0}: pos[{1}]={2:0.00}m, Rssi={3}", g.Key.Id, i, pos[i], dn.Rssi);
 
+            // Get txRefRssi from node settings or use default
+            double txRefRssi = nodeSettings?.Calibration?.TxRefRssi ?? -59;
+
             double Distance(Vector<double> x, Measure dn)
             {
                 double exponent = (txRefRssi + x[0] - dn.Rssi) / (10.0d * x[1]);

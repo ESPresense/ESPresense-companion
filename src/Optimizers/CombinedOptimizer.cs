@@ -23,6 +23,12 @@ public class CombinedOptimizer : IOptimizer
         var results = new OptimizationResults();
         var optimization = _state.Config?.Optimization;
 
+        if (optimization == null)
+        {
+            _logger.Warning("Optimization configuration not found");
+            return results;
+        }
+
         var allNodes = os.ByRx().SelectMany(g => g).ToList();
         var uniqueDeviceIds = allNodes.SelectMany(n => new[] { n.Rx.Id, n.Tx.Id }).Distinct().ToList();
 
@@ -34,13 +40,11 @@ public class CombinedOptimizer : IOptimizer
 
         try
         {
-            if (optimization == null) return results;
-            
             // Step 1: Optimize RxAdjRssi and path-specific absorptions
-            var (rxAdjRssiDict, pathAbsorptionDict, error) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
+            var (rxAdjRssiDict, pathAbsorptionDict, error1) = OptimizeRxAdjRssiAndPathAbsorption(allNodes, uniqueDeviceIds, optimization, existingSettings);
 
             // Step 2: Optimize node-specific absorptions while keeping RxAdjRssi constant
-            var nodeAbsorptions = OptimizeNodeAbsorptions(allNodes, uniqueDeviceIds, rxAdjRssiDict, pathAbsorptionDict, optimization, existingSettings);
+            var (deviceParams, error2) = OptimizeNodeAbsorptions(allNodes, uniqueDeviceIds, rxAdjRssiDict, pathAbsorptionDict, optimization, existingSettings);
 
             // Process and store results
             foreach (var deviceId in uniqueDeviceIds)
@@ -51,12 +55,12 @@ public class CombinedOptimizer : IOptimizer
                     {
                         RxAdjRssi = parameters.RxAdjRssi,
                         Absorption = parameters.Absorption,
-                        Error = error
+                        Error = error2
                     };
                 }
             }
 
-            _logger.Information("Optimization completed with error: {Error}", error);
+            _logger.Information("Optimization completed. Step 1 error: {Error1}, Step 2 error: {Error2}", error1, error2);
         }
         catch (Exception ex)
         {
@@ -79,10 +83,9 @@ public class CombinedOptimizer : IOptimizer
             for (int i = 0; i < uniqueDeviceIds.Count; i++)
             {
                 var rxAdjRssi = x[i];
-                existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
                 // Bounds should always come from global config
-                double rxAdjMin = optimization?.RxAdjRssiMin ?? -15;
-                double rxAdjMax = optimization?.RxAdjRssiMax ?? 25;
+                double rxAdjMin = optimization.RxAdjRssiMin;
+                double rxAdjMax = optimization.RxAdjRssiMax;
                 if (rxAdjRssi < rxAdjMin || rxAdjRssi > rxAdjMax)
                     return double.PositiveInfinity;
                 rxAdjRssiDict[uniqueDeviceIds[i]] = rxAdjRssi;
@@ -92,7 +95,7 @@ public class CombinedOptimizer : IOptimizer
             foreach (var pair in pathPairs)
             {
                 var absorption = x[offset++];
-                if (absorption <= optimization?.AbsorptionMin || absorption >= optimization?.AbsorptionMax)
+                if (absorption <= optimization.AbsorptionMin || absorption >= optimization.AbsorptionMax)
                     return double.PositiveInfinity;
                 absorptionDict[pair] = absorption;
             }
@@ -111,7 +114,7 @@ public class CombinedOptimizer : IOptimizer
         for (int i = uniqueDeviceIds.Count; i < initialGuess.Count; i++)
         {
             // Clamp initial guess within global bounds (Path absorption uses global midpoint, clamped)
-            initialGuess[i] = Math.Clamp((optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2 + optimization?.AbsorptionMin ?? 3d, optimization.AbsorptionMin, optimization.AbsorptionMax);
+            initialGuess[i] = Math.Clamp((optimization.AbsorptionMax - optimization.AbsorptionMin) / 2 + optimization.AbsorptionMin, optimization.AbsorptionMin, optimization.AbsorptionMax);
         }
 
         var solver = new NelderMeadSimplex(1e-7, 20000);
@@ -134,169 +137,120 @@ public class CombinedOptimizer : IOptimizer
         return (rxAdjRssiDict, pathAbsorptionDict, result.FunctionInfoAtMinimum.Value);
     }
 
-    private Dictionary<string, double> OptimizeNodeAbsorptions(List<Measure> allNodes, List<string> uniqueDeviceIds,
-        Dictionary<string, double> rxAdjRssiDict, Dictionary<(string, string), double> pathAbsorptionDict, ConfigOptimization optimization, Dictionary<string, NodeSettings> existingSettings)
+    private (Dictionary<string, DeviceParameters> DeviceParams, double Error) OptimizeNodeAbsorptions(
+        List<Measure> allNodes,
+        List<string> uniqueDeviceIds,
+        Dictionary<string, double> rxAdjRssiDict,
+        Dictionary<(string, string), double> pathAbsorptionDict,
+        ConfigOptimization optimization,
+        Dictionary<string, NodeSettings> existingSettings)
     {
-        // Create reasonable initial guesses
-        var initialGuess = Vector<double>.Build.Dense(uniqueDeviceIds.Count * 2);
-        for (int i = 0; i < uniqueDeviceIds.Count; i++)
-        {
-            // Include more intelligent initial guesses based on naive distance model
-            // Attempt to calculate a reasonable starting point based on physics model
-            double estimatedRxAdjRssi = 0;
-            double estimatedAbsorption = 2.5; // Middle of typical range (between 2-3)
-
-            // If we have data from existing nodes, try to extract better initial guesses
-            var existingMeasurements = allNodes.Where(n =>
-                n.Rx.Id == uniqueDeviceIds[i] || n.Tx.Id == uniqueDeviceIds[i]).ToList();
-
-            if (existingMeasurements.Any())
-            {
-                // Estimate parameters based on known distances and RSSI
-                // This is a simplified approach, but provides a better starting point
-                var avgDistance = existingMeasurements.Average(m => m.Rx.Location.DistanceTo(m.Tx.Location));
-                var avgRssi = existingMeasurements.Average(m => m.Rssi);
-
-                // Heuristic formula based on RSSI model
-                if (avgDistance > 0 && !double.IsNaN(avgRssi))
-                {
-                    var absorption = x[i];
-                    existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
-                    // Bounds should always come from global config
-                    double absorptionMin = optimization?.AbsorptionMin ?? 2.5;
-                    double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
-                    if (absorption < absorptionMin || absorption > absorptionMax)
-                        return double.PositiveInfinity;
-                    nodeAbsorptionDict[uniqueDeviceIds[i]] = absorption;
-                }
-
-                return CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: nodeAbsorptionDict);
-            },
-            // Function to compute gradient
-            x => {
-                try
-                {
-                    nodeAbsorptionDict[uniqueDeviceIds[i]] = x[i];
-                }
-
-                // Numerically approximate the gradient
-                var gradient = Vector<double>.Build.Dense(x.Count);
-                double epsilon = 1e-5;
-                double baseError = CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: nodeAbsorptionDict);
-
-                    // Compute gradient numerically
-                    var gradient = Vector<double>.Build.Dense(x.Count);
-                    double h = 1e-5; // Step size for finite difference
-
-                    for (int i = 0; i < x.Count; i++)
-                    {
-                        var xPlus = x.Clone();
-                        xPlus[i] += h;
-
-                        var paramsPlus = CreateDeviceParamsFromVector(xPlus, uniqueDeviceIds, optimization);
-                        var errorPlus = CalculateError(allNodes, paramsPlus);
-
-                        gradient[i] = (errorPlus - baseError) / h;
-                    }
-
-                    return gradient;
-                }
-                catch (Exception ex)
-                {
-                    var tempDict = new Dictionary<string, double>(nodeAbsorptionDict);
-                    tempDict[uniqueDeviceIds[i]] += epsilon;
-
-                    var errorPlusEps = CalculateError(allNodes, rxAdjRssiDict, nodeAbsorptionDict: tempDict);
-                    gradient[i] = (errorPlusEps - baseError) / epsilon;
-                }
-            }
-        );
-
-        // ConjugateGradientMinimizer only takes 3 tolerance parameters, not a maximum iteration count
-        var solver = new ConjugateGradientMinimizer(1e-3, 1000);
-
-        // Initial guess uses node setting if available, else global midpoint
+        // Build initial guess vector: one absorption parameter per device
         var initialGuess = Vector<double>.Build.Dense(uniqueDeviceIds.Count);
         for (int i = 0; i < uniqueDeviceIds.Count; i++)
         {
             existingSettings.TryGetValue(uniqueDeviceIds[i], out var nodeSettings);
-            double absorptionMin = optimization?.AbsorptionMin ?? 2.5; // Need global bounds for fallback midpoint
-            double absorptionMax = optimization?.AbsorptionMax ?? 3.5;
-            // Clamp initial guess within global bounds
-            initialGuess[i] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? (absorptionMax - absorptionMin) / 2 + absorptionMin, absorptionMin, absorptionMax);
+            double absorptionMin = optimization.AbsorptionMin;
+            double absorptionMax = optimization.AbsorptionMax;
+            // Use existing absorption if available, otherwise midpoint
+            initialGuess[i] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? ((absorptionMax - absorptionMin) / 2 + absorptionMin), absorptionMin, absorptionMax);
         }
 
-        var solver = new BfgsMinimizer(1e-7, 1e-7, 1e-7);
-        var result = solver.FindMinimum(obj, initialGuess);
-
-        var nodeAbsorptions = new Dictionary<string, double>();
-        for (int i = 0; i < uniqueDeviceIds.Count; i++)
+        // Define objective function: given absorption vector x, compute total error
+        double CalculateErrorFromAbsorptions(Vector<double> x)
         {
-            result = solver.FindMinimum(objGradient, initialGuess);
-            _logger.Information("Optimization completed: Iterations={0}, Status={1}, Error={2}",
+            // Build deviceParams from x (absorptions) combined with fixed rxAdjRssi and TxRefRssi from settings
+            var deviceParams = new Dictionary<string, DeviceParameters>();
+            for (int i = 0; i < uniqueDeviceIds.Count; i++)
+            {
+                var deviceId = uniqueDeviceIds[i];
+                var absorption = x[i];
+                absorption = Math.Clamp(absorption, optimization.AbsorptionMin, optimization.AbsorptionMax);
+                existingSettings.TryGetValue(deviceId, out var nodeSettings);
+                deviceParams[deviceId] = new DeviceParameters
+                {
+                    RxAdjRssi = rxAdjRssiDict[deviceId],
+                    Absorption = absorption,
+                    TxRefRssi = nodeSettings?.Calibration?.TxRefRssi
+                };
+            }
+
+            return CalculateError(allNodes, rxAdjRssiDict, deviceParamsDict: deviceParams);
+        }
+
+        // Create objective with numeric gradient
+        var objGradient = ObjectiveFunction.Gradient(
+            x => CalculateErrorFromAbsorptions(x),
+            x =>
+            {
+                var gradient = Vector<double>.Build.Dense(x.Count);
+                double h = 1e-5;
+                double baseError = CalculateErrorFromAbsorptions(x);
+
+                for (int i = 0; i < x.Count; i++)
+                {
+                    var xPlus = x.Clone();
+                    xPlus[i] += h;
+                    double errorPlus = CalculateErrorFromAbsorptions(xPlus);
+                    gradient[i] = (errorPlus - baseError) / h;
+                }
+
+                return gradient;
+            }
+        );
+
+        try
+        {
+            // Bounds for absorption parameters
+            var lowerBound = Vector<double>.Build.Dense(uniqueDeviceIds.Count, optimization.AbsorptionMin);
+            var upperBound = Vector<double>.Build.Dense(uniqueDeviceIds.Count, optimization.AbsorptionMax);
+
+            // Use bounded BFGS minimizer
+            var solver = new BfgsBMinimizer(1e-8, 1e-8, 1e-8, 10000);
+            var result = solver.FindMinimum(objGradient, lowerBound, upperBound, initialGuess);
+
+            // Extract optimized parameters into DeviceParameters dictionary
+            var deviceParams = new Dictionary<string, DeviceParameters>();
+            for (int i = 0; i < uniqueDeviceIds.Count; i++)
+            {
+                var deviceId = uniqueDeviceIds[i];
+                var absorption = result.MinimizingPoint[i];
+                existingSettings.TryGetValue(deviceId, out var nodeSettings);
+                deviceParams[deviceId] = new DeviceParameters
+                {
+                    RxAdjRssi = rxAdjRssiDict[deviceId], // from step 1
+                    Absorption = absorption,
+                    TxRefRssi = nodeSettings?.Calibration?.TxRefRssi
+                };
+            }
+
+            _logger.Information("Node absorption optimization completed: Iterations={Iterations}, Status={Status}, Error={Error}",
                 result.Iterations, result.ReasonForExit, result.FunctionInfoAtMinimum.Value);
+
+            return (deviceParams, result.FunctionInfoAtMinimum.Value);
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Optimization failed");
+            _logger.Error(ex, "Node absorption optimization failed");
 
             // Return default values if optimization fails
             var defaultParams = new Dictionary<string, DeviceParameters>();
             foreach (var id in uniqueDeviceIds)
             {
+                existingSettings.TryGetValue(id, out var nodeSettings);
                 defaultParams[id] = new DeviceParameters
                 {
-                    RxAdjRssi = 0,
-                    Absorption = (optimization?.AbsorptionMax + optimization?.AbsorptionMin) / 2 ?? 3.0
+                    RxAdjRssi = rxAdjRssiDict[id],
+                    Absorption = (optimization.AbsorptionMax + optimization.AbsorptionMin) / 2,
+                    TxRefRssi = nodeSettings?.Calibration?.TxRefRssi
                 };
             }
 
             return (defaultParams, double.MaxValue);
         }
-
-        // Extract optimized parameters
-        var deviceParams = new Dictionary<string, DeviceParameters>();
-        for (int i = 0; i < uniqueDeviceIds.Count; i++)
-        {
-            deviceParams[uniqueDeviceIds[i]] = new DeviceParameters
-            {
-                RxAdjRssi = result.MinimizingPoint[i],
-                Absorption = result.MinimizingPoint[i + uniqueDeviceIds.Count]
-            };
-        }
-
-        return (deviceParams, result.FunctionInfoAtMinimum.Value);
     }
 
-    private Dictionary<string, DeviceParameters> CreateDeviceParamsFromVector(Vector<double> x, List<string> uniqueDeviceIds, ConfigOptimization optimization)
-    {
-        var deviceParams = new Dictionary<string, DeviceParameters>();
-
-        for (int i = 0; i < uniqueDeviceIds.Count; i++)
-        {
-            var rxAdjRssi = x[i];
-            var absorption = x[i + uniqueDeviceIds.Count];
-
-            // Enforce constraints by clamping values to valid ranges
-            rxAdjRssi = Math.Clamp(rxAdjRssi,
-                optimization?.RxAdjRssiMin ?? -20,
-                optimization?.RxAdjRssiMax ?? 20);
-
-            absorption = Math.Clamp(absorption,
-                optimization?.AbsorptionMin ?? 1.5,
-                optimization?.AbsorptionMax ?? 4.5);
-
-            deviceParams[uniqueDeviceIds[i]] = new DeviceParameters
-            {
-                RxAdjRssi = rxAdjRssi,
-                Absorption = absorption
-            };
-        }
-
-        return deviceParams;
-    }
-
-    private double CalculateError(List<Measure> nodes, Dictionary<string, DeviceParameters> deviceParams)
+    private double CalculateError(List<Measure> nodes, Dictionary<string, double> rxAdjRssiDict, Dictionary<(string, string), double>? pathAbsorptionDict = null, Dictionary<string, DeviceParameters>? deviceParamsDict = null)
     {
         double totalError = 0;
         int count = 0;
@@ -305,18 +259,36 @@ public class CombinedOptimizer : IOptimizer
         {
             try
             {
-                if (!deviceParams.TryGetValue(node.Rx.Id, out var rxParams) ||
-                    !deviceParams.TryGetValue(node.Tx.Id, out var txParams))
+                if (!rxAdjRssiDict.TryGetValue(node.Rx.Id, out var rxAdjRssi))
+                    continue;
+
+                // Get absorption: either per-device from deviceParamsDict or per-path from pathAbsorptionDict
+                double absorption;
+                if (deviceParamsDict != null && deviceParamsDict.TryGetValue(node.Rx.Id, out var rxDeviceParams))
+                {
+                    absorption = rxDeviceParams.Absorption;
+                }
+                else if (pathAbsorptionDict != null)
+                {
+                    var key = (Min(node.Rx.Id, node.Tx.Id), Max(node.Rx.Id, node.Tx.Id));
+                    if (!pathAbsorptionDict.TryGetValue(key, out absorption))
+                        continue;
+                }
+                else
                 {
                     continue;
                 }
 
-                var distance = node.Rx.Location.DistanceTo(node.Tx.Location);
-                var rxAdjRssi = rxParams.RxAdjRssi;
-                var txAdjRssi = txParams.RxAdjRssi;
+                // Get TxRefRssi
+                double? txRefRssi = null;
+                if (deviceParamsDict != null && deviceParamsDict.TryGetValue(node.Tx.Id, out var txDeviceParams))
+                {
+                    txRefRssi = txDeviceParams.TxRefRssi;
+                }
+                // Fallback: could also try to get from existingSettings but not passed here; use default
+                txRefRssi ??= -59;
 
-                // Use average of both device absorptions
-                var absorption = (rxParams.Absorption + txParams.Absorption) / 2;
+                var distance = node.Rx.Location.DistanceTo(node.Tx.Location);
 
                 // Safeguard against negative or zero absorption
                 if (absorption <= 0.1)
@@ -325,7 +297,7 @@ public class CombinedOptimizer : IOptimizer
                 }
 
                 // Calculate distance based on RSSI
-                var calculatedDistance = Math.Pow(10, (-59 + rxAdjRssi + txAdjRssi - node.Rssi) / (10.0d * absorption));
+                var calculatedDistance = Math.Pow(10, (txRefRssi.Value + rxAdjRssi - node.Rssi) / (10.0d * absorption));
 
                 // Skip invalid calculations
                 if (double.IsNaN(calculatedDistance) || double.IsInfinity(calculatedDistance))
@@ -344,5 +316,52 @@ public class CombinedOptimizer : IOptimizer
         }
 
         return count > 0 ? totalError / count : double.MaxValue;
+    }
+
+    private Dictionary<string, DeviceParameters> CreateDeviceParamsFromVector(Vector<double> x, List<string> uniqueDeviceIds, ConfigOptimization optimization)
+    {
+        var deviceParams = new Dictionary<string, DeviceParameters>();
+
+        for (int i = 0; i < uniqueDeviceIds.Count; i++)
+        {
+            var rxAdjRssi = x[i];
+            var absorption = x[i + uniqueDeviceIds.Count];
+
+            // Enforce constraints by clamping values to valid ranges
+            rxAdjRssi = Math.Clamp(rxAdjRssi,
+                optimization.RxAdjRssiMin,
+                optimization.RxAdjRssiMax);
+
+            absorption = Math.Clamp(absorption,
+                optimization.AbsorptionMin,
+                optimization.AbsorptionMax);
+
+            deviceParams[uniqueDeviceIds[i]] = new DeviceParameters
+            {
+                RxAdjRssi = rxAdjRssi,
+                Absorption = absorption,
+                TxRefRssi = null // Not stored in this method; only RxAdj and Absorption are optimized
+            };
+        }
+
+        return deviceParams;
+    }
+
+    private T Min<T>(T a, T b) where T : IComparable<T>
+    {
+        return a.CompareTo(b) < 0 ? a : b;
+    }
+
+    private T Max<T>(T a, T b) where T : IComparable<T>
+    {
+        return a.CompareTo(b) > 0 ? a : b;
+    }
+
+    // Nested class to hold device parameters
+    private class DeviceParameters
+    {
+        public double RxAdjRssi { get; set; }
+        public double Absorption { get; set; }
+        public double? TxRefRssi { get; set; }
     }
 }

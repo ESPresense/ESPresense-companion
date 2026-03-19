@@ -20,10 +20,16 @@ public class RxTxAdjRssiOptimizer : IOptimizer
 
     public string Name => "Rx Tx Adj Rssi";
 
-    public OptimizationResults Optimize(OptimizationSnapshot os)
+    public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         var or = new OptimizationResults();
         var optimization = _state.Config?.Optimization;
+
+        if (optimization == null)
+        {
+            Log.Warning("Optimization configuration not found");
+            return or;
+        }
 
         // Group all valid measurements
         var allRxNodes = os.ByRx().SelectMany(g => g).ToList();
@@ -121,7 +127,8 @@ public class RxTxAdjRssiOptimizer : IOptimizer
                     double absorption = x[rxBaseIndex + 1];
                     double txRefRssi = x[txBaseIndex];
 
-                    double calculatedDistance = Math.Pow(10, (txRefRssi + rxAdjRssi - node.Rssi) / (10.0 * absorption));
+                    double safeAbsorption = Math.Max(absorption, 0.1);
+                    double calculatedDistance = Math.Pow(10, (txRefRssi + rxAdjRssi - node.Rssi) / (10.0 * safeAbsorption));
                     double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
 
                     // Get the weight for this node
@@ -163,7 +170,8 @@ public class RxTxAdjRssiOptimizer : IOptimizer
                             double rxAdjRssi = xPlus[rxBaseIndex];
                             double absorption = xPlus[rxBaseIndex + 1];
                             double txRefRssi = xPlus[txBaseIndex];
-                            double calculatedDistance = Math.Pow(10, (txRefRssi + rxAdjRssi - node.Rssi) / (10.0 * absorption));
+                            double safeAbsorption = Math.Max(absorption, 0.1);
+                            double calculatedDistance = Math.Pow(10, (txRefRssi + rxAdjRssi - node.Rssi) / (10.0 * safeAbsorption));
                             double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
 
                             fPlus += weight * (calculateDistanceError(calculatedDistance, mapDistance)
@@ -174,7 +182,8 @@ public class RxTxAdjRssiOptimizer : IOptimizer
                             double rxAdjRssi = xMinus[rxBaseIndex];
                             double absorption = xMinus[rxBaseIndex + 1];
                             double txRefRssi = xMinus[txBaseIndex];
-                            double calculatedDistance = Math.Pow(10, (txRefRssi + rxAdjRssi - node.Rssi) / (10.0 * absorption));
+                            double safeAbsorption = Math.Max(absorption, 0.1);
+                            double calculatedDistance = Math.Pow(10, (txRefRssi + rxAdjRssi - node.Rssi) / (10.0 * safeAbsorption));
                             double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
 
                             fMinus += weight * (calculateDistanceError(calculatedDistance, mapDistance)
@@ -223,7 +232,7 @@ public class RxTxAdjRssiOptimizer : IOptimizer
         }
         foreach (var txId in uniqueTxIds)
         {
-            initialGuess[txIndexMap[txId]] = -59;
+            initialGuess[txIndexMap[txId]] = (optimization.TxRefRssiMin + optimization.TxRefRssiMax) / 2.0;
         }
 
         try
@@ -262,7 +271,7 @@ public class RxTxAdjRssiOptimizer : IOptimizer
         }
         catch (Exception ex)
         {
-            Log.Error("Error optimizing all nodes: {0}", ex.Message);
+            Log.Error(ex, "Error optimizing all nodes");
         }
 
         return or;

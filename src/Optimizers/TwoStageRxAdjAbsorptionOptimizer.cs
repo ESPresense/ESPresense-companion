@@ -70,7 +70,12 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                         double error = 0;
                         for (int i = 0; i < nodesToUse.Length; i++)
                         {
-                            double dist = Math.Pow(10, (txRefRssi + x[0] - nodesToUse[i].Node.Rssi) / (10.0 * fixedAbsorption));
+                            var measure = nodesToUse[i].Node;
+                            // Get TxRefRssi from transmitter's settings
+                            existingSettings.TryGetValue(measure.Tx.Id, out var txSettings);
+                            double txRefRssi = txSettings?.Calibration?.TxRefRssi ?? -59;
+
+                            double dist = Math.Pow(10, (txRefRssi + x[0] - measure.Rssi) / (10.0 * fixedAbsorption));
                             double distError = posToUse[i] - dist;
                             error += distError * distError;
                         }
@@ -95,13 +100,18 @@ public class TwoStageRxAdjAbsorptionOptimizer : IOptimizer
                         double error = 0;
                         for (int i = 0; i < rxNodes.Length; i++)
                         {
+                            var measure = rxNodes[i];
+                            // Get TxRefRssi from transmitter's settings
+                            existingSettings.TryGetValue(measure.Tx.Id, out var txSettings);
+                            double txRefRssi = txSettings?.Calibration?.TxRefRssi ?? -59;
+
                             double d = pos[i];
                             double wAbs = Math.Min(2.0, 2.0 * Math.Pow(d / 3.0, 2) / (1 + Math.Pow(d / 3.0, 2)));
-                            double dist = Math.Pow(10, (txRefRssi + rxAdjRssi - rxNodes[i].Rssi) / (10.0 * x[0]));
+                            double dist = Math.Pow(10, (txRefRssi + rxAdjRssi - measure.Rssi) / (10.0 * x[0]));
                             double distError = pos[i] - dist;
                             double predictedRssi = txRefRssi + rxAdjRssi - 10 * x[0] * Math.Log10(pos[i]);
                             Log.Debug("Node {0}: d={1:0.00}, wAbs={2:0.00}, distErr={3:0.00}, PredRssi={4:0.00}, MeasRssi={5}",
-                                g.Key.Id, d, wAbs, distError, predictedRssi, rxNodes[i].Rssi);
+                                g.Key.Id, d, wAbs, distError, predictedRssi, measure.Rssi);
                             error += wAbs * distError * distError;
                         }
                         return error / rxNodes.Length;
