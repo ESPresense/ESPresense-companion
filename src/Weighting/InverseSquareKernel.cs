@@ -27,14 +27,15 @@ namespace ESPresense.Weighting
         /// </summary>
         /// <param name="distance">Distance from the center</param>
         /// <returns>Weight calculated by the kernel</returns>
+        /// <exception cref="ArgumentException">Thrown when distance is negative, NaN, or Infinity.</exception>
         public double Evaluate(double distance)
         {
-            if (distance < 0)
+            if (distance < 0 || double.IsNaN(distance) || double.IsInfinity(distance))
             {
-                throw new ArgumentException("Distance must be non-negative.", nameof(distance));
+                throw new ArgumentException("Distance must be non-negative and finite.", nameof(distance));
             }
 
-            return 1.0 / (Math.Pow(distance, 2) + _epsilon);
+            return 1.0 / (distance * distance + _epsilon);
         }
     }
 }

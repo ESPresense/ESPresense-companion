@@ -56,6 +56,7 @@ public class ConfigTests
         Assert.That(nadarayaWatson.Floors, Is.EqualTo(new[] { "floor1", "floor2" }));
         Assert.NotNull(nadarayaWatson.Kernel);
         Assert.That(nadarayaWatson.Kernel.Algorithm, Is.EqualTo("gaussian"));
+        Assert.True(nadarayaWatson.Kernel.Props.ContainsKey("bandwidth"), "Expected 'bandwidth' property in kernel props");
         Assert.That(nadarayaWatson.Kernel.Props["bandwidth"], Is.EqualTo(0.5));
 
         var nelderMead = config.Locators.NelderMead;

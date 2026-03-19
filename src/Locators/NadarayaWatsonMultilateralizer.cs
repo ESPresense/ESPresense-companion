@@ -29,7 +29,8 @@ public class NadarayaWatsonMultilateralizer : ILocate
         {
             "epanechnikov" => new EpanechnikovKernel(kernelConfig?.Props),
             "gaussian" => new GaussianKernel(kernelConfig?.Props),
-            _ => new InverseSquareKernel(kernelConfig?.Props)
+            "inverse-square" => new InverseSquareKernel(kernelConfig?.Props),
+            _ => throw new ArgumentException($"Unknown kernel algorithm: {kernelConfig?.Algorithm}")
         };
     }
 
@@ -61,7 +62,6 @@ public class NadarayaWatsonMultilateralizer : ILocate
             {
                 est = Point3D.MidPoint(heard[0].Node!.Location, heard[1].Node!.Location);
                 scenario.Error = null;
-                scenario.PearsonCorrelation = null;
             }
             else
             {
@@ -72,7 +72,6 @@ public class NadarayaWatsonMultilateralizer : ILocate
                 {
                     est = Point3D.MidPoint(heard[0].Node!.Location, heard[1].Node!.Location);
                     scenario.Error = null;
-                    scenario.PearsonCorrelation = null;
                 }
                 else
                 {

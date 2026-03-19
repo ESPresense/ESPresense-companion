@@ -10,7 +10,6 @@ namespace ESPresense.Locators
     {
         private readonly Device _device;
         private readonly Floor _floor;
-        private readonly State _state;
         private readonly IKernel _kernel;
 
         // How many times to iterate the scale-fitting process
@@ -26,10 +25,9 @@ namespace ESPresense.Locators
         {
             _device = device;
             _floor = floor;
-            _state = state;
             _maxIterations = maxIterations;
 
-            _kernel = kernelConfig?.Algorithm?.ToLower() switch
+            _kernel = kernelConfig?.Algorithm?.ToLowerInvariant() switch
             {
                 "epanechnikov" => new EpanechnikovKernel(kernelConfig?.Props),
                 "gaussian"     => new GaussianKernel(kernelConfig?.Props),
@@ -39,6 +37,9 @@ namespace ESPresense.Locators
 
         public bool Locate(Scenario scenario)
         {
+            // Capture whether we have a previous location to check for jitter
+            bool hasPreviousLocation = scenario.LastHit.HasValue;
+
             // 1. Collect nodes relevant to this device & floor
             var nodes = _device.Nodes.Values
                 .Where(a => a.Current && (a.Node?.Floors?.Contains(_floor) ?? false))
@@ -73,25 +74,21 @@ namespace ESPresense.Locators
                 // Update location with newAlpha
                 Point3D newLocation = ComputeNadarayaWatsonLocation(nodes, newAlpha);
 
-                // Optional: check for convergence if desired (not strictly required)
-                // if (Math.Abs(newAlpha - alpha) < 0.001 &&
-                //     newLocation.DistanceTo(locationEstimate) < 0.01)
-                // {
-                //     // close enough, break early
-                //     alpha = newAlpha;
-                //     locationEstimate = newLocation;
-                //     break;
-                // }
+                // Check for convergence
+                if (Math.Abs(newAlpha - alpha) < 0.001 &&
+                    newLocation.DistanceTo(locationEstimate) < 0.01)
+                {
+                    // close enough, break early
+                    alpha = newAlpha;
+                    locationEstimate = newLocation;
+                    break;
+                }
 
                 alpha = newAlpha;
                 locationEstimate = newLocation;
             }
 
-            // 4. Update scenario with final location + alpha
-            scenario.UpdateLocation(locationEstimate);
-            scenario.Scale = alpha;
-
-            // 5. Optional: compute a weighted error just like before
+            // 4. Compute totalWeight before updating scenario; fail if non-positive
             double totalWeight = 0.0;
             double weightedSumErrors = 0.0;
             foreach (var node in nodes)
@@ -99,17 +96,27 @@ namespace ESPresense.Locators
                 double scaledDist = alpha * node.Distance;
                 double w = _kernel.Evaluate(scaledDist);
                 double residual = locationEstimate.DistanceTo(node.Node!.Location) - node.Distance;
-                weightedSumErrors += w * Math.Pow(residual, 2);
+                weightedSumErrors += w * residual * residual;
                 totalWeight += w;
             }
 
-            double weightedError = (totalWeight > 0) ? (weightedSumErrors / totalWeight) : 0;
+            if (totalWeight <= 0.0)
+            {
+                scenario.Confidence = 0;
+                scenario.Error = null;
+                // Do not update location; other scenario fields already set (Floor, Minimum, LastHit, Fixes)
+                return false;
+            }
+
+            // 5. Update scenario with final location + alpha
+            scenario.UpdateLocation(locationEstimate);
+            scenario.Scale = alpha;
+
+            // 6. Compute weighted error
+            double weightedError = weightedSumErrors / totalWeight;
             scenario.Error = weightedError;
 
             // Confidence formula components:
-            // - Base score from number of fixes (more fixes = higher confidence)
-            // - Penalty for error (normalized by dividing by 10)
-            // - Penalty for scale deviation from 1.0 (ideal scale)
             double fixesScore = (double)scenario.Fixes * 3;
             double errorValue = scenario.Error ?? 0;
             double normalizedError = errorValue / 10.0;
@@ -118,11 +125,12 @@ namespace ESPresense.Locators
             double rawConfidence = fixesScore + (100 - errorPenalty);
             scenario.Confidence = (int)Math.Clamp(rawConfidence, 10, 100);
 
-            if (_device.Id.Contains("android"))
+            if (_device.Id.Contains("android", StringComparison.OrdinalIgnoreCase))
                 Log.Information("Scenario {Scenario} confidence {Confidence}% fixes {fixes:0} error {Error:00.0} scale {Scale:0.0}", scenario.Name, scenario.Confidence, scenario.Fixes, scenario.Error, scenario.Scale);
+
             // 7. Decide whether to accept or reject
             if (scenario.Confidence <= 0) return false;
-            if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
+            if (hasPreviousLocation && Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
 
             // 8. If there's a polygon for rooms, figure out which room we're in
             scenario.Room = _floor.Rooms.Values.FirstOrDefault(a =>

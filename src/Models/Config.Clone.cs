@@ -56,7 +56,6 @@ namespace ESPresense.Models
                 Floors = Floors?.ToArray(),
                 Kernel = Kernel.Clone(),
                 MaxIterations = MaxIterations
->>>>>>> 6c18672 (Pluggable kernels)
             };
         }
     }
