@@ -77,13 +77,13 @@ public class FirmwareUpdateJobService
             CreatedAt = DateTime.UtcNow
         };
 
-        if (!_jobs.TryAdd(jobId, job))
-            return (null, "Unable to create update job");
-
         if (!_activeJobByNode.TryAdd(nodeId, jobId))
-        {
-            _jobs.TryRemove(jobId, out _);
             return (null, $"A firmware update is already running for node '{nodeId}'");
+
+        if (!_jobs.TryAdd(jobId, job))
+        {
+            _activeJobByNode.TryRemove(nodeId, out _);
+            return (null, "Unable to create update job");
         }
 
         var cts = new CancellationTokenSource();
