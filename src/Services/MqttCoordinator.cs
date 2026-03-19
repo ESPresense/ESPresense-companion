@@ -531,7 +531,7 @@ public class MqttCoordinator : IMqttCoordinator
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Already logged by EnqueueAsync, just return false
             // Common causes: DNS resolution failure, network unreachable, broker down
