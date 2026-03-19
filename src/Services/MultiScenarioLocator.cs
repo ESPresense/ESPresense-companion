@@ -81,10 +81,28 @@ public class MultiScenarioLocator(DeviceTracker dl,
         // 1. Refresh all scenarios -------------------------------------------------
         // -----------------------------------------------------------------
         device.LastCalculated = DateTime.UtcNow;
+        var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
         var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
 
         // -----------------------------------------------------------------
-        // 2. Feed Kalman with the scenario that has the highest raw Confidence
+        // 1b. Softmax confidence across all current scenarios ----------------
+        // -----------------------------------------------------------------
+        var currentScenarios = device.Scenarios.Where(s => s.Current).ToArray();
+        if (currentScenarios.Length > 0)
+        {
+            var temperature = filtering.ConfidenceTemperature;
+            var logits = currentScenarios.Select(s => MathUtils.ScenarioLogit(s.Rmse, s.PearsonCorrelation, s.Fixes, temperature)).ToArray();
+            var probs = MathUtils.Softmax(logits);
+            for (int i = 0; i < currentScenarios.Length; i++)
+                currentScenarios[i].Confidence = probs[i];
+        }
+
+        // Zero out non-current scenarios
+        foreach (var s in device.Scenarios.Where(s => !s.Current))
+            s.Confidence = 0.0;
+
+        // -----------------------------------------------------------------
+        // 2. Feed Kalman with the scenario that has the highest Confidence
         // -----------------------------------------------------------------
         var kalmanSource = device.Scenarios
             .Where(s => s.Current)
@@ -102,7 +120,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
         // -----------------------------------------------------------------
         // 3. Motion‑consistency weighting for every scenario -------------------
         // -----------------------------------------------------------------
-        var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
         foreach (var scenario in device.Scenarios)
         {
             if (!scenario.Current)
@@ -144,14 +161,34 @@ public class MultiScenarioLocator(DeviceTracker dl,
         // -----------------------------------------------------------------
         // 5. Choose scenario to *report* (was SelectBestScenario)
         // -----------------------------------------------------------------
+        var previousScenario = device.BestScenario;
+        var hysteresis = filtering.ScenarioHysteresis;
         var bestScenario = device.Scenarios
             .Where(s => s.Current)
-            .OrderByDescending(s => s.Probability)
+            .OrderByDescending(s => s.Probability + (s == previousScenario ? hysteresis : 0))
             .ThenByDescending(s => s.Confidence)
             .ThenBy(s => device.Scenarios.IndexOf(s))
             .FirstOrDefault();
 
         device.BestScenario = bestScenario;
+
+        if (bestScenario != null && previousScenario != null && bestScenario.Name != previousScenario.Name)
+            Log.Information("Device {DeviceId} switched scenario {From} -> {To} (confidence {Confidence:P0})",
+                device.Id, previousScenario.Name, bestScenario.Name, bestScenario.Confidence ?? 0);
+
+        if (device.Debug)
+        {
+            foreach (var s in device.Scenarios)
+            {
+                var best = s == bestScenario ? "*" : " ";
+                var prev = s == previousScenario ? ">" : " ";
+                Log.Information("{DeviceId} {Best}{Prev} {Scenario,-20} rmse={Rmse,6:F2} r={Pearson,6:F2} fixes={Fixes} conf={Confidence:P0} mcw={WeightedConf:F3} prob={Probability:F3} loc=({X:F1},{Y:F1},{Z:F1})",
+                    device.Id, best, prev, s.Name ?? "?",
+                    s.Rmse ?? -1, s.PearsonCorrelation ?? 0, s.Fixes ?? 0,
+                    s.Confidence ?? 0, s.WeightedConfidence, s.Probability,
+                    s.Location.X, s.Location.Y, s.Location.Z);
+            }
+        }
 
         // -----------------------------------------------------------------
         // 6. Publish state / attributes if anything moved ----------------------
@@ -211,7 +248,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
             // optional history
             if (state?.Config?.History?.Enabled ?? false)
             {
-                foreach (var ds in device.Scenarios.Where(ds => ds.Confidence != 0))
+                foreach (var ds in device.Scenarios.Where(ds => ds.Confidence > 0))
                 {
                     await deviceHistory.Add(new DeviceHistory
                     {
@@ -259,7 +296,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 if (state.Config?.Locators?.NelderMead?.Enabled ?? false) active.Add("NelderMead");
                 if (state.Config?.Locators?.Bfgs?.Enabled ?? false) active.Add("Bfgs");
                 if (state.Config?.Locators?.Mle?.Enabled ?? false) active.Add("Mle");
-                if (state.Config?.Locators?.MultiFloor?.Enabled ?? false) active.Add("MultiFloor");
                 if (state.Config?.Locators?.NearestNode?.Enabled ?? false) active.Add("NearestNode");
 
                 UpdateStatus(active.Count > 0 ? string.Join(", ", active) : "None");

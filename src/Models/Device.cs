@@ -56,7 +56,7 @@ public class Device
     [STJ.JsonConverter(typeof(FloorConverter))]
     public Floor? Floor => Anchor?.Floor ?? BestScenario?.Floor;
 
-    public int? Confidence => IsAnchored ? 100 : BestScenario?.Confidence;
+    public double? Confidence => IsAnchored ? 1.0 : BestScenario?.Confidence;
 
     public double? Scale => BestScenario?.Scale;
 
@@ -78,6 +78,7 @@ public class Device
 
     [STJ.JsonIgnore] public bool Check { get; set; }
     [STJ.JsonIgnore] public bool Track { get; set; }
+    [STJ.JsonIgnore] public bool Debug { get; set; }
 
     [STJ.JsonIgnore] public Scenario? BestScenario { get; set; }
     [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();

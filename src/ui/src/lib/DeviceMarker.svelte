@@ -41,7 +41,7 @@
 	}
 </script>
 
-{#if visible && d.confidence > 1 && d.location}
+{#if visible && d.confidence > 0.01 && d.location}
 	<g in:fade={{ duration: 1000 }} out:fade={{ duration: 1000 }}>
 		<circle
 			role="none"
