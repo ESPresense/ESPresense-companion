@@ -7,7 +7,11 @@ namespace ESPresense.Controllers;
 
 [Route("api/node")]
 [ApiController]
-public class NodeController(NodeSettingsStore nodeSettingsStore, NodeTelemetryStore nodeTelemetryStore, State state) : ControllerBase
+public class NodeController(
+    NodeSettingsStore nodeSettingsStore,
+    NodeTelemetryStore nodeTelemetryStore,
+    State state,
+    FirmwareUpdateJobService firmwareUpdateJobs) : ControllerBase
 {
     /// <summary>
     /// Retrieve the saved settings for a node and any runtime details available from in-memory state.
@@ -36,9 +40,13 @@ public class NodeController(NodeSettingsStore nodeSettingsStore, NodeTelemetrySt
     }
 
     [HttpPost("{id}/update")]
-    public async Task Update(string id, [FromBody] NodeUpdate? ds = null)
+    public async Task<IActionResult> Update(string id, [FromBody] NodeUpdate? ds = null)
     {
+        if (!firmwareUpdateJobs.IsValidNodeUpdateUrl(ds?.Url))
+            return BadRequest("Only ESPresense GitHub URLs are allowed");
+
         await nodeSettingsStore.Update(id, ds?.Url);
+        return NoContent();
     }
 
     [HttpPost("{id}/restart")]
