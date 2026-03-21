@@ -206,8 +206,15 @@ public class State
         var multiFloor = Config?.Locators?.MultiFloor;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
+        var iterativeNadarayaWatson = Config?.Locators?.IterativeNadarayaWatson;
 
-        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (multiFloor?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        if ((nelderMead?.Enabled ?? false) ||
+            (bfgs?.Enabled ?? false) ||
+            (mle?.Enabled ?? false) ||
+            (multiFloor?.Enabled ?? false) ||
+            (nadarayaWatson?.Enabled ?? false) ||
+            (nearestNode?.Enabled ?? false) ||
+            (iterativeNadarayaWatson?.Enabled ?? false))
         {
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
@@ -224,12 +231,32 @@ public class State
             if (multiFloor?.Enabled ?? false)
                 yield return new Scenario(Config, new MultiFloorMultilateralizer(device, this), "MultiFloor");
 
-            if (nadarayaWatson?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
-                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this, _nts), floor.Name);
+            var nw = nadarayaWatson;
+            if (nw?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(nw?.Floors))
+                    yield return new Scenario(
+                        Config,
+                        new NadarayaWatsonMultilateralizer(device, floor, this, _nts, nw!.Kernel),
+                        floor.Name
+                    );
 
             if (nearestNode?.Enabled ?? false)
                 yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
+
+            var inw = iterativeNadarayaWatson;
+            if (inw?.Enabled ?? false)
+                foreach (var floor in GetFloorsByIds(inw?.Floors))
+                    yield return new Scenario(
+                        Config,
+                        new IterativeNadarayaWatsonMultilateralizer(
+                            device,
+                            floor,
+                            this,
+                            inw!.Kernel,
+                            inw.MaxIterations
+                        ),
+                        floor.Name
+                    );
         }
         else
         {
