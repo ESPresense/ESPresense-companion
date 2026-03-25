@@ -27,3 +27,4 @@ A Home Assistant Add-on / Docker container that solves indoor positions using MQ
 ## Contributing
 - Submit pull requests
 - Improve our [documentation](https://espresense.com)
+# trigger CI
