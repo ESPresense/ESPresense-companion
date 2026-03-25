@@ -18,7 +18,6 @@ namespace ESPresense.Locators
         public IterativeNadarayaWatsonMultilateralizer(
             Device device,
             Floor floor,
-            State state,
             ConfigKernel? kernelConfig = null,
             int maxIterations = 2 // default to 2 iterations
         )
@@ -29,9 +28,11 @@ namespace ESPresense.Locators
 
             _kernel = kernelConfig?.Algorithm?.ToLowerInvariant() switch
             {
-                "epanechnikov" => new EpanechnikovKernel(kernelConfig?.Props),
-                "gaussian"     => new GaussianKernel(kernelConfig?.Props),
-                _              => new InverseSquareKernel(kernelConfig?.Props)
+                "epanechnikov"  => new EpanechnikovKernel(kernelConfig?.Props),
+                "gaussian"      => new GaussianKernel(kernelConfig?.Props),
+                "inverse-square" => new InverseSquareKernel(kernelConfig?.Props),
+                null or ""      => new InverseSquareKernel(kernelConfig?.Props),
+                _               => throw new ArgumentException($"Unknown kernel algorithm: {kernelConfig?.Algorithm}")
             };
         }
 

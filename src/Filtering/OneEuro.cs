@@ -14,11 +14,16 @@ public class OneEuroFilter
     /// <summary>
     /// Create a 1€ filter for 1D signals.
     /// </summary>
-    /// <param name="minCutoff">Minimal cutoff frequency (Hz)</param>
+    /// <param name="minCutoff">Minimal cutoff frequency (Hz), must be greater than zero.</param>
     /// <param name="beta">Speed coefficient to adjust cutoff based on derivative</param>
-    /// <param name="dCutoff">Cutoff frequency for derivative filter</param>
+    /// <param name="dCutoff">Cutoff frequency for derivative filter, must be greater than zero.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when minCutoff or dCutoff is not greater than zero.</exception>
     public OneEuroFilter(double minCutoff = 1.0, double beta = 0.0, double dCutoff = 1.0)
     {
+        if (minCutoff <= 0)
+            throw new ArgumentOutOfRangeException(nameof(minCutoff), "minCutoff must be greater than zero.");
+        if (dCutoff <= 0)
+            throw new ArgumentOutOfRangeException(nameof(dCutoff), "dCutoff must be greater than zero.");
         _minCutoff = minCutoff;
         _beta = beta;
         _dCutoff = dCutoff;
@@ -26,8 +31,12 @@ public class OneEuroFilter
 
     /// <summary>
     /// Filters an incoming raw value and returns the smoothed result.
-    /// Call this whenever you have a new reading; dt is automatically inferred unless you want to pass it.
+    /// The time step dt is inferred from the difference between the supplied currentTime
+    /// and the previously recorded timestamp.
     /// </summary>
+    /// <param name="value">The new raw reading.</param>
+    /// <param name="currentTime">Timestamp of the new reading, used to infer dt between readings.</param>
+    /// <returns>The smoothed filtered value.</returns>
     public double Filter(double value, DateTime currentTime)
     {
         if (!_initialized)

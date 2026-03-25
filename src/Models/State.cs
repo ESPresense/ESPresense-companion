@@ -251,7 +251,6 @@ public class State
                         new IterativeNadarayaWatsonMultilateralizer(
                             device,
                             floor,
-                            this,
                             inw!.Kernel,
                             inw.MaxIterations
                         ),

@@ -397,14 +397,15 @@ public class StateController : ControllerBase
         return Ok(new { autoOptimize = c?.Optimization.Enabled ?? false });
     }
 
-    [HttpPost("api/state/calibration/autoOptimize")]
-    public IActionResult ToggleAutoOptimize([FromBody] bool enable)
+    [HttpPut("api/state/{id}/calibration/autoOptimize")]
+    public async Task<IActionResult> ToggleAutoOptimize(string id, [FromBody] bool enable)
     {
         var c = _config.Config;
-        if (c != null) c.Optimization.Enabled = enable;
+        if (c == null) return NotFound();
+        c.Optimization.Enabled = enable;
+        await _config.SaveSectionAsync("optimization", c.Optimization);
 
-        return Ok(new { autoOptimize = c?.Optimization.Enabled ?? false });
-    }
+        return Ok(new { autoOptimize = c.Optimization.Enabled });
     }
 }
 
