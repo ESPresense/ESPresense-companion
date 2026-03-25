@@ -3,6 +3,7 @@ using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Utils;
 using ESPresense.Controllers;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SQLite;
@@ -12,6 +13,16 @@ namespace ESPresense.Companion.Tests;
 
 public class MultiScenarioLocatorTests
 {
+    private static (State State, DeviceSettingsStore DeviceSettingsStore) CreateStateAndStores(ConfigLoader configLoader, Mock<MqttCoordinator> mqttMock)
+    {
+        DeviceSettingsStore? deviceSettingsStore = null;
+        var nodeSettingsStore = new Mock<NodeSettingsStore>(mqttMock.Object, NullLogger<NodeSettingsStore>.Instance);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore!);
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), nodeSettingsStore.Object, lazyDss);
+        deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
+        return (state, deviceSettingsStore);
+    }
+
     private class DummyLocator : ILocate
     {
         public bool Locate(Scenario scenario) => true;
@@ -32,10 +43,10 @@ public class MultiScenarioLocatorTests
             new MqttNetLogger(),
             supervisor);
 
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var (state, deviceSettingsStore) = CreateStateAndStores(configLoader, mqttMock);
         var tele = new TelemetryService(mqttMock.Object);
-        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
-        var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
+        var distCalc = new DistanceCalculator(new Mock<NodeSettingsStore>(mqttMock.Object, NullLogger<NodeSettingsStore>.Instance).Object, state);
+        var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore, distCalc);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
 
@@ -79,10 +90,10 @@ public class MultiScenarioLocatorTests
             supervisor)
         { CallBase = true };
 
-        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var (state, deviceSettingsStore) = CreateStateAndStores(configLoader, mqttMock);
         var tele = new TelemetryService(mqttMock.Object);
-        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
-        var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
+        var distCalc = new DistanceCalculator(new Mock<NodeSettingsStore>(mqttMock.Object, NullLogger<NodeSettingsStore>.Instance).Object, state);
+        var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore, distCalc);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
         var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
