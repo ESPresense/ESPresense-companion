@@ -167,12 +167,14 @@ public class MultiScenarioLocator(DeviceTracker dl,
         var previousFloor = device.EnsembleFloor;
         var hysteresis = filtering.ScenarioHysteresis;
 
-        // 5a. Group scenarios by floor and sum probabilities
+        // 5a. Group scenarios by floor — TotalConfidence for floor selection,
+        //     TotalProb for position blending within the winning floor
         var floorGroups = currentScenarios
             .GroupBy(s => s.Floor)
             .Select(g => new
             {
                 Floor = g.Key,
+                TotalConfidence = g.Sum(s => s.Confidence ?? 0),
                 TotalProb = g.Sum(s => s.Probability),
                 Scenarios = g.ToArray()
             })
@@ -182,15 +184,15 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
         if (floorGroups.Length > 0)
         {
-            // 5b. Pick winning floor with hysteresis
+            // 5b. Pick winning floor using raw confidence (responsive to current cycle)
             var bestFloorGroup = floorGroups
-                .OrderByDescending(f => f.TotalProb + (f.Floor == previousFloor ? hysteresis : 0))
+                .OrderByDescending(f => f.TotalConfidence + (f.Floor == previousFloor ? hysteresis : 0))
                 .First();
 
             // Log floor changes only
             if (previousFloor != null && bestFloorGroup.Floor != previousFloor)
                 Log.Information("Device {DeviceId} switched floor {From} -> {To} (confidence {Confidence:P0})",
-                    device.Id, previousFloor.Name, bestFloorGroup.Floor?.Name, bestFloorGroup.TotalProb);
+                    device.Id, previousFloor.Name, bestFloorGroup.Floor?.Name, bestFloorGroup.TotalConfidence);
 
             // 5c. Weighted average position within winning floor
             var floorScenarios = bestFloorGroup.Scenarios;
@@ -222,9 +224,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 .First();
             device.BestScenario = bestScenario;
 
-            // 5e. Set ensemble properties
+            // 5e. Set ensemble properties (FloorConfidence = raw confidence for current-cycle certainty)
             device.EnsembleFloor = bestFloorGroup.Floor;
-            device.FloorConfidence = bestFloorGroup.TotalProb;
+            device.FloorConfidence = bestFloorGroup.TotalConfidence;
 
             // Determine room from Kalman-filtered blended position
             var kalmanLocation = device.Location ?? blendedPosition;
@@ -251,12 +253,12 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     s.Location.X, s.Location.Y, s.Location.Z);
             }
 
-            // Show floor aggregation
-            foreach (var fg in floorGroups.OrderByDescending(f => f.TotalProb))
+            // Show floor aggregation (TotalConfidence for floor selection, TotalProb for position blending)
+            foreach (var fg in floorGroups.OrderByDescending(f => f.TotalConfidence))
             {
                 var winner = fg.Floor == device.EnsembleFloor ? "*" : " ";
-                Log.Information("{DeviceId} {Winner} Floor={Floor,-15} prob={TotalProb:F3} scenarios={Count}",
-                    device.Id, winner, fg.Floor?.Name ?? "?", fg.TotalProb, fg.Scenarios.Length);
+                Log.Information("{DeviceId} {Winner} Floor={Floor,-15} conf={TotalConfidence:F3} prob={TotalProb:F3} scenarios={Count}",
+                    device.Id, winner, fg.Floor?.Name ?? "?", fg.TotalConfidence, fg.TotalProb, fg.Scenarios.Length);
             }
 
             if (bestScenario != null)
