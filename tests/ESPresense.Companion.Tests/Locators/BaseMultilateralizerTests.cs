@@ -235,6 +235,88 @@ public class BaseMultilateralizerTests
         Assert.That(result, Is.False); // Should return false because movement < 0.1
     }
 
+    [Test]
+    public void InitializeScenario_FiltersNodesByFloorZBounds()
+    {
+        // Arrange: floor with Z bounds 0-10
+        var floor = new Floor();
+        var configFloor = new ConfigFloor
+        {
+            Id = "z_bounded_floor",
+            Name = "Z-Bounded Floor",
+            Bounds = new double[][]
+            {
+                new double[] { -10, -10, 0 },
+                new double[] { 10, 10, 10 }
+            }
+        };
+        floor.Update(_configLoader.Config!, configFloor);
+        _state.Floors[floor.Id] = floor;
+
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        // Node within floor Z bounds (Z=5)
+        var nodeInBounds = CreateTestNode("node_in_bounds", 1, 1, 5, floor);
+        device.Nodes["node_in_bounds"] = new DeviceToNode(device, nodeInBounds)
+        {
+            Distance = 1.0,
+            LastHit = DateTime.UtcNow
+        };
+
+        // Node outside floor Z bounds (Z=15) but still assigned to the floor
+        var nodeOutOfBounds = CreateTestNode("node_out_of_bounds", 2, 2, 15, floor);
+        device.Nodes["node_out_of_bounds"] = new DeviceToNode(device, nodeOutOfBounds)
+        {
+            Distance = 1.5,
+            LastHit = DateTime.UtcNow
+        };
+
+        var scenario = new Scenario(_configLoader.Config, CreateTestMultilateralizer(device, floor), "Test");
+        var multilateralizer = CreateTestMultilateralizer(device, floor);
+
+        // Act
+        var result = multilateralizer.PublicInitializeScenario(scenario, out var nodes, out var guess);
+
+        // Assert: only the in-bounds node should be included
+        Assert.That(result, Is.True);
+        Assert.That(nodes.Length, Is.EqualTo(1));
+        Assert.That(nodes[0].Node!.Id, Is.EqualTo("node_in_bounds"));
+    }
+
+    [Test]
+    public void InitializeScenario_IncludesNodesWhenFloorHasNoZBounds()
+    {
+        // Arrange: floor with no Z bounds
+        var floor = new Floor();
+        var configFloor = new ConfigFloor
+        {
+            Id = "no_bounds_floor",
+            Name = "No Bounds Floor"
+        };
+        floor.Update(_configLoader.Config!, configFloor);
+        _state.Floors[floor.Id] = floor;
+
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        // Node with any Z should be included when floor has no bounds
+        var node = CreateTestNode("any_z_node", 1, 1, 100, floor);
+        device.Nodes["any_z_node"] = new DeviceToNode(device, node)
+        {
+            Distance = 1.0,
+            LastHit = DateTime.UtcNow
+        };
+
+        var scenario = new Scenario(_configLoader.Config, CreateTestMultilateralizer(device, floor), "Test");
+        var multilateralizer = CreateTestMultilateralizer(device, floor);
+
+        // Act
+        var result = multilateralizer.PublicInitializeScenario(scenario, out var nodes, out var guess);
+
+        // Assert: node should be included when floor has no Z bounds
+        Assert.That(result, Is.False); // Only 1 node, needs 2
+        Assert.That(nodes.Length, Is.EqualTo(1));
+    }
+
     // Test multilateralizer that exposes protected methods for testing
     private class TestMultilateralizer : BaseMultilateralizer
     {
