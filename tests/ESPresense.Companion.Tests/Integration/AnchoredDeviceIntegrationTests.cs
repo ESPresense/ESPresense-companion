@@ -8,6 +8,7 @@ using MathNet.Spatial.Euclidean;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace ESPresense.Companion.Tests.Integration;
 
@@ -22,16 +23,22 @@ public class AnchoredDeviceIntegrationTests
     private DeviceSettingsStore _deviceSettingsStore;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
 
         _configLoader = new ConfigLoader(_configDir);
+        // Ensure the default config is fully loaded before proceeding
+        await _configLoader.ConfigAsync(CancellationToken.None);
+
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
         _deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object, _state);
+
+        // Clear default floors from config to isolate test scenarios
+        _state.Floors.Clear();
     }
 
     [TearDown]
