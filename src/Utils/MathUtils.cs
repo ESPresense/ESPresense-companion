@@ -214,5 +214,27 @@ namespace ESPresense.Utils
         }
 
         private readonly record struct Block(int Start, int End, double Weight, double Value);
+
+        /// <summary>
+        /// Computes directional antenna gain in dB using a simplified cosine power pattern.
+        /// </summary>
+        /// <param name="px">Antenna pointing vector X (normalized)</param>
+        /// <param name="py">Antenna pointing vector Y (normalized)</param>
+        /// <param name="pz">Antenna pointing vector Z (normalized)</param>
+        /// <param name="dx">Direction vector X (from antenna toward device, normalized)</param>
+        /// <param name="dy">Direction vector Y (from antenna toward device, normalized)</param>
+        /// <param name="dz">Direction vector Z (from antenna toward device, normalized)</param>
+        /// <param name="gMaxDb">Maximum gain in dB (at boresight)</param>
+        /// <param name="patternExponent">Pattern exponent (1=half-wave dipole, 2=whip, higher=more directional)</param>
+        /// <param name="backLossDb">Back lobe loss in dB (typically 10–30)</param>
+        /// <returns>Gain in dB</returns>
+        public static double ComputeGainDb(double px, double py, double pz, double dx, double dy, double dz, double gMaxDb, double patternExponent, double backLossDb)
+        {
+            double cosTheta = px * dx + py * dy + pz * dz;
+            if (cosTheta > 0)
+                return gMaxDb - 10.0 * patternExponent * Math.Log10(1.0 / cosTheta);
+            else
+                return gMaxDb - backLossDb - 10.0 * patternExponent * Math.Log10(1.0 / (-cosTheta));
+        }
     }
 }

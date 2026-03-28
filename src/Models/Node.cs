@@ -18,6 +18,7 @@ public class Node(string id, NodeSourceType sourceType)
     public NodeSourceType SourceType { get; private set; } = sourceType;
 
     public string? Name { get; private set; }
+    public string? AntennaProfile { get; set; }
 
     public double? X { get; private set; }
     public double? Y { get; private set; }
