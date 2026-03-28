@@ -106,8 +106,7 @@ filtering:
 
             var tele = new TelemetryService(mqttMock.Object);
             var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
-            var distCalc = new DistanceCalculator(mockNss.Object, state);
-            var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore, distCalc);
+            var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
             var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
             var leaseServiceMock = new Mock<ILeaseService>();
             var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
