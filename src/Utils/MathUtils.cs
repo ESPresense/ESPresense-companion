@@ -214,5 +214,51 @@ namespace ESPresense.Utils
         }
 
         private readonly record struct Block(int Start, int End, double Weight, double Value);
+
+        /// <summary>
+        /// Computes directional antenna gain in dB using a simplified antenna radiation model.
+        /// </summary>
+        /// <param name="px">Antenna pointing vector X (sin(az)*cos(el))</param>
+        /// <param name="py">Antenna pointing vector Y (cos(az)*cos(el))</param>
+        /// <param name="pz">Antenna pointing vector Z (sin(el))</param>
+        /// <param name="dx">Path vector X (from Rx to Tx)</param>
+        /// <param name="dy">Path vector Y (from Rx to Tx)</param>
+        /// <param name="dz">Path vector Z (from Rx to Tx)</param>
+        /// <param name="gMaxDb">Maximum gain in dB (at broadside)</param>
+        /// <param name="patternExponent">Pattern exponent controlling front/back gain ratio</param>
+        /// <param name="backLossDb">Back lobe loss in dB</param>
+        /// <returns>Antenna gain contribution in dB</returns>
+        public static double ComputeGainDb(double px, double py, double pz, double dx, double dy, double dz, double gMaxDb, double patternExponent, double backLossDb)
+        {
+            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            if (len < 1e-9) return gMaxDb; // co-located
+
+            // cosTheta = dot product of normalized path vector and pointing vector
+            double cosTheta = (px * dx + py * dy + pz * dz) / len;
+
+            // Front hemisphere: cosTheta > 0
+            // cosTheta = 1 (head-on) → gain = GMax
+            // cosTheta = 0 (edge-on) → gain = GMax - 3
+            // Back hemisphere: cosTheta < 0 → apply backLoss penalty
+            if (cosTheta >= 0)
+            {
+                // Front: gain rolls off smoothly from GMax at cosTheta=1 to GMax-3 at cosTheta=0
+                double gainDb = gMaxDb - 3.0 * (1.0 - cosTheta);
+                // Apply pattern shaping: higher patternExponent = sharper front beam
+                if (patternExponent != 0)
+                {
+                    // Widen the beam by reducing the effective rolloff
+                    double rolloff = 3.0 * Math.Pow(cosTheta, patternExponent + 1.0);
+                    gainDb = gMaxDb - rolloff;
+                }
+                return gainDb;
+            }
+            else
+            {
+                // Back: apply back loss (more negative cosTheta = more loss)
+                double gainDb = gMaxDb - 3.0 * (1.0 - cosTheta) - backLossDb;
+                return Math.Min(gainDb, gMaxDb - backLossDb);
+            }
+        }
     }
 }
