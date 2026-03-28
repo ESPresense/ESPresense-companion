@@ -81,28 +81,38 @@ public class MultiScenarioLocator(DeviceTracker dl,
         // 1. Refresh all scenarios -------------------------------------------------
         // -----------------------------------------------------------------
         device.LastCalculated = DateTime.UtcNow;
+        var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
         var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
 
         // -----------------------------------------------------------------
-        // 2. Feed Kalman with the scenario that has the highest raw Confidence
+        // 1b. Softmax confidence across all current scenarios ----------------
         // -----------------------------------------------------------------
-        var kalmanSource = device.Scenarios
-            .Where(s => s.Current)
-            .OrderByDescending(s => s.Confidence)
-            .FirstOrDefault();
-
-        if (kalmanSource != null)
+        var currentScenarios = device.Scenarios.Where(s => s.Current).ToArray();
+        if (currentScenarios.Length > 0)
         {
-            device.UpdateLocation(kalmanSource.Location);
+            var temperature = filtering.ConfidenceTemperature;
+            var logits = currentScenarios.Select(s => MathUtils.ScenarioLogit(s.Rmse, s.PearsonCorrelation, s.Fixes, temperature)).ToArray();
+            var probs = MathUtils.Softmax(logits);
+            for (int i = 0; i < currentScenarios.Length; i++)
+                currentScenarios[i].Confidence = probs[i];
         }
 
-        // Predicted location from the updated Kalman filter (x̂ₖ|ₖ⁻¹)
+        // Zero out non-current scenarios
+        foreach (var s in device.Scenarios.Where(s => !s.Current))
+            s.Confidence = 0.0;
+
+        // -----------------------------------------------------------------
+        // 2. Get Kalman prediction from current state (for motion consistency)
+        // -----------------------------------------------------------------
+        // Prediction comes BEFORE update; the blended position feeds Kalman in step 5
         var (predictedLocation, _) = device.KalmanFilter.GetPrediction();
 
         // -----------------------------------------------------------------
         // 3. Motion‑consistency weighting for every scenario -------------------
+        //    Only applied within the current floor; cross-floor scenarios use
+        //    raw confidence so that genuine floor transitions aren't blocked.
         // -----------------------------------------------------------------
-        var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
+        var currentFloor = device.EnsembleFloor;
         foreach (var scenario in device.Scenarios)
         {
             if (!scenario.Current)
@@ -111,9 +121,18 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 continue;
             }
 
-            double delta = predictedLocation.DistanceTo(scenario.Location);
-            double mcw = Math.Exp(-(delta * delta) / (2 * filtering.MotionSigma * filtering.MotionSigma));
-            scenario.WeightedConfidence = (scenario.Confidence ?? 0) * mcw;
+            if (currentFloor != null && scenario.Floor != currentFloor)
+            {
+                // Cross-floor: use raw confidence (no motion penalty)
+                scenario.WeightedConfidence = scenario.Confidence ?? 0;
+            }
+            else
+            {
+                // Same floor (or no prior floor): apply motion consistency
+                double delta = predictedLocation.DistanceTo(scenario.Location);
+                double mcw = Math.Exp(-(delta * delta) / (2 * filtering.MotionSigma * filtering.MotionSigma));
+                scenario.WeightedConfidence = (scenario.Confidence ?? 0) * mcw;
+            }
         }
 
         // -----------------------------------------------------------------
@@ -142,16 +161,114 @@ public class MultiScenarioLocator(DeviceTracker dl,
         }
 
         // -----------------------------------------------------------------
-        // 5. Choose scenario to *report* (was SelectBestScenario)
+        // 5. Floor-level ensemble (Monte Carlo aggregation)
         // -----------------------------------------------------------------
-        var bestScenario = device.Scenarios
-            .Where(s => s.Current)
-            .OrderByDescending(s => s.Probability)
-            .ThenByDescending(s => s.Confidence)
-            .ThenBy(s => device.Scenarios.IndexOf(s))
-            .FirstOrDefault();
+        var previousScenario = device.BestScenario;
+        var previousFloor = device.EnsembleFloor;
+        var hysteresis = filtering.ScenarioHysteresis;
 
-        device.BestScenario = bestScenario;
+        // 5a. Group scenarios by floor — TotalConfidence for floor selection,
+        //     TotalProb for position blending within the winning floor
+        var floorGroups = currentScenarios
+            .GroupBy(s => s.Floor)
+            .Select(g => new
+            {
+                Floor = g.Key,
+                TotalConfidence = g.Sum(s => s.Confidence ?? 0),
+                TotalProb = g.Sum(s => s.Probability),
+                Scenarios = g.ToArray()
+            })
+            .ToArray();
+
+        Scenario? bestScenario = null;
+
+        if (floorGroups.Length > 0)
+        {
+            // 5b. Pick winning floor using raw confidence (responsive to current cycle)
+            var bestFloorGroup = floorGroups
+                .OrderByDescending(f => f.TotalConfidence + (f.Floor == previousFloor ? hysteresis : 0))
+                .First();
+
+            // Log floor changes only
+            if (previousFloor != null && bestFloorGroup.Floor != previousFloor)
+                Log.Information("Device {DeviceId} switched floor {From} -> {To} (confidence {Confidence:P0})",
+                    device.Id, previousFloor.Name, bestFloorGroup.Floor?.Name, bestFloorGroup.TotalConfidence);
+
+            // 5c. Weighted average position within winning floor
+            var floorScenarios = bestFloorGroup.Scenarios;
+            var totalProb = bestFloorGroup.TotalProb;
+
+            Point3D blendedPosition;
+            if (totalProb > 0)
+            {
+                var blendedX = floorScenarios.Sum(s => s.Location.X * s.Probability) / totalProb;
+                var blendedY = floorScenarios.Sum(s => s.Location.Y * s.Probability) / totalProb;
+                var blendedZ = floorScenarios.Sum(s => s.Location.Z * s.Probability) / totalProb;
+                blendedPosition = new Point3D(blendedX, blendedY, blendedZ);
+            }
+            else
+            {
+                // Fallback: use highest-confidence scenario location
+                blendedPosition = floorScenarios
+                    .OrderByDescending(s => s.Confidence)
+                    .First().Location;
+            }
+
+            // Feed Kalman with blended position
+            device.UpdateLocation(blendedPosition);
+
+            // 5d. Best scenario = highest-prob on winning floor (for best_scenario attribute)
+            bestScenario = floorScenarios
+                .OrderByDescending(s => s.Probability)
+                .ThenByDescending(s => s.Confidence)
+                .First();
+            device.BestScenario = bestScenario;
+
+            // 5e. Set ensemble properties (FloorConfidence = raw confidence for current-cycle certainty)
+            device.EnsembleFloor = bestFloorGroup.Floor;
+            device.FloorConfidence = bestFloorGroup.TotalConfidence;
+
+            // Determine room from Kalman-filtered blended position
+            var kalmanLocation = device.Location ?? blendedPosition;
+            device.EnsembleRoom = SpatialUtils.FindRoomContaining(kalmanLocation, bestFloorGroup.Floor);
+        }
+        else
+        {
+            device.BestScenario = null;
+            device.EnsembleFloor = null;
+            device.EnsembleRoom = null;
+            device.FloorConfidence = null;
+        }
+
+        if (device.Debug)
+        {
+            foreach (var s in device.Scenarios)
+            {
+                var best = s == bestScenario ? "*" : " ";
+                var prev = s == previousScenario ? ">" : " ";
+                Log.Information("{DeviceId} {Best}{Prev} {Scenario,-20} rmse={Rmse,6:F2} r={Pearson,6:F2} fixes={Fixes} conf={Confidence:P0} mcw={WeightedConf:F3} prob={Probability:F3} loc=({X:F1},{Y:F1},{Z:F1})",
+                    device.Id, best, prev, s.Name ?? "?",
+                    s.Rmse ?? -1, s.PearsonCorrelation ?? 0, s.Fixes ?? 0,
+                    s.Confidence ?? 0, s.WeightedConfidence, s.Probability,
+                    s.Location.X, s.Location.Y, s.Location.Z);
+            }
+
+            // Show floor aggregation (TotalConfidence for floor selection, TotalProb for position blending)
+            foreach (var fg in floorGroups.OrderByDescending(f => f.TotalConfidence))
+            {
+                var winner = fg.Floor == device.EnsembleFloor ? "*" : " ";
+                Log.Information("{DeviceId} {Winner} Floor={Floor,-15} conf={TotalConfidence:F3} prob={TotalProb:F3} scenarios={Count}",
+                    device.Id, winner, fg.Floor?.Name ?? "?", fg.TotalConfidence, fg.TotalProb, fg.Scenarios.Length);
+            }
+
+            if (bestScenario != null)
+            {
+                var blendLoc = device.Location ?? new Point3D();
+                Log.Information("{DeviceId}   Blended: floor={Floor} room={Room} conf={Confidence:F3} loc=({X:F1},{Y:F1},{Z:F1})",
+                    device.Id, device.EnsembleFloor?.Name, device.EnsembleRoom?.Name,
+                    device.FloorConfidence, blendLoc.X, blendLoc.Y, blendLoc.Z);
+            }
+        }
 
         // -----------------------------------------------------------------
         // 6. Publish state / attributes if anything moved ----------------------
@@ -197,7 +314,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 x = location.X,
                 y = location.Y,
                 z = location.Z,
-                confidence = bestScenario.Confidence,
+                confidence = device.FloorConfidence,
                 fixes = bestScenario.Fixes,
                 best_scenario = bestScenario.Name,
                 last_seen = device.LastSeen
@@ -211,7 +328,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
             // optional history
             if (state?.Config?.History?.Enabled ?? false)
             {
-                foreach (var ds in device.Scenarios.Where(ds => ds.Confidence != 0))
+                foreach (var ds in device.Scenarios.Where(ds => ds.Confidence > 0))
                 {
                     await deviceHistory.Add(new DeviceHistory
                     {
@@ -259,7 +376,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 if (state.Config?.Locators?.NelderMead?.Enabled ?? false) active.Add("NelderMead");
                 if (state.Config?.Locators?.Bfgs?.Enabled ?? false) active.Add("Bfgs");
                 if (state.Config?.Locators?.Mle?.Enabled ?? false) active.Add("Mle");
-                if (state.Config?.Locators?.MultiFloor?.Enabled ?? false) active.Add("MultiFloor");
                 if (state.Config?.Locators?.NearestNode?.Enabled ?? false) active.Add("NearestNode");
 
                 UpdateStatus(active.Count > 0 ? string.Join(", ", active) : "None");
