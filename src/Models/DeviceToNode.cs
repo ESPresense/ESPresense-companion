@@ -19,6 +19,17 @@ public class DeviceToNode(Device device, Node node)
 
     public bool Current => DateTime.UtcNow - LastHit < Device!.Timeout;
 
+    // Antenna parameters populated by BaseMultilateralizer.EnrichNodeFields()
+    public double NodeAbsorption { get; set; }
+    public double NodeRxAdjRssi { get; set; }
+    public double? NodeGMaxDb { get; set; }
+    public double NodePatternExponent { get; set; }
+    public double NodeBackLossDb { get; set; }
+    public double? NodeAzimuthRad { get; set; }
+    public double? NodeElevationRad { get; set; }
+    public double? NodeCosTheta { get; set; }
+    public double TxAdjRssi { get; set; }
+
     public bool ReadMessage(DeviceMessage payload)
     {
         Rssi = payload.Rssi;
