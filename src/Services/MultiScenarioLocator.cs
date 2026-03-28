@@ -1,4 +1,4 @@
-﻿using ESPresense.Controllers;
+﻿﻿using ESPresense.Controllers;
 using ESPresense.Models;
 using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
@@ -44,8 +44,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var stateChanged = device.ReportedState != "not_home";
             if (stateChanged)
             {
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home"))
-                    device.ReportedState = "not_home";
+                await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home");
+                device.ReportedState = "not_home";
             }
 
             var locationChanged = device.ReportedLocation != anchorLocation;
@@ -70,8 +70,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     last_seen = device.LastSeen
                 }, SerializerSettings.NullIgnore);
 
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
-                    globalEventDispatcher.OnDeviceChanged(device, false);
+                await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
+                globalEventDispatcher.OnDeviceChanged(device, false);
             }
 
             return;
@@ -161,20 +161,16 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var newState = device.Room?.Name ?? device.Floor?.Name ?? "not_home";
             if (newState != device.ReportedState)
             {
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", newState))
-                {
-                    moved += 1;
-                    device.ReportedState = newState;
-                }
+                moved += 1;
+                await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", newState);
+                device.ReportedState = newState;
             }
         }
         else if (device.ReportedState != "not_home")
         {
-            if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home"))
-            {
-                moved += 1;
-                device.ReportedState = "not_home";
-            }
+            moved += 1;
+            await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home");
+            device.ReportedState = "not_home";
         }
 
         if (moved > 0 && bestScenario != null)
@@ -203,8 +199,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 last_seen = device.LastSeen
             }, SerializerSettings.NullIgnore);
 
-            if (!await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
-                return;
+            await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
 
             globalEventDispatcher.OnDeviceChanged(device, false);
 

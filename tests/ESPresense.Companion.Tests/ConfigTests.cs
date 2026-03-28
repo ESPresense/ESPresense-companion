@@ -15,8 +15,10 @@ public class ConfigTests
           nadaraya_watson:
             enabled: true
             floors: [""floor1"", ""floor2""]
-            bandwidth: 0.5
-            kernel: ""gaussian""
+            kernel:
+              algorithm: gaussian
+              props:
+                bandwidth: 0.5
           nelder_mead:
             enabled: false
             floors: [""floor3""]
@@ -52,8 +54,10 @@ public class ConfigTests
         var nadarayaWatson = config.Locators.NadarayaWatson;
         Assert.True(nadarayaWatson.Enabled);
         Assert.That(nadarayaWatson.Floors, Is.EqualTo(new[] { "floor1", "floor2" }));
-        Assert.That(nadarayaWatson.Bandwidth, Is.EqualTo(0.5));
-        Assert.That(nadarayaWatson.Kernel, Is.EqualTo("gaussian"));
+        Assert.NotNull(nadarayaWatson.Kernel);
+        Assert.That(nadarayaWatson.Kernel.Algorithm, Is.EqualTo("gaussian"));
+        Assert.True(nadarayaWatson.Kernel.Props.ContainsKey("bandwidth"), "Expected 'bandwidth' property in kernel props");
+        Assert.That(nadarayaWatson.Kernel.Props["bandwidth"], Is.EqualTo(0.5));
 
         var nelderMead = config.Locators.NelderMead;
         Assert.False(nelderMead.Enabled);
