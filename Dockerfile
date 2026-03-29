@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build-env
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
@@ -45,13 +45,7 @@ RUN case "${TARGETARCH}" in \
     dotnet publish src/ESPresense.Companion.csproj -c Release --no-restore -r "${TARGETOS}-${dotnet_arch}" -o out
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
-ARG TARGETPLATFORM
-
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /App
 EXPOSE 8267 8268
 
