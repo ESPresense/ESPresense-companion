@@ -31,7 +31,7 @@
 		"@types/node": "^25.2.3",
 		"@types/three": "^0.182.0",
 		"@typescript-eslint/eslint-plugin": "^8.54.0",
-		"@typescript-eslint/parser": "^8.54.0",
+		"@typescript-eslint/parser": "^8.58.0",
 		"autoprefixer": "^10.4.24",
 		"d3": "^7.9.0",
 		"d3-interpolate": "^3.0.1",
