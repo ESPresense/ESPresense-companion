@@ -10,7 +10,8 @@ public class FirmwareUpdateJobService
     private static readonly string[] TrustedFirmwarePrefixes =
     {
         "https://github.com/ESPresense/",
-        "https://nightly.link/ESPresense/"
+        "https://nightly.link/ESPresense/",
+        "https://espresense.com/"
     };
 
     private readonly ConcurrentDictionary<string, FirmwareUpdateJob> _jobs = new(StringComparer.OrdinalIgnoreCase);

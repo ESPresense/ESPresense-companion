@@ -5,7 +5,7 @@
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showComponent, showConfirm } from '$lib/modal/modalStore';
-	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getLocalFirmwareUrl, getFirmwareUrl } from '$lib/firmware';
+	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getFirmwareUrl } from '$lib/firmware';
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from '$lib/modals/NodeSettingsModal.svelte';
 
@@ -98,7 +98,7 @@
 					throw new Error(`No firmware found for selected CPU (${cpuId}) and flavor (${selectedFlavorId})`);
 				}
 
-				url = $artifact ? getLocalFirmwareUrl($firmwareSource, $version, $artifact, firmwareId) : getFirmwareUrl($firmwareSource, $version, $artifact, firmwareId);
+				url = getFirmwareUrl($firmwareSource, $version, $artifact, firmwareId);
 
 				if (!url) {
 					throw new Error(`No firmware URL found for ${$firmwareSource}, ${$version || $artifact}, ${cpuId}, ${selectedFlavorId}`);

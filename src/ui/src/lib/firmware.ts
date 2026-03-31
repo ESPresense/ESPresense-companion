@@ -128,7 +128,7 @@ export function getFirmwareUrl(firmwareSource: string, version: string, artifact
 	if (firmware) {
 		switch (firmwareSource) {
 			case 'artifact':
-				if (artifact) return `https://nightly.link/ESPresense/ESPresense/actions/runs/${artifact}/${firmware}.zip`;
+				if (artifact) return `https://espresense.com/artifacts/download/runs/${artifact}/${firmware}`;
 				break;
 			case 'release':
 				if (version) return `https://github.com/ESPresense/ESPresense/releases/download/${version}/${firmware}`;

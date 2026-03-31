@@ -34,6 +34,7 @@ public class FirmwareUpdateJobServiceTests
         Assert.That(sut.IsTrustedFirmwareUrl("https://github.com/ESPresense/ESPresense/releases/download/v1/test.bin"), Is.True);
         Assert.That(sut.IsTrustedFirmwareUrl("https://nightly.link/ESPresense/ESPresense/actions/runs/1/test.zip"), Is.True);
         Assert.That(sut.IsTrustedFirmwareUrl("https://github.com/espresense/ESPresense/releases/download/v1/test.bin"), Is.True);
+        Assert.That(sut.IsTrustedFirmwareUrl("https://espresense.com/artifacts/download/runs/123/firmware.bin"), Is.True);
     }
 
     [Test]
