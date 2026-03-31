@@ -14,22 +14,14 @@ public class FirmwareController : Controller
     private readonly FirmwareTypeStore _firmwareTypeStore;
     private readonly NodeSettingsStore _nodeSettingsStore;
     private readonly NodeTelemetryStore _nts;
-    private readonly FirmwareUpdateJobService _firmwareUpdateJobs;
     private readonly ILogger<FirmwareController> _logger;
     private readonly HttpClient _hc;
 
-    public FirmwareController(
-        FirmwareTypeStore firmwareTypeStore,
-        NodeSettingsStore nodeSettingsStore,
-        NodeTelemetryStore nts,
-        FirmwareUpdateJobService firmwareUpdateJobs,
-        ILogger<FirmwareController> logger,
-        HttpClient hc)
+    public FirmwareController(FirmwareTypeStore firmwareTypeStore, NodeSettingsStore nodeSettingsStore, NodeTelemetryStore nts, ILogger<FirmwareController> logger, HttpClient hc)
     {
         _firmwareTypeStore = firmwareTypeStore;
         _nodeSettingsStore = nodeSettingsStore;
         _nts = nts;
-        _firmwareUpdateJobs = firmwareUpdateJobs;
         _logger = logger;
         _hc = hc;
     }
@@ -45,7 +37,8 @@ public class FirmwareController : Controller
     [Route("api/firmware/download")]
     public async Task<IActionResult> DownloadFirmware([FromQuery] string url)
     {
-        if (!_firmwareUpdateJobs.IsTrustedFirmwareUrl(url))
+        if (!url.StartsWith("https://github.com/ESPresense/") &&
+            !url.StartsWith("https://nightly.link/ESPresense/"))
         {
             _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
             return StatusCode(StatusCodes.Status400BadRequest, "Only ESPresense GitHub URLs are allowed");
@@ -73,11 +66,6 @@ public class FirmwareController : Controller
     public async Task Update(string id, [FromQuery] string url)
     {
         if (!HttpContext.WebSockets.IsWebSocketRequest)
-        {
-            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-            return;
-        }
-        if (!_firmwareUpdateJobs.IsTrustedFirmwareUrl(url))
         {
             HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
@@ -135,7 +123,7 @@ public class FirmwareController : Controller
         if (!isZip && mediaType != "application/zip")
             return ms1;
 
-        using (var zipArchive = new ZipArchive(ms1, ZipArchiveMode.Read, leaveOpen: true))
+        using (var zipArchive = new ZipArchive(ms1))
         {
             foreach (var entry in zipArchive.Entries)
             {
@@ -143,7 +131,6 @@ public class FirmwareController : Controller
                 await using var entryStream = entry.Open();
                 await entryStream.CopyToAsync(ms2);
                 ms2.Position = 0;
-                ms1.Dispose();
                 return ms2;
             }
         }
