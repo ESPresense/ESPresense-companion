@@ -22,10 +22,11 @@ export const tooltip: Action<HTMLElement, string> = (node, content) => {
 	function ensureTooltip() {
 		if (tooltipEl) return;
 		tooltipEl = document.createElement('div');
-		tooltipEl.className = 'card preset-filled-secondary-500 p-4';
+		tooltipEl.className = 'card preset-filled-secondary-500 p-4 text-sm';
 		tooltipEl.style.position = 'absolute';
 		tooltipEl.style.zIndex = '1000';
 		tooltipEl.style.pointerEvents = 'none';
+		tooltipEl.style.whiteSpace = 'pre-line';
 		tooltipEl.textContent = content ?? '';
 		// Set ARIA attributes for accessibility
 		tooltipEl.setAttribute('role', 'tooltip');

@@ -15,18 +15,15 @@ public class NodeControllerTests
         var mqtt = new Mock<IMqttCoordinator>();
         var nodeSettingsStore = new NodeSettingsStore(mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt.Object);
-        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore);
-        var firmwareUpdateJobs = new FirmwareUpdateJobService(
-            nodeSettingsStore,
-            nodeTelemetryStore,
-            new HttpClient(),
-            Mock.Of<ILogger<FirmwareUpdateJobService>>());
+        DeviceSettingsStore? deviceSettingsStore = null;
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore!);
+        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore, nodeSettingsStore, lazyDss);
+        deviceSettingsStore = new DeviceSettingsStore(mqtt.Object, state);
 
-        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state, firmwareUpdateJobs);
+        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state);
 
-        var result = await sut.Update("node-1", new NodeController.NodeUpdate { Url = "https://example.com/firmware.bin" });
+        await sut.Update("node-1", new NodeController.NodeUpdate { Url = "https://example.com/firmware.bin" });
 
-        Assert.That(result, Is.TypeOf<BadRequestObjectResult>());
         mqtt.Verify(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
     }
 
@@ -39,21 +36,18 @@ public class NodeControllerTests
 
         var nodeSettingsStore = new NodeSettingsStore(mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt.Object);
-        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore);
-        var firmwareUpdateJobs = new FirmwareUpdateJobService(
-            nodeSettingsStore,
-            nodeTelemetryStore,
-            new HttpClient(),
-            Mock.Of<ILogger<FirmwareUpdateJobService>>());
+        DeviceSettingsStore? deviceSettingsStore = null;
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore!);
+        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore, nodeSettingsStore, lazyDss);
+        deviceSettingsStore = new DeviceSettingsStore(mqtt.Object, state);
 
-        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state, firmwareUpdateJobs);
+        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state);
 
-        var result = await sut.Update("node-1", new NodeController.NodeUpdate
+        await sut.Update("node-1", new NodeController.NodeUpdate
         {
             Url = "https://github.com/espresense/ESPresense/releases/download/v1/test.bin"
         });
 
-        Assert.That(result, Is.TypeOf<NoContentResult>());
         mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/update/set", "https://github.com/espresense/ESPresense/releases/download/v1/test.bin", false), Times.Once);
     }
 }

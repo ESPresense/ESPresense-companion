@@ -95,5 +95,7 @@ public class CalibrationSettings
     public int? RxAdjRssi { get; set; }
     public double? Absorption { get; set; }
     public int? TxRefRssi { get; set; }
+    public double? Azimuth { get; set; }
+    public double? Elevation { get; set; }
     public CalibrationSettings Clone() => (CalibrationSettings)MemberwiseClone();
 }

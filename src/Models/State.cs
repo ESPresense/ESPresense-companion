@@ -13,6 +13,8 @@ namespace ESPresense.Models;
 public class State
 {
     private readonly NodeTelemetryStore _nts;
+    private readonly NodeSettingsStore _nss;
+    private readonly Lazy<DeviceSettingsStore> _dss;
 
     /// <summary>
     /// Initializes a new State, wiring telemetry and configuration handling.
@@ -22,9 +24,11 @@ public class State
     /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
     /// selects the locators' weighting strategy, and marks existing Devices for checking.
     /// </remarks>
-    public State(ConfigLoader cl, NodeTelemetryStore nts)
+    public State(ConfigLoader cl, NodeTelemetryStore nts, NodeSettingsStore nss, Lazy<DeviceSettingsStore> dss)
     {
         _nts = nts;
+        _nss = nss;
+        _dss = dss;
         void LoadConfig(Config c)
         {
             Config = c;
@@ -164,6 +168,21 @@ public class State
             }
         }
 
+        // Mark ESPresense infrastructure nodes and populate antenna parameters
+        foreach (var (nodeId, infraNode) in Nodes)
+        {
+            if (!nodes.TryGetValue(nodeId, out var optNode)) continue;
+            optNode.IsNode = true;
+            var antenna = Config?.ResolveAntenna(infraNode.AntennaProfile);
+            if (antenna != null)
+            {
+                optNode.HasDirectionalAntenna = true;
+                optNode.GMax = Math.Pow(10.0, antenna.GMaxDb / 10.0);
+                optNode.PatternExponent = antenna.PatternExponent;
+                optNode.BackLossDb = antenna.BackLoss;
+            }
+        }
+
         // Remove expired snapshots by time
         var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
         var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
@@ -211,15 +230,15 @@ public class State
         {
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
-                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this, _nss, _dss.Value), floor.Name);
 
             if (bfgs?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(bfgs?.Floors))
-                    yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this, _nss, _dss.Value), floor.Name);
 
             if (mle?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(mle?.Floors))
-                    yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this, _nss, _dss.Value), floor.Name);
 
             if (multiFloor?.Enabled ?? false)
                 yield return new Scenario(Config, new MultiFloorMultilateralizer(device, this), "MultiFloor");
@@ -237,7 +256,7 @@ public class State
             if (Floors.Values.Any())
             {
                 foreach (var floor in Floors.Values)
-                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this, _nss, _dss.Value), floor.Name);
             }
             else
             {

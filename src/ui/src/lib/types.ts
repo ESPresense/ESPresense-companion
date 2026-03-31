@@ -116,6 +116,8 @@ export type NodeSetting = {
 		rxRefRssi: number | null;
 		rxAdjRssi: number | null;
 		txRefRssi: number | null;
+		azimuth: number | null;
+		elevation: number | null;
 	};
 };
 
@@ -205,6 +207,8 @@ export interface NodeCalibrationMatrix {
 			tx_ref_rssi?: number;
 			rx_adj_rssi?: number;
 			absorption?: number;
+			azimuth?: number;
+			elevation?: number;
 			mapDistance: number;
 			distance: number;
 			rssi: number;
@@ -221,8 +225,18 @@ export interface OptimizerState {
 	bestR?: number;
 }
 
+export interface NodeCalibration {
+	antenna?: string;
+	azimuth?: number;
+	elevation?: number;
+	absorption?: number;
+	rxAdjRssi?: number;
+	txRefRssi?: number;
+}
+
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
+	nodes?: Record<string, NodeCalibration>;
 	rmse?: number;
 	r?: number;
 	optimizerState?: OptimizerState;
