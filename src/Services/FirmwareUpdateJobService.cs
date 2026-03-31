@@ -11,7 +11,7 @@ public class FirmwareUpdateJobService
     {
         "https://github.com/ESPresense/",
         "https://nightly.link/ESPresense/",
-        "https://espresense.com/"
+        "https://espresense.com/artifacts/download/runs/"
     };
 
     private readonly ConcurrentDictionary<string, FirmwareUpdateJob> _jobs = new(StringComparer.OrdinalIgnoreCase);
