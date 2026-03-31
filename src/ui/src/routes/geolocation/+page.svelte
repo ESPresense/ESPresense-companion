@@ -29,7 +29,9 @@
 	// Sources for map features
 	const floorplanSource = new VectorSource();
 	const deviceSource = new VectorSource();
+	const deviceCoordSource = new VectorSource();
 	const nodeSource = new VectorSource();
+	const nodeCoordSource = new VectorSource();
 
 	// Styles
 	const roomStyle = new Style({
@@ -56,6 +58,15 @@
 		})
 	});
 
+	const deviceCoordStyle = new Style({
+		text: new Text({
+			font: '10px Calibri,sans-serif',
+			fill: new Fill({ color: '#666' }),
+			stroke: new Stroke({ color: '#fff', width: 2 }),
+			offsetY: 28
+		})
+	});
+
 	const nodeStyle = new Style({
 		image: new CircleStyle({
 			radius: 5,
@@ -67,6 +78,15 @@
 			fill: new Fill({ color: '#000' }),
 			stroke: new Stroke({ color: '#fff', width: 3 }),
 			offsetY: -15
+		})
+	});
+
+	const nodeCoordStyle = new Style({
+		text: new Text({
+			font: '10px Calibri,sans-serif',
+			fill: new Fill({ color: '#666' }),
+			stroke: new Stroke({ color: '#fff', width: 2 }),
+			offsetY: -28
 		})
 	});
 
@@ -96,10 +116,26 @@
 					}
 				}),
 				new VectorLayer({
+					source: deviceCoordSource,
+					style: (feature) => {
+						const coords = feature.get('coords');
+						deviceCoordStyle.getText()?.setText(coords || '');
+						return deviceCoordStyle;
+					}
+				}),
+				new VectorLayer({
 					source: nodeSource,
 					style: (feature) => {
 						nodeStyle.getText()?.setText(feature.get('name') || '');
 						return nodeStyle;
+					}
+				}),
+				new VectorLayer({
+					source: nodeCoordSource,
+					style: (feature) => {
+						const coords = feature.get('coords');
+						nodeCoordStyle.getText()?.setText(coords || '');
+						return nodeCoordStyle;
 					}
 				})
 			],
@@ -173,7 +209,9 @@
 
 	function updateDeviceFeatures(deviceList: Device[], gpsConfig: ConfigGps) {
 		deviceSource.clear();
+		deviceCoordSource.clear();
 		const features: Feature[] = [];
+		const coordFeatures: Feature[] = [];
 		deviceList.forEach((device) => {
 			if (device.location?.x != null && device.location?.y != null) {
 				const gpsCoords = internalToGps(device.location.x, device.location.y, gpsConfig);
@@ -184,18 +222,27 @@
 						name: device.name || device.id
 					});
 					features.push(feature);
+					// Add coordinate label
+					const coordFeature = new Feature({
+						geometry: point,
+						coords: `(${Math.round(device.location.x)}, ${Math.round(device.location.y)})`
+					});
+					coordFeatures.push(coordFeature);
 				}
 			}
 		});
 		if (features.length > 0) {
 			deviceSource.addFeatures(features);
+			deviceCoordSource.addFeatures(coordFeatures);
 			// Don't fit view on device updates alone, floorplan fit is primary
 		}
 	}
 
 	function updateNodeFeatures(nodeList: Node[], gpsConfig: ConfigGps) {
 		nodeSource.clear();
+		nodeCoordSource.clear();
 		const features: Feature[] = [];
+		const coordFeatures: Feature[] = [];
 		nodeList.forEach((node) => {
 			if (node.location?.x != null && node.location?.y != null) {
 				const gpsCoords = internalToGps(node.location.x, node.location.y, gpsConfig);
@@ -206,11 +253,18 @@
 						name: node.name || node.id
 					});
 					features.push(feature);
+					// Add coordinate label
+					const coordFeature = new Feature({
+						geometry: point,
+						coords: `(${Math.round(node.location.x)}, ${Math.round(node.location.y)})`
+					});
+					coordFeatures.push(coordFeature);
 				}
 			}
 		});
 		if (features.length > 0) {
 			nodeSource.addFeatures(features);
+			nodeCoordSource.addFeatures(coordFeatures);
 			// Don't fit view on node updates alone
 		}
 	}
