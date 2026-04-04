@@ -34,7 +34,14 @@ public class LeaseHandle : IAsyncDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        await _leaseService.ReleaseAsync(_leaseName);
+        try
+        {
+            await _leaseService.ReleaseAsync(_leaseName);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to release lease '{LeaseName}' during dispose", _leaseName);
+        }
     }
 
     public bool HasLease()
