@@ -34,6 +34,7 @@ public abstract class BaseMultilateralizer : ILocate
 
         nodes = Device.Nodes.Values
             .Where(a => a.Current && (a.Node?.Floors?.Contains(Floor) ?? false))
+            .Where(a => Floor.Contained(a.Node?.Z))
             .OrderBy(a => a.Distance)
             .ToArray();
 
