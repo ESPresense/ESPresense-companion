@@ -339,6 +339,8 @@ public class DeviceSettingsStoreTests
         }
 
         _deviceSettingsStore.ApplyToDevice(deviceId, deviceSettings);
+        // Allow time for async event handler to complete (important in .NET 10+)
+        Task.Delay(10).Wait();
         await Task.CompletedTask;
     }
 }

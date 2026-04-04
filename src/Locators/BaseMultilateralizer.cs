@@ -33,7 +33,7 @@ public abstract class BaseMultilateralizer : ILocate
         var confidence = scenario.Confidence ?? 0;
 
         nodes = Device.Nodes.Values
-            .Where(a => a.Current && (a.Node?.Floors?.Contains(Floor) ?? false))
+            .Where(a => a.Current && (a.Node?.Floors?.Contains(Floor) ?? false) && Floor.Contained(a.Node?.Z))
             .OrderBy(a => a.Distance)
             .ToArray();
 
