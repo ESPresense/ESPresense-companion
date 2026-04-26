@@ -92,13 +92,21 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "locate")
+        {
+            int exit = LocateCli.Run(Console.In, Console.Out, Console.Error);
+            Environment.Exit(exit);
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
         Console.WriteLine($"Accurate run threshold: <= {SuccessThresholdMeters:F1}m 2D error\n");
         Console.WriteLine("Tips:");
         Console.WriteLine("  Run 'dotnet run weightings' to compare weighting schemes");
-        Console.WriteLine("  Run 'dotnet run multifloor' to test multi-floor confidence\n");
+        Console.WriteLine("  Run 'dotnet run multifloor' to test multi-floor confidence");
+        Console.WriteLine("  Pipe a JSON request to 'dotnet run locate' to call ILocate as a CLI\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]
