@@ -22,13 +22,13 @@ importers:
         version: 0.3.9(svelte@5.53.8)
       '@skeletonlabs/skeleton':
         specifier: ^4.12.0
-        version: 4.12.0(tailwindcss@4.2.1)
+        version: 4.12.0(tailwindcss@4.2.4)
       '@skeletonlabs/skeleton-svelte':
         specifier: ^4.13.0
         version: 4.13.0(svelte@5.53.8)
       '@skeletonlabs/tw-plugin':
         specifier: ^0.4.1
-        version: 0.4.1(tailwindcss@4.2.1)
+        version: 0.4.1(tailwindcss@4.2.4)
       '@sveltejs/adapter-static':
         specifier: ^3.0.10
         version: 3.0.10(@sveltejs/kit@2.53.4(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.8)(vite@7.3.2(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.1)))(svelte@5.53.8)(typescript@5.9.3)(vite@7.3.2(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.1)))
@@ -40,7 +40,7 @@ importers:
         version: 6.2.4(svelte@5.53.8)(vite@7.3.2(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.1))
       '@tailwindcss/forms':
         specifier: ^0.5.11
-        version: 0.5.11(tailwindcss@4.2.1)
+        version: 0.5.11(tailwindcss@4.2.4)
       '@tailwindcss/vite':
         specifier: ^4.2.1
         version: 4.2.1(vite@7.3.2(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.1))
@@ -126,8 +126,8 @@ importers:
         specifier: ^0.6.5
         version: 0.6.5
       tailwindcss:
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.2.4
+        version: 4.2.4
       three:
         specifier: ^0.184.0
         version: 0.184.0
@@ -2224,6 +2224,9 @@ packages:
   tailwindcss@4.2.1:
     resolution: {integrity: sha512-/tBrSQ36vCleJkAOsy9kbNTgaxvGbyOamC30PRePTQe/o1MFwEKHQk4Cn7BNGaPtjp+PuUrByJehM1hgxfq4sw==}
 
+  tailwindcss@4.2.4:
+    resolution: {integrity: sha512-HhKppgO81FQof5m6TEnuBWCZGgfRAWbaeOaGT00KOy/Pf/j6oUihdvBpA7ltCeAvZpFhW3j0PTclkxsd4IXYDA==}
+
   tapable@2.3.0:
     resolution: {integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==}
     engines: {node: '>=6'}
@@ -2836,13 +2839,13 @@ snapshots:
       '@zag-js/tree-view': 1.35.3
       svelte: 5.53.8
 
-  '@skeletonlabs/skeleton@4.12.0(tailwindcss@4.2.1)':
+  '@skeletonlabs/skeleton@4.12.0(tailwindcss@4.2.4)':
     dependencies:
-      tailwindcss: 4.2.1
+      tailwindcss: 4.2.4
 
-  '@skeletonlabs/tw-plugin@0.4.1(tailwindcss@4.2.1)':
+  '@skeletonlabs/tw-plugin@0.4.1(tailwindcss@4.2.4)':
     dependencies:
-      tailwindcss: 4.2.1
+      tailwindcss: 4.2.4
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -2895,10 +2898,10 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@tailwindcss/forms@0.5.11(tailwindcss@4.2.1)':
+  '@tailwindcss/forms@0.5.11(tailwindcss@4.2.4)':
     dependencies:
       mini-svg-data-uri: 1.4.4
-      tailwindcss: 4.2.1
+      tailwindcss: 4.2.4
 
   '@tailwindcss/node@4.2.1':
     dependencies:
@@ -4687,6 +4690,8 @@ snapshots:
   symbol-tree@3.2.4: {}
 
   tailwindcss@4.2.1: {}
+
+  tailwindcss@4.2.4: {}
 
   tapable@2.3.0: {}
 
