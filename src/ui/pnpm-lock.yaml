@@ -90,8 +90,8 @@ importers:
         specifier: ^2.10.2
         version: 2.10.2(eslint@9.39.2(jiti@2.6.1))
       eslint-plugin-svelte:
-        specifier: ^3.15.0
-        version: 3.15.0(eslint@9.39.2(jiti@2.6.1))(svelte@5.53.8)
+        specifier: ^3.17.1
+        version: 3.17.1(eslint@9.39.2(jiti@2.6.1))(svelte@5.53.8)
       globals:
         specifier: ^17.6.0
         version: 17.6.0
@@ -1588,8 +1588,8 @@ packages:
     peerDependencies:
       eslint: '>=8.40.0'
 
-  eslint-plugin-svelte@3.15.0:
-    resolution: {integrity: sha512-QKB7zqfuB8aChOfBTComgDptMf2yxiJx7FE04nneCmtQzgTHvY8UJkuh8J2Rz7KB9FFV9aTHX6r7rdYGvG8T9Q==}
+  eslint-plugin-svelte@3.17.1:
+    resolution: {integrity: sha512-NyiXHtS3Ni7e532RBwS9OXlMKDIrENg3gY+/+ODjZzQx2xhU3NlJ+nIl1a93iUUQeiJL3lS8KLmY+W8hklzweQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^8.57.1 || ^9.0.0 || ^10.0.0
@@ -2155,11 +2155,6 @@ packages:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
     engines: {node: '>=v12.22.7'}
 
-  semver@7.7.3:
-    resolution: {integrity: sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.0:
     resolution: {integrity: sha512-AcM7dV/5ul4EekoQ29Agm5vri8JNqRyj39o0qpX6vDF2GZrtutZl5RwgD1XnZjiTAfncsJhMI48QQH3sN87YNA==}
     engines: {node: '>=10'}
@@ -2467,8 +2462,8 @@ packages:
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
 
-  yaml@1.10.2:
-    resolution: {integrity: sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==}
+  yaml@1.10.3:
+    resolution: {integrity: sha512-vIYeF1u3CjlhAFekPPAk2h/Kv4T3mAkMox5OymRiJQB0spDP10LHvt+K7G9Ny6NuuMAb25/6n1qyUjAcGNf/AA==}
     engines: {node: '>= 6'}
 
   yaml@2.8.1:
@@ -4079,7 +4074,7 @@ snapshots:
       eslint: 9.39.2(jiti@2.6.1)
       globals: 17.6.0
 
-  eslint-plugin-svelte@3.15.0(eslint@9.39.2(jiti@2.6.1))(svelte@5.53.8):
+  eslint-plugin-svelte@3.17.1(eslint@9.39.2(jiti@2.6.1))(svelte@5.53.8):
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@9.39.2(jiti@2.6.1))
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -4090,7 +4085,7 @@ snapshots:
       postcss: 8.5.14
       postcss-load-config: 3.1.4(postcss@8.5.14)
       postcss-safe-parser: 7.0.1(postcss@8.5.14)
-      semver: 7.7.3
+      semver: 7.8.0
       svelte-eslint-parser: 1.6.1(svelte@5.53.8)
     optionalDependencies:
       svelte: 5.53.8
@@ -4507,7 +4502,7 @@ snapshots:
   postcss-load-config@3.1.4(postcss@8.5.14):
     dependencies:
       lilconfig: 2.1.0
-      yaml: 1.10.2
+      yaml: 1.10.3
     optionalDependencies:
       postcss: 8.5.14
 
@@ -4621,8 +4616,6 @@ snapshots:
   saxes@6.0.0:
     dependencies:
       xmlchars: 2.2.0
-
-  semver@7.7.3: {}
 
   semver@7.8.0: {}
 
@@ -4870,7 +4863,7 @@ snapshots:
 
   xmlchars@2.2.0: {}
 
-  yaml@1.10.2: {}
+  yaml@1.10.3: {}
 
   yaml@2.8.1:
     optional: true
