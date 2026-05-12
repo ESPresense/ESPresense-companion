@@ -45,6 +45,15 @@ namespace ESPresense.Controllers
             }
         }
 
+        [HttpPost("{id}/debug")]
+        public IActionResult ToggleDebug(string id, [FromBody] bool enable)
+        {
+            if (!_state.Devices.TryGetValue(id, out var device))
+                return NotFound();
+            device.Debug = enable;
+            return Ok(new { id, debug = enable });
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {

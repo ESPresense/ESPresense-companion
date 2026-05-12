@@ -49,7 +49,7 @@
 		{ key: 'location', title: 'Location (X, Y, Z)', value: (d: Device) => formatLocation(d), sortable: false },
 		{ key: 'fixes', title: 'Fixes', value: (d: Device) => d.fixes ?? 'n/a', sortable: true },
 		{ key: 'scale', title: 'Scale', value: (d: Device) => d.scale?.toFixed(3) ?? 'n/a', sortable: true },
-		{ key: 'confidence', title: 'Confidence', value: (d: Device) => d.confidence ?? 'n/a', sortValue: (d: Device) => d.confidence ?? -1, sortable: true },
+		{ key: 'confidence', title: 'Confidence', value: (d: Device) => d.confidence != null ? `${Math.round(d.confidence * 100)}%` : 'n/a', sortValue: (d: Device) => d.confidence ?? -1, sortable: true },
 		{ key: 'lastSeen', title: 'Last Seen', value: (d: Device) => (d.lastSeen ? (ago(new Date(d.lastSeen)) ?? 'n/a') : 'n/a'), sortValue: (d: Device) => (d.lastSeen ? new Date(d.lastSeen) : new Date(0)), sortable: true },
 		{ key: 'actions', title: '', renderComponent: { component: DeviceActions } }
 	];
