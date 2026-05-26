@@ -53,9 +53,9 @@ test.describe('Tooltip', () => {
 		// Verify tooltip content contains expected data
 		const tooltipText = await tooltip.textContent();
 		expect(tooltipText).toContain('Map Distance');
-		expect(tooltipText).toContain('4.57');
+		expect(tooltipText).toContain('4.567');
 		expect(tooltipText).toContain('Measured');
-		expect(tooltipText).toContain('5.12');
+		expect(tooltipText).toContain('5.123');
 		expect(tooltipText).toContain('Error');
 		expect(tooltipText).toContain('0.556');
 	});

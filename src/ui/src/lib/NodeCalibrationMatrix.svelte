@@ -53,7 +53,7 @@
 					num = n1?.var;
 					break;
 			}
-			return num !== null && num !== undefined ? Number(num.toPrecision(3)) : 'n/a';
+			return num !== null && num !== undefined ? Number(num.toFixed(3)) : 'n/a';
 		}
 	}
 
@@ -237,11 +237,11 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each Object.entries($calibration.matrix).sort((a, b) => a[0].localeCompare(b[0])) as [id1, n1] (id1)}
+							{#each Object.entries($calibration.matrix).sort((a, b) => { const [aName, aData] = a; const [bName, bData] = b; const aAnchor = isAnchored(aName); const bAnchor = isAnchored(bName); if (aAnchor && !bAnchor) return -1; if (!aAnchor && bAnchor) return 1; return aName.localeCompare(bName); }) as [id1, n1] (id1)}
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}
-										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toPrecision(3))} - Measured ${Number(n1[id2]?.distance?.toPrecision(3))} = Error ${Number(n1[id2]?.diff?.toPrecision(3))}` : 'No beacon Received in last 30 seconds'}
+										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${Number(n1[id2].mapDistance?.toFixed(3))} - Measured ${Number(n1[id2]?.distance?.toFixed(3))} = Error ${Number(n1[id2]?.diff?.toFixed(3))}` : 'No beacon Received in last 30 seconds'}
 											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
 										>
 									{/each}
