@@ -39,7 +39,7 @@
 		"d3-zoom": "^3.0.0",
 		"eslint": "^10.4.0",
 		"eslint-config-prettier": "^10.1.8",
-		"eslint-plugin-playwright": "^2.10.2",
+		"eslint-plugin-playwright": "^2.10.4",
 		"eslint-plugin-svelte": "^3.17.1",
 		"globals": "^17.6.0",
 		"jsdom": "^29.1.1",
