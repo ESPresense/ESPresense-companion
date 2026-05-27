@@ -60,8 +60,7 @@ public static class LocateCli
         try
         {
             var response = Solve(req!);
-            JsonSerializer.Serialize(stdout, response, JsonOpts);
-            stdout.WriteLine();
+            stdout.WriteLine(JsonSerializer.Serialize(response, JsonOpts));
             return 0;
         }
         catch (Exception ex)
