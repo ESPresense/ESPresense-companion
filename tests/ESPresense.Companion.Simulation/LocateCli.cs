@@ -15,6 +15,9 @@ namespace ESPresense.Simulation;
 /// </summary>
 public static class LocateCli
 {
+    /// <summary>Thrown for malformed input so the outer handler can return exit code 2 rather than 1.</summary>
+    private sealed class LocateInputException(string message) : Exception(message);
+
     public static int Run(TextReader stdin, TextWriter stdout, TextWriter stderr)
     {
         string raw;
@@ -62,6 +65,11 @@ public static class LocateCli
             var response = Solve(req!);
             stdout.WriteLine(JsonSerializer.Serialize(response, JsonOpts));
             return 0;
+        }
+        catch (LocateInputException ex)
+        {
+            stderr.WriteLine(ex.Message);
+            return 2;
         }
         catch (Exception ex)
         {
@@ -141,8 +149,10 @@ public static class LocateCli
         var nodesById = new Dictionary<string, Node>(StringComparer.OrdinalIgnoreCase);
         foreach (var s in req.Stations!)
         {
+            if (s == null)
+                throw new LocateInputException("stations must not contain null entries.");
             if (string.IsNullOrWhiteSpace(s.Id))
-                throw new InvalidOperationException("station.id is required for each station.");
+                throw new LocateInputException("station.id is required for each station.");
 
             var node = new Node(s.Id, NodeSourceType.Config);
             var configNode = new ConfigNode
@@ -159,10 +169,12 @@ public static class LocateCli
         var now = DateTime.UtcNow;
         foreach (var d in req.Distances!)
         {
+            if (d == null)
+                throw new LocateInputException("distances must not contain null entries.");
             if (string.IsNullOrWhiteSpace(d.StationId))
-                throw new InvalidOperationException("distance.station_id is required.");
+                throw new LocateInputException("distance.station_id is required.");
             if (!nodesById.TryGetValue(d.StationId, out var node))
-                throw new InvalidOperationException($"distance.station_id '{d.StationId}' has no matching station entry.");
+                throw new LocateInputException($"distance.station_id '{d.StationId}' has no matching station entry.");
 
             device.Nodes[node.Id] = new DeviceToNode(device, node)
             {
@@ -177,7 +189,7 @@ public static class LocateCli
             "gaussnewton" or "gauss-newton" or "gn" => new GaussNewtonMultilateralizer(device, floor, state),
             "bfgs" => new BfgsMultilateralizer(device, floor, state),
             "mle" => new MLEMultilateralizer(device, floor, state),
-            _ => throw new InvalidOperationException(
+            _ => throw new LocateInputException(
                 $"unknown locator '{req.Locator}'. Supported: NelderMead, GaussNewton, BFGS, MLE.")
         };
 

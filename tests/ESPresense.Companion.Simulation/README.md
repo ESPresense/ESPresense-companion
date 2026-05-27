@@ -41,12 +41,25 @@ Request shape (snake_case):
 
 ```json
 {
-  "floor_bounds": [[0, 0, 0], [12, 12, 3]],
+  "floor_bounds": [[0, 0, 0], [10, 10, 3]],
   "locator": "NelderMead",
-  "stations": [{ "id": "n0", "x": 0, "y": 0, "z": 1 }],
-  "distances": [{ "station_id": "n0", "distance_m": 7.07 }]
+  "stations": [
+    { "id": "n0", "x": 0,  "y": 0,  "z": 1 },
+    { "id": "n1", "x": 10, "y": 0,  "z": 1 },
+    { "id": "n2", "x": 10, "y": 10, "z": 1 },
+    { "id": "n3", "x": 0,  "y": 10, "z": 1 }
+  ],
+  "distances": [
+    { "station_id": "n0", "distance_m": 7.07 },
+    { "station_id": "n1", "distance_m": 7.07 },
+    { "station_id": "n2", "distance_m": 7.07 },
+    { "station_id": "n3", "distance_m": 7.07 }
+  ]
 }
 ```
+
+This is the bundled `locate-example.json`; the four `7.07 m` distances place the
+device at the floor centre `(5, 5, 1)`.
 
 Supported `locator` values: `NelderMead`, `GaussNewton`, `BFGS`, `MLE`
 (case-insensitive; `nelder-mead` and `gauss-newton` also accepted).
@@ -57,18 +70,20 @@ Response shape:
 
 ```json
 {
-  "x": 6.0, "y": 6.0, "z": 1.0,
-  "confidence": 7,
+  "x": 5.0, "y": 5.0, "z": 1.0,
+  "confidence": 80,
   "fixes": 4,
-  "error": 0.0123,
-  "iterations": 42,
-  "reason_for_exit": "BoundTolerance",
+  "error": 0.0000,
+  "iterations": 251,
+  "reason_for_exit": "Converged",
   "moved": true
 }
 ```
 
 Exit codes: `0` solve completed (whether or not `moved` is true);
-`1` locator threw; `2` invalid or empty input.
+`1` the locator itself threw at runtime; `2` invalid or empty input
+(malformed JSON, missing fields, unknown locator, or a `station_id` with
+no matching station).
 
 ## What It Tests
 
