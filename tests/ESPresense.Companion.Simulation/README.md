@@ -1,6 +1,9 @@
 # ESPresense Multilateration Simulator
 
 Compares real `ILocate` implementations from `ESPresense.Companion` under controlled conditions.
+Also exposes those same implementations as a stdin/stdout JSON CLI so external accuracy
+harnesses (e.g. firmware QA) can call them without taking a process-level dependency on
+the full Companion service stack.
 
 ## Quick Start
 
@@ -16,6 +19,56 @@ Or from this directory:
 cd tests/ESPresense.Companion.Simulation
 dotnet run
 ```
+
+## Subcommands
+
+- (no args) — Monte-Carlo comparison across scenarios and node layouts.
+- `weightings` — compare weighting schemes for the chosen locator.
+- `multifloor` — multi-floor confidence regression test.
+- `locate` — read one JSON solve request on stdin, write one solve result on stdout.
+
+### `locate` CLI
+
+Reads a single JSON request describing the floor, the chosen locator, the stations,
+and the per-station distance measurements. Emits a single JSON solve on stdout.
+
+```bash
+dotnet run --project tests/ESPresense.Companion.Simulation -- locate \
+  < tests/ESPresense.Companion.Simulation/locate-example.json
+```
+
+Request shape (snake_case):
+
+```json
+{
+  "floor_bounds": [[0, 0, 0], [12, 12, 3]],
+  "locator": "NelderMead",
+  "stations": [{ "id": "n0", "x": 0, "y": 0, "z": 1 }],
+  "distances": [{ "station_id": "n0", "distance_m": 7.07 }]
+}
+```
+
+Supported `locator` values: `NelderMead`, `GaussNewton`, `BFGS`, `MLE`
+(case-insensitive; `nelder-mead` and `gauss-newton` also accepted).
+`NadarayaWatson` is intentionally not exposed here because it depends on
+node telemetry data that an offline harness does not have.
+
+Response shape:
+
+```json
+{
+  "x": 6.0, "y": 6.0, "z": 1.0,
+  "confidence": 7,
+  "fixes": 4,
+  "error": 0.0123,
+  "iterations": 42,
+  "reason_for_exit": "BoundTolerance",
+  "moved": true
+}
+```
+
+Exit codes: `0` solve completed (whether or not `moved` is true);
+`1` locator threw; `2` invalid or empty input.
 
 ## What It Tests
 
