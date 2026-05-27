@@ -68,7 +68,9 @@ Response shape:
 ```
 
 Exit codes: `0` solve completed (whether or not `moved` is true);
-`1` locator threw; `2` invalid or empty input.
+`1` the locator itself threw at runtime; `2` invalid or empty input
+(malformed JSON, missing fields, unknown locator, or a `station_id` with
+no matching station).
 
 ## What It Tests
 
