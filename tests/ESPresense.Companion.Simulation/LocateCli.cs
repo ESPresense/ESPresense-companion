@@ -149,6 +149,8 @@ public static class LocateCli
         var nodesById = new Dictionary<string, Node>(StringComparer.OrdinalIgnoreCase);
         foreach (var s in req.Stations!)
         {
+            if (s == null)
+                throw new LocateInputException("stations must not contain null entries.");
             if (string.IsNullOrWhiteSpace(s.Id))
                 throw new LocateInputException("station.id is required for each station.");
 
@@ -167,6 +169,8 @@ public static class LocateCli
         var now = DateTime.UtcNow;
         foreach (var d in req.Distances!)
         {
+            if (d == null)
+                throw new LocateInputException("distances must not contain null entries.");
             if (string.IsNullOrWhiteSpace(d.StationId))
                 throw new LocateInputException("distance.station_id is required.");
             if (!nodesById.TryGetValue(d.StationId, out var node))
