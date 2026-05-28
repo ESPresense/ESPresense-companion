@@ -490,14 +490,14 @@
 								{#each nodeDistances as node}
 									<tr>
 										<td>{node.name}</td>
-										<td>{node.nodeZ?.toFixed(2) || 'n/a'}</td>
-										<td>{node.distance?.toFixed(2) || 'n/a'}</td>
+										<td>{node.nodeZ?.toFixed(1) || 'n/a'}</td>
+										<td>{node.distance?.toFixed(1) || 'n/a'}</td>
 										<td>
 											{#if rssiValues[node.id] != null && currentRefRssi != null}
 												{#if nodeSettings[node.id]?.calibration?.absorption != null}
-													{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / (10 * (nodeSettings[node.id]?.calibration?.absorption || 2))).toFixed(2)}
+													{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / (10 * (nodeSettings[node.id]?.calibration?.absorption || 2))).toFixed(1)}
 												{:else}
-													{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / 20).toFixed(2)}
+													{Math.pow(10, (currentRefRssi - (rssiValues[node.id] || 0)) / 20).toFixed(1)}
 												{/if}
 											{:else}
 												n/a
@@ -506,7 +506,7 @@
 										<td>{rssiValues[node.id] != null ? rssiValues[node.id]?.toFixed(1) : 'n/a'}</td>
 										<td>
 											{#if rssiValues[node.id] != null && node.distance != null && node.distance > 0.1}
-												{Math.round((rssiValues[node.id] || 0) + 10 * (nodeSettings[node.id]?.calibration?.absorption || 2) * Math.log10(node.distance))}
+												{((rssiValues[node.id] || 0) + 10 * (nodeSettings[node.id]?.calibration?.absorption || 2) * Math.log10(node.distance)).toFixed(1)}
 											{:else}
 												n/a
 											{/if}
