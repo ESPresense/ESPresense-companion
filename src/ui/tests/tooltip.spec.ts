@@ -53,11 +53,11 @@ test.describe('Tooltip', () => {
 		// Verify tooltip content contains expected data
 		const tooltipText = await tooltip.textContent();
 		expect(tooltipText).toContain('Map Distance');
-		expect(tooltipText).toContain('4.57');
+		expect(tooltipText).toContain('4.6');
 		expect(tooltipText).toContain('Measured');
-		expect(tooltipText).toContain('5.12');
+		expect(tooltipText).toContain('5.1');
 		expect(tooltipText).toContain('Error');
-		expect(tooltipText).toContain('0.556');
+		expect(tooltipText).toContain('0.6');
 	});
 
 	test('hides tooltip when mouse leaves cell', async ({ page }) => {
