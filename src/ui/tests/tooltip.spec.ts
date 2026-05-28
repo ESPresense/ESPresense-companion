@@ -224,4 +224,61 @@ test.describe('Tooltip', () => {
 		expect(tooltipId).toMatch(/^tooltip-/);
 		await expect(dataCell).toHaveAttribute('aria-describedby', tooltipId!);
 	});
+
+	test('keeps trailing zero for whole-number values (x.x)', async ({ page }) => {
+		const calibrationData = {
+			matrix: {
+				'Node A': {
+					'Node B': {
+						distance: 3.0,
+						rssi: -70,
+						mapDistance: 5.0,
+						diff: 2.0,
+						percent: 0.4,
+						rx_adj_rssi: -10,
+						absorption: 0.1
+					}
+				}
+			},
+			rmse: 0.123,
+			r: 0.95
+		};
+
+		await mockApi(page, { stubWebSocket: true });
+
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify(calibrationData)
+			});
+		});
+
+		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({ autoOptimize: false })
+			});
+		});
+
+		await page.goto('/calibration');
+		await page.waitForSelector('table');
+
+		// Switch to the "Error (m)" view so the cell renders diff via value()
+		await page.getByRole('button', { name: 'Error (m)' }).click();
+
+		// Cell shows the diff as "2.0", not "2"
+		const dataCell = page.locator('table tbody td').filter({ hasText: '2.0' });
+		await expect(dataCell).toBeVisible();
+
+		// Tooltip keeps trailing zeros too
+		await dataCell.hover();
+		const tooltip = page.locator('[role="tooltip"]');
+		await expect(tooltip).toBeVisible();
+		const tooltipText = await tooltip.textContent();
+		expect(tooltipText).toContain('Map Distance 5.0');
+		expect(tooltipText).toContain('Measured 3.0');
+		expect(tooltipText).toContain('Error 2.0');
+	});
 });
