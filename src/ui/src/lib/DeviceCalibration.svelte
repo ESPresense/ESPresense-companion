@@ -432,8 +432,8 @@
 					<div>
 						<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
 						<div class="input-group input-group-divider grid-cols-[1fr_auto]">
-							<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input rounded-r-none" />
-							<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}>Set</button>
+							<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} onchange={() => (calibrationSpotHeight = Math.round(calibrationSpotHeight * 10) / 10)} class="input rounded-r-none" />
+							<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = Math.round(calibrationSpotHeight * 10) / 10)}>Set</button>
 						</div>
 					</div>
 				{/if}
