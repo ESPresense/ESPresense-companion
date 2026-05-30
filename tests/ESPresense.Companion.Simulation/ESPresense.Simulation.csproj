@@ -12,4 +12,11 @@
     <ProjectReference Include="../../src/ESPresense.Companion.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="AccuracyHarness/Scenarios/*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>AccuracyHarness/Scenarios/%(FileName)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
 </Project>

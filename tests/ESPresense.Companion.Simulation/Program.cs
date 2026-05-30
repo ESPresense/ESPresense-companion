@@ -99,6 +99,13 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "accuracy")
+        {
+            int exit = ESPresense.Simulation.AccuracyHarness.AccuracyCli.Run(args.Skip(1).ToArray());
+            Environment.Exit(exit);
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
@@ -106,7 +113,8 @@ class Program
         Console.WriteLine("Tips:");
         Console.WriteLine("  Run 'dotnet run weightings' to compare weighting schemes");
         Console.WriteLine("  Run 'dotnet run multifloor' to test multi-floor confidence");
-        Console.WriteLine("  Pipe a JSON request to 'dotnet run locate' to call ILocate as a CLI\n");
+        Console.WriteLine("  Pipe a JSON request to 'dotnet run locate' to call ILocate as a CLI");
+        Console.WriteLine("  Run 'dotnet run accuracy baseline' for the public accuracy baseline (real ILocate)\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]

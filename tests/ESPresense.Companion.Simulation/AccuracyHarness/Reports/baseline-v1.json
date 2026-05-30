@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "harness_version": "0.1.0",
+  "scenarios": [
+    {
+      "scenario": "baseline_4node_6x4m",
+      "locator": "NelderMead",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.599,
+          "p95_error_m": 1.33,
+          "mean_error_m": 0.7,
+          "max_error_m": 1.557,
+          "room_misid_rate": 0.066,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 0.845,
+              "p95_error_m": 2.065
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 0.802,
+              "p95_error_m": 1.691
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 0.61,
+              "p95_error_m": 1.444
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 0.849,
+              "p95_error_m": 2.168
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.605,
+          "p95_error_m": 1.61,
+          "mean_error_m": 0.692,
+          "max_error_m": 2.033,
+          "room_misid_rate": 0.223,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 0.7,
+              "p95_error_m": 2.012
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 0.71,
+              "p95_error_m": 2.04
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 0.688,
+              "p95_error_m": 1.831
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 0.69,
+              "p95_error_m": 1.864
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
