@@ -89,10 +89,14 @@ public static class AccuracyRunner
         // re-solve, collect error distribution.
         var outageErrors = scenario.Stations.ToDictionary(s => s.Id, _ => new List<double>());
 
-        // Build the simulation context ONCE per (scenario, track) so the
-        // ILocate's internal Kalman filter sees a consistent device id
-        // across the whole track — that matches how Companion runs in
-        // production.
+        // Build the simulation context ONCE per track and reuse it for every
+        // solve below (full-fix and each outage drop). The *Multilateralizer
+        // locators are stateless across Locate() calls: they read Device.Nodes
+        // (which SolveOnce clears and repopulates each call) and write a fresh
+        // Scenario, so reusing the context is byte-identical to rebuilding it,
+        // just without the per-solve State/Device/Node/Floor allocations. The
+        // Device Kalman filter lives in MultiScenarioLocator, not in these
+        // locators, so there is no cross-call continuity to preserve here.
         var ctx = BuildContext(scenario, locatorKind);
 
         var rng = new Random(unchecked((int)SeedFor(baseSeed, scenario.Name, track.Name)));
@@ -135,8 +139,7 @@ public static class AccuracyRunner
                 if (measured.Length - 1 < 3) break;
                 var subset = measured.Where((_, i) => i != dropIdx).ToArray();
                 var droppedId = measured[dropIdx].Station.Id;
-                var outCtx = BuildContext(scenario, locatorKind);
-                var outSolve = SolveOnce(outCtx, subset);
+                var outSolve = SolveOnce(ctx, subset);
                 if (outSolve.HasValue)
                 {
                     double ex = outSolve.Value.X - tx;

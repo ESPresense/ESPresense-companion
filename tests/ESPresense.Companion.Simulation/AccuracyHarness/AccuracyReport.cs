@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace ESPresense.Simulation.AccuracyHarness;
 
@@ -32,7 +33,14 @@ public static class AccuracyReport
         };
         var options = new JsonSerializerOptions
         {
-            WriteIndented = true
+            WriteIndented = true,
+            // A report generator must never throw on its own output. The
+            // realistic NaN source (0-sample outage drops) is skipped in
+            // SerializeScenario like ToMarkdown does; AllowNamedFloatingPointLiterals
+            // is a belt-and-suspenders so any residual NaN/Infinity (e.g. a
+            // track that never solved) serializes instead of throwing under
+            // the default Strict number handling.
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
         };
         return root.ToJsonString(options) + "\n";
     }
@@ -45,6 +53,9 @@ public static class AccuracyReport
             var outage = new JsonObject();
             foreach (var kv in t.SingleStationOutage.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             {
+                // Match ToMarkdown: a 0-sample drop has NaN metrics (Percentile
+                // of an empty list). Skip it rather than emit NaN.
+                if (kv.Value.Samples == 0) continue;
                 outage[kv.Key] = new JsonObject
                 {
                     ["samples"] = kv.Value.Samples,

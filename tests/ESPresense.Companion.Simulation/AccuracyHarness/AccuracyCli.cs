@@ -263,6 +263,19 @@ public static class AccuracyCli
         }
         if (a is JsonValue av && b is JsonValue bv)
         {
+            // Identity / count fields (schema_version, base_seed, samples) are
+            // emitted as integer JSON tokens. Compare those EXACTLY — a
+            // regression guard should flag e.g. a drop in valid-solve count,
+            // which the ±tolerance path could otherwise swallow. Only fractional
+            // metrics fall through to the tolerance compare. (TryGetValue<long>
+            // succeeds only when BOTH sides are integral, so a metric that
+            // rounds to a whole number on one side still uses tolerance.)
+            if (av.TryGetValue<long>(out var al) && bv.TryGetValue<long>(out var bl))
+            {
+                if (al != bl)
+                    diffs.Add($"{path}: {al} → {bl} (exact-match field)");
+                return;
+            }
             // Numeric tolerance compare; otherwise exact string compare.
             if (av.TryGetValue<double>(out var ad) && bv.TryGetValue<double>(out var bd))
             {
