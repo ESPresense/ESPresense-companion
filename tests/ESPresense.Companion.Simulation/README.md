@@ -26,6 +26,12 @@ dotnet run
 - `weightings` — compare weighting schemes for the chosen locator.
 - `multifloor` — multi-floor confidence regression test.
 - `locate` — read one JSON solve request on stdin, write one solve result on stdout.
+- `accuracy baseline` — generate the public accuracy baseline against the
+  real `ILocate` and emit JSON + markdown. See [`AccuracyHarness/`](AccuracyHarness/)
+  and the public doc at [`docs/accuracy.md`](../../docs/accuracy.md).
+- `accuracy check` — re-run the baseline and compare against the
+  checked-in `AccuracyHarness/Reports/baseline-v1.json` within ±5%
+  tolerance. CI uses this as a regression guard.
 
 ### `locate` CLI
 

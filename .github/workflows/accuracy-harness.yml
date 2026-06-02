@@ -1,0 +1,62 @@
+name: Accuracy harness
+
+# Locator + RSSI-distance regression gate.
+# Scoped to code that can move the public accuracy baseline:
+#   - the production ILocate implementations and their weighting,
+#   - the harness itself (scenarios, noise model, runner, reports),
+#   - and this workflow.
+# This is NOT a general "did the build break" gate (that is ci.yml).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/Locators/**"
+      - "src/Weighting/**"
+      - "src/Utils/MathUtils.cs"
+      - "src/Models/Scenario.cs"
+      - "src/Models/KalmanLocation.cs"
+      - "src/Models/KalmanFilterSettings.cs"
+      - "tests/ESPresense.Companion.Simulation/AccuracyHarness/**"
+      - "docs/accuracy.md"
+      - ".github/workflows/accuracy-harness.yml"
+  pull_request:
+    paths:
+      - "src/Locators/**"
+      - "src/Weighting/**"
+      - "src/Utils/MathUtils.cs"
+      - "src/Models/Scenario.cs"
+      - "src/Models/KalmanLocation.cs"
+      - "src/Models/KalmanFilterSettings.cs"
+      - "tests/ESPresense.Companion.Simulation/AccuracyHarness/**"
+      - "docs/accuracy.md"
+      - ".github/workflows/accuracy-harness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Accuracy baseline regression guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Pin the SDK exact-version. Patch-rev drift can quietly shift libm
+      # which moves the baseline within tolerance; an unpinned SDK makes
+      # that drift impossible to attribute. Bumping this is an explicit
+      # decision that needs to ship with a re-baseline.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.421
+
+      - name: Restore + build simulation project (Release)
+        # Release config bypasses the SPA install in src/ESPresense.Companion.csproj,
+        # which has no business running for the accuracy gate.
+        run: dotnet build -c Release tests/ESPresense.Companion.Simulation/ESPresense.Simulation.csproj
+
+      - name: Run accuracy check (±5% tolerance)
+        run: |
+          dotnet run --no-build -c Release --project tests/ESPresense.Companion.Simulation -- \
+            accuracy check \
+            --baseline tests/ESPresense.Companion.Simulation/AccuracyHarness/Reports/baseline-v1.json
