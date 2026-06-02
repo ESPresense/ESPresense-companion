@@ -39,7 +39,7 @@
 			switch (data_point) {
 				case DataPoint.ErrorMeters:
 					num = n1?.diff;
-					break;
+					return num !== null && num !== undefined ? Number(num.toFixed(3)) : 'n/a';
 				case DataPoint.Absorption:
 					num = n1?.absorption;
 					break;
@@ -242,7 +242,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each Object.entries($calibration.matrix).sort((a, b) => a[0].localeCompare(b[0])) as [id1, n1] (id1)}
+							{#each Object.entries($calibration.matrix).sort((a, b) => { const aAnchor = isAnchored(a[0]) ? 0 : 1; const bAnchor = isAnchored(b[0]) ? 0 : 1; if (aAnchor !== bAnchor) return aAnchor - bAnchor; return a[0].localeCompare(b[0]); }) as [id1, n1] (id1)}
 								<tr>
 									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
 									{#each rxColumns as id2 (id2)}

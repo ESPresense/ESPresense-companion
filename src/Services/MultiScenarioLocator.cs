@@ -67,7 +67,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     confidence = 100,
                     fixes = 0,
                     best_scenario = "Anchored",
-                    last_seen = device.LastSeen
+                    last_seen = device.LastSeen,
+                    room = anchor.Room?.Name
                 }, SerializerSettings.NullIgnore);
 
                 if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
@@ -200,7 +201,13 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 confidence = bestScenario.Confidence,
                 fixes = bestScenario.Fixes,
                 best_scenario = bestScenario.Name,
-                last_seen = device.LastSeen
+                last_seen = device.LastSeen,
+                room = bestScenario.Room?.Name,
+                room_ranked = device.Scenarios
+                    .Where(s => s.Current && s.Room != null)
+                    .OrderByDescending(s => s.Probability)
+                    .Select(s => new { room = s.Room?.Name, probability = Math.Round(s.Probability, 4) })
+                    .ToList()
             }, SerializerSettings.NullIgnore);
 
             if (!await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
