@@ -54,8 +54,19 @@ locators:
   nadaraya_watson:
     enabled: true
     floors: ["first", "second"]
-    bandwidth: 0.5
-    kernel: gaussian
+    kernel:
+      algorithm: inverse_square
+      props:
+        epsilon: 1e-6
+
+  iterative_nadaraya_watson:
+    enabled: false
+    floors: ["first", "second"]
+    kernel:
+      algorithm: gaussian
+      props:
+        bandwidth: 0.5
+    max_iterations: 2
 
   nelder_mead:
     enabled: false
