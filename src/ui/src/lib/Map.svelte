@@ -4,7 +4,7 @@
 	import { scaleOrdinal, schemeCategory10 } from 'd3';
 	import { select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
-	import { setContext } from 'svelte';
+	import { setContext, createEventDispatcher } from 'svelte';
 	import type { Device, Node } from '$lib/types';
 
 	import Rooms from './Rooms.svelte';
@@ -14,6 +14,8 @@
 	import AxisY from './AxisY.svelte';
 	import MapCoordinates from './MapCoordinates.svelte';
 	import CalibrationSpot from './CalibrationSpot.svelte';
+
+	const dispatch = createEventDispatcher();
 
 	let svg: Element;
 	let transform = zoomIdentity;
@@ -113,6 +115,19 @@
 		}
 	}
 
+	function zoomIn() {
+		select(svg).call(handler.scaleBy, 1.2);
+	}
+
+	function zoomOut() {
+		select(svg).call(handler.scaleBy, 1 / 1.2);
+	}
+
+	function handleCalibrationDrag(event: CustomEvent<{ position: { x: number; y: number } }>) {
+		// Dispatch upward so DeviceCalibration can show live coordinates
+		dispatch('calibrationDrag', event.detail);
+	}
+
 	setContext('colors', scaleOrdinal(schemeCategory10));
 
 	$: {
@@ -144,9 +159,14 @@
 			<Nodes {transform} {floorId} {deviceId} {nodeId} onselected={selectedNode} onhovered={hoveredNode} />
 			<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
 			{#if calibrate && calibrationSpot}
-				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} />
+				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} on:drag={handleCalibrationDrag} />
 			{/if}
 		</Svg>
+		<!-- Zoom controls overlay -->
+		<div class="zoom-controls absolute top-2 right-2 flex flex-col gap-1">
+			<button class="btn btn-sm preset-filled-surface-500" onclick={zoomIn} title="Zoom in">+</button>
+			<button class="btn btn-sm preset-filled-surface-500" onclick={zoomOut} title="Zoom out">−</button>
+		</div>
 	</LayerCake>
 {:else}
 	<div>Loading...</div>

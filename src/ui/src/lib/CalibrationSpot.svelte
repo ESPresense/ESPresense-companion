@@ -64,6 +64,9 @@
 		window.addEventListener('mouseup', handlePointerUp, { capture: true });
 		window.addEventListener('touchend', handlePointerUp, { capture: true });
 		window.addEventListener('touchcancel', handlePointerUp, { capture: true });
+
+		// Notify that dragging has started
+		dispatch('dragstart', { position });
 	}
 
 	// While dragging...
@@ -90,6 +93,9 @@
 
 		// Update position - this will trigger the two-way binding update
 		position = { x: clampedX, y: clampedY };
+
+		// Notify of position change during drag
+		dispatch('drag', { position: { x: clampedX, y: clampedY } });
 
 		// Prevent scrolling on touch devices
 		if ('touches' in event) {

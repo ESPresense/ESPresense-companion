@@ -20,6 +20,11 @@
 	let calibrationSpotHeight = 1.0; // Default height in meters
 	let currentRefRssi: number | null = null; // Will set after fetch
 
+	// Manual position entry
+	let manualX: string = '';
+	let manualY: string = '';
+	let isDragging = false;
+
 	// Local storage for all device messages (keyed by nodeId)
 	let deviceMessages: Record<string, DeviceMessage[]> = {};
 
@@ -264,6 +269,27 @@
 		}
 	}
 
+	function goToManualPosition() {
+		if (!bounds || !calibrationSpot) return;
+		const x = parseFloat(manualX);
+		const y = parseFloat(manualY);
+		if (isNaN(x) || isNaN(y)) return;
+		// Clamp to floor bounds
+		const clampedX = Math.max(bounds[0][0], Math.min(bounds[1][0], x));
+		const clampedY = Math.max(bounds[0][1], Math.min(bounds[1][1], y));
+		calibrationSpot = { x: clampedX, y: clampedY, z: calibrationSpot.z };
+		manualX = clampedX.toFixed(2);
+		manualY = clampedY.toFixed(2);
+	}
+
+	function handleCalibrationDrag(event: CustomEvent<{ position: { x: number; y: number } }>) {
+		isDragging = true;
+	}
+
+	function handleCalibrationDragEnd() {
+		isDragging = false;
+	}
+
 	async function clearAnchor() {
 		if (!deviceSettings?.id && !deviceSettings?.originalId) return;
 		const payload = buildSettingsPayload({ x: null, y: null, z: null });
@@ -442,8 +468,25 @@
 
 		{#if selectedFloorId}
 			<div class="card h-[400px] relative overflow-hidden">
-				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
+				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot on:calibrationDrag={handleCalibrationDrag} on:dragend={handleCalibrationDragEnd} />
 			</div>
+			<!-- Manual position entry and live coordinates -->
+			{#if calibrationSpot}
+				<div class="flex flex-wrap items-center gap-4 mt-2">
+					<div class="flex items-center gap-2 text-sm">
+						<span class="text-surface-700-300 font-medium">Position:</span>
+						<span class="font-mono">
+							(x: {calibrationSpot.x.toFixed(2)}, y: {calibrationSpot.y.toFixed(2)})
+							{#if isDragging}<span class="text-primary-500 animate-pulse">dragging</span>{/if}
+						</span>
+					</div>
+					<div class="flex items-center gap-2 ml-auto">
+						<input type="number" bind:value={manualX} placeholder="X" step="0.1" class="input input-sm w-20" />
+						<input type="number" bind:value={manualY} placeholder="Y" step="0.1" class="input input-sm w-20" />
+						<button class="btn btn-sm preset-filled-primary-500" onclick={goToManualPosition}>Go to position</button>
+					</div>
+				</div>
+			{/if}
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<div class="text-sm text-surface-700-300">
 					{#if isAnchored}
