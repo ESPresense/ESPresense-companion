@@ -7,6 +7,7 @@ name: Accuracy harness
 #   - and this workflow.
 # This is NOT a general "did the build break" gate (that is ci.yml).
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -54,6 +55,25 @@ jobs:
         # Release config bypasses the SPA install in src/ESPresense.Companion.csproj,
         # which has no business running for the accuracy gate.
         run: dotnet build -c Release tests/ESPresense.Companion.Simulation/ESPresense.Simulation.csproj
+
+      - name: Generate accuracy report
+        run: |
+          mkdir -p accuracy-report
+          dotnet run --no-build -c Release --project tests/ESPresense.Companion.Simulation -- \
+            accuracy baseline \
+            --output accuracy-report/accuracy-report.json \
+            --markdown accuracy-report/accuracy-report.md
+          echo "## Multilateration accuracy report" >> "$GITHUB_STEP_SUMMARY"
+          cat accuracy-report/accuracy-report.md >> "$GITHUB_STEP_SUMMARY"
+          cat accuracy-report/accuracy-report.md
+
+      - name: Upload accuracy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accuracy-report-${{ github.sha }}
+          path: accuracy-report/
+          retention-days: 90
 
       - name: Run accuracy check (±5% tolerance)
         run: |
