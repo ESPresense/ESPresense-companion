@@ -4,7 +4,7 @@ public class DeviceHistory
 {
     public string? Id { get; set; }
     public string? Scenario { get; set; }
-    public int Confidence { get; set; }
+    public double Confidence { get; set; }
     public int Fixes { get; set; }
     public DateTime? When { get; set; }
     public double? X { get; set; }
