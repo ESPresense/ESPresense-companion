@@ -12,13 +12,15 @@ namespace ESPresense.Controllers
         private readonly DeviceSettingsStore _deviceSettingsStore;
         private readonly DeviceService _deviceService;
         private readonly State _state;
+        private readonly DeviceCaptureService _captureService;
 
-        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, DeviceService deviceService, State state)
+        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, DeviceService deviceService, State state, DeviceCaptureService captureService)
         {
             _logger = logger;
             _deviceSettingsStore = deviceSettingsStore;
             _deviceService = deviceService;
             _state = state;
+            _captureService = captureService;
         }
 
         [HttpGet("{id}")]
@@ -51,7 +53,53 @@ namespace ESPresense.Controllers
             var deleted = await _deviceService.DeleteAsync(id, "manual");
             return deleted ? NoContent() : NotFound();
         }
+
+        [HttpPost("{id}/capture/start")]
+        public Task<CaptureStatus> StartCapture(string id)
+        {
+            var settings = _deviceSettingsStore.Get(id);
+            return _captureService.Start(id, settings?.Id, settings?.OriginalId);
+        }
+
+        [HttpPost("{id}/capture/position")]
+        public ActionResult<CaptureStatus> AddCapturePosition(string id, [FromBody] CapturePositionRequest position)
+        {
+            var status = _captureService.AddPosition(id, position.x, position.y, position.z, position.floor);
+            return status == null ? NotFound() : status;
+        }
+
+        [HttpPost("{id}/capture/stop")]
+        public async Task<ActionResult<CaptureStatus>> StopCapture(string id)
+        {
+            var status = await _captureService.Stop(id);
+            return status == null ? NotFound() : status;
+        }
+
+        [HttpGet("{id}/capture")]
+        public ActionResult<CaptureStatus> GetCapture(string id)
+        {
+            var status = _captureService.GetStatus(id);
+            return status == null ? NotFound() : status;
+        }
+
+        [HttpDelete("{id}/capture")]
+        public async Task<IActionResult> DiscardCapture(string id)
+        {
+            return await _captureService.Discard(id) ? NoContent() : NotFound();
+        }
+
+        [HttpGet("{id}/capture/export")]
+        public IActionResult ExportCapture(string id)
+        {
+            var settings = _deviceSettingsStore.Get(id);
+            var export = _captureService.Export(id, settings?.Name);
+            if (export == null) return NotFound();
+            var fileName = $"{id}-capture-{export.Value.started:yyyyMMdd-HHmmss}.json";
+            return File(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(export.Value), "application/json", fileName);
+        }
     }
 
     public readonly record struct DeviceSettingsDetails(DeviceSettings? settings, IList<KeyValuePair<string, string>> details);
+
+    public readonly record struct CapturePositionRequest(double x, double y, double z, string? floor);
 }
