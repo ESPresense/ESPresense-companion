@@ -48,12 +48,16 @@ public class DeviceControllerTests
         var mockDeviceServiceLogger = new Mock<ILogger<DeviceService>>();
         
         var deviceService = new DeviceService(_mockState.Object, mockMqttCoordinatorConcrete, globalEventDispatcher, mockDeviceServiceLogger.Object);
-        
+
+        var nodeSettingsStore = new NodeSettingsStore(mockMqttCoordinatorInterface.Object, new Mock<ILogger<NodeSettingsStore>>().Object);
+        var captureService = new DeviceCaptureService(mockMqttCoordinatorInterface.Object, _mockState.Object, nodeSettingsStore);
+
         _deviceController = new DeviceController(
             _mockLogger.Object,
             _mockDeviceSettingsStore.Object,
             deviceService,
-            _mockState.Object
+            _mockState.Object,
+            captureService
         );
     }
 
