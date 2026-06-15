@@ -238,13 +238,45 @@ public class PerNodeAbsorptionRxTx : IOptimizer
             // Use the bounded BFGS solver
             var solver = new BfgsBMinimizer(1e-8, 1e-8, 1e-8, 10000);
             var result = solver.FindMinimum(objectiveFunction, lowerBound, upperBound, initialGuess);
+            var final = result.MinimizingPoint;
+
+            // Per-node fit quality: weighted RMS of the (asymmetric) distance error over each
+            // node's own measurements, using the final fitted parameters. This replaces storing
+            // the single global objective value on every node, which made every node's Error look
+            // identical regardless of how well that node actually fit.
+            var rxErrorSum = new Dictionary<string, double>();
+            var rxWeightSum = new Dictionary<string, double>();
+            var txErrorSum = new Dictionary<string, double>();
+            var txWeightSum = new Dictionary<string, double>();
+
+            foreach (var node in allRxNodes)
+            {
+                int rxBaseIndex = rxIndexMap[node.Rx.Id];
+                int txBaseIndex = txIndexMap[node.Tx.Id];
+                double rxAdjRssi = final[rxBaseIndex];
+                double absorption = final[rxBaseIndex + 1];
+                double txRefRssi = final[txBaseIndex];
+
+                double calculatedDistance = Math.Pow(10, (txRefRssi - node.GetAdjustedRssi(rxAdjRssi)) / (10.0 * absorption));
+                double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
+                double weight = nodeWeights[node];
+                double err = weight * calculateDistanceError(calculatedDistance, mapDistance);
+
+                rxErrorSum[node.Rx.Id] = rxErrorSum.GetValueOrDefault(node.Rx.Id) + err;
+                rxWeightSum[node.Rx.Id] = rxWeightSum.GetValueOrDefault(node.Rx.Id) + weight;
+                txErrorSum[node.Tx.Id] = txErrorSum.GetValueOrDefault(node.Tx.Id) + err;
+                txWeightSum[node.Tx.Id] = txWeightSum.GetValueOrDefault(node.Tx.Id) + weight;
+            }
+
+            double? PerNodeError(Dictionary<string, double> errSum, Dictionary<string, double> wSum, string id)
+                => wSum.TryGetValue(id, out var w) && w > 0 ? Math.Sqrt(errSum[id] / w) : null;
 
             // Process Rx node results
             foreach (var rxId in uniqueRxIds)
             {
                 int baseIndex = rxIndexMap[rxId];
-                double rxAdjRssi = result.MinimizingPoint[baseIndex];
-                double absorption = result.MinimizingPoint[baseIndex + 1];
+                double rxAdjRssi = final[baseIndex];
+                double absorption = final[baseIndex + 1];
 
                 // Ensure values are within bounds (should be already)
                 rxAdjRssi = Math.Max(optimization.RxAdjRssiMin, Math.Min(rxAdjRssi, optimization.RxAdjRssiMax));
@@ -253,18 +285,18 @@ public class PerNodeAbsorptionRxTx : IOptimizer
                 var n = or.Nodes.GetOrAdd(rxId);
                 n.RxAdjRssi = rxAdjRssi;
                 n.Absorption = absorption;
-                n.Error = result.FunctionInfoAtMinimum.Value;
+                n.Error = PerNodeError(rxErrorSum, rxWeightSum, rxId);
             }
 
             // Process Tx node results
             foreach (var txId in uniqueTxIds)
             {
-                double txRefRssi = result.MinimizingPoint[txIndexMap[txId]];
+                double txRefRssi = final[txIndexMap[txId]];
                 txRefRssi = Math.Max(optimization.TxRefRssiMin, Math.Min(txRefRssi, optimization.TxRefRssiMax));
 
                 var n = or.Nodes.GetOrAdd(txId);
                 n.TxRefRssi = txRefRssi;
-                n.Error = result.FunctionInfoAtMinimum.Value;
+                n.Error = PerNodeError(txErrorSum, txWeightSum, txId);
             }
         }
         catch (Exception ex)
