@@ -75,9 +75,11 @@ builder.Services.AddSingleton<FirmwareTypeStore>();
 builder.Services.AddSingleton<FirmwareUpdateJobService>();
 builder.Services.AddSingleton<DeviceService>();
 builder.Services.AddSingleton<DeviceCaptureService>();
+builder.Services.AddSingleton<RadioTomographyService>();
 builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
 
+builder.Services.AddHostedService(provider => provider.GetRequiredService<RadioTomographyService>());
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceTracker>());
