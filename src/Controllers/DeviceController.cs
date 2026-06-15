@@ -94,7 +94,8 @@ namespace ESPresense.Controllers
             var settings = _deviceSettingsStore.Get(id);
             var export = _captureService.Export(id, settings?.Name);
             if (export == null) return NotFound();
-            var fileName = $"{id}-capture-{export.Value.started:yyyyMMdd-HHmmss}.json";
+            var safeId = string.Join("_", id.Split(Path.GetInvalidFileNameChars()));
+            var fileName = $"{safeId}-capture-{export.Value.started:yyyyMMdd-HHmmss}.json";
             return File(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(export.Value), "application/json", fileName);
         }
     }
