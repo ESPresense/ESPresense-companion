@@ -52,8 +52,9 @@ public static class ReplayCli
         double stale = 30.0;
         var absorptions = new List<double>();
         string? calibrationFile = null;
+        double? ransac = null;
 
-        for (int i = 1; i < args.Length - 1; i++)
+        for (int i = 1; i < args.Length; i++)
         {
             switch (args[i])
             {
@@ -63,6 +64,12 @@ public static class ReplayCli
                 case "--step": step = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                 case "--stale": stale = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                 case "--calibration": calibrationFile = args[++i]; break;
+                // --ransac [threshold]; threshold defaults to 2.0m if the next token is another flag
+                case "--ransac":
+                    if (i + 1 < args.Length && double.TryParse(args[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var rt))
+                    { ransac = rt; i++; }
+                    else ransac = 2.0;
+                    break;
             }
         }
 
@@ -121,19 +128,26 @@ public static class ReplayCli
             calibrations.Add(("per-node-file",
                 m => perNode.TryGetValue(m.Node, out var n) ? Recompute(m, n, refDelta) : m.Distance));
 
-        stdout.WriteLine($"{"locator",-12} {"calibration",-20} {"fixes",6} {"median",8} {"p95",8} {"mean",8}");
-        stdout.WriteLine(new string('-', 66));
+        // null = plain solve; a threshold = RANSAC consensus solve. Run both when --ransac is set.
+        var modes = ransac is double rthr ? new double?[] { null, rthr } : new double?[] { null };
+
+        stdout.WriteLine($"{"locator",-12} {"calibration",-26} {"fixes",6} {"median",8} {"p95",8} {"mean",8}");
+        stdout.WriteLine(new string('-', 72));
         foreach (var loc in locators)
         {
             foreach (var (label, distFn) in calibrations)
             {
-                var errors = engine.Score(loc, distFn);
-                if (errors.Count == 0)
+                foreach (var mode in modes)
                 {
-                    stdout.WriteLine($"{loc,-12} {label,-20} {0,6}   (no locatable fixes)");
-                    continue;
+                    var lbl = mode is double t ? $"{label} +ransac{t:0.#}" : label;
+                    var errors = engine.Score(loc, distFn, mode);
+                    if (errors.Count == 0)
+                    {
+                        stdout.WriteLine($"{loc,-12} {lbl,-26} {0,6}   (no locatable fixes)");
+                        continue;
+                    }
+                    stdout.WriteLine($"{loc,-12} {lbl,-26} {errors.Count,6} {Median(errors),8:0.000} {Percentile(errors, 95),8:0.000} {errors.Average(),8:0.000}");
                 }
-                stdout.WriteLine($"{loc,-12} {label,-20} {errors.Count,6} {Median(errors),8:0.000} {Percentile(errors, 95),8:0.000} {errors.Average(),8:0.000}");
             }
         }
 
@@ -272,7 +286,7 @@ public static class ReplayCli
             public Node_(string id) : base(id, NodeSourceType.Config) { }
         }
 
-        public List<double> Score(string locatorName, Func<Msg, double> distFn)
+        public List<double> Score(string locatorName, Func<Msg, double> distFn, double? ransacThreshold = null)
         {
             var errors = new List<double>();
             for (var t = _start; t <= _end; t = t.AddSeconds(_step))
@@ -287,7 +301,9 @@ public static class ReplayCli
                 }
                 if (fixDistances.Count < 3) continue;
 
-                var est = Locate(locatorName, fixDistances);
+                var est = ransacThreshold is double thr
+                    ? LocateRansac(locatorName, fixDistances, thr)
+                    : Locate(locatorName, fixDistances);
                 if (est == null) continue;
 
                 var truth = TruthAt(t);
@@ -351,6 +367,62 @@ public static class ReplayCli
 
             var scenario = new Scenario(_config, locator, "replay") { Confidence = 0 };
             return locator.Locate(scenario) ? scenario.Location : (Point3D?)null;
+        }
+
+        /// <summary>
+        /// Consensus-based outlier rejection: fit on each minimal 3-node subset, count how many
+        /// of ALL nodes agree with that fit (|predicted - measured| &lt;= threshold), keep the
+        /// largest consensus set, then refit on those inliers. Drops persistent NLOS outliers
+        /// (e.g. a node reading several metres long through a wall) that least-squares would
+        /// otherwise smear across the whole fix.
+        /// </summary>
+        private Point3D? LocateRansac(string locatorName, Dictionary<string, double> distances, double threshold)
+        {
+            if (distances.Count <= 4) return Locate(locatorName, distances); // too few to spare any
+
+            var ids = distances.Keys.ToList();
+            HashSet<string>? bestInliers = null;
+
+            foreach (var sample in Combinations(ids, 3))
+            {
+                var subset = sample.ToDictionary(id => id, id => distances[id]);
+                var est = Locate(locatorName, subset);
+                if (est == null) continue;
+
+                var inliers = new HashSet<string>();
+                foreach (var id in ids)
+                {
+                    if (!_nodeMeta.TryGetValue(id, out var meta)) continue;
+                    double predicted = Math.Sqrt(
+                        Math.Pow(meta.Point[0] - est.Value.X, 2) +
+                        Math.Pow(meta.Point[1] - est.Value.Y, 2) +
+                        Math.Pow(meta.Point[2] - est.Value.Z, 2));
+                    if (Math.Abs(predicted - distances[id]) <= threshold) inliers.Add(id);
+                }
+                if (bestInliers == null || inliers.Count > bestInliers.Count) bestInliers = inliers;
+            }
+
+            // Refit on the consensus set (fall back to all nodes if consensus is too small).
+            var keep = bestInliers != null && bestInliers.Count >= 3
+                ? distances.Where(kv => bestInliers.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value)
+                : distances;
+            return Locate(locatorName, keep);
+        }
+
+        private static IEnumerable<List<string>> Combinations(List<string> items, int k)
+        {
+            var idx = Enumerable.Range(0, k).ToArray();
+            int n = items.Count;
+            if (k > n) yield break;
+            while (true)
+            {
+                yield return idx.Select(i => items[i]).ToList();
+                int p = k - 1;
+                while (p >= 0 && idx[p] == n - k + p) p--;
+                if (p < 0) yield break;
+                idx[p]++;
+                for (int j = p + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
+            }
         }
 
         private Pos TruthAt(DateTime t)
