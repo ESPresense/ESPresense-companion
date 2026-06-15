@@ -166,6 +166,141 @@ public static class ReplayCli
     private static double Recompute(Msg m, double absorption, double refDelta)
         => Math.Max(0.1, Math.Pow(10, ((m.RefRssi + refDelta) - m.Rssi) / (10.0 * absorption)));
 
+    private static double RecomputeAbs(Msg m, double absorption, double refRssi)
+        => Math.Max(0.1, Math.Pow(10, (refRssi - m.Rssi) / (10.0 * absorption)));
+
+    /// <summary>
+    /// Leave-one-capture-out test of "better calibration is the lever": fit per-node
+    /// (absorption, refRssi) by RANSAC against ground truth on all-but-one capture, then score the
+    /// held-out capture with that calibration vs the as-captured baseline. Honest generalization —
+    /// the scored capture never contributed to its own calibration.
+    /// </summary>
+    public static int CalVal(string[] args, TextWriter stdout, TextWriter stderr)
+    {
+        var files = new List<string>();
+        double ransacDb = 6.0, step = 1.0, stale = 30.0;
+        string locator = "neldermead";
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--ransac": ransacDb = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--step": step = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--stale": stale = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--locator": locator = args[++i]; break;
+                default: if (File.Exists(args[i])) files.Add(args[i]); break;
+            }
+        }
+        if (files.Count < 2) { stderr.WriteLine("calval needs >=2 capture files (leave-one-out)."); return 2; }
+
+        var caps = files.Select(f => (name: Path.GetFileName(f), cap: LoadCapture(f)))
+                        .Where(x => x.cap?.Nodes?.Length > 0 && x.cap.Messages?.Length > 0 && x.cap.Positions?.Length > 0)
+                        .Select(x => (x.name, cap: x.cap!)).ToList();
+        if (caps.Count < 2) { stderr.WriteLine("Fewer than 2 valid captures (need nodes, messages, and ground-truth positions)."); return 2; }
+
+        stdout.WriteLine($"Leave-one-capture-out calibration (RANSAC {ransacDb}dB, locator {locator})");
+        stdout.WriteLine($"{"held-out",-44} {"fixes",6} {"baseline",9} {"fitted",9} {"delta",8}");
+        stdout.WriteLine(new string('-', 80));
+
+        foreach (var (name, held) in caps)
+        {
+            var trainers = caps.Where(c => !ReferenceEquals(c.cap, held)).Select(c => c.cap).ToList();
+            var calib = FitCalibration(trainers, ransacDb);
+
+            var engine = new ReplayEngine(held, step, stale);
+            var baseErr = engine.Score(locator, m => m.Distance);
+            var calErr = engine.Score(locator,
+                m => calib.TryGetValue(m.Node, out var c) ? RecomputeAbs(m, c.absorption, c.refRssi) : m.Distance);
+
+            if (baseErr.Count == 0) { stdout.WriteLine($"{name,-44} {0,6}  (no fixes)"); continue; }
+            double b = Median(baseErr), f = Median(calErr);
+            stdout.WriteLine($"{name,-44} {baseErr.Count,6} {b,9:0.000} {f,9:0.000} {f - b,8:+0.000;-0.000}");
+        }
+
+        // Show the calibration fitted from ALL captures (what you'd ship), with inlier counts.
+        stdout.WriteLine();
+        stdout.WriteLine("Per-node calibration fitted from ALL captures:");
+        stdout.WriteLine($"{"node",-22} {"pts",5} {"inliers",8} {"absorption",11} {"refRssi",9}");
+        stdout.WriteLine(new string('-', 60));
+        var all = FitCalibration(caps.Select(c => c.cap).ToList(), ransacDb);
+        foreach (var (node, c) in all.OrderBy(kv => kv.Key))
+            stdout.WriteLine($"{node,-22} {c.total,5} {c.inliers,8} {c.absorption,11:0.00} {c.refRssi,9:0.0}");
+
+        return 0;
+    }
+
+    private static Dictionary<string, (double absorption, double refRssi, int inliers, int total)> FitCalibration(
+        List<Capture> caps, double ransacDb)
+    {
+        // Pool (log10(trueDist), rssi) per node across all training captures.
+        var pts = new Dictionary<string, List<(double x, double y)>>();
+        foreach (var cap in caps)
+        {
+            var positions = cap.Positions!.OrderBy(p => p.T).ToList();
+            var meta = cap.Nodes!.ToDictionary(n => n.Id, StringComparer.OrdinalIgnoreCase);
+            foreach (var m in cap.Messages!)
+            {
+                if (!meta.TryGetValue(m.Node, out var nd)) continue;
+                var truth = TruthAt(positions, m.T);
+                double d = Math.Sqrt(Math.Pow(nd.Point[0] - truth.X, 2) + Math.Pow(nd.Point[1] - truth.Y, 2) + Math.Pow(nd.Point[2] - truth.Z, 2));
+                if (d < 0.3) continue;
+                if (!pts.TryGetValue(m.Node, out var list)) pts[m.Node] = list = new List<(double, double)>();
+                list.Add((Math.Log10(d), m.Rssi));
+            }
+        }
+
+        var result = new Dictionary<string, (double, double, int, int)>();
+        foreach (var (node, ps) in pts)
+        {
+            var fit = RansacLine(ps, ransacDb);
+            if (fit == null) continue;
+            var (a, slope, inliers) = fit.Value;
+            double absorption = -slope / 10.0;            // rssi = refRssi - 10*absorption*log10(d)
+            if (absorption < 1.5 || absorption > 6.0) continue; // nonphysical fit -> skip (fall back to as-captured)
+            result[node] = (absorption, a, inliers, ps.Count);
+        }
+        return result;
+    }
+
+    // RANSAC line fit y = a + b*x. Returns (a, b, inlierCount) or null if no usable model.
+    private static (double a, double b, int inliers)? RansacLine(List<(double x, double y)> pts, double thr)
+    {
+        int n = pts.Count;
+        if (n < 4 || pts.Select(p => Math.Round(p.x, 3)).Distinct().Count() < 2) return null;
+
+        int bestCount = -1; double bestA = 0, bestB = 0;
+        for (int i = 0; i < n; i++)
+            for (int j = i + 1; j < n; j++)
+            {
+                double dx = pts[j].x - pts[i].x;
+                if (Math.Abs(dx) < 1e-6) continue;
+                double b = (pts[j].y - pts[i].y) / dx;
+                double a = pts[i].y - b * pts[i].x;
+                int count = pts.Count(p => Math.Abs(p.y - (a + b * p.x)) <= thr);
+                if (count > bestCount) { bestCount = count; bestA = a; bestB = b; }
+            }
+        if (bestCount < 4) return null;
+
+        // Least-squares refit on the consensus inliers.
+        var inl = pts.Where(p => Math.Abs(p.y - (bestA + bestB * p.x)) <= thr).ToList();
+        double mx = inl.Average(p => p.x), my = inl.Average(p => p.y);
+        double sxx = inl.Sum(p => (p.x - mx) * (p.x - mx)), sxy = inl.Sum(p => (p.x - mx) * (p.y - my));
+        if (Math.Abs(sxx) < 1e-9) return (bestA, bestB, inl.Count);
+        double bb = sxy / sxx, aa = my - bb * mx;
+        return (aa, bb, inl.Count);
+    }
+
+    private static Pos TruthAt(List<Pos> sorted, DateTime t)
+    {
+        Pos current = sorted[0];
+        foreach (var p in sorted) { if (p.T <= t) current = p; else break; }
+        return current;
+    }
+
+    private static Capture? LoadCapture(string file)
+        => JsonSerializer.Deserialize<Capture>(File.ReadAllText(file),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
     private static double Median(List<double> xs)
     {
         var s = xs.OrderBy(x => x).ToList();

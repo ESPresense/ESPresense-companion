@@ -113,6 +113,13 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "calval")
+        {
+            int exit = ReplayCli.CalVal(args.Skip(1).ToArray(), Console.Out, Console.Error);
+            Environment.Exit(exit);
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
