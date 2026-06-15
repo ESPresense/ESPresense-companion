@@ -25,6 +25,17 @@
 
 	$: isAnchored = deviceSettings?.x != null && deviceSettings?.y != null && deviceSettings?.z != null;
 
+	let showInstructions = false;
+
+	function toggleInstructions() {
+		showInstructions = !showInstructions;
+		try {
+			localStorage.setItem('deviceCalibrationInstructions', showInstructions ? 'shown' : 'hidden');
+		} catch {
+			// localStorage unavailable; toggle still works for this session
+		}
+	}
+
 	// Function to fetch device settings based on deviceId
 	async function fetchDeviceSettings() {
 		try {
@@ -79,6 +90,11 @@
 	}
 
 	onMount(async () => {
+		try {
+			showInstructions = localStorage.getItem('deviceCalibrationInstructions') === 'shown';
+		} catch {
+			// localStorage unavailable; leave instructions hidden
+		}
 		// Initialize currentRefRssi from deviceSettings
 		currentRefRssi = deviceSettings?.['rssi@1m'] || null;
 		if (deviceSettings?.id) {
@@ -86,9 +102,13 @@
 			wsManager.subscribeDeviceMessage(deviceSettings.id);
 			console.log('Subscribed to device messages for', deviceSettings.id);
 		}
+		refreshCapture();
+		captureInterval = setInterval(refreshCapture, 1000);
 	});
 
 	onDestroy(() => {
+		if (captureInterval) clearInterval(captureInterval);
+		if (positionDebounce) clearTimeout(positionDebounce);
 		if (deviceSettings?.id) {
 			wsManager.unsubscribeFromEvent('deviceMessage', handleDeviceMessage);
 			wsManager.sendMessage({
@@ -285,6 +305,91 @@
 		}
 	}
 
+	// --- Recording (capture for offline accuracy analysis) ---
+
+	type CaptureStatus = { deviceId: string; active: boolean; count: number; positions: number; started: string; ended?: string; truncated: boolean };
+
+	let capture: CaptureStatus | null = null;
+	let captureInterval: ReturnType<typeof setInterval> | null = null;
+	let lastSentPosition: string | null = null;
+
+	$: exportUrl = deviceSettings?.id ? resolve(`/api/device/${deviceSettings.id}/capture/export`) : '';
+
+	async function refreshCapture() {
+		if (!deviceSettings?.id) return;
+		try {
+			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture`));
+			capture = response.ok ? await response.json() : null;
+		} catch {
+			capture = null;
+		}
+	}
+
+	async function startCapture() {
+		if (!deviceSettings?.id) return;
+		try {
+			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/start`), { method: 'POST' });
+			if (!response.ok) throw new Error(response.statusText);
+			capture = await response.json();
+			lastSentPosition = null;
+			await sendCapturePosition();
+		} catch (error) {
+			console.error('Error starting capture:', error);
+			toastStore.trigger({ message: 'Error starting recording.', background: 'preset-filled-error-500' });
+		}
+	}
+
+	async function stopCapture() {
+		if (!deviceSettings?.id) return;
+		try {
+			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/stop`), { method: 'POST' });
+			if (response.ok) capture = await response.json();
+		} catch (error) {
+			console.error('Error stopping capture:', error);
+		}
+	}
+
+	async function discardCapture() {
+		if (!deviceSettings?.id) return;
+		try {
+			await fetch(resolve(`/api/device/${deviceSettings.id}/capture`), { method: 'DELETE' });
+			capture = null;
+		} catch (error) {
+			console.error('Error discarding capture:', error);
+		}
+	}
+
+	async function sendCapturePosition() {
+		if (!capture?.active || !deviceSettings?.id || !calibrationSpot || calibrationSpot.x == null || calibrationSpot.y == null) return;
+		const z = calibrationSpot.z ?? (bounds ? bounds[0][2] + calibrationSpotHeight : calibrationSpotHeight);
+		const position = { x: calibrationSpot.x, y: calibrationSpot.y, z, floor: selectedFloorId };
+		const key = JSON.stringify(position);
+		if (key === lastSentPosition) return;
+		lastSentPosition = key;
+		try {
+			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/position`), {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(position)
+			});
+			if (response.ok) capture = await response.json();
+		} catch (error) {
+			console.error('Error sending capture position:', error);
+		}
+	}
+
+	// Record a ground-truth marker whenever the marker moves during recording.
+	// Depends only on the marker (not `capture`), so status polling can't trigger
+	// posts — otherwise every open tab would push its own stale marker position.
+	// Debounced so dragging posts a sparse trail instead of one point per mousemove.
+	let positionDebounce: ReturnType<typeof setTimeout> | null = null;
+	$: queueCapturePosition(calibrationSpot, calibrationSpotHeight, selectedFloorId);
+	function queueCapturePosition(..._deps: unknown[]) {
+		if (!capture?.active) return;
+		if (positionDebounce) clearTimeout(positionDebounce);
+		positionDebounce = setTimeout(() => sendCapturePosition(), 300);
+	}
+
 	// Update this function to use only parameters from device messages
 	function calculateFinalRssi() {
 		const refRssiEstimates: Array<{ refRssi: number; weight: number }> = [];
@@ -397,24 +502,30 @@
 	<title>ESPresense Companion: Device Calibration</title>
 </svelte:head>
 
-
 <div class="h-full overflow-y-auto">
-	<div class="w-full px-4 py-4 space-y-6">
+	<div class="w-full px-4 py-3 space-y-4">
 		<header class="flex items-center justify-between">
 			<h1 class="text-2xl font-bold text-surface-900-100">Device Calibration</h1>
 		</header>
 
-		<div class="card p-4 preset-tonal">
-			<header class="font-semibold mb-2">Instructions</header>
-			<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
-			<ol class="list-decimal pl-6 mb-2">
-				<li>Select a floor from the dropdown</li>
-				<li>Place the marker where your device is physically located (drag to position)</li>
-				<li>Data is automatically collected as you keep the device stationary</li>
-				<li>Compare Map Distance (actual) with Est. Distance (calculated from RSSI)</li>
-				<li>When stability is good, review and save the calculated value</li>
-			</ol>
-			<p class="text-sm font-medium mt-2">The closer Map Distance matches Est. Distance for all nodes, the more accurate your positioning will be.</p>
+		<div class="card preset-tonal">
+			<button type="button" class="w-full flex items-center justify-between px-4 py-2" onclick={toggleInstructions} aria-expanded={showInstructions}>
+				<span class="font-semibold">Instructions</span>
+				<span class="text-sm opacity-70">{showInstructions ? 'Hide ▲' : 'Show ▼'}</span>
+			</button>
+			{#if showInstructions}
+				<div class="px-4 pb-4">
+					<p class="mb-2">This tool helps calibrate the RSSI@1m value for your device to improve location accuracy.</p>
+					<ol class="list-decimal pl-6 mb-2">
+						<li>Select a floor from the dropdown</li>
+						<li>Place the marker where your device is physically located (drag to position)</li>
+						<li>Data is automatically collected as you keep the device stationary</li>
+						<li>Compare Map Distance (actual) with Est. Distance (calculated from RSSI)</li>
+						<li>When stability is good, review and save the calculated value</li>
+					</ol>
+					<p class="text-sm font-medium mt-2">The closer Map Distance matches Est. Distance for all nodes, the more accurate your positioning will be.</p>
+				</div>
+			{/if}
 		</div>
 
 		{#if $config?.floors}
@@ -461,6 +572,31 @@
 						<button class="btn preset-filled-error-500" onclick={clearAnchor}>Remove anchor</button>
 					{/if}
 				</div>
+			</div>
+
+			<div class="card p-4 preset-tonal">
+				<header class="font-semibold mb-2">Recording</header>
+				<p class="text-sm mb-3">Records this device's raw node measurements along with the marker position as ground truth. Keep the marker on the device's actual location — move it whenever the device moves.</p>
+				<div class="flex flex-wrap items-center gap-2">
+					{#if capture?.active}
+						<span class="text-sm font-medium text-success-500">Recording… {capture.count} messages, {capture.positions} positions</span>
+						<button class="btn preset-filled-error-500" onclick={stopCapture}>Stop</button>
+					{:else}
+						<button class="btn preset-filled-primary-500" onclick={startCapture} disabled={!calibrationSpot}>Start recording</button>
+						{#if capture && capture.count > 0}
+							<span class="text-sm font-medium">{capture.count} messages, {capture.positions} positions captured</span>
+						{/if}
+					{/if}
+					{#if capture && capture.count > 0}
+						<a class="btn preset-filled-secondary-500" href={exportUrl} download>Export JSON</a>
+						{#if !capture.active}
+							<button class="btn preset-filled-surface-500" onclick={discardCapture}>Discard</button>
+						{/if}
+					{/if}
+				</div>
+				{#if capture?.truncated}
+					<p class="text-sm text-warning-500 mt-2">Capture truncated (message limit reached)</p>
+				{/if}
 			</div>
 		{/if}
 
@@ -594,6 +730,6 @@
 					</div>
 				</div>
 			</div>
-	{/if}
+		{/if}
 	</div>
 </div>

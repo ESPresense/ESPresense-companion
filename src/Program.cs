@@ -74,6 +74,7 @@ builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();
 builder.Services.AddSingleton<FirmwareUpdateJobService>();
 builder.Services.AddSingleton<DeviceService>();
+builder.Services.AddSingleton<DeviceCaptureService>();
 builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
 
