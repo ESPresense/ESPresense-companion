@@ -50,7 +50,7 @@
 		"s-ago": "^2.2.0",
 		"svelte": "^5.55.7",
 		"svelte-check": "^4.5.0",
-		"svelte-eslint-parser": "^1.6.1",
+		"svelte-eslint-parser": "^1.8.0",
 		"svelte-table": "^0.6.5",
 		"tailwindcss": "^4.3.0",
 		"three": "^0.184.0",
