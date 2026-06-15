@@ -174,11 +174,8 @@ namespace ESPresense.Models
         [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set; } = new();
         [YamlMember(Alias = "weights")] public Dictionary<string, double> Weights { get; set; } = new();
 
-        // Indoor effective path-loss exponents commonly run 3.5-4.5 once body shadowing and
-        // appliances are present, well above the free-space ~2. A [2, 4] default silently
-        // clamps most real nodes at the ceiling, so default to a wider, realistic range.
         [YamlIgnore] public double AbsorptionMin => Limits.TryGetValue("absorption_min", out var val) ? val : 2;
-        [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 5;
+        [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 4;
         [YamlIgnore] public double TxRefRssiMin => Limits.TryGetValue("tx_ref_rssi_min", out var val) ? val : -70;
         [YamlIgnore] public double TxRefRssiMax => Limits.TryGetValue("tx_ref_rssi_max", out var val) ? val : -50;
         [YamlIgnore] public double RxAdjRssiMin => Limits.TryGetValue("rx_adj_rssi_min", out var val) ? val : -5;

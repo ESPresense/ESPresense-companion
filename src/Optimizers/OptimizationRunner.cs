@@ -203,7 +203,7 @@ internal class OptimizationRunner : BackgroundService
             railed.Add($"TxRefRssi={result.TxRefRssi:0} ({txEdge} {(txEdge == "min" ? optimization.TxRefRssiMin : optimization.TxRefRssiMax):0})");
 
         if (railed.Count > 0)
-            Log.Warning("Node {0} railed to optimization bound(s): {1}. Consider widening the corresponding limit; a clamped value is not a true fit.",
+            Log.Warning("Node {0} railed to optimization bound(s): {1}. A clamped value is not a true fit — review the limit or the node (note: a wider absorption range does not necessarily improve positioning).",
                 id, string.Join(", ", railed));
     }
 
