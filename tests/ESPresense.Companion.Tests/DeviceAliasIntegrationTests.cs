@@ -43,8 +43,7 @@ public class DeviceAliasIntegrationTests
         var globalEventDispatcher = new GlobalEventDispatcher();
         _deviceService = new DeviceService(_state, mqttCoordinator, globalEventDispatcher, _mockDeviceServiceLogger.Object);
         
-        var nodeSettingsStore = new NodeSettingsStore(_mockMqttCoordinator.Object, new Mock<ILogger<NodeSettingsStore>>().Object);
-        var captureService = new DeviceCaptureService(_mockMqttCoordinator.Object, _state, nodeSettingsStore);
+        var captureService = new DeviceCaptureService(_mockMqttCoordinator.Object, _state);
 
         _deviceController = new DeviceController(
             _mockControllerLogger.Object,

@@ -55,7 +55,7 @@ namespace ESPresense.Controllers
         }
 
         [HttpPost("{id}/capture/start")]
-        public Task<CaptureStatus> StartCapture(string id)
+        public CaptureStatus StartCapture(string id)
         {
             var settings = _deviceSettingsStore.Get(id);
             return _captureService.Start(id, settings?.Id, settings?.OriginalId);
@@ -69,9 +69,9 @@ namespace ESPresense.Controllers
         }
 
         [HttpPost("{id}/capture/stop")]
-        public async Task<ActionResult<CaptureStatus>> StopCapture(string id)
+        public ActionResult<CaptureStatus> StopCapture(string id)
         {
-            var status = await _captureService.Stop(id);
+            var status = _captureService.Stop(id);
             return status == null ? NotFound() : status;
         }
 
@@ -83,9 +83,9 @@ namespace ESPresense.Controllers
         }
 
         [HttpDelete("{id}/capture")]
-        public async Task<IActionResult> DiscardCapture(string id)
+        public IActionResult DiscardCapture(string id)
         {
-            return await _captureService.Discard(id) ? NoContent() : NotFound();
+            return _captureService.Discard(id) ? NoContent() : NotFound();
         }
 
         [HttpGet("{id}/capture/export")]

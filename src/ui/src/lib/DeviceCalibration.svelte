@@ -576,7 +576,7 @@
 
 			<div class="card p-4 preset-tonal">
 				<header class="font-semibold mb-2">Recording</header>
-				<p class="text-sm mb-3">Records this device's raw node measurements along with the marker position as ground truth. Keep the marker on the device's actual location — move it whenever the device moves. While recording, all nodes are switched to high-rate reporting (restored on stop; auto-stops after 15 minutes).</p>
+				<p class="text-sm mb-3">Records this device's raw node measurements along with the marker position as ground truth. Keep the marker on the device's actual location — move it whenever the device moves.</p>
 				<div class="flex flex-wrap items-center gap-2">
 					{#if capture?.active}
 						<span class="text-sm font-medium text-success-500">Recording… {capture.count} messages, {capture.positions} positions</span>
