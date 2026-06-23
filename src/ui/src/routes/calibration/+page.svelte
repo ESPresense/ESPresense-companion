@@ -31,7 +31,7 @@
 	{:else if calibrationType === 'obstructions'}
 		<section class="px-4 space-y-2">
 			<p class="text-sm text-surface-600-300">
-				Static RF-attenuation map reconstructed from node-to-node links (radio tomography). Hot cells are where the radio sees something solid — walls, appliances, a refrigerator. This is a sanity check: if the hot blobs line up with things you know are there, the model is learning real physics. Updates every ~30s; sparse-coverage areas read cooler than reality.
+				Static RF-attenuation map reconstructed from node-to-node links (radio tomography). Hot cells are where the radio sees something solid — walls, appliances, a refrigerator. If the hot spots line up with things you know are there, the model is learning real physics. Updates every ~30s; sparse-coverage areas read cooler than reality.
 			</p>
 			<FloorTabs bind:floorId />
 			<div class="w-full" style="height: 70vh">

@@ -20,9 +20,10 @@ public class RadioTomographyService : BackgroundService
     // Tunables (kept conservative for a first cut).
     private const double FreeSpaceExponent = 2.0;  // n in rssi = ref - 10*n*log10(d)
     private const double CellSizeMeters = 1.0;
-    private const int MaxCells = 1200;             // bound the inverse-problem size
+    private const int MaxCells = 1200;             // bound the inverse-problem size (Cholesky is O(cells^3))
     private const int MinLinksPerFloor = 6;
-    private const double Regularization = 0.15;    // ridge strength, relative to data scale
+    private const double SmoothLambda = 0.4;        // spatial-smoothness strength, relative to data scale
+    private const double RidgeEpsilon = 0.01;       // tiny magnitude prior: pulls truly-unobserved cells to 0
     private const double DecayDbPerCycle = 1.0;    // how fast the per-link "clean" peak forgets
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
@@ -119,7 +120,7 @@ public class RadioTomographyService : BackgroundService
 
         if (rows_W.Count < MinLinksPerFloor) return null;
 
-        var attenuation = SolveRidge(rows_W, ys, cellCount);
+        var attenuation = SolveSmooth(rows_W, ys, cols, rows);
 
         var tf = new TomographyFloor
         {
@@ -170,22 +171,48 @@ public class RadioTomographyService : BackgroundService
         }
     }
 
-    /// <summary>Non-negative ridge regression: min ||Wx - y||^2 + λ||x||^2, then clamp x >= 0.</summary>
-    private static double[] SolveRidge(List<double[]> rowsW, List<double> ys, int cellCount)
+    /// <summary>
+    /// Smoothness-regularized non-negative reconstruction:
+    ///   min ||Wx - y||^2 + λ·Σ_neighbours (x_i - x_j)^2 + ε||x||^2,  then clamp x >= 0.
+    /// The Laplacian term couples adjacent cells so the field interpolates smoothly between links
+    /// (no streaking, contiguous blobs) instead of treating every cell independently. The tiny ε
+    /// ridge fixes the Laplacian's constant null space and pulls genuinely unobserved cells to 0.
+    /// </summary>
+    private static double[] SolveSmooth(List<double[]> rowsW, List<double> ys, int cols, int rows)
     {
+        int cellCount = cols * rows;
         int L = rowsW.Count;
         var W = Matrix<double>.Build.Dense(L, cellCount, (i, j) => rowsW[i][j]);
         var y = Vector<double>.Build.Dense(L, i => ys[i]);
 
-        var wtw = W.TransposeThisAndMultiply(W);          // C x C, SPD after ridge
+        var A = W.TransposeThisAndMultiply(W);            // C x C
         double meanDiag = 0;
-        for (int i = 0; i < cellCount; i++) meanDiag += wtw[i, i];
+        for (int i = 0; i < cellCount; i++) meanDiag += A[i, i];
         meanDiag = cellCount > 0 ? meanDiag / cellCount : 1.0;
-        double lambda = Regularization * meanDiag + 1e-9;
-        for (int i = 0; i < cellCount; i++) wtw[i, i] += lambda;
+        double lambda = SmoothLambda * meanDiag;
+        double eps = RidgeEpsilon * meanDiag + 1e-9;
+
+        // Add λ·(graph Laplacian over 4-neighbours): x^T L x = Σ_edges (x_i - x_j)^2.
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                int idx = r * cols + c;
+                void Edge(int nr, int nc)
+                {
+                    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) return;
+                    int nidx = nr * cols + nc;
+                    A[idx, idx] += lambda;
+                    A[idx, nidx] -= lambda;
+                }
+                Edge(r - 1, c);
+                Edge(r + 1, c);
+                Edge(r, c - 1);
+                Edge(r, c + 1);
+            }
+        for (int i = 0; i < cellCount; i++) A[i, i] += eps;
 
         var wty = W.TransposeThisAndMultiply(y);
-        var x = wtw.Cholesky().Solve(wty);
+        var x = A.Cholesky().Solve(wty);
 
         var result = new double[cellCount];
         for (int i = 0; i < cellCount; i++) result[i] = Math.Max(0, x[i]);

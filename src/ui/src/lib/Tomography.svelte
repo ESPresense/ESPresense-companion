@@ -48,8 +48,9 @@
 				const cx = tomo.minX + col * tomo.cellSize;
 				const cy = tomo.minY + row * tomo.cellSize;
 				const intensity = Math.min(1, att / maxAtt);
-				// Fade cells that few links cross — low confidence, not "nothing there".
-				const conf = Math.min(1, cov / (0.25 * maxCov));
+				// Smoothness interpolates between links; keep interpolated cells visible but still
+				// fade the lowest-coverage areas a little as a confidence cue (floored at 0.45).
+				const conf = 0.45 + 0.55 * Math.min(1, cov / (0.25 * maxCov));
 				const r = rect(cx, cy, tomo.cellSize);
 				out.push({
 					...r,
