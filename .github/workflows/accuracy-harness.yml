@@ -40,7 +40,7 @@ jobs:
     name: Accuracy baseline regression guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Pin the SDK exact-version. Patch-rev drift can quietly shift libm
       # which moves the baseline within tolerance; an unpinned SDK makes
