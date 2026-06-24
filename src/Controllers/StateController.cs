@@ -390,31 +390,22 @@ public class StateController : ControllerBase
             return StatusCode(500, new { error = "An error occurred while resetting calibration" });
         }
     }
-
-    [HttpGet("api/state/calibration/auto-optimize")]
+    [HttpGet("api/state/calibration/autoOptimize")]
     public IActionResult GetAutoOptimize()
     {
         var c = _config.Config;
         return Ok(new { autoOptimize = c?.Optimization.Enabled ?? false });
     }
 
-    [HttpPost("api/state/calibration/auto-optimize")]
-    public async Task<IActionResult> ToggleAutoOptimize([FromBody] bool enable)
+    [HttpPut("api/state/{id}/calibration/autoOptimize")]
+    public async Task<IActionResult> ToggleAutoOptimize(string id, [FromBody] bool enable)
     {
-        try
-        {
-            var c = _config.Config;
-            if (c == null) return StatusCode(500, new { error = "Config not loaded" });
+        var c = _config.Config;
+        if (c == null) return NotFound();
+        c.Optimization.Enabled = enable;
+        await _config.SaveSectionAsync("optimization", c.Optimization);
 
-            c.Optimization.Enabled = enable;
-            await _config.SaveSectionAsync("optimization", c.Optimization);
-            return Ok(new { autoOptimize = enable });
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Failed to save auto-optimize setting");
-            return StatusCode(500, new { error = "Failed to save auto-optimize setting" });
-        }
+        return Ok(new { autoOptimize = c.Optimization.Enabled });
     }
 }
 
