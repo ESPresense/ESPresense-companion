@@ -173,6 +173,65 @@ public class BaseMultilateralizerTests
     }
 
     [Test]
+    public void InitializeScenario_FiltersNodesOutsideFloorZBounds()
+    {
+        // Arrange: floor bounds Z in [-10, 10]; node at Z=15 should be excluded.
+        var floor = CreateTestFloor();
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+
+        var inBounds = CreateTestNode("node_in", 1, 1, 0, floor);
+        var outOfBounds = CreateTestNode("node_out", 1, 1, 15, floor);
+
+        device.Nodes["node_in"] = new DeviceToNode(device, inBounds)
+        {
+            Distance = 1.0,
+            LastHit = DateTime.UtcNow
+        };
+        device.Nodes["node_out"] = new DeviceToNode(device, outOfBounds)
+        {
+            Distance = 1.0,
+            LastHit = DateTime.UtcNow
+        };
+
+        var scenario = new Scenario(_configLoader.Config, CreateTestMultilateralizer(device, floor), "Test");
+        var multilateralizer = CreateTestMultilateralizer(device, floor);
+
+        // Act
+        multilateralizer.PublicInitializeScenario(scenario, out var nodes, out _);
+
+        // Assert: only the in-bounds node should be included.
+        Assert.That(nodes.Length, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void InitializeScenario_IncludesNodesWhenFloorHasNoZBounds()
+    {
+        // Arrange: floor with no Z bounds (legacy configs); node with unknown Z should still pass.
+        var floor = new Floor();
+        var configFloor = new ConfigFloor { Id = "no_bounds", Name = "NoBounds" };
+        floor.Update(_configLoader.Config!, configFloor);
+        _state.Floors[floor.Id] = floor;
+
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+        var node = CreateTestNode("node1", 1, 1, 0, floor);
+
+        device.Nodes["node1"] = new DeviceToNode(device, node)
+        {
+            Distance = 1.0,
+            LastHit = DateTime.UtcNow
+        };
+
+        var scenario = new Scenario(_configLoader.Config, CreateTestMultilateralizer(device, floor), "Test");
+        var multilateralizer = CreateTestMultilateralizer(device, floor);
+
+        // Act
+        multilateralizer.PublicInitializeScenario(scenario, out var nodes, out _);
+
+        // Assert: node is included because floor has no bounds to filter by.
+        Assert.That(nodes.Length, Is.EqualTo(1));
+    }
+
+    [Test]
     public void CalculateAndSetPearsonCorrelation_HandlesLessThanTwoNodes()
     {
         // Arrange
