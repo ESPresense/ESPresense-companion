@@ -2,6 +2,7 @@
 using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
+using ESPresense.Services;
 using MathNet.Numerics.LinearAlgebra.Double;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
@@ -11,81 +12,55 @@ namespace ESPresense.Locators;
 
 public class GaussNewtonMultilateralizer : BaseMultilateralizer
 {
-    public GaussNewtonMultilateralizer(Device device, Floor floor, State state)
-        : base(device, floor, state)
+    public GaussNewtonMultilateralizer(Device device, Floor floor, State state, NodeSettingsStore nodeSettings, DeviceSettingsStore deviceSettings)
+        : base(device, floor, state, nodeSettings, deviceSettings)
     {
     }
 
-    public override bool Locate(Scenario scenario)
+    protected override Point3D? Solve(Scenario scenario, DeviceToNode[] nodes, Point3D guess)
     {
         double Error(Point3D pos1, Point3D pos2, double dist) => pos1.DistanceTo(pos2) - dist;
-
-        if (!InitializeScenario(scenario, out var nodes, out var guess))
-            return false;
 
         var (pos, ranges) = SelectNonColinearTransmitters(nodes, 4);
 
         if (pos.Length <= 1)
-        {
-            ResetScenario(scenario);
-            return false;
-        }
+            return null; // Not enough non-colinear nodes; base template falls back to guess
 
         scenario.Minimum = ranges.Min(a => a);
         scenario.Fixes = pos.Length;
 
-        int confidence = scenario.Confidence ?? 0;
+        if (pos.Length < 3)
+            return null; // Not enough non-colinear nodes for 3-D solve; use guess
+
+        // Floor.Bounds non-null is guaranteed by the base template before calling Solve()
+        var lowerBound = new Vector3((float)Floor.Bounds![0].X, (float)Floor.Bounds[0].Y, (float)Floor.Bounds[0].Z);
+        var upperBound = new Vector3((float)Floor.Bounds[1].X, (float)Floor.Bounds[1].Y, (float)Floor.Bounds[1].Z);
+        var clampedGuess = ClampToFloorBounds(guess);
+        var initialGuess = new Vector3((float)clampedGuess.X, (float)clampedGuess.Y, (float)clampedGuess.Z);
+
         try
         {
-            if (pos.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
+            var gaussNewton = new GaussNewton(pos, ranges, lowerBound, upperBound);
+            var result = gaussNewton.FindPosition(initialGuess);
+
+            scenario.Fixes = pos.Length;
+            scenario.Error = pos.Select((p, i) => Math.Pow(Error(result.ToPoint3D(), p.ToPoint3D(), ranges[i]), 2)).Average();
+            scenario.Iterations = gaussNewton.Iterations;
+            if (!gaussNewton.Converged)
             {
-                confidence = 1;
-                scenario.UpdateLocation(guess);
+                scenario.ReasonForExit = ExitCondition.ExceedIterations;
+                return null;
             }
-            else
-            {
-                var lowerBound = new Vector3((float)Floor.Bounds[0].X, (float)Floor.Bounds[0].Y, (float)Floor.Bounds[0].Z);
-                var upperBound = new Vector3((float)Floor.Bounds[1].X, (float)Floor.Bounds[1].Y, (float)Floor.Bounds[1].Z);
-                var clampedGuess = ClampToFloorBounds(guess);
-                var initialGuess = new Vector3((float)clampedGuess.X, (float)clampedGuess.Y, (float)clampedGuess.Z);
 
-                var gaussNewton = new GaussNewton(pos, ranges, lowerBound, upperBound);
-                var result = gaussNewton.FindPosition(initialGuess);
+            scenario.ReasonForExit = ExitCondition.Converged;
 
-                scenario.UpdateLocation(new Point3D(result.X, result.Y, result.Z));
-                scenario.Fixes = pos.Length;
-                scenario.Error = pos.Select((p, i) => Math.Pow(Error(result.ToPoint3D(), p.ToPoint3D(), ranges[i]), 2)).Average();
-                scenario.Iterations = gaussNewton.Iterations;
-
-                scenario.ReasonForExit = ExitCondition.Converged;
-            }
+            return new Point3D(result.X, result.Y, result.Z);
         }
         catch (MaximumIterationsException)
         {
             scenario.ReasonForExit = ExitCondition.ExceedIterations;
-            confidence = 1;
-            scenario.UpdateLocation(guess);
+            return null; // Base template falls back to using guess with confidence=1
         }
-        catch (Exception ex)
-        {
-            confidence = HandleLocatorException(ex, scenario, guess);
-        }
-
-        CalculateAndSetPearsonCorrelation(scenario, nodes);
-
-        // Calculate number of possible nodes for this floor
-        int nodesPossibleOnline = State.Nodes.Values
-            .Count(n => n.Floors?.Contains(Floor) ?? false);
-
-        // Use the centralized confidence calculation
-        confidence = MathUtils.CalculateConfidence(
-            scenario.Error,
-            scenario.PearsonCorrelation,
-            nodes.Length,
-            nodesPossibleOnline
-        );
-
-        return FinalizeScenario(scenario, confidence);
     }
 
     private Tuple<Vector3[], float[]> SelectNonColinearTransmitters(DeviceToNode[] dns, int numberOfTransmitters = 4)
@@ -153,6 +128,8 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         }
 
         public int? Iterations { get; set; }
+        public int MaxIterations { get; } = 100;
+        public bool Converged { get; private set; }
 
         private double Error(Vector3 x, Vector3 dnLocation, float dnDistance)
         {
@@ -163,9 +140,13 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         {
             var guess = initialGuess;
             var lambda = 1e-3; // Regularization parameter
+            Converged = false;
+            Iterations = 0;
 
-            for (var iter = 0; iter < 100; ++iter)
+            for (var iter = 0; iter < MaxIterations; ++iter)
             {
+                Iterations = iter + 1;
+
                 // Construct the Jacobian matrix
                 var jacobian = DenseMatrix.OfArray(new double[_transmitters.Length, 3]);
                 for (var i = 0; i < _transmitters.Length; ++i)
@@ -187,7 +168,11 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
                 guess = Vector3.Max(_lowerBounds, Vector3.Min(_upperBounds, guess));
 
                 // If the step size is small enough, stop iterating
-                if (step.L2Norm() < 1e-5) break;
+                if (step.L2Norm() < 1e-5)
+                {
+                    Converged = true;
+                    break;
+                }
             }
 
             return guess;

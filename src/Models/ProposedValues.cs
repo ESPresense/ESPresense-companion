@@ -6,4 +6,6 @@ public class ProposedValues
     public double? TxRefRssi { get; set; }
     public double? Absorption { get; set; }
     public double? Error { get; set; }
+    public double? Azimuth { get; set; }
+    public double? Elevation { get; set; }
 }

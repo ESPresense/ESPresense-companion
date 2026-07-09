@@ -34,8 +34,9 @@ public class StateControllerAnchorTests
 
         _configLoader = new ConfigLoader(_configDir);
         var nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
-        _state = new State(_configLoader, nodeTelemetryStore);
-        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, _state);
+        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => _mockDeviceSettingsStore.Object);
+        _state = new State(_configLoader, nodeTelemetryStore, _mockNodeSettingsStore.Object, lazyDss);
 
         var mockEventDispatcher = new Mock<GlobalEventDispatcher>();
 

@@ -1,6 +1,7 @@
 using ESPresense.Models;
 using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace ESPresense.Companion.Tests.Models;
@@ -22,7 +23,10 @@ public class StateOptimizationAnchorTests
 
         _configLoader = new ConfigLoader(_configDir);
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
-        _state = new State(_configLoader, _nodeTelemetryStore);
+        var mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, (ILogger<NodeSettingsStore>)null!);
+        var mockDss = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore, mockNss.Object, lazyDss);
     }
 
     [TearDown]
@@ -244,6 +248,52 @@ public class StateOptimizationAnchorTests
         var anchorMeasures = snapshot.Measures.Where(m => m.Tx.Id == device.Id).ToList();
         Assert.That(anchorMeasures, Has.Count.EqualTo(1), "Should only include nodes with locations");
         Assert.That(anchorMeasures[0].Rx.Id, Is.EqualTo(nodeWithLocation.Id));
+    }
+
+    [Test]
+    public void TakeOptimizationSnapshot_SetsIsNodeAndGMaxForEsPresenseNodes()
+    {
+        // Arrange - create infrastructure node with antenna profile configured
+        // Ensure State.Config is non-null so ResolveAntenna works in TakeOptimizationSnapshot
+        if (_state.Config == null) _state.Config = new Config();
+
+        var node1 = new Node("node1", NodeSourceType.Config);
+        var configNode1 = new ConfigNode { Name = "Node 1", Point = new double[] { 0, 0, 0 }, Antenna = "pcb_ifa" };
+        node1.Update(_state.Config, configNode1, Enumerable.Empty<Floor>());
+        _state.Nodes["node1"] = node1;
+
+        var node2 = new Node("node2", NodeSourceType.Config);
+        var configNode2 = new ConfigNode { Name = "Node 2", Point = new double[] { 5, 0, 0 } };
+        node2.Update(_state.Config, configNode2, Enumerable.Empty<Floor>());
+        _state.Nodes["node2"] = node2;
+
+        var device = new Device("anchored-device", null, TimeSpan.FromSeconds(30));
+        device.SetAnchor(new DeviceAnchor(new MathNet.Spatial.Euclidean.Point3D(2.5, 2.5, 0), null, null));
+        _state.Devices["anchored-device"] = device;
+
+        device.Nodes["node1"] = new DeviceToNode(device, node1) { Distance = 3.5, Rssi = -60, RefRssi = -59, LastHit = DateTime.UtcNow };
+        device.Nodes["node2"] = new DeviceToNode(device, node2) { Distance = 4.2, Rssi = -65, RefRssi = -59, LastHit = DateTime.UtcNow };
+
+        // Act
+        var snapshot = _state.TakeOptimizationSnapshot();
+
+        // Assert - ESPresense infrastructure nodes should have IsNode=true
+        var rxNode1 = snapshot.Measures.FirstOrDefault(m => m.Rx.Id == "node1")?.Rx;
+        Assert.That(rxNode1, Is.Not.Null, "node1 should appear as Rx");
+        Assert.That(rxNode1!.IsNode, Is.True, "ESPresense node1 should have IsNode=true");
+        // pcb_ifa: GMaxDb=3.4 dB → linear GMax = 10^(3.4/10)
+        Assert.That(rxNode1.GMax, Is.EqualTo(Math.Pow(10.0, 3.4 / 10.0)).Within(1e-9), "GMax should be set from antenna profile");
+
+        var rxNode2 = snapshot.Measures.FirstOrDefault(m => m.Rx.Id == "node2")?.Rx;
+        Assert.That(rxNode2, Is.Not.Null, "node2 should appear as Rx");
+        Assert.That(rxNode2!.IsNode, Is.True, "ESPresense node2 should have IsNode=true");
+        // No antenna configured → GMax stays at default 1.0
+        Assert.That(rxNode2.GMax, Is.EqualTo(1.0), "GMax should stay at 1.0 when no antenna is configured");
+
+        // The anchored device (Tx) should NOT be marked as IsNode
+        var txDevice = snapshot.Measures.FirstOrDefault(m => m.Tx.Id == "anchored-device")?.Tx;
+        Assert.That(txDevice, Is.Not.Null);
+        Assert.That(txDevice!.IsNode, Is.False, "Anchored BLE device should NOT have IsNode=true");
     }
 
     [Test]
