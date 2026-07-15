@@ -219,6 +219,8 @@ export interface OptimizerState {
 	optimizers: string;
 	bestRMSE?: number;
 	bestR?: number;
+	bestLoss?: number;
+	validationSamples: number;
 }
 
 export interface CalibrationResponse {

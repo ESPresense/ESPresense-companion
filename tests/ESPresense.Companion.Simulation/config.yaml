@@ -33,8 +33,12 @@ device_retention: 30d
 
 optimization:
   enabled: true
-  interval_secs: 3600
-  keep_snapshot_mins: 5   # How long to keep optimization snapshots (default: 5 minutes)
+  sample_interval_secs: 30
+  training_window_mins: 60
+  optimization_interval_secs: 900
+  validation_fraction: 0.2
+  huber_delta: 2.0
+  minimum_improvement: 0.01
   optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:
     absorption_min: 2.5
@@ -43,13 +47,6 @@ optimization:
     rx_adj_rssi_max: 25
     tx_ref_rssi_min: -80
     tx_ref_rssi_max: -40
-  weights:
-    # Weighting factor for Pearson Correlation in best scenario scoring (default: 0.5)
-    correlation: 0.5
-    # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5)
-    rmse: 0.5
-
-
 locators:
   nadaraya_watson:
     enabled: true

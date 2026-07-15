@@ -165,7 +165,7 @@ public class State
         }
 
         // Remove expired snapshots by time
-        var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
+        var expiryMinutes = Config?.Optimization?.EffectiveTrainingWindowMins ?? 30;
         var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
         OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
         OptimizationSnaphots.Add(os);

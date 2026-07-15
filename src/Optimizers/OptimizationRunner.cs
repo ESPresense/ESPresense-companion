@@ -87,88 +87,27 @@ internal class OptimizationRunner : BackgroundService
                     ?? throw new InvalidOperationException("Optimization lease acquisition returned null unexpectedly.");
 
                 Log.Information("Optimization enabled");
-                _state.OptimizerState.Optimizers = "Starting...";
-                await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
-
-                for (int i = 0; i < 3; i++)
-                {
-                    _state.TakeOptimizationSnapshot();
-                    await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
-                }
-
-                Log.Information("Optimization cycle started");
-                double previousBestCorr = double.NaN;
-                double previousBestRmse = double.NaN;
+                _state.OptimizerState.Optimizers = "Collecting samples...";
+                var lastOptimizationAt = DateTime.UtcNow;
 
                 while (lease.HasLease())
                 {
                     optimization = _state.Config?.Optimization;
                     if (optimization is not { Enabled: true }) break;
-                    var os = _state.TakeOptimizationSnapshot();
+                    _state.TakeOptimizationSnapshot();
 
-                    var baselineResults = new OptimizationResults();
-                    var (bestCorr, bestRmse) = baselineResults.Evaluate(_state.OptimizationSnaphots, _nsd);
-                    // Use weights from ConfigOptimization
-                    double correlationWeight = optimization.CorrelationWeight;
-                    double rmseWeight = optimization.RmseWeight;
-                    double bestScore = (bestCorr * correlationWeight) + ((1 - bestRmse / (1 + bestRmse)) * rmseWeight);
-
-                    if (double.IsNaN(previousBestCorr) || double.IsNaN(previousBestRmse) || Math.Abs(bestCorr - previousBestCorr) > 0.001 || Math.Abs(bestRmse - previousBestRmse) > 0.001)
+                    var now = DateTime.UtcNow;
+                    if (now - lastOptimizationAt >= TimeSpan.FromSeconds(optimization.EffectiveOptimizationIntervalSecs))
                     {
-                        Log.Information("Baseline metrics: Composite={2:0.000} (R={0:0.000}, RMSE={1:0.000})", bestCorr, bestRmse, bestScore);
-                        previousBestCorr = bestCorr;
-                        previousBestRmse = bestRmse;
+                        lastOptimizationAt = now;
+                        await RunOptimizationCycle(optimization, stoppingToken);
+                    }
+                    else
+                    {
+                        _state.OptimizerState.Optimizers = $"Collecting samples ({_state.OptimizationSnaphots.Count})...";
                     }
 
-                    _state.OptimizerState.BestR = bestCorr;
-                    _state.OptimizerState.BestRMSE = bestRmse;
-
-                    IList<IOptimizer> currentOptimizers;
-                    lock (_optimizersLock)
-                        currentOptimizers = _optimizers.ToList();
-                    _state.OptimizerState.Optimizers = string.Join(", ", currentOptimizers.Select(o => o.Name));
-
-                    var currentSettings = os.GetNodeIds().ToDictionary(id => id, _nsd.Get);
-
-                    foreach (var optimizer in currentOptimizers)
-                    {
-                        var results = optimizer.Optimize(os, currentSettings);
-                        var (corr, rmse) = results.Evaluate(_state.OptimizationSnaphots, _nsd);
-                        // Use weights from ConfigOptimization
-                        var composite = (corr * correlationWeight) + ((1 - rmse / (1 + rmse)) * rmseWeight);
-
-                        if (double.IsNaN(composite) || double.IsInfinity(composite) || composite <= bestScore)
-                        {
-                            Log.Information("Optimizer {0,-24} found worse results: Composite={1:0.000} <= Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
-                                optimizer.Name, composite, bestScore, corr, rmse);
-
-                            foreach (var (id, result) in results.Nodes)
-                                Log.Debug("Rejected {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
-                                    id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
-                            continue;
-                        }
-
-                        Log.Information("Optimizer {0,-24} found better results: Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
-                            optimizer.Name, composite, bestScore, corr, rmse);
-                        _state.OptimizerState.BestR = corr;
-                        _state.OptimizerState.BestRMSE = rmse;
-
-                        foreach (var (id, result) in results.Nodes)
-                        {
-                            Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
-                                id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
-
-                            var nodeSettings = _nsd.Get(id);
-                            if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
-                            if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
-                            if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
-                            await _nsd.Set(id, nodeSettings);
-                        }
-
-                        bestScore = composite;
-                    }
-
-                    await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(optimization.EffectiveSampleIntervalSecs), stoppingToken);
                 }
             }
             catch (OperationCanceledException)
@@ -181,6 +120,112 @@ internal class OptimizationRunner : BackgroundService
                 Log.Error(ex, "Error in OptimizationRunner");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
+        }
+    }
+
+    private async Task RunOptimizationCycle(ConfigOptimization optimization, CancellationToken stoppingToken)
+    {
+        var snapshots = _state.OptimizationSnaphots.ToArray();
+        if (!OptimizationDataSplit.TryCreate(snapshots, optimization.EffectiveValidationFraction, out var split) || split == null)
+        {
+            _state.OptimizerState.Optimizers = $"Collecting samples ({snapshots.Length}, need at least 3)...";
+            Log.Information("Optimization deferred: only {SnapshotCount} snapshots are available", snapshots.Length);
+            return;
+        }
+
+        IList<IOptimizer> currentOptimizers;
+        lock (_optimizersLock)
+            currentOptimizers = _optimizers.ToList();
+
+        _state.OptimizerState.Optimizers = string.Join(", ", currentOptimizers.Select(optimizer => optimizer.Name));
+        var baseline = new OptimizationResults().EvaluateMetrics(
+            split.Validation,
+            _nsd,
+            optimization.EffectiveHuberDelta);
+
+        _state.OptimizerState.BestR = baseline.Correlation;
+        _state.OptimizerState.BestRMSE = baseline.Rmse;
+        _state.OptimizerState.BestLoss = baseline.HuberLoss;
+        _state.OptimizerState.ValidationSamples = baseline.SampleCount;
+
+        if (!baseline.IsValid)
+        {
+            Log.Warning("Optimization deferred: the validation set has no valid measurements");
+            return;
+        }
+
+        Log.Information(
+            "Validation baseline: Huber={Huber:0.000}, RMSE={RMSE:0.000}, MAE={MAE:0.000}, R={Correlation:0.000}, Samples={SampleCount}",
+            baseline.HuberLoss,
+            baseline.Rmse,
+            baseline.Mae,
+            baseline.Correlation,
+            baseline.SampleCount);
+
+        var currentSettings = split.Training.GetNodeIds().ToDictionary(id => id, _nsd.Get);
+        OptimizationResults? bestResults = null;
+        OptimizationMetrics bestMetrics = baseline;
+        string? bestOptimizerName = null;
+
+        foreach (var optimizer in currentOptimizers)
+        {
+            stoppingToken.ThrowIfCancellationRequested();
+
+            var results = optimizer.Optimize(split.Training, currentSettings).QuantizeForApplication();
+            var metrics = results.EvaluateMetrics(
+                split.Validation,
+                _nsd,
+                optimization.EffectiveHuberDelta);
+            var requiredLoss = bestMetrics.HuberLoss * (1 - optimization.EffectiveMinimumImprovement);
+
+            if (!metrics.IsValid || metrics.HuberLoss >= requiredLoss)
+            {
+                Log.Information(
+                    "Optimizer {Optimizer,-24} rejected: Huber={Huber:0.000} >= Required={Required:0.000} (RMSE={RMSE:0.000}, MAE={MAE:0.000}, R={Correlation:0.000})",
+                    optimizer.Name,
+                    metrics.HuberLoss,
+                    requiredLoss,
+                    metrics.Rmse,
+                    metrics.Mae,
+                    metrics.Correlation);
+                continue;
+            }
+
+            Log.Information(
+                "Optimizer {Optimizer,-24} is the best holdout candidate: Huber={Huber:0.000} < Required={Required:0.000} (RMSE={RMSE:0.000}, MAE={MAE:0.000}, R={Correlation:0.000})",
+                optimizer.Name,
+                metrics.HuberLoss,
+                requiredLoss,
+                metrics.Rmse,
+                metrics.Mae,
+                metrics.Correlation);
+            bestResults = results;
+            bestMetrics = metrics;
+            bestOptimizerName = optimizer.Name;
+        }
+
+        if (bestResults == null) return;
+
+        _state.OptimizerState.BestR = bestMetrics.Correlation;
+        _state.OptimizerState.BestRMSE = bestMetrics.Rmse;
+        _state.OptimizerState.BestLoss = bestMetrics.HuberLoss;
+        _state.OptimizerState.ValidationSamples = bestMetrics.SampleCount;
+
+        foreach (var (id, result) in bestResults.Nodes)
+        {
+            Log.Information(
+                "Applied {NodeId,-20} from {Optimizer}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}",
+                id,
+                bestOptimizerName,
+                result.Absorption,
+                result.RxAdjRssi,
+                result.TxRefRssi);
+
+            var nodeSettings = _nsd.Get(id);
+            if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
+            if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
+            if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
+            await _nsd.Set(id, nodeSettings);
         }
     }
 }
