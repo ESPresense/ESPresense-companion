@@ -183,14 +183,62 @@ export const nodes = readable<Node[]>([], function start(set) {
 	};
 });
 
-// Calibration polling store
-export const calibration = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
-	async function fetchAndSet() {
-		const response = await fetch(resolve(`/api/state/calibration`));
-		const data = await response.json();
-		set(data);
-	}
-	fetchAndSet();
-	const interval = setInterval(fetchAndSet, 1000);
-	return () => clearInterval(interval);
-});
+function createCalibrationStore() {
+	let activeRefresh: (() => Promise<void>) | undefined;
+
+	const store = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
+		let request: AbortController | undefined;
+		let stopped = false;
+
+		async function fetchAndSet() {
+			if (stopped || request) return;
+
+			const controller = new AbortController();
+			request = controller;
+
+			try {
+				const response = await fetch(resolve(`/api/state/calibration`), {
+					cache: 'no-store',
+					signal: controller.signal
+				});
+				if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+				const data: CalibrationResponse = await response.json();
+				if (!stopped) set(data);
+			} catch (error) {
+				if ((error as Error)?.name !== 'AbortError') {
+					console.error('Error fetching calibration:', error);
+				}
+			} finally {
+				if (request === controller) request = undefined;
+			}
+		}
+
+		const refreshWhenVisible = () => {
+			if (document.visibilityState === 'visible') void fetchAndSet();
+		};
+
+		activeRefresh = fetchAndSet;
+		void fetchAndSet();
+		const interval = setInterval(fetchAndSet, 1000);
+		if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshWhenVisible);
+		if (typeof window !== 'undefined') window.addEventListener('focus', fetchAndSet);
+
+		return () => {
+			stopped = true;
+			request?.abort();
+			clearInterval(interval);
+			if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshWhenVisible);
+			if (typeof window !== 'undefined') window.removeEventListener('focus', fetchAndSet);
+			if (activeRefresh === fetchAndSet) activeRefresh = undefined;
+		};
+	});
+
+	return {
+		subscribe: store.subscribe,
+		refresh: () => activeRefresh?.() ?? Promise.resolve()
+	};
+}
+
+// Calibration changes continuously while optimization collects and validates samples.
+export const calibration = createCalibrationStore();

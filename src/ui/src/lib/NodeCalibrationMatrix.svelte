@@ -148,6 +148,7 @@
 		try {
 			const response = await fetch(resolve('/api/state/calibration/reset'), { method: 'POST' });
 			if (response.ok) {
+				await calibration.refresh();
 				toastStore.trigger({
 					message: 'Calibration reset successfully',
 					background: 'preset-filled-success-500'

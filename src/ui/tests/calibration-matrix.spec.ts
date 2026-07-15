@@ -2,6 +2,45 @@ import { expect, test } from '@playwright/test';
 import { mockApi } from './mock-api';
 
 test.describe('Calibration Matrix Anchored Devices', () => {
+	test('refreshes calibration without overlapping requests', async ({ page }) => {
+		let requestCount = 0;
+		let activeRequests = 0;
+		let maxActiveRequests = 0;
+
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', async (route) => {
+			requestCount++;
+			activeRequests++;
+			maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+			await new Promise((resolve) => setTimeout(resolve, 1250));
+
+			const phase = requestCount === 1 ? 'Collecting' : 'Waiting';
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: {},
+					optimizerState: {
+						optimizers: 'Test',
+						phase,
+						message: `${phase} samples`,
+						snapshotCount: requestCount,
+						measurementCount: requestCount,
+						trainingSamples: 0,
+						validationSamples: 0
+					}
+				})
+			});
+			activeRequests--;
+		});
+
+		await page.goto('/calibration');
+		await expect(page.getByText('Collecting', { exact: true })).toBeVisible();
+		await expect(page.getByText('Waiting', { exact: true })).toBeVisible({ timeout: 5000 });
+		expect(requestCount).toBeGreaterThanOrEqual(2);
+		expect(maxActiveRequests).toBe(1);
+	});
+
 	test('excludes empty receiver columns for anchored devices', async ({ page }) => {
 		// Mock calibration data with anchored devices
 		const calibrationData = {
