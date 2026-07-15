@@ -217,10 +217,20 @@ export interface NodeCalibrationMatrix {
 
 export interface OptimizerState {
 	optimizers: string;
+	phase: string;
+	message: string;
+	snapshotCount: number;
+	measurementCount: number;
+	trainingSamples: number;
 	bestRMSE?: number;
 	bestR?: number;
 	bestLoss?: number;
 	validationSamples: number;
+	lastRunAt?: string;
+	nextRunAt?: string;
+	lastOutcome?: string;
+	leaseHolder?: string;
+	leaseExpiresAt?: string;
 }
 
 export interface CalibrationResponse {

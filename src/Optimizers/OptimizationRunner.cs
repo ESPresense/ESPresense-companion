@@ -73,38 +73,64 @@ internal class OptimizationRunner : BackgroundService
                 while (optimization is not { Enabled: true })
                 {
                     Log.Information("Optimization disabled");
-                    _state.OptimizerState.Optimizers = "Disabled";
+                    _state.OptimizerState.Optimizers = string.Empty;
+                    _state.OptimizerState.Phase = "Disabled";
+                    _state.OptimizerState.Message = "Auto optimization is disabled.";
+                    _state.OptimizerState.NextRunAt = null;
+                    _state.OptimizerState.LeaseHolder = null;
+                    _state.OptimizerState.LeaseExpiresAt = null;
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                     optimization = _state.Config?.Optimization;
                 }
 
-                // Try to acquire the optimization lease (wait indefinitely)
-                _state.OptimizerState.Optimizers = "Acquiring lease...";
-                await using var lease = await _leaseService.AcquireAsync(
+                _state.OptimizerState.Phase = "WaitingForLease";
+                _state.OptimizerState.Message = "Waiting for MQTT connection or optimization lease availability.";
+                var leaseTask = _leaseService.AcquireAsync(
                     OptimizationLeaseName,
-                    timeout: null, // Wait indefinitely
-                    cancellationToken: stoppingToken)
+                    timeout: null,
+                    cancellationToken: stoppingToken);
+
+                while (!leaseTask.IsCompleted)
+                {
+                    UpdateLeaseStatus();
+                    await Task.WhenAny(leaseTask, Task.Delay(TimeSpan.FromSeconds(1), stoppingToken));
+                }
+
+                await using var lease = await leaseTask
                     ?? throw new InvalidOperationException("Optimization lease acquisition returned null unexpectedly.");
 
                 Log.Information("Optimization enabled");
-                _state.OptimizerState.Optimizers = "Collecting samples...";
-                var lastOptimizationAt = DateTime.UtcNow;
+                _state.OptimizerState.Optimizers = GetOptimizerNames();
+                _state.OptimizerState.Phase = "Collecting";
+                _state.OptimizerState.Message = "Collecting snapshots for the initial training and validation split.";
+                _state.OptimizerState.LeaseHolder = "This instance";
+                _state.OptimizerState.LeaseExpiresAt = _leaseService.GetStatus(OptimizationLeaseName)?.ExpiresAt;
+                DateTime? lastOptimizationAt = null;
 
                 while (lease.HasLease())
                 {
                     optimization = _state.Config?.Optimization;
                     if (optimization is not { Enabled: true }) break;
                     _state.TakeOptimizationSnapshot();
+                    UpdateSampleCounts();
 
                     var now = DateTime.UtcNow;
-                    if (now - lastOptimizationAt >= TimeSpan.FromSeconds(optimization.EffectiveOptimizationIntervalSecs))
+                    var optimizationDue = lastOptimizationAt == null ||
+                                          now - lastOptimizationAt.Value >= TimeSpan.FromSeconds(optimization.EffectiveOptimizationIntervalSecs);
+                    if (optimizationDue)
                     {
-                        lastOptimizationAt = now;
-                        await RunOptimizationCycle(optimization, stoppingToken);
+                        if (await RunOptimizationCycle(optimization, stoppingToken))
+                        {
+                            lastOptimizationAt = now;
+                            _state.OptimizerState.NextRunAt = now.AddSeconds(optimization.EffectiveOptimizationIntervalSecs);
+                            _state.OptimizerState.Phase = "Waiting";
+                            _state.OptimizerState.Message = _state.OptimizerState.LastOutcome ?? "Validation cycle completed.";
+                        }
                     }
                     else
                     {
-                        _state.OptimizerState.Optimizers = $"Collecting samples ({_state.OptimizationSnaphots.Count})...";
+                        _state.OptimizerState.Phase = "Waiting";
+                        _state.OptimizerState.Message = $"Collecting fresh samples; next validation at {_state.OptimizerState.NextRunAt:O}.";
                     }
 
                     await Task.Delay(TimeSpan.FromSeconds(optimization.EffectiveSampleIntervalSecs), stoppingToken);
@@ -116,21 +142,24 @@ internal class OptimizationRunner : BackgroundService
             }
             catch (Exception ex)
             {
-                _state.OptimizerState.Optimizers = "Error: " + ex.Message;
+                _state.OptimizerState.Phase = "Error";
+                _state.OptimizerState.Message = ex.Message;
+                _state.OptimizerState.NextRunAt = null;
                 Log.Error(ex, "Error in OptimizationRunner");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
     }
 
-    private async Task RunOptimizationCycle(ConfigOptimization optimization, CancellationToken stoppingToken)
+    private async Task<bool> RunOptimizationCycle(ConfigOptimization optimization, CancellationToken stoppingToken)
     {
         var snapshots = _state.OptimizationSnaphots.ToArray();
         if (!OptimizationDataSplit.TryCreate(snapshots, optimization.EffectiveValidationFraction, out var split) || split == null)
         {
-            _state.OptimizerState.Optimizers = $"Collecting samples ({snapshots.Length}, need at least 3)...";
+            _state.OptimizerState.Phase = "Collecting";
+            _state.OptimizerState.Message = $"Collected {snapshots.Length} of 3 required snapshots.";
             Log.Information("Optimization deferred: only {SnapshotCount} snapshots are available", snapshots.Length);
-            return;
+            return false;
         }
 
         IList<IOptimizer> currentOptimizers;
@@ -138,6 +167,9 @@ internal class OptimizationRunner : BackgroundService
             currentOptimizers = _optimizers.ToList();
 
         _state.OptimizerState.Optimizers = string.Join(", ", currentOptimizers.Select(optimizer => optimizer.Name));
+        _state.OptimizerState.Phase = "Optimizing";
+        _state.OptimizerState.Message = $"Training on {split.Training.Measures.Count} measurements and validating newer holdout data.";
+        _state.OptimizerState.TrainingSamples = split.Training.Measures.Count;
         var baseline = new OptimizationResults().EvaluateMetrics(
             split.Validation,
             _nsd,
@@ -150,8 +182,10 @@ internal class OptimizationRunner : BackgroundService
 
         if (!baseline.IsValid)
         {
+            _state.OptimizerState.Phase = "Collecting";
+            _state.OptimizerState.Message = "The validation set has no valid measurements; collecting more data.";
             Log.Warning("Optimization deferred: the validation set has no valid measurements");
-            return;
+            return false;
         }
 
         Log.Information(
@@ -204,7 +238,12 @@ internal class OptimizationRunner : BackgroundService
             bestOptimizerName = optimizer.Name;
         }
 
-        if (bestResults == null) return;
+        _state.OptimizerState.LastRunAt = DateTime.UtcNow;
+        if (bestResults == null)
+        {
+            _state.OptimizerState.LastOutcome = $"No candidate improved holdout loss beyond {optimization.EffectiveMinimumImprovement:P0}.";
+            return true;
+        }
 
         _state.OptimizerState.BestR = bestMetrics.Correlation;
         _state.OptimizerState.BestRMSE = bestMetrics.Rmse;
@@ -227,5 +266,41 @@ internal class OptimizationRunner : BackgroundService
             if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
             await _nsd.Set(id, nodeSettings);
         }
+
+        _state.OptimizerState.LastOutcome =
+            $"Applied {bestOptimizerName} to {bestResults.Nodes.Count} nodes; holdout loss {baseline.HuberLoss:0.000} -> {bestMetrics.HuberLoss:0.000}.";
+
+        return true;
+    }
+
+    private string GetOptimizerNames()
+    {
+        lock (_optimizersLock)
+            return string.Join(", ", _optimizers.Select(optimizer => optimizer.Name));
+    }
+
+    private void UpdateSampleCounts()
+    {
+        _state.OptimizerState.SnapshotCount = _state.OptimizationSnaphots.Count;
+        _state.OptimizerState.MeasurementCount = _state.OptimizationSnaphots.Sum(snapshot => snapshot.Measures.Count);
+        _state.OptimizerState.LeaseExpiresAt = _leaseService.GetStatus(OptimizationLeaseName)?.ExpiresAt;
+    }
+
+    private void UpdateLeaseStatus()
+    {
+        var status = _leaseService.GetStatus(OptimizationLeaseName);
+        if (status == null || status.InstanceId == "nobody" || status.ExpiresAt <= DateTime.UtcNow)
+        {
+            _state.OptimizerState.LeaseHolder = null;
+            _state.OptimizerState.LeaseExpiresAt = null;
+            _state.OptimizerState.Message = "Waiting for MQTT connection or lease confirmation.";
+            return;
+        }
+
+        _state.OptimizerState.LeaseHolder = status.IsOwned ? "This instance" : status.InstanceId;
+        _state.OptimizerState.LeaseExpiresAt = status.ExpiresAt;
+        _state.OptimizerState.Message = status.IsOwned
+            ? "Confirming this instance's optimization lease."
+            : $"Lease held by {status.InstanceId} until {status.ExpiresAt:O}.";
     }
 }
