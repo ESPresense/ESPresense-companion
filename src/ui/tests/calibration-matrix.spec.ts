@@ -41,6 +41,46 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		expect(maxActiveRequests).toBe(1);
 	});
 
+	test('uses the page scroller instead of clipping the matrix', async ({ page }) => {
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: Object.fromEntries(
+						Array.from({ length: 30 }, (_, index) => [
+							`Transmitter ${index}`,
+							{
+								Receiver: {
+									distance: 5,
+									rssi: -70,
+									mapDistance: 4.5,
+									diff: 0.5,
+									percent: 0.1
+								}
+							}
+						])
+					)
+				})
+			});
+		});
+
+		await page.goto('/calibration');
+		const content = page.getByTestId('calibration-content');
+		await expect(content.locator('tbody tr')).toHaveCount(30);
+		expect(await content.evaluate((element) => getComputedStyle(element).overflowY)).toBe('visible');
+		expect(
+			await content.evaluate((element) => {
+				let ancestor = element.parentElement;
+				while (ancestor && !['auto', 'scroll'].includes(getComputedStyle(ancestor).overflowY)) {
+					ancestor = ancestor.parentElement;
+				}
+				return !!ancestor && ancestor.scrollHeight > ancestor.clientHeight;
+			})
+		).toBe(true);
+	});
+
 	test('excludes empty receiver columns for anchored devices', async ({ page }) => {
 		// Mock calibration data with anchored devices
 		const calibrationData = {

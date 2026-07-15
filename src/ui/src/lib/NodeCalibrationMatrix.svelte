@@ -171,7 +171,7 @@
 
 <!-- Retrigger CI on $(date) -->
 
-<div class="h-full overflow-y-auto">
+<div data-testid="calibration-content">
 	<div class="w-full px-4 py-2">
 		{#if $calibration?.optimizerState}
 		<div class="card preset-tonal mb-4 p-4">
