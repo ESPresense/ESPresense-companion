@@ -36,7 +36,7 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 
 		await page.goto('/calibration');
 		await expect(page.getByText('Collecting', { exact: true })).toBeVisible();
-		await expect(page.getByText('Waiting', { exact: true })).toBeVisible({ timeout: 5000 });
+		await expect(page.getByText('Waiting', { exact: true })).toBeVisible({ timeout: 8000 });
 		expect(requestCount).toBeGreaterThanOrEqual(2);
 		expect(maxActiveRequests).toBe(1);
 	});

@@ -191,7 +191,7 @@ function createCalibrationStore() {
 		let stopped = false;
 
 		async function fetchAndSet() {
-			if (stopped || request) return;
+			if (stopped || request || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
 
 			const controller = new AbortController();
 			request = controller;
@@ -220,7 +220,7 @@ function createCalibrationStore() {
 
 		activeRefresh = fetchAndSet;
 		void fetchAndSet();
-		const interval = setInterval(fetchAndSet, 1000);
+		const interval = setInterval(fetchAndSet, 5000);
 		if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshWhenVisible);
 		if (typeof window !== 'undefined') window.addEventListener('focus', fetchAndSet);
 

@@ -2,6 +2,41 @@ import { expect, test } from '@playwright/test';
 import { mockApi } from './mock-api';
 
 test.describe('Tooltip', () => {
+	test('renders when crypto.randomUUID is unavailable', async ({ page }) => {
+		await page.addInitScript(() => {
+			Object.defineProperty(Crypto.prototype, 'randomUUID', {
+				configurable: true,
+				value: undefined
+			});
+		});
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: {
+						'Node A': {
+							'Node B': {
+								distance: 5,
+								rssi: -70,
+								mapDistance: 4.5,
+								diff: 0.5,
+								percent: 0.1
+							}
+						}
+					}
+				})
+			});
+		});
+
+		const pageErrors: Error[] = [];
+		page.on('pageerror', (error) => pageErrors.push(error));
+		await page.goto('/calibration');
+		await expect(page.locator('table tbody tr')).toHaveCount(1);
+		expect(pageErrors).toEqual([]);
+	});
+
 	test('shows tooltip on hover over calibration matrix cell', async ({ page }) => {
 		const calibrationData = {
 			matrix: {
