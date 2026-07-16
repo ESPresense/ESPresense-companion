@@ -175,6 +175,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "validation_fraction")] public double ValidationFraction { get; set; } = 0.2;
         [YamlMember(Alias = "huber_delta")] public double HuberDelta { get; set; } = 2.0;
         [YamlMember(Alias = "minimum_improvement")] public double MinimumImprovement { get; set; } = 0.01;
+        [YamlMember(Alias = "max_absorption_bound_fraction")] public double MaxAbsorptionBoundFraction { get; set; } = 0.2;
 
         // Legacy timing keys. Keep these as deserialization fallbacks for existing installations.
         [YamlMember(Alias = "interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? IntervalSecs { get; set; }
@@ -188,6 +189,7 @@ namespace ESPresense.Models
         [YamlIgnore] public double EffectiveValidationFraction => Math.Clamp(ValidationFraction, 0.1, 0.5);
         [YamlIgnore] public double EffectiveHuberDelta => Math.Max(0.1, HuberDelta);
         [YamlIgnore] public double EffectiveMinimumImprovement => Math.Clamp(MinimumImprovement, 0, 0.5);
+        [YamlIgnore] public double EffectiveMaxAbsorptionBoundFraction => Math.Clamp(MaxAbsorptionBoundFraction, 0, 1);
 
         [YamlIgnore] public double AbsorptionMin => Limits.TryGetValue("absorption_min", out var val) ? val : 2;
         [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 5;

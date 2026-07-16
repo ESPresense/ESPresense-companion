@@ -43,6 +43,20 @@ optimization:
     }
 
     [Test]
+    public void OptimizationBoundFraction_IsConfigurableAndClamped()
+    {
+        const string yaml = @"
+optimization:
+  max_absorption_bound_fraction: 1.5
+";
+
+        var config = new DeserializerBuilder().Build().Deserialize<Config>(yaml);
+
+        Assert.That(config.Optimization.EffectiveMaxAbsorptionBoundFraction, Is.EqualTo(1));
+        Assert.That(new ConfigOptimization().EffectiveMaxAbsorptionBoundFraction, Is.EqualTo(0.2));
+    }
+
+    [Test]
     public void TestLocatorsDeserialization()
     {
         string yaml = @"

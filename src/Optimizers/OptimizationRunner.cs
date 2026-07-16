@@ -203,6 +203,7 @@ internal class OptimizationRunner : BackgroundService
         OptimizationMetrics? closestRejectedMetrics = null;
         string? closestRejectedName = null;
         string? closestRejectedParameters = null;
+        string? closestRejectedReason = null;
 
         foreach (var optimizer in currentOptimizers)
         {
@@ -214,21 +215,26 @@ internal class OptimizationRunner : BackgroundService
                 _nsd,
                 optimization.EffectiveHuberDelta);
             var requiredLoss = bestMetrics.HuberLoss * (1 - optimization.EffectiveMinimumImprovement);
+            var excessiveRailing = HasExcessiveAbsorptionRailing(results, optimization);
 
-            if (!metrics.IsValid || metrics.HuberLoss >= requiredLoss)
+            if (!metrics.IsValid || metrics.HuberLoss >= requiredLoss || excessiveRailing)
             {
                 if (metrics.IsValid && (closestRejectedMetrics == null || metrics.HuberLoss < closestRejectedMetrics.HuberLoss))
                 {
                     closestRejectedMetrics = metrics;
                     closestRejectedName = optimizer.Name;
                     closestRejectedParameters = DescribeAbsorptions(results, optimization);
+                    closestRejectedReason = excessiveRailing
+                        ? $"too many proposed absorptions are at a configured bound (maximum {optimization.EffectiveMaxAbsorptionBoundFraction:P0})"
+                        : $"holdout improvement is below {optimization.EffectiveMinimumImprovement:P0}";
                 }
 
                 Log.Information(
-                    "Optimizer {Optimizer,-24} rejected: Huber={Huber:0.000} >= Required={Required:0.000} (RMSE={RMSE:0.000}, MAE={MAE:0.000}, R={Correlation:0.000})",
+                    "Optimizer {Optimizer,-24} rejected: Huber={Huber:0.000}, Required<{Required:0.000}, ExcessiveRailing={ExcessiveRailing} (RMSE={RMSE:0.000}, MAE={MAE:0.000}, R={Correlation:0.000})",
                     optimizer.Name,
                     metrics.HuberLoss,
                     requiredLoss,
+                    excessiveRailing,
                     metrics.Rmse,
                     metrics.Mae,
                     metrics.Correlation);
@@ -254,7 +260,7 @@ internal class OptimizationRunner : BackgroundService
             _state.OptimizerState.LastOutcome = closestRejectedMetrics == null
                 ? $"No valid candidate was produced; collecting more data."
                 : $"Rejected {closestRejectedName}: holdout Huber {baseline.HuberLoss:0.000} -> {closestRejectedMetrics.HuberLoss:0.000} " +
-                  $"(required < {baseline.HuberLoss * (1 - optimization.EffectiveMinimumImprovement):0.000}); {closestRejectedParameters}.";
+                  $"(required < {baseline.HuberLoss * (1 - optimization.EffectiveMinimumImprovement):0.000}); {closestRejectedParameters}; {closestRejectedReason}.";
             return true;
         }
 
@@ -298,6 +304,20 @@ internal class OptimizationRunner : BackgroundService
         var railed = values.Count(value =>
             value <= optimization.AbsorptionMin + epsilon || value >= optimization.AbsorptionMax - epsilon);
         return $"absorption {values.Min():0.00}-{values.Max():0.00}, {railed}/{values.Length} at a bound";
+    }
+
+    internal static bool HasExcessiveAbsorptionRailing(OptimizationResults results, ConfigOptimization optimization)
+    {
+        var values = results.Nodes.Values
+            .Where(result => result.Absorption.HasValue)
+            .Select(result => result.Absorption!.Value)
+            .ToArray();
+        if (values.Length == 0) return false;
+
+        const double epsilon = 0.005;
+        var railed = values.Count(value =>
+            value <= optimization.AbsorptionMin + epsilon || value >= optimization.AbsorptionMax - epsilon);
+        return (double)railed / values.Length > optimization.EffectiveMaxAbsorptionBoundFraction;
     }
 
     private string GetOptimizerNames()

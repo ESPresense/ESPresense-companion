@@ -39,6 +39,7 @@ optimization:
   validation_fraction: 0.2       # Newest fraction reserved for holdout validation
   huber_delta: 2.0               # RSSI error where Huber loss becomes linear
   minimum_improvement: 0.01      # Required holdout loss improvement (1%)
+  max_absorption_bound_fraction: 0.2 # Reject candidates with more than 20% of receivers at an absorption limit
   optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:
     absorption_min: 2.5
