@@ -8,19 +8,21 @@ namespace ESPresense.Optimizers;
 
 public class PerNodeAbsorptionRxTx : IOptimizer
 {
-    private readonly State _state;
+    private readonly Func<ConfigOptimization?> _getOptimization;
 
     public PerNodeAbsorptionRxTx(State state)
     {
-        _state = state;
+        _getOptimization = () => state.Config?.Optimization;
     }
+
+    internal PerNodeAbsorptionRxTx(ConfigOptimization optimization) => _getOptimization = () => optimization;
 
     public string Name => "Per Node Absorption Rx Tx Adj";
 
     public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         var or = new OptimizationResults();
-        var optimization = _state.Config?.Optimization;
+        var optimization = _getOptimization();
 
         // Group all valid measurements
         var allRxNodes = os.ByRx().SelectMany(g => g).ToList();
@@ -59,7 +61,9 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         if (optimization == null) return or;
 
         var targetAbsorption = optimization.AbsorptionMin + (optimization.AbsorptionMax - optimization.AbsorptionMin) / 2.0;
-        double penaltyWeight = 10;
+        var huberDelta = optimization.EffectiveHuberDelta;
+        const double absorptionRegularization = 10.0;
+        const double rssiRegularization = 0.01;
 
         // Pre-calculate weights for each node based on RssiVar
         var nodeWeights = new Dictionary<Measure, double>();
@@ -87,55 +91,68 @@ public class PerNodeAbsorptionRxTx : IOptimizer
             }
         }
 
-        // Define asymmetric error function that penalizes impossible situations
-        // (when estimated distance is less than actual map distance)
-        Func<double, double, double> calculateDistanceError = (calculated, map) =>
+        var rxPriors = uniqueRxIds.ToDictionary(
+            id => id,
+            id => Math.Clamp(
+                existingSettings.TryGetValue(id, out var settings) ? settings.Calibration.RxAdjRssi ?? 0 : 0,
+                optimization.RxAdjRssiMin,
+                optimization.RxAdjRssiMax));
+        var txPriors = uniqueTxIds.ToDictionary(
+            id => id,
+            id => Math.Clamp(
+                existingSettings.TryGetValue(id, out var settings) && settings.Calibration.TxRefRssi is { } configured
+                    ? configured
+                    : allRxNodes.Where(measure => measure.Tx.Id == id && double.IsFinite(measure.RefRssi) && measure.RefRssi != 0)
+                        .Select(measure => measure.RefRssi)
+                        .DefaultIfEmpty(-59)
+                        .Average(),
+                optimization.TxRefRssiMin,
+                optimization.TxRefRssiMax));
+
+        double CalculateObjective(Vector<double> x)
         {
-            if (calculated < map)
+            double loss = 0;
+            double weightSum = 0;
+
+            foreach (var node in allRxNodes)
             {
-                // This is physically impossible (can't be closer than map distance)
-                // Apply higher penalty with asymmetric factor
-                return Math.Pow(map - calculated, 4);
+                int rxBaseIndex = rxIndexMap[node.Rx.Id];
+                int txBaseIndex = txIndexMap[node.Tx.Id];
+                double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
+                if (!double.IsFinite(mapDistance) || mapDistance <= 0) continue;
+
+                double rxAdjRssi = x[rxBaseIndex];
+                double absorption = x[rxBaseIndex + 1];
+                double txRefRssi = x[txBaseIndex];
+                double predictedRssi = txRefRssi - 10 * absorption * Math.Log10(mapDistance);
+                double measuredRssi = node.GetAdjustedRssi(rxAdjRssi);
+                if (!double.IsFinite(predictedRssi) || !double.IsFinite(measuredRssi)) continue;
+
+                double residual = Math.Abs(predictedRssi - measuredRssi);
+                double huberLoss = residual <= huberDelta
+                    ? 0.5 * residual * residual
+                    : huberDelta * (residual - 0.5 * huberDelta);
+                double weight = nodeWeights[node];
+                loss += weight * huberLoss;
+                weightSum += weight;
             }
-            else
-            {
-                // Regular error calculation for the normal case (estimated >= actual)
-                // This means there could be an obstacle causing signal attenuation
-                return Math.Pow(map - calculated, 2);
-            }
-        };
+
+            if (weightSum <= 0) return double.PositiveInfinity;
+
+            double absorptionPenalty = uniqueRxIds
+                .Average(id => Math.Pow(x[rxIndexMap[id] + 1] - targetAbsorption, 2));
+            double rxPenalty = uniqueRxIds
+                .Average(id => Math.Pow(x[rxIndexMap[id]] - rxPriors[id], 2));
+            double txPenalty = uniqueTxIds
+                .Average(id => Math.Pow(x[txIndexMap[id]] - txPriors[id], 2));
+
+            return loss / weightSum
+                   + absorptionRegularization * absorptionPenalty
+                   + rssiRegularization * (rxPenalty + txPenalty);
+        }
 
         var objectiveFunction = ObjectiveFunction.Gradient(
-            x =>
-            {
-                double error = 0;
-                double weightSum = 0;
-
-                foreach (var node in allRxNodes)
-                {
-                    int rxBaseIndex = rxIndexMap[node.Rx.Id];
-                    int txBaseIndex = txIndexMap[node.Tx.Id];
-
-                    double rxAdjRssi = x[rxBaseIndex];
-                    double absorption = x[rxBaseIndex + 1];
-                    double txRefRssi = x[txBaseIndex];
-
-                    double calculatedDistance = Math.Pow(10, (txRefRssi - node.GetAdjustedRssi(rxAdjRssi)) / (10.0 * absorption));
-                    double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
-
-                    // Get the weight for this node
-                    double weight = nodeWeights[node];
-                    weightSum += weight;
-
-                    // Apply weight to the asymmetric error
-                    error += weight * calculateDistanceError(calculatedDistance, mapDistance);
-
-                    // Regularization: Penalize absorption deviation from the middle value
-                    error += weight * penaltyWeight * Math.Pow(absorption - targetAbsorption, 2);
-                }
-
-                return weightSum > 0 ? error / weightSum : error;
-            },
+            CalculateObjective,
             x =>
             {
                 var grad = Vector<double>.Build.Dense(totalParams);
@@ -146,47 +163,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
                     var xMinus = x.Clone();
                     xPlus[i] = x[i] + h;
                     xMinus[i] = x[i] - h;
-
-                    double fPlus = 0;
-                    double fMinus = 0;
-                    double weightSumPlus = 0;
-                    double weightSumMinus = 0;
-
-                    foreach (var node in allRxNodes)
-                    {
-                        int rxBaseIndex = rxIndexMap[node.Rx.Id];
-                        int txBaseIndex = txIndexMap[node.Tx.Id];
-                        double weight = nodeWeights[node];
-
-                        {
-                            double rxAdjRssi = xPlus[rxBaseIndex];
-                            double absorption = xPlus[rxBaseIndex + 1];
-                            double txRefRssi = xPlus[txBaseIndex];
-                            double calculatedDistance = Math.Pow(10, (txRefRssi - node.GetAdjustedRssi(rxAdjRssi)) / (10.0 * absorption));
-
-                            double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
-
-                            fPlus += weight * (calculateDistanceError(calculatedDistance, mapDistance)
-                                     + penaltyWeight * Math.Pow(absorption - targetAbsorption, 2));
-                            weightSumPlus += weight;
-                        }
-                        {
-                            double rxAdjRssi = xMinus[rxBaseIndex];
-                            double absorption = xMinus[rxBaseIndex + 1];
-                            double txRefRssi = xMinus[txBaseIndex];
-                            double calculatedDistance = Math.Pow(10, (txRefRssi - node.GetAdjustedRssi(rxAdjRssi)) / (10.0 * absorption));
-
-                            double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
-
-                            fMinus += weight * (calculateDistanceError(calculatedDistance, mapDistance)
-                                      + penaltyWeight * Math.Pow(absorption - targetAbsorption, 2));
-                            weightSumMinus += weight;
-                        }
-                    }
-
-                    fPlus = weightSumPlus > 0 ? fPlus / weightSumPlus : fPlus;
-                    fMinus = weightSumMinus > 0 ? fMinus / weightSumMinus : fMinus;
-                    grad[i] = (fPlus - fMinus) / (2 * h);
+                    grad[i] = (CalculateObjective(xPlus) - CalculateObjective(xMinus)) / (2 * h);
                 }
                 return grad;
             }
@@ -220,17 +197,12 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         {
             int baseIndex = rxIndexMap[rxId];
             existingSettings.TryGetValue(rxId, out var nodeSettings);
-            // Clamp initial guess within global bounds
-            initialGuess[baseIndex] = Math.Clamp(nodeSettings?.Calibration?.RxAdjRssi ?? 0, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
-            // Clamp initial guess within global bounds
-            initialGuess[baseIndex + 1] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? ((optimization.AbsorptionMax - optimization.AbsorptionMin) / 2.0) + optimization.AbsorptionMin, optimization.AbsorptionMin, optimization.AbsorptionMax);
+            initialGuess[baseIndex] = rxPriors[rxId];
+            initialGuess[baseIndex + 1] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? targetAbsorption, optimization.AbsorptionMin, optimization.AbsorptionMax);
         }
         foreach (var txId in uniqueTxIds)
         {
-            existingSettings.TryGetValue(txId, out var nodeSettings);
-            // Initial guess uses node setting if available, else -59
-            // Clamp initial guess within global bounds
-            initialGuess[txIndexMap[txId]] = Math.Clamp(nodeSettings?.Calibration?.TxRefRssi ?? -59, optimization.TxRefRssiMin, optimization.TxRefRssiMax);
+            initialGuess[txIndexMap[txId]] = txPriors[txId];
         }
 
         try
