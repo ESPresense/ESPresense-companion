@@ -62,7 +62,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
 
         var targetAbsorption = optimization.AbsorptionMin + (optimization.AbsorptionMax - optimization.AbsorptionMin) / 2.0;
         var huberDelta = optimization.EffectiveHuberDelta;
-        const double absorptionRegularization = 10.0;
+        const double absorptionRegularization = 0.1;
         const double rssiRegularization = 0.01;
 
         // Pre-calculate weights for each node based on RssiVar
@@ -196,9 +196,9 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         foreach (var rxId in uniqueRxIds)
         {
             int baseIndex = rxIndexMap[rxId];
-            existingSettings.TryGetValue(rxId, out var nodeSettings);
             initialGuess[baseIndex] = rxPriors[rxId];
-            initialGuess[baseIndex + 1] = Math.Clamp(nodeSettings?.Calibration?.Absorption ?? targetAbsorption, optimization.AbsorptionMin, optimization.AbsorptionMax);
+            // Do not seed from a previously railed value; that can trap the bounded solver at the same edge.
+            initialGuess[baseIndex + 1] = targetAbsorption;
         }
         foreach (var txId in uniqueTxIds)
         {

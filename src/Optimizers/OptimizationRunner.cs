@@ -200,6 +200,9 @@ internal class OptimizationRunner : BackgroundService
         OptimizationResults? bestResults = null;
         OptimizationMetrics bestMetrics = baseline;
         string? bestOptimizerName = null;
+        OptimizationMetrics? closestRejectedMetrics = null;
+        string? closestRejectedName = null;
+        string? closestRejectedParameters = null;
 
         foreach (var optimizer in currentOptimizers)
         {
@@ -214,6 +217,13 @@ internal class OptimizationRunner : BackgroundService
 
             if (!metrics.IsValid || metrics.HuberLoss >= requiredLoss)
             {
+                if (metrics.IsValid && (closestRejectedMetrics == null || metrics.HuberLoss < closestRejectedMetrics.HuberLoss))
+                {
+                    closestRejectedMetrics = metrics;
+                    closestRejectedName = optimizer.Name;
+                    closestRejectedParameters = DescribeAbsorptions(results, optimization);
+                }
+
                 Log.Information(
                     "Optimizer {Optimizer,-24} rejected: Huber={Huber:0.000} >= Required={Required:0.000} (RMSE={RMSE:0.000}, MAE={MAE:0.000}, R={Correlation:0.000})",
                     optimizer.Name,
@@ -241,7 +251,10 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.LastRunAt = DateTime.UtcNow;
         if (bestResults == null)
         {
-            _state.OptimizerState.LastOutcome = $"No candidate improved holdout loss beyond {optimization.EffectiveMinimumImprovement:P0}.";
+            _state.OptimizerState.LastOutcome = closestRejectedMetrics == null
+                ? $"No valid candidate was produced; collecting more data."
+                : $"Rejected {closestRejectedName}: holdout Huber {baseline.HuberLoss:0.000} -> {closestRejectedMetrics.HuberLoss:0.000} " +
+                  $"(required < {baseline.HuberLoss * (1 - optimization.EffectiveMinimumImprovement):0.000}); {closestRejectedParameters}.";
             return true;
         }
 
@@ -271,6 +284,20 @@ internal class OptimizationRunner : BackgroundService
             $"Applied {bestOptimizerName} to {bestResults.Nodes.Count} nodes; holdout loss {baseline.HuberLoss:0.000} -> {bestMetrics.HuberLoss:0.000}.";
 
         return true;
+    }
+
+    private static string DescribeAbsorptions(OptimizationResults results, ConfigOptimization optimization)
+    {
+        var values = results.Nodes.Values
+            .Where(result => result.Absorption.HasValue)
+            .Select(result => result.Absorption!.Value)
+            .ToArray();
+        if (values.Length == 0) return "no absorption values proposed";
+
+        const double epsilon = 0.005;
+        var railed = values.Count(value =>
+            value <= optimization.AbsorptionMin + epsilon || value >= optimization.AbsorptionMax - epsilon);
+        return $"absorption {values.Min():0.00}-{values.Max():0.00}, {railed}/{values.Length} at a bound";
     }
 
     private string GetOptimizerNames()

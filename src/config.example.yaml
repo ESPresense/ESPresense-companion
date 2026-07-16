@@ -42,7 +42,7 @@ optimization:
   optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:
     absorption_min: 2.5
-    absorption_max: 3.5
+    absorption_max: 5.0
     rx_adj_rssi_min: -5
     rx_adj_rssi_max: 25
     tx_ref_rssi_min: -80
