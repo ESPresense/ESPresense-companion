@@ -131,6 +131,26 @@ public class StateControllerAnchorTests
     }
 
     [Test]
+    public void GetCalibration_TracksBestLiveDistanceMetrics()
+    {
+        var first = _state.RecordCalibrationMetrics(2.5, 0.7);
+        var worse = _state.RecordCalibrationMetrics(3.0, 0.6);
+        var mixed = _state.RecordCalibrationMetrics(2.0, 0.8);
+
+        Assert.That(first.BestRMSE, Is.EqualTo(2.5));
+        Assert.That(first.BestR, Is.EqualTo(0.7));
+        Assert.That(worse.BestRMSE, Is.EqualTo(2.5));
+        Assert.That(worse.BestR, Is.EqualTo(0.7));
+        Assert.That(mixed.BestRMSE, Is.EqualTo(2.0));
+        Assert.That(mixed.BestR, Is.EqualTo(0.8));
+
+        _state.ResetCalibrationMetrics();
+        var afterReset = _state.RecordCalibrationMetrics(4.0, 0.4);
+        Assert.That(afterReset.BestRMSE, Is.EqualTo(4.0));
+        Assert.That(afterReset.BestR, Is.EqualTo(0.4));
+    }
+
+    [Test]
     public void GetCalibration_AnchoredDeviceDoesNotHaveTxRefRssi()
     {
         // Arrange

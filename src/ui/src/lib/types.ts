@@ -237,6 +237,8 @@ export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
 	rmse?: number;
 	r?: number;
+	bestRMSE?: number;
+	bestR?: number;
 	optimizerState?: OptimizerState;
 	anchored?: string[];
 }

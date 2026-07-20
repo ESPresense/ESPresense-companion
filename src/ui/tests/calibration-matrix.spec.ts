@@ -2,6 +2,42 @@ import { expect, test } from '@playwright/test';
 import { mockApi } from './mock-api';
 
 test.describe('Calibration Matrix Anchored Devices', () => {
+	test('labels current and best-seen live distance metrics', async ({ page }) => {
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: {},
+					rmse: 1.2344,
+					r: 0.7654,
+					bestRMSE: 0.9874,
+					bestR: 0.8764,
+					optimizerState: {
+						optimizers: 'Test',
+						phase: 'Waiting',
+						message: 'Waiting',
+						snapshotCount: 3,
+						measurementCount: 30,
+						trainingSamples: 20,
+						validationSamples: 10
+					}
+				})
+			});
+		});
+
+		await page.goto('/calibration');
+		await expect(page.getByText('Current RMSE (m)', { exact: true })).toBeVisible();
+		await expect(page.getByText('Current R', { exact: true })).toBeVisible();
+		await expect(page.getByText('Best Seen RMSE (m)', { exact: true })).toBeVisible();
+		await expect(page.getByText('Best Seen R', { exact: true })).toBeVisible();
+		await expect(page.getByText('1.234', { exact: true })).toBeVisible();
+		await expect(page.getByText('0.765', { exact: true })).toBeVisible();
+		await expect(page.getByText('0.987', { exact: true })).toBeVisible();
+		await expect(page.getByText('0.876', { exact: true })).toBeVisible();
+	});
+
 	test('refreshes calibration without overlapping requests', async ({ page }) => {
 		let requestCount = 0;
 		let activeRequests = 0;
@@ -86,8 +122,8 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		const calibrationData = {
 			matrix: {
 				// Regular node with receiver data
-				"Regular Node": {
-					"Receiver Node": {
+				'Regular Node': {
+					'Receiver Node': {
 						distance: 5.0,
 						rssi: -70,
 						mapDistance: 4.5,
@@ -98,8 +134,8 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 					}
 				},
 				// Anchored device as transmitter with receiver data
-				"Test Anchor": {
-					"Receiver Node": {
+				'Test Anchor': {
+					'Receiver Node': {
 						distance: 4.1,
 						rssi: -65,
 						mapDistance: 4.0,
@@ -110,8 +146,8 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 					}
 				},
 				// Regular transmitter that would show anchored device as receiver (empty)
-				"TX Node": {
-					"Anchored Device": {
+				'TX Node': {
+					'Anchored Device': {
 						// This would be empty/null in real data, but let's test with empty object
 					}
 				}
@@ -137,8 +173,9 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		await page.waitForSelector('table');
 
 		// Get all column headers
-		const columnHeaders = await page.$$eval('table thead th', (headers) =>
-			headers.slice(1).map((header) => header.textContent?.trim()) // Skip first "Name" column
+		const columnHeaders = await page.$$eval(
+			'table thead th',
+			(headers) => headers.slice(1).map((header) => header.textContent?.trim()) // Skip first "Name" column
 		);
 
 		// Should include "Receiver Node" since it has actual data
@@ -148,13 +185,11 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		expect(columnHeaders).not.toContain('Rx: Anchored Device');
 
 		// Verify we have the expected number of receiver columns (only those with data)
-		const receiverColumns = columnHeaders.filter(header => header?.startsWith('Rx:'));
+		const receiverColumns = columnHeaders.filter((header) => header?.startsWith('Rx:'));
 		expect(receiverColumns).toHaveLength(1); // Only "Receiver Node"
 
 		// Verify transmitter rows are still present
-		const transmitterRows = await page.$$eval('table tbody tr', (rows) =>
-			rows.map((row) => row.querySelector('td:first-child')?.textContent?.trim())
-		);
+		const transmitterRows = await page.$$eval('table tbody tr', (rows) => rows.map((row) => row.querySelector('td:first-child')?.textContent?.trim()));
 
 		expect(transmitterRows).toContain('Tx: Regular Node');
 		expect(transmitterRows).toContain('Tx: Test Anchor');
@@ -165,8 +200,8 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		// Mock calibration data where an anchored device actually has receiver data
 		const calibrationData = {
 			matrix: {
-				"Regular Node": {
-					"Anchored Device": {
+				'Regular Node': {
+					'Anchored Device': {
 						distance: 3.0,
 						rssi: -60,
 						mapDistance: 2.8,
@@ -174,7 +209,7 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 						percent: 0.071,
 						rx_adj_rssi: -5
 					},
-					"Regular Receiver": {
+					'Regular Receiver': {
 						distance: 5.0,
 						rssi: -70,
 						mapDistance: 4.5,
@@ -204,8 +239,9 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		await page.waitForSelector('table');
 
 		// Get all column headers
-		const columnHeaders = await page.$$eval('table thead th', (headers) =>
-			headers.slice(1).map((header) => header.textContent?.trim()) // Skip first "Name" column
+		const columnHeaders = await page.$$eval(
+			'table thead th',
+			(headers) => headers.slice(1).map((header) => header.textContent?.trim()) // Skip first "Name" column
 		);
 
 		// Should include both receivers since they both have actual data
@@ -213,12 +249,13 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		expect(columnHeaders).toContain('Rx: Regular Receiver');
 
 		// Verify we have the expected number of receiver columns
-		const receiverColumns = columnHeaders.filter(header => header?.startsWith('Rx:'));
+		const receiverColumns = columnHeaders.filter((header) => header?.startsWith('Rx:'));
 		expect(receiverColumns).toHaveLength(2);
 
 		// Verify the data is displayed correctly in the matrix
-		const firstRowCells = await page.$$eval('table tbody tr:first-child td', (cells) =>
-			cells.slice(1).map((cell) => cell.textContent?.trim()) // Skip first "Name" cell
+		const firstRowCells = await page.$$eval(
+			'table tbody tr:first-child td',
+			(cells) => cells.slice(1).map((cell) => cell.textContent?.trim()) // Skip first "Name" cell
 		);
 
 		// Should have data for both receivers
@@ -231,8 +268,8 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		// Mock calibration data with only transmitters, no receivers
 		const calibrationData = {
 			matrix: {
-				"Standalone Transmitter": {},
-				"Another Transmitter": {}
+				'Standalone Transmitter': {},
+				'Another Transmitter': {}
 			},
 			rmse: null,
 			r: null
@@ -255,18 +292,17 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		await page.waitForSelector('table');
 
 		// Get all column headers
-		const columnHeaders = await page.$$eval('table thead th', (headers) =>
-			headers.slice(1).map((header) => header.textContent?.trim()) // Skip first "Name" column
+		const columnHeaders = await page.$$eval(
+			'table thead th',
+			(headers) => headers.slice(1).map((header) => header.textContent?.trim()) // Skip first "Name" column
 		);
 
 		// Should have no receiver columns
-		const receiverColumns = columnHeaders.filter(header => header?.startsWith('Rx:'));
+		const receiverColumns = columnHeaders.filter((header) => header?.startsWith('Rx:'));
 		expect(receiverColumns).toHaveLength(0);
 
 		// But should still show transmitter rows
-		const transmitterRows = await page.$$eval('table tbody tr', (rows) =>
-			rows.map((row) => row.querySelector('td:first-child')?.textContent?.trim())
-		);
+		const transmitterRows = await page.$$eval('table tbody tr', (rows) => rows.map((row) => row.querySelector('td:first-child')?.textContent?.trim()));
 
 		expect(transmitterRows).toContain('Tx: Standalone Transmitter');
 		expect(transmitterRows).toContain('Tx: Another Transmitter');
