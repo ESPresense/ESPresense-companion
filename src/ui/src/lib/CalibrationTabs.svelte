@@ -15,6 +15,9 @@
 				<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {calibrationType === 'device' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (calibrationType = 'device')}>
 					Devices
 				</button>
+				<button class="px-4 py-1 rounded-full text-sm font-medium transition-colors {calibrationType === 'obstructions' ? 'bg-emerald-400 text-black' : 'text-white hover:bg-slate-500'}" onclick={() => (calibrationType = 'obstructions')}>
+					Obstructions
+				</button>
 			</div>
 		</div>
 	</nav>
