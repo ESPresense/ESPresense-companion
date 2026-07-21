@@ -242,14 +242,50 @@ floors:
           - [5,17.1]
           - [1.3,17.1]
 
+# Antenna profiles (optional, extends/overrides built-ins)
+# Built-in profiles: pcb_ifa, dev_board, 3d_pifa, 3d_pifa_pro, external_dipole, switchbot_cramped
+antennas:
+  pcb_ifa:
+    # ESP-WROOM-32E module, clean custom boards
+    g_max_db: 3.4
+    pattern_exponent: 0.28
+    back_loss: 14.3
+
+  dev_board:
+    # ESP32 dev boards (DevKitC, NodeMCU, etc.)
+    g_max_db: 2.5
+    pattern_exponent: 0.25
+    back_loss: 12
+
+  3d_pifa:
+    # M5Atom standard
+    g_max_db: 2.0
+    pattern_exponent: 0.03
+    back_loss: 5.5
+
+  3d_pifa_pro:
+    # M5Atom PRO-OB-440 (the "enhanced" one)
+    g_max_db: 2.0
+    pattern_exponent: 0.03
+    back_loss: 5.5
+
+  external_dipole:
+    # External 2.4 GHz dipole (rubber ducky style)
+    g_max_db: 4.0
+    pattern_exponent: 0.2
+    back_loss: 2
+
+
 # Locations of espresense nodes in meters
 nodes:
   - name: Master
     point: [3.4, 10.4, 3.4]
     floors: ["second"]
+    antenna: pcb_ifa         # references an antenna profile by name
   - name: Bathroom
     point: [0.15, 8.6, 4]
     floors: ["second"]
+    antenna: 3d_pifa         # M5Atom standard
   - name: Upstairs Hallway
     point: [10.4, 6.4, 3.4]
     floors: ["second"]

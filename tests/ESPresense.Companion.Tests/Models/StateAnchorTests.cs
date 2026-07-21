@@ -1,6 +1,7 @@
 using ESPresense.Models;
 using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace ESPresense.Companion.Tests.Models;
@@ -23,7 +24,10 @@ public class StateAnchorTests
 
         _configLoader = new ConfigLoader(_configDir);
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
-        _state = new State(_configLoader, _nodeTelemetryStore);
+        var mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, (ILogger<NodeSettingsStore>)null!);
+        var mockDss = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore, mockNss.Object, lazyDss);
         _deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object, _state);
     }
 

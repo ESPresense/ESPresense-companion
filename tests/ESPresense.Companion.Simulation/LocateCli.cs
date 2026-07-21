@@ -141,7 +141,9 @@ public static class LocateCli
 
         var configLoader = new MockConfigLoader(config);
         var nodeTelemetryStore = new MockNodeTelemetryStore();
-        var state = new State(configLoader, nodeTelemetryStore);
+        var nodeSettingsStore = new MockNodeSettingsStore();
+        var deviceSettingsStore = new MockDeviceSettingsStore();
+        var state = new State(configLoader, nodeTelemetryStore, nodeSettingsStore, new Lazy<ESPresense.Services.DeviceSettingsStore>(() => deviceSettingsStore));
 
         var device = new Device("harness-device", "harness", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
@@ -185,10 +187,10 @@ public static class LocateCli
 
         ILocate locator = req.Locator!.Trim().ToLowerInvariant() switch
         {
-            "neldermead" or "nelder-mead" or "nm" => new NelderMeadMultilateralizer(device, floor, state),
-            "gaussnewton" or "gauss-newton" or "gn" => new GaussNewtonMultilateralizer(device, floor, state),
-            "bfgs" => new BfgsMultilateralizer(device, floor, state),
-            "mle" => new MLEMultilateralizer(device, floor, state),
+            "neldermead" or "nelder-mead" or "nm" => new NelderMeadMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
+            "gaussnewton" or "gauss-newton" or "gn" => new GaussNewtonMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
+            "bfgs" => new BfgsMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
+            "mle" => new MLEMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
             _ => throw new LocateInputException(
                 $"unknown locator '{req.Locator}'. Supported: NelderMead, GaussNewton, BFGS, MLE.")
         };

@@ -2,6 +2,7 @@ using ESPresense.Locators;
 using ESPresense.Models;
 using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace ESPresense.Companion.Tests.Locators;
@@ -15,6 +16,8 @@ public class NadarayaWatsonMultilateralizerTests
     private NodeTelemetryStore _nodeTelemetryStore;
     private Mock<IMqttCoordinator> _mockMqttCoordinator;
     private Mock<NodeTelemetryStore> _mockNodeTelemetryStore;
+    private Mock<NodeSettingsStore> _mockNss;
+    private Mock<DeviceSettingsStore> _mockDss;
 
     [SetUp]
     public void Setup()
@@ -27,7 +30,10 @@ public class NadarayaWatsonMultilateralizerTests
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _mockNodeTelemetryStore = new Mock<NodeTelemetryStore>(_mockMqttCoordinator.Object);
         _mockNodeTelemetryStore.Setup(n => n.Online(It.IsAny<string>())).Returns(true);
-        _state = new State(_configLoader, _nodeTelemetryStore);
+        _mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, (ILogger<NodeSettingsStore>)null!);
+        _mockDss = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => _mockDss.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore, _mockNss.Object, lazyDss);
     }
 
     [TearDown]
@@ -76,10 +82,10 @@ public class NadarayaWatsonMultilateralizerTests
         return floor;
     }
 
-    private Node CreateTestNode(string id, double x, double y, double z, Floor floor)
+    private Node CreateTestNode(string id, double x, double y, double z, Floor floor, string? antenna = null)
     {
         var node = new Node(id, NodeSourceType.Config);
-        var configNode = new ConfigNode { Name = id, Point = new double[] { x, y, z } };
+        var configNode = new ConfigNode { Name = id, Point = new double[] { x, y, z }, Antenna = antenna };
         node.Update(_configLoader.Config!, configNode, new[] { floor });
         _state.Nodes[id] = node;
         return node;

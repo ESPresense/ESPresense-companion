@@ -36,7 +36,7 @@ class CompareWeightings
         };
     }
 
-    private static (Config Config, Floor Floor, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore)
+    private static (Config Config, Floor Floor, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore, MockNodeSettingsStore NodeSettingsStore, MockDeviceSettingsStore DeviceSettingsStore)
         CreateSimulationContext(IWeighting? weighting)
     {
         var floor = new Floor();
@@ -63,12 +63,15 @@ class CompareWeightings
 
         var mockConfigLoader = new MockConfigLoader(config);
         var nodeTelemetryStore = new MockNodeTelemetryStore();
-        var state = new State(mockConfigLoader, nodeTelemetryStore);
+        var mockNss = new MockNodeSettingsStore();
+        var mockDss = new MockDeviceSettingsStore();
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss);
+        var state = new State(mockConfigLoader, nodeTelemetryStore, mockNss, lazyDss);
 
         var device = new Device("sim-device", "test-discovery", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
 
-        return (config, floor, state, device, nodeTelemetryStore);
+        return (config, floor, state, device, nodeTelemetryStore, mockNss, mockDss);
     }
 
     public static void Run()
@@ -103,11 +106,11 @@ class CompareWeightings
         };
 
         // Locators to test (that support weighting)
-        var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, ILocate> Factory)[]
+        var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, NodeSettingsStore, DeviceSettingsStore, ILocate> Factory)[]
         {
-            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s)),
-            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s)),
-            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s)),
+            ("BFGS", (d, f, s, nts, nss, dss) => new BfgsMultilateralizer(d, f, s, nss, dss)),
+            ("Nelder-Mead", (d, f, s, nts, nss, dss) => new NelderMeadMultilateralizer(d, f, s, nss, dss)),
+            ("MLE", (d, f, s, nts, nss, dss) => new MLEMultilateralizer(d, f, s, nss, dss)),
         };
 
         int iterations = 200;
@@ -140,7 +143,9 @@ class CompareWeightings
                                 context.Device,
                                 context.Floor,
                                 context.State,
-                                context.NodeTelemetryStore);
+                                context.NodeTelemetryStore,
+                                context.NodeSettingsStore,
+                                context.DeviceSettingsStore);
                             var report = sim.RunMonteCarlo(
                                 iterations,
                                 locator,

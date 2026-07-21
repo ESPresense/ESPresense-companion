@@ -12,8 +12,8 @@ namespace ESPresense.Models
         {
             return new Config
             {
-                Mqtt = Mqtt?.Clone(),
-                Bounds = Bounds?.Select(b => b.ToArray()).ToArray(),
+                Mqtt = Mqtt?.Clone() ?? new ConfigMqtt(),
+                Bounds = Bounds?.Select(b => b.ToArray()).ToArray() ?? Array.Empty<double[]>(),
                 Timeout = Timeout,
                 AwayTimeout = AwayTimeout,
                 Gps = Gps.Clone(),
@@ -24,7 +24,8 @@ namespace ESPresense.Models
                 ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
                 History = History.Clone(),
                 Locators = Locators.Clone(),
-                Optimization = Optimization.Clone()
+                Optimization = Optimization.Clone(),
+                Antennas = Antennas?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Clone())
             };
         }
     }
@@ -264,7 +265,8 @@ namespace ESPresense.Models
                 Point = Point?.ToArray(),
                 Floors = Floors?.ToArray(),
                 Enabled = Enabled,
-                Stationary = Stationary
+                Stationary = Stationary,
+                Antenna = Antenna
             };
         }
     }
