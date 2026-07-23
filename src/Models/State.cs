@@ -13,6 +13,9 @@ namespace ESPresense.Models;
 public class State
 {
     private readonly NodeTelemetryStore _nts;
+    private readonly object _calibrationMetricsLock = new();
+    private double? _bestCalibrationRMSE;
+    private double? _bestCalibrationR;
 
     /// <summary>
     /// Initializes a new State, wiring telemetry and configuration handling.
@@ -96,6 +99,31 @@ public class State
     public OptimizerState OptimizerState { get; set; } = new();
     public LocatorState LocatorState { get; } = new();
 
+    public (double? BestRMSE, double? BestR) RecordCalibrationMetrics(double? rmse, double? r)
+    {
+        lock (_calibrationMetricsLock)
+        {
+            if (rmse is { } currentRMSE && double.IsFinite(currentRMSE) &&
+                (_bestCalibrationRMSE == null || currentRMSE < _bestCalibrationRMSE))
+                _bestCalibrationRMSE = currentRMSE;
+
+            if (r is { } currentR && double.IsFinite(currentR) &&
+                (_bestCalibrationR == null || currentR > _bestCalibrationR))
+                _bestCalibrationR = currentR;
+
+            return (_bestCalibrationRMSE, _bestCalibrationR);
+        }
+    }
+
+    public void ResetCalibrationMetrics()
+    {
+        lock (_calibrationMetricsLock)
+        {
+            _bestCalibrationRMSE = null;
+            _bestCalibrationR = null;
+        }
+    }
+
     /// <summary>
     /// Creates an optimization snapshot from current node measurements and purges expired snapshots.
     /// </summary>
@@ -165,7 +193,7 @@ public class State
         }
 
         // Remove expired snapshots by time
-        var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
+        var expiryMinutes = Config?.Optimization?.EffectiveTrainingWindowMins ?? 30;
         var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
         OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
         OptimizationSnaphots.Add(os);
