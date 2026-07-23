@@ -243,6 +243,9 @@ floors:
           - [1.3,17.1]
 
 # Locations of espresense nodes in meters
+# Coordinates are absolute (same origin as rooms/floors), NOT relative to the room or floor:
+# z must include the floor's base elevation, e.g. a node mounted 1.7m up a wall on a floor
+# whose bounds start at z=3 has point z of 4.7
 nodes:
   - name: Master
     point: [3.4, 10.4, 3.4]
