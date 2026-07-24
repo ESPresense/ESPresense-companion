@@ -139,6 +139,21 @@ public class DeviceService
             _logger.LogWarning(ex, "Failed to delete HA auto-discovery entries for device {DeviceId}", device.Id);
         }
 
+        foreach (var topic in new[]
+        {
+            $"espresense/companion/{device.Id}",
+            $"espresense/companion/{device.Id}/attributes"
+        })
+        {
+            try
+            {
+                await _mqtt.EnqueueAsync(topic, null, retain: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clear retained MQTT topic {Topic}", topic);
+            }
+        }
         // Notify connected clients to remove device immediately
         _events.OnDeviceRemoved(device.Id);
 
