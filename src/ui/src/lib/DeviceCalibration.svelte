@@ -542,7 +542,7 @@
 				{#if calibrationSpot}
 					<div>
 						<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
-						<div class="input-group input-group-divider grid-cols-[1fr_auto]">
+						<div class="flex">
 							<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input rounded-r-none" />
 							<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}>Set</button>
 						</div>
