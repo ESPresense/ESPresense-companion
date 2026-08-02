@@ -45,7 +45,7 @@ RUN case "${TARGETARCH}" in \
     dotnet publish src/ESPresense.Companion.csproj -c Release --no-restore -r "${TARGETOS}-${dotnet_arch}" -o out
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 ARG TARGETPLATFORM
 
 # Install curl for healthcheck
