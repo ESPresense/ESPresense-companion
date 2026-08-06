@@ -1,12 +1,19 @@
 import type { Action } from 'svelte/action';
 import { computePosition, offset, flip, shift, autoUpdate } from '@floating-ui/dom';
 
+let tooltipSequence = 0;
+
+function createTooltipId() {
+	tooltipSequence++;
+	return `tooltip-${Date.now().toString(36)}-${tooltipSequence.toString(36)}`;
+}
+
 // A lightweight tooltip action that opens on hover/focus
 export const tooltip: Action<HTMLElement, string> = (node, content) => {
 	let tooltipEl: HTMLDivElement | null = null;
 	let cleanupAutoUpdate: (() => void) | null = null;
 	// Generate a unique, stable ID for this tooltip instance
-	const tooltipId = `tooltip-${crypto.randomUUID()}`;
+	const tooltipId = createTooltipId();
 
 	/**
 	 * Ensure the tooltip DOM element exists, creating and initializing it if needed.

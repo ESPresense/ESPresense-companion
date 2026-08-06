@@ -8,6 +8,55 @@ namespace ESPresense.Companion.Tests;
 public class ConfigTests
 {
     [Test]
+    public void OptimizationTiming_NewKeysOverrideLegacyFallbacks()
+    {
+        const string yaml = @"
+optimization:
+  sample_interval_secs: 15
+  training_window_mins: 45
+  optimization_interval_secs: 600
+  interval_secs: 3600
+  keep_snapshot_mins: 5
+";
+
+        var config = new DeserializerBuilder().Build().Deserialize<Config>(yaml);
+
+        Assert.That(config.Optimization.EffectiveSampleIntervalSecs, Is.EqualTo(15));
+        Assert.That(config.Optimization.EffectiveTrainingWindowMins, Is.EqualTo(45));
+        Assert.That(config.Optimization.EffectiveOptimizationIntervalSecs, Is.EqualTo(600));
+    }
+
+    [Test]
+    public void OptimizationTiming_LegacyKeysRemainSupported()
+    {
+        const string yaml = @"
+optimization:
+  interval_secs: 3600
+  keep_snapshot_mins: 5
+";
+
+        var config = new DeserializerBuilder().Build().Deserialize<Config>(yaml);
+
+        Assert.That(config.Optimization.EffectiveSampleIntervalSecs, Is.EqualTo(30));
+        Assert.That(config.Optimization.EffectiveTrainingWindowMins, Is.EqualTo(5));
+        Assert.That(config.Optimization.EffectiveOptimizationIntervalSecs, Is.EqualTo(3600));
+    }
+
+    [Test]
+    public void OptimizationBoundFraction_IsConfigurableAndClamped()
+    {
+        const string yaml = @"
+optimization:
+  max_absorption_bound_fraction: 1.5
+";
+
+        var config = new DeserializerBuilder().Build().Deserialize<Config>(yaml);
+
+        Assert.That(config.Optimization.EffectiveMaxAbsorptionBoundFraction, Is.EqualTo(1));
+        Assert.That(new ConfigOptimization().EffectiveMaxAbsorptionBoundFraction, Is.EqualTo(0.2));
+    }
+
+    [Test]
     public void TestLocatorsDeserialization()
     {
         string yaml = @"
