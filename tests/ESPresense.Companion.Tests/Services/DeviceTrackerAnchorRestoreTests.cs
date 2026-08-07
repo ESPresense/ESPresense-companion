@@ -27,6 +27,9 @@ public class DeviceTrackerAnchorRestoreTests
     {
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
+        // Write a minimal config with no floors/nodes so LoadConfig is idempotent
+        // even if the ConfigChanged race condition triggers a double-call.
+        File.WriteAllText(Path.Combine(_configDir, "config.yaml"), "mqtt:\n  host: localhost\n");
 
         _configLoader = new ConfigLoader(_configDir);
         var supervisorLoader = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
@@ -34,8 +37,14 @@ public class DeviceTrackerAnchorRestoreTests
         _mockMqttCoordinator.Setup(m => m.EnqueueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
 
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
-        _state = new State(_configLoader, _nodeTelemetryStore);
+        var mockNss = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, NullLogger<NodeSettingsStore>.Instance);
+        // Use a closure so that lazyDss can be passed to State before _mockDeviceSettingsStore is created,
+        // while still supplying the correct State instance to DeviceSettingsStore.
+        Mock<DeviceSettingsStore>? dssRef = null;
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => dssRef!.Object);
+        _state = new State(_configLoader, _nodeTelemetryStore, mockNss.Object, lazyDss);
         _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, _state);
+        dssRef = _mockDeviceSettingsStore;
         _telemetryService = new TelemetryService(_mockMqttCoordinator.Object);
         _eventDispatcher = new GlobalEventDispatcher();
 

@@ -3,6 +3,8 @@ using ESPresense.Controllers;
 using ESPresense.Locators;
 using ESPresense.Models;
 using ESPresense.Services;
+using Microsoft.Extensions.Logging;
+using Moq;
 using Newtonsoft.Json;
 
 namespace ESPresense.Companion.Tests;
@@ -33,8 +35,11 @@ public class DeviceTrackerTests
 
         // Create the NodeTelemetryStore instance that's now required by State constructor
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt); // Use the existing mqtt instance
-        var state = new State(configLoader, nodeTelemetryStore);
-        var deviceSettingsStore = new DeviceSettingsStore(mqtt, state);
+        var mockNss = new Mock<NodeSettingsStore>((IMqttCoordinator)mqtt, (ILogger<NodeSettingsStore>)null!);
+        DeviceSettingsStore? deviceSettingsStore = null;
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore!);
+        var state = new State(configLoader, nodeTelemetryStore, mockNss.Object, lazyDss);
+        deviceSettingsStore = new DeviceSettingsStore(mqtt, state);
 
         var locator = new DeviceTracker(state, mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher(), deviceSettingsStore);
         // Use testData to test locator...

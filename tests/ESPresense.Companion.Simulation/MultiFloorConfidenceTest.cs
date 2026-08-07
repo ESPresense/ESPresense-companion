@@ -17,7 +17,7 @@ class MultiFloorConfidenceTest
     private const int BaseSeed = 54321;
     private const int IterationsPerScenario = 100;
     
-    private static (Config Config, List<Floor> Floors, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore)
+    private static (Config Config, List<Floor> Floors, State State, Device Device, MockNodeTelemetryStore NodeTelemetryStore, MockNodeSettingsStore NodeSettingsStore, MockDeviceSettingsStore DeviceSettingsStore)
         CreateMultiFloorContext()
     {
         var config = new Config
@@ -55,12 +55,15 @@ class MultiFloorConfidenceTest
 
         var mockConfigLoader = new MockConfigLoader(config);
         var nodeTelemetryStore = new MockNodeTelemetryStore();
-        var state = new State(mockConfigLoader, nodeTelemetryStore);
+        var nodeSettingsStore = new MockNodeSettingsStore();
+        var deviceSettingsStore = new MockDeviceSettingsStore();
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore);
+        var state = new State(mockConfigLoader, nodeTelemetryStore, nodeSettingsStore, lazyDss);
 
         var device = new Device("sim-device-multifloor", "test-discovery", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
 
-        return (config, floors, state, device, nodeTelemetryStore);
+        return (config, floors, state, device, nodeTelemetryStore, nodeSettingsStore, deviceSettingsStore);
     }
 
     /// <summary>
@@ -235,6 +238,8 @@ class MultiFloorConfidenceTest
         var state = context.State;
         var device = context.Device;
         var nodeTelemetryStore = context.NodeTelemetryStore;
+        var nodeSettingsStore = context.NodeSettingsStore;
+        var deviceSettingsStore = context.DeviceSettingsStore;
 
         var basement = floors.First(f => f.Id == "basement");
         var first = floors.First(f => f.Id == "first");
@@ -258,13 +263,13 @@ class MultiFloorConfidenceTest
         Console.WriteLine($"\nIterations per scenario: {IterationsPerScenario}\n");
 
         // Locators to test
-        var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, ILocate> Factory)[]
+        var locators = new (string Name, Func<Device, Floor, State, NodeTelemetryStore, NodeSettingsStore, DeviceSettingsStore, ILocate> Factory)[]
         {
-            ("Gauss-Newton", (d, f, s, nts) => new GaussNewtonMultilateralizer(d, f, s)),
-            ("Nelder-Mead", (d, f, s, nts) => new NelderMeadMultilateralizer(d, f, s)),
-            ("BFGS", (d, f, s, nts) => new BfgsMultilateralizer(d, f, s)),
-            ("MLE", (d, f, s, nts) => new MLEMultilateralizer(d, f, s)),
-            ("Nadaraya-Watson", (d, f, s, nts) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
+            ("Gauss-Newton", (d, f, s, nts, nss, dss) => new GaussNewtonMultilateralizer(d, f, s, nss, dss)),
+            ("Nelder-Mead", (d, f, s, nts, nss, dss) => new NelderMeadMultilateralizer(d, f, s, nss, dss)),
+            ("BFGS", (d, f, s, nts, nss, dss) => new BfgsMultilateralizer(d, f, s, nss, dss)),
+            ("MLE", (d, f, s, nts, nss, dss) => new MLEMultilateralizer(d, f, s, nss, dss)),
+            ("Nadaraya-Watson", (d, f, s, nts, nss, dss) => new NadarayaWatsonMultilateralizer(d, f, s, nts)),
         };
 
         bool allPassed = true;
@@ -282,17 +287,17 @@ class MultiFloorConfidenceTest
             // Using first floor bounds since the locator always targets first floor
             var belowResult = TestConfidenceAtZ(
                 -1.5, first, floors, firstFloorNodes, secondFloorNodes, basementNodes,
-                config, state, device, nodeTelemetryStore, locatorInfo.Factory(device, first, state, nodeTelemetryStore),
+                config, state, device, nodeTelemetryStore, locatorInfo.Factory(device, first, state, nodeTelemetryStore, nodeSettingsStore, deviceSettingsStore),
                 IterationsPerScenario, BaseSeed + 1);
             
             var onResult = TestConfidenceAtZ(
                 1.5, first, floors, firstFloorNodes, secondFloorNodes, basementNodes,
-                config, state, device, nodeTelemetryStore, locatorInfo.Factory(device, first, state, nodeTelemetryStore),
+                config, state, device, nodeTelemetryStore, locatorInfo.Factory(device, first, state, nodeTelemetryStore, nodeSettingsStore, deviceSettingsStore),
                 IterationsPerScenario, BaseSeed + 2);
             
             var aboveResult = TestConfidenceAtZ(
                 4.5, first, floors, firstFloorNodes, secondFloorNodes, basementNodes,
-                config, state, device, nodeTelemetryStore, locatorInfo.Factory(device, first, state, nodeTelemetryStore),
+                config, state, device, nodeTelemetryStore, locatorInfo.Factory(device, first, state, nodeTelemetryStore, nodeSettingsStore, deviceSettingsStore),
                 IterationsPerScenario, BaseSeed + 3);
 
             PrintComparison("Device Below (-1.5m)", belowResult, onResult);

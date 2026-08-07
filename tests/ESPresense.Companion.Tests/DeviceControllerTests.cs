@@ -39,8 +39,10 @@ public class DeviceControllerTests
         var mockMqttCoordinatorInterface = new Mock<IMqttCoordinator>();
         
         var mockNodeTelemetryStore = new Mock<NodeTelemetryStore>(mockMqttCoordinatorInterface.Object);
-        _mockState = new Mock<State>(mockConfigLoader.Object, mockNodeTelemetryStore.Object);
-        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(mockMqttCoordinatorInterface.Object, _mockState.Object);
+        var mockNss = new Mock<NodeSettingsStore>(mockMqttCoordinatorInterface.Object, (ILogger<NodeSettingsStore>)null!);
+        _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(mockMqttCoordinatorInterface.Object, (State)null!);
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => _mockDeviceSettingsStore.Object);
+        _mockState = new Mock<State>(mockConfigLoader.Object, mockNodeTelemetryStore.Object, mockNss.Object, lazyDss);
         
         // Create dependencies for DeviceService
         var mockMqttCoordinatorConcrete = CreateMockMqttCoordinator();

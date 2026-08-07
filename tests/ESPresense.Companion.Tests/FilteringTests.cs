@@ -1,6 +1,7 @@
 using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SQLite;
@@ -98,7 +99,10 @@ filtering:
             await configLoader.ConfigAsync(); // Wait for load
 
             var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
-            var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+            var mockNss = new Mock<NodeSettingsStore>(mqttMock.Object, (ILogger<NodeSettingsStore>)null!);
+            var mockDss = new Mock<DeviceSettingsStore>(mqttMock.Object, (State)null!);
+            var lazyDss = new Lazy<DeviceSettingsStore>(() => mockDss.Object);
+            var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object), mockNss.Object, lazyDss);
 
             var tele = new TelemetryService(mqttMock.Object);
             var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);

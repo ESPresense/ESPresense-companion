@@ -14,7 +14,10 @@ public class McpResourcesTests
         var mqtt = new Mock<IMqttCoordinator>();
         var nodeSettingsStore = new NodeSettingsStore(mqtt.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<NodeSettingsStore>>());
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt.Object);
-        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore);
+        DeviceSettingsStore? deviceSettingsStore = null;
+        var lazyDss = new Lazy<DeviceSettingsStore>(() => deviceSettingsStore!);
+        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore, nodeSettingsStore, lazyDss);
+        deviceSettingsStore = new DeviceSettingsStore(mqtt.Object, state);
         var firmwareUpdateJobs = new FirmwareUpdateJobService(
             nodeSettingsStore,
             nodeTelemetryStore,
@@ -27,7 +30,7 @@ public class McpResourcesTests
             new Mock<ConfigLoader>("test-config-dir").Object,
             nodeSettingsStore,
             nodeTelemetryStore,
-            new DeviceSettingsStore(mqtt.Object, state),
+            deviceSettingsStore,
             telemetryService,
             firmwareUpdateJobs,
             Mock.Of<IMapper>());

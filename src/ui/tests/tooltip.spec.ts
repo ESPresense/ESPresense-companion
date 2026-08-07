@@ -52,12 +52,12 @@ test.describe('Tooltip', () => {
 
 		// Verify tooltip content contains expected data
 		const tooltipText = await tooltip.textContent();
-		expect(tooltipText).toContain('Map Distance');
-		expect(tooltipText).toContain('4.6');
-		expect(tooltipText).toContain('Measured');
-		expect(tooltipText).toContain('5.1');
-		expect(tooltipText).toContain('Error');
-		expect(tooltipText).toContain('0.6');
+		expect(tooltipText).toContain('Map:');
+		expect(tooltipText).toContain('4.57');
+		expect(tooltipText).toContain('Measured:');
+		expect(tooltipText).toContain('5.12');
+		expect(tooltipText).toContain('Error:');
+		expect(tooltipText).toContain('0.6m');
 	});
 
 	test('hides tooltip when mouse leaves cell', async ({ page }) => {
@@ -277,8 +277,8 @@ test.describe('Tooltip', () => {
 		const tooltip = page.locator('[role="tooltip"]');
 		await expect(tooltip).toBeVisible();
 		const tooltipText = await tooltip.textContent();
-		expect(tooltipText).toContain('Map Distance 5.0');
-		expect(tooltipText).toContain('Measured 3.0');
-		expect(tooltipText).toContain('Error 2.0');
+		expect(tooltipText).toContain('Map: 5m');
+		expect(tooltipText).toContain('Measured: 3m');
+		expect(tooltipText).toContain('Error: 2.0m');
 	});
 });

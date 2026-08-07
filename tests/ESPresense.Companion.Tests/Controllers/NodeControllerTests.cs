@@ -15,7 +15,7 @@ public class NodeControllerTests
         var mqtt = new Mock<IMqttCoordinator>();
         var nodeSettingsStore = new NodeSettingsStore(mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt.Object);
-        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore);
+        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore, nodeSettingsStore, new Lazy<DeviceSettingsStore>(() => null!));
         var firmwareUpdateJobs = new FirmwareUpdateJobService(
             nodeSettingsStore,
             nodeTelemetryStore,
@@ -39,7 +39,7 @@ public class NodeControllerTests
 
         var nodeSettingsStore = new NodeSettingsStore(mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt.Object);
-        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore);
+        var state = new State(new Mock<ConfigLoader>("test-config-dir").Object, nodeTelemetryStore, nodeSettingsStore, new Lazy<DeviceSettingsStore>(() => null!));
         var firmwareUpdateJobs = new FirmwareUpdateJobService(
             nodeSettingsStore,
             nodeTelemetryStore,

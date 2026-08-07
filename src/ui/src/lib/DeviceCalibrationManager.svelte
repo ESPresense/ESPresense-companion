@@ -39,7 +39,7 @@
 
 	function displayRoomFloor(d: Device): string {
 		const base = baseRoomFloor(d);
-		return (d.isAnchored ?? false) ? `${base} 📍` : base;
+		return d.isAnchored ? `${base} 📍` : base;
 	}
 
 	const columns = [

@@ -224,7 +224,9 @@ public static class AccuracyRunner
 
         var configLoader = new MockConfigLoader(config);
         var nodeTelemetryStore = new MockNodeTelemetryStore();
-        var state = new State(configLoader, nodeTelemetryStore);
+        var nodeSettingsStore = new MockNodeSettingsStore();
+        var deviceSettingsStore = new MockDeviceSettingsStore();
+        var state = new State(configLoader, nodeTelemetryStore, nodeSettingsStore, new Lazy<ESPresense.Services.DeviceSettingsStore>(() => deviceSettingsStore));
 
         var nodes = new Dictionary<string, Node>();
         foreach (var st in scenario.Stations)
@@ -241,10 +243,10 @@ public static class AccuracyRunner
 
         ILocate locator = kind switch
         {
-            LocatorKind.NelderMead => new NelderMeadMultilateralizer(device, floor, state),
-            LocatorKind.GaussNewton => new GaussNewtonMultilateralizer(device, floor, state),
-            LocatorKind.Bfgs => new BfgsMultilateralizer(device, floor, state),
-            LocatorKind.Mle => new MLEMultilateralizer(device, floor, state),
+            LocatorKind.NelderMead => new NelderMeadMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
+            LocatorKind.GaussNewton => new GaussNewtonMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
+            LocatorKind.Bfgs => new BfgsMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
+            LocatorKind.Mle => new MLEMultilateralizer(device, floor, state, nodeSettingsStore, deviceSettingsStore),
             _ => throw new InvalidOperationException($"Unsupported locator {kind}")
         };
 

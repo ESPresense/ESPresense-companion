@@ -35,6 +35,13 @@ public class OptNode
     public string Id { get; set; }
     public string? Name { get; set; }
     public Point3D Location { get; set; }
+    public bool IsNode { get; set; }
+    public bool HasDirectionalAntenna { get; set; }
+    public double GMax { get; set; } = 1.0;
+    public double PatternExponent { get; set; } = 2.0;
+    public double BackLossDb { get; set; } = 15.0;
+    public double AzimuthRad { get; set; }
+    public double ElevationRad { get; set; }
 }
 
 public class Measure
