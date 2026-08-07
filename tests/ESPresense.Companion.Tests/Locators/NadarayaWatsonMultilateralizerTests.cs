@@ -232,8 +232,8 @@ public class NadarayaWatsonMultilateralizerTests
 
         // Assert
         Assert.That(result, Is.True);
-        Assert.That(scenario.Confidence, Is.GreaterThanOrEqualTo(5));
-        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(100));
+        Assert.That(scenario.Confidence, Is.GreaterThan(0.0));
+        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(1.0));
     }
 
     [Test]
@@ -297,9 +297,9 @@ public class NadarayaWatsonMultilateralizerTests
         // Act
         multilateralizer.Locate(scenario);
 
-        // Assert - centralized confidence is clamped between ConfidenceFloor (5) and 100
-        Assert.That(scenario.Confidence, Is.GreaterThanOrEqualTo(5));
-        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(100));
+        // Assert - confidence is positive (softmax will set final value)
+        Assert.That(scenario.Confidence, Is.GreaterThan(0.0));
+        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(1.0));
     }
 
     [Test]
@@ -428,8 +428,8 @@ public class NadarayaWatsonMultilateralizerTests
 
         // Assert - confidence should account for 3/5 coverage ratio
         Assert.That(result, Is.True);
-        Assert.That(scenario.Confidence, Is.GreaterThanOrEqualTo(5));
-        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(100));
+        Assert.That(scenario.Confidence, Is.GreaterThan(0.0));
+        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(1.0));
     }
 
     [Test]

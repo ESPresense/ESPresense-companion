@@ -19,7 +19,7 @@ public class AnchorLocatorTests
 
         // Assert
         Assert.That(scenario.Location, Is.EqualTo(anchorLocation));
-        Assert.That(scenario.Confidence, Is.EqualTo(100));
+        Assert.That(scenario.Confidence, Is.EqualTo(1.0));
         Assert.That(scenario.Scale, Is.EqualTo(1.0));
         Assert.That(scenario.Error, Is.EqualTo(0.0));
         Assert.That(scenario.Iterations, Is.EqualTo(0));

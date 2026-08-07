@@ -6,11 +6,13 @@ namespace ESPresense.Utils
 {
     public static class MathUtils
     {
-        // Constants for confidence calculation
-        private const double MaxErr = 10.0;
-        private const double AlphaErr = 0.60;
-        private const double BetaR = 0.40;
-        private const int ConfidenceFloor = 5;
+        // Softmax logit weights
+        private const double WeightError = 0.6;
+        private const double WeightPearson = 0.2;
+        private const double WeightNodes = 0.2;
+
+        // Default softmax temperature — lower = more peaked (winner-take-all), higher = more uniform
+        private const double DefaultTemperature = 1.0;
 
         public static double CalculateRMSE(List<double> predicted, List<double> measured)
         {
@@ -56,40 +58,33 @@ namespace ESPresense.Utils
         }
 
         /// <summary>
-        /// Calculate standardized confidence score based on error, correlation, and node coverage
+        /// Computes a logit (softmax input) for a scenario from error, correlation, and node count.
+        /// Higher logit = better scenario. Null values contribute 0 for their component.
         /// </summary>
-        /// <param name="error">Error value (lower is better)</param>
-        /// <param name="pearsonCorrelation">Pearson correlation coefficient (higher is better)</param>
-        /// <param name="nodeCount">Number of nodes used in calculation</param>
-        /// <param name="possibleNodeCount">Total number of possible nodes</param>
-        /// <returns>Confidence value between ConfidenceFloor and 100</returns>
-        public static int CalculateConfidence(double? error, double? pearsonCorrelation, int nodeCount, int possibleNodeCount)
+        public static double ScenarioLogit(double? error, double? pearsonCorrelation, int? nodeCount, double temperature = DefaultTemperature)
         {
-            // Ensure we have at least one node in possibleNodeCount to avoid division by zero
-            if (possibleNodeCount <= 0) possibleNodeCount = 1;
+            double errTerm = error.HasValue ? -error.Value : -100.0;
+            double rTerm = pearsonCorrelation ?? 0.0;               // [-1, 1]
+            double nodeTerm = nodeCount > 0 ? Math.Log(nodeCount.Value) : 0.0; // log(2)=0.69, log(6)=1.79
 
-            // Clamp nodeCount to ensure it doesn't exceed possibleNodeCount
-            nodeCount = Math.Min(nodeCount, possibleNodeCount);
+            if (temperature <= 0) temperature = DefaultTemperature;
+            return (WeightError * errTerm + WeightPearson * rTerm + WeightNodes * nodeTerm) / temperature;
+        }
 
-            // Calculate coverage component (0-50 points)
-            double coveragePart = 50.0 * nodeCount / possibleNodeCount;
+        /// <summary>
+        /// Applies softmax across an array of logits, returning probabilities in [0, 1] that sum to 1.
+        /// Uses the log-sum-exp trick for numerical stability.
+        /// </summary>
+        public static double[] Softmax(double[] logits)
+        {
+            if (logits.Length == 0) return Array.Empty<double>();
+            if (logits.Length == 1) return new[] { 1.0 };
 
-            // Calculate error score (0-1 range, 1 is best)
-            double errScore = error.HasValue
-                ? Math.Clamp(1.0 - (error.Value / MaxErr), 0.0, 1.0)
-                : 0.0;
+            double max = logits.Max();
+            var exps = logits.Select(l => Math.Exp(l - max)).ToArray();
+            double sum = exps.Sum();
 
-            // Calculate correlation score (0-1 range, 1 is best)
-            double rScore = Math.Max(0.0, pearsonCorrelation ?? 0.0);
-
-            // Calculate quality component (0-50 points)
-            double qualityPart = 50.0 * (AlphaErr * errScore + BetaR * rScore);
-
-            // Calculate final confidence score
-            int confidence = (int)Math.Round(coveragePart + qualityPart);
-
-            // Ensure confidence is within the defined floor and ceiling (100)
-            return Math.Clamp(confidence, ConfidenceFloor, 100);
+            return exps.Select(e => e / sum).ToArray();
         }
 
         /// <summary>

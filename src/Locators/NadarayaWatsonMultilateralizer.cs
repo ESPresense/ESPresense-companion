@@ -20,7 +20,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
 
         if (heard.Length <= 1)
         {
-            scenario.Confidence = 0;
+            scenario.Confidence = 0.0;
             scenario.Room = null;
             scenario.Error = null;
             return false;
@@ -68,25 +68,14 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             var measured = heard.Select(n => n.Distance).ToList();
             var calculated = heard.Select(n => est.DistanceTo(n.Node!.Location)).ToList();
             scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measured, calculated);
+            scenario.Rmse = MathUtils.CalculateRMSE(calculated, measured);
 
-            // Get count of possible online nodes for this floor
-            int nodesPossibleOnline = state.Nodes.Values
-                .Count(n =>
-                    (n.Floors?.Contains(floor) ?? false) &&
-                    (nts.Online(n.Id)));
-
-            // Use the centralized confidence calculation
-            scenario.Confidence = MathUtils.CalculateConfidence(
-                scenario.Error,
-                scenario.PearsonCorrelation,
-                heard.Length,
-                nodesPossibleOnline
-            );
+            scenario.Confidence = 0.5;
         }
         catch (Exception ex)
         {
             scenario.UpdateLocation(scenario.Location); // revert to last good
-            scenario.Confidence = 0;
+            scenario.Confidence = 0.0;
             scenario.Error = null;
             Log.Error("Locator error for {Device}: {Message}", device, ex.Message);
         }

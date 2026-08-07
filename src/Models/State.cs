@@ -31,7 +31,7 @@ public class State
             foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
             foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
 
-            var idsToTrack = new List<Glob>();
+            var idsToTrack = new List<(Glob, ConfigDevice)>();
             var configDeviceById = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);
             foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
                 if (!string.IsNullOrWhiteSpace(d.Id))
@@ -40,10 +40,10 @@ public class State
                     if (glob.Tokens.All(a => a is LiteralToken))
                         configDeviceById.GetOrAdd(d.Id, a => d);
                     else
-                        idsToTrack.Add(glob);
+                        idsToTrack.Add((glob, d));
                 }
 
-            var namesToTrack = new List<Glob>();
+            var namesToTrack = new List<(Glob, ConfigDevice)>();
             var configDeviceByName = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);
             foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
                 if (!string.IsNullOrWhiteSpace(d.Name))
@@ -52,7 +52,7 @@ public class State
                     if (glob.Tokens.All(a => a is LiteralToken))
                         configDeviceByName.GetOrAdd(d.Name, a => d);
                     else
-                        namesToTrack.Add(glob);
+                        namesToTrack.Add((glob, d));
                 }
 
             IdsToTrack = idsToTrack;
@@ -90,8 +90,8 @@ public class State
     public ConcurrentDictionary<string, Floor> Floors { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceByName { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceById { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    public List<Glob> IdsToTrack { get; private set; } = new();
-    public List<Glob> NamesToTrack { get; private set; } = new();
+    public List<(Glob Glob, ConfigDevice Config)> IdsToTrack { get; private set; } = new();
+    public List<(Glob Glob, ConfigDevice Config)> NamesToTrack { get; private set; } = new();
     public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
     public OptimizerState OptimizerState { get; set; } = new();
     public LocatorState LocatorState { get; } = new();
@@ -194,7 +194,7 @@ public class State
             var anchor = device.Anchor;
             var scenario = new Scenario(Config, new AnchorLocator(anchor.Location, anchor.Floor, anchor.Room, Floors.Values), "Anchored")
             {
-                Confidence = 100
+                Confidence = 1.0
             };
             yield return scenario;
             yield break;
@@ -211,22 +211,19 @@ public class State
         {
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
-                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), $"{floor.Name}/NM");
 
             if (bfgs?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(bfgs?.Floors))
-                    yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this), floor.Name);
+                    yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this), $"{floor.Name}/BFGS");
 
             if (mle?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(mle?.Floors))
-                    yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this), floor.Name);
-
-            if (multiFloor?.Enabled ?? false)
-                yield return new Scenario(Config, new MultiFloorMultilateralizer(device, this), "MultiFloor");
+                    yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this), $"{floor.Name}/MLE");
 
             if (nadarayaWatson?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
-                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this, _nts), floor.Name);
+                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this, _nts), $"{floor.Name}/NW");
 
             if (nearestNode?.Enabled ?? false)
                 yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
@@ -255,14 +252,32 @@ public class State
         {
             if (!string.IsNullOrWhiteSpace(cdById.Name))
                 device.Name = cdById.Name;
+            device.Debug = cdById.Debug;
             return true;
         }
-        if (!string.IsNullOrWhiteSpace(device.Name) && ConfigDeviceByName.TryGetValue(device.Name, out _))
+        if (!string.IsNullOrWhiteSpace(device.Name) && ConfigDeviceByName.TryGetValue(device.Name, out var cdByName))
+        {
+            device.Debug = cdByName.Debug;
             return true;
-        if (!string.IsNullOrWhiteSpace(device.Id) && IdsToTrack.Any(a => a.IsMatch(device.Id)))
-            return true;
-        if (!string.IsNullOrWhiteSpace(device.Name) && NamesToTrack.Any(a => a.IsMatch(device.Name)))
-            return true;
+        }
+        if (!string.IsNullOrWhiteSpace(device.Id))
+        {
+            var match = IdsToTrack.FirstOrDefault(a => a.Glob.IsMatch(device.Id));
+            if (match.Config != null)
+            {
+                device.Debug = match.Config.Debug;
+                return true;
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(device.Name))
+        {
+            var match = NamesToTrack.FirstOrDefault(a => a.Glob.IsMatch(device.Name));
+            if (match.Config != null)
+            {
+                device.Debug = match.Config.Debug;
+                return true;
+            }
+        }
         return false;
     }
 
