@@ -88,7 +88,7 @@
 
 	async function fetchAutoOptimizationState() {
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'));
+			const response = await fetch(resolve('/api/state/calibration/autoOptimize'));
 			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 			const data = await response.json();
 			autoOptimization = !!data.autoOptimize;
@@ -109,7 +109,7 @@
 		const desiredState = autoOptimization;
 
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'), {
+			const response = await fetch(resolve('/api/state/calibration/autoOptimize'), {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
