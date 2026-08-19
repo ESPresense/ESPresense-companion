@@ -309,6 +309,7 @@ public class MqttCoordinator : IMqttCoordinator
 
     private async Task ReconnectLoopAsync(IMqttClient client)
     {
+        var reconnectDelay = TimeSpan.FromSeconds(1);
         while (!_reconnectRequired)
         {
             if (!ReferenceEquals(_mqttClient, client))
@@ -348,17 +349,21 @@ public class MqttCoordinator : IMqttCoordinator
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "MQTT reconnect attempt failed, retrying in 30 seconds");
+                _logger.LogWarning(ex, "MQTT reconnect attempt failed, retrying in {ReconnectDelay:0.#} seconds", reconnectDelay.TotalSeconds);
             }
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+                // Exponential backoff with ±20% jitter to avoid synchronized reconnect storms
+                var jitter = 0.8 + (Random.Shared.NextDouble() * 0.4);
+                await Task.Delay(TimeSpan.FromMilliseconds(reconnectDelay.TotalMilliseconds * jitter)).ConfigureAwait(false);
             }
             catch (TaskCanceledException)
             {
                 return;
             }
+
+            reconnectDelay = TimeSpan.FromSeconds(Math.Min(reconnectDelay.TotalSeconds * 2, 30));
         }
     }
 
