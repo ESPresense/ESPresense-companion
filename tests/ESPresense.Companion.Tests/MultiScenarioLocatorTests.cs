@@ -52,7 +52,7 @@ public class MultiScenarioLocatorTests
         };
         device.Scenarios.Add(scenario);
 
-        mqttMock.Setup(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", false))
+        mqttMock.Setup(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", true))
                 .ReturnsAsync(true)
                 .Verifiable();
 
@@ -92,7 +92,7 @@ public class MultiScenarioLocatorTests
         device.SetAnchor(new DeviceAnchor(anchorLocation, null, null));
         state.Devices[device.Id] = device;
 
-        mqttMock.Setup(m => m.EnqueueAsync($"espresense/companion/{device.Id}", "not_home", false))
+        mqttMock.Setup(m => m.EnqueueAsync($"espresense/companion/{device.Id}", "not_home", true))
             .Returns(Task.CompletedTask)
             .Verifiable();
 
