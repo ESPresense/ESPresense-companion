@@ -8,6 +8,23 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
+      - name: Wait for the release image to be published
+        # Docker Release builds on the tag push, which races this workflow's
+        # release:published trigger. hassio-addons smoke-tests by pulling the
+        # image, so don't notify anyone until the tag actually exists.
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for i in $(seq 1 60); do
+            if curl -sf "https://hub.docker.com/v2/repositories/espresense/espresense-companion/tags/$TAG" >/dev/null; then
+              echo "espresense/espresense-companion:$TAG is published"
+              exit 0
+            fi
+            echo "waiting for espresense/espresense-companion:$TAG ($i/60)"
+            sleep 15
+          done
+          echo "timed out waiting for espresense/espresense-companion:$TAG" >&2
+          exit 1
+
       - name: Repository Dispatch to ESPresense.com
         uses: peter-evans/repository-dispatch@v4
         with:
