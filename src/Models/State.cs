@@ -22,6 +22,9 @@ public class State
     /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
     /// selects the locators' weighting strategy, and marks existing Devices for checking.
     /// </remarks>
+    // ponytail: device ids/names are matched case-insensitively everywhere else (all the dictionaries are OrdinalIgnoreCase), globs must agree
+    private static readonly GlobOptions GlobOpts = new() { Evaluation = { CaseInsensitive = true } };
+
     public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
         _nts = nts;
@@ -36,7 +39,7 @@ public class State
             foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
                 if (!string.IsNullOrWhiteSpace(d.Id))
                 {
-                    var glob = Glob.Parse(d.Id);
+                    var glob = Glob.Parse(d.Id, GlobOpts);
                     if (glob.Tokens.All(a => a is LiteralToken))
                         configDeviceById.GetOrAdd(d.Id, a => d);
                     else
@@ -48,7 +51,7 @@ public class State
             foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
                 if (!string.IsNullOrWhiteSpace(d.Name))
                 {
-                    var glob = Glob.Parse(d.Name);
+                    var glob = Glob.Parse(d.Name, GlobOpts);
                     if (glob.Tokens.All(a => a is LiteralToken))
                         configDeviceByName.GetOrAdd(d.Name, a => d);
                     else
@@ -269,8 +272,8 @@ public class State
     private bool IsExcluded(Device device)
     {
         return Config?.ExcludeDevices.Any(d =>
-            (!string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(device.Id) && Glob.Parse(d.Id).IsMatch(device.Id)) ||
-            (!string.IsNullOrWhiteSpace(d.Name) && !string.IsNullOrWhiteSpace(device.Name) && Glob.Parse(d.Name).IsMatch(device.Name))
+            (!string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(device.Id) && Glob.Parse(d.Id, GlobOpts).IsMatch(device.Id)) ||
+            (!string.IsNullOrWhiteSpace(d.Name) && !string.IsNullOrWhiteSpace(device.Name) && Glob.Parse(d.Name, GlobOpts).IsMatch(device.Name))
         ) ?? false;
     }
 }
