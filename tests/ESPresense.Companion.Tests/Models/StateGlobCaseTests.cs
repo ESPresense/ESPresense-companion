@@ -18,8 +18,10 @@ public class StateGlobCaseTests
         await File.WriteAllTextAsync(Path.Combine(_configDir, "config.yaml"), """
             devices:
               - id: "iBeacon:*"
+              - name: "Phone *"
             exclude_devices:
               - id: "iBeacon:BBBB*"
+              - name: "Phone GUEST*"
             """);
 
         _configLoader = new ConfigLoader(_configDir);
@@ -42,9 +44,20 @@ public class StateGlobCaseTests
     [TestCase("iBeacon:bbbb-1", false)]  // exclude glob must match regardless of case
     [TestCase("IBEACON:BBBB-1", false)]
     [TestCase("other:1", false)]
-    public void ShouldTrack_GlobsAreCaseInsensitive(string id, bool expected)
+    public void ShouldTrack_IdGlobsAreCaseInsensitive(string id, bool expected)
     {
         var device = new Device(id, null, TimeSpan.FromSeconds(30));
+        Assert.That(_state.ShouldTrack(device), Is.EqualTo(expected));
+    }
+
+    [TestCase("Phone Bob", true)]
+    [TestCase("phone bob", true)]        // include glob must match regardless of case
+    [TestCase("Phone guest 1", false)]   // exclude glob must match regardless of case
+    [TestCase("PHONE GUEST 1", false)]
+    [TestCase("Tablet Bob", false)]
+    public void ShouldTrack_NameGlobsAreCaseInsensitive(string name, bool expected)
+    {
+        var device = new Device("xyz:1", null, TimeSpan.FromSeconds(30)) { Name = name };
         Assert.That(_state.ShouldTrack(device), Is.EqualTo(expected));
     }
 }
