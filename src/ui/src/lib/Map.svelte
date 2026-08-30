@@ -14,6 +14,9 @@
 	import AxisY from './AxisY.svelte';
 	import MapCoordinates from './MapCoordinates.svelte';
 	import CalibrationSpot from './CalibrationSpot.svelte';
+	import Tomography from './Tomography.svelte';
+	import { onDestroy } from 'svelte';
+	import type { TomographyResult, TomographyFloor } from '$lib/types';
 
 	let svg: Element;
 	let transform = zoomIdentity;
@@ -24,7 +27,34 @@
 	export let exclusive: boolean = false;
 	export let calibrate: boolean = false;
 	export let calibrationSpot: { x: number; y: number } | null = null;
+	export let showTomography: boolean = false;
 	export let onselected: ((item: Device | Node) => void) | undefined = undefined;
+
+	let tomography: TomographyResult | null = null;
+	let tomoTimer: ReturnType<typeof setInterval> | null = null;
+
+	async function fetchTomography() {
+		try {
+			const r = await fetch('/api/tomography');
+			if (r.ok) tomography = await r.json();
+		} catch {
+			/* transient; keep last */
+		}
+	}
+
+	$: if (showTomography && !tomoTimer) {
+		fetchTomography();
+		tomoTimer = setInterval(fetchTomography, 15000);
+	}
+	$: if (!showTomography && tomoTimer) {
+		clearInterval(tomoTimer);
+		tomoTimer = null;
+	}
+	onDestroy(() => {
+		if (tomoTimer) clearInterval(tomoTimer);
+	});
+
+	$: tomoFloor = (showTomography && tomography?.floors?.find((f) => f.floorId === floorId)) || null;
 
 	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
 	$: bounds = floor?.bounds;
@@ -141,6 +171,9 @@
 			<AxisX {transform} />
 			<AxisY {transform} />
 			<Rooms {transform} {floorId} />
+			{#if showTomography}
+				<Tomography {transform} tomo={tomoFloor} />
+			{/if}
 			<Nodes {transform} {floorId} {deviceId} {nodeId} onselected={selectedNode} onhovered={hoveredNode} />
 			<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
 			{#if calibrate && calibrationSpot}
