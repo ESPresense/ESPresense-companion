@@ -93,8 +93,8 @@ importers:
         specifier: ^29.1.1
         version: 29.1.1
       layercake:
-        specifier: ^10.0.1
-        version: 10.0.2(svelte@5.55.7(@typescript-eslint/types@8.65.0))(typescript@5.9.3)
+        specifier: ^10.0.3
+        version: 10.0.3(svelte@5.55.7(@typescript-eslint/types@8.65.0))
       ol:
         specifier: ^10.9.0
         version: 10.9.0
@@ -1810,12 +1810,10 @@ packages:
   known-css-properties@0.37.0:
     resolution: {integrity: sha512-JCDrsP4Z1Sb9JwG0aJ8Eo2r7k4Ou5MwmThS/6lcIe1ICyb7UBJKGRIUUdqc2ASdE/42lgz6zFUnzAIhtXnBVrQ==}
 
-  layercake@10.0.2:
-    resolution: {integrity: sha512-cYtPVA+AL/HbAzsH5xDL9/pbuNuhboGUI9GBtrC1Akjsx4V74rvBmUHZW8lO2ufCDMu+J2CtBRKgO8rkONsYBw==}
-    engines: {node: ^20.17.0 || >=22.9.0}
+  layercake@10.0.3:
+    resolution: {integrity: sha512-9obQ5YDh70s2ovLCSZ/lZKhHy4R9FvWYxdMUiR3TLUBxxEEn3p9cGqfty0wig+bzzXUcpAvfff5pcPkp2keTdw==}
     peerDependencies:
       svelte: '>=5'
-      typescript: ^5.0.2
 
   lerc@3.0.0:
     resolution: {integrity: sha512-Rm4J/WaHhRa93nCN2mwWDZFoRVF18G1f47C+kvQWyHGEZxFpTUi73p7lMVSAndyxGt6lJ2/CFbOcf9ra5p8aww==}
@@ -4311,14 +4309,13 @@ snapshots:
 
   known-css-properties@0.37.0: {}
 
-  layercake@10.0.2(svelte@5.55.7(@typescript-eslint/types@8.65.0))(typescript@5.9.3):
+  layercake@10.0.3(svelte@5.55.7(@typescript-eslint/types@8.65.0)):
     dependencies:
       d3-array: 3.2.4
       d3-color: 3.1.0
       d3-scale: 4.0.2
       d3-shape: 3.2.0
       svelte: 5.55.7(@typescript-eslint/types@8.65.0)
-      typescript: 5.9.3
 
   lerc@3.0.0: {}
 
