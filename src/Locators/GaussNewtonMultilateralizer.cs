@@ -34,12 +34,12 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         scenario.Minimum = ranges.Min(a => a);
         scenario.Fixes = pos.Length;
 
-        int confidence = scenario.Confidence ?? 0;
+        double confidence = scenario.Confidence ?? 0.0;
         try
         {
             if (pos.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
             {
-                confidence = 1;
+                confidence = 0.01;
                 scenario.UpdateLocation(guess);
             }
             else
@@ -63,7 +63,7 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         catch (MaximumIterationsException)
         {
             scenario.ReasonForExit = ExitCondition.ExceedIterations;
-            confidence = 1;
+            confidence = 0.01;
             scenario.UpdateLocation(guess);
         }
         catch (Exception ex)
@@ -72,18 +72,7 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
         }
 
         CalculateAndSetPearsonCorrelation(scenario, nodes);
-
-        // Calculate number of possible nodes for this floor
-        int nodesPossibleOnline = State.Nodes.Values
-            .Count(n => n.Floors?.Contains(Floor) ?? false);
-
-        // Use the centralized confidence calculation
-        confidence = MathUtils.CalculateConfidence(
-            scenario.Error,
-            scenario.PearsonCorrelation,
-            nodes.Length,
-            nodesPossibleOnline
-        );
+        if (confidence < 0.01) confidence = 0.5;
 
         return FinalizeScenario(scenario, confidence);
     }

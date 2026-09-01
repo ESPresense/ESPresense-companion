@@ -254,6 +254,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "id")]
         public string? Id { get; set; }
 
+        [YamlMember(Alias = "debug")]
+        public bool Debug { get; set; }
+
         public string GetId() => Id ?? Name?.ToSnakeCase()?.ToLower() ?? "none";
     }
 
@@ -326,9 +329,15 @@ namespace ESPresense.Models
         public double MaxVelocity { get; set; } = 0.5;
 
         [YamlMember(Alias = "smoothing_weight")]
-        public double SmoothingWeight { get; set; } = 0.7;
+        public double SmoothingWeight { get; set; } = 0.8;
 
         [YamlMember(Alias = "motion_sigma")]
-        public double MotionSigma { get; set; } = 2.0;
+        public double MotionSigma { get; set; } = 1.5;
+
+        [YamlMember(Alias = "confidence_temperature")]
+        public double ConfidenceTemperature { get; set; } = 1.0;
+
+        [YamlMember(Alias = "scenario_hysteresis")]
+        public double ScenarioHysteresis { get; set; } = 0.15;
     }
 }

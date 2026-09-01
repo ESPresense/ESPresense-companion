@@ -110,8 +110,10 @@ filtering:
   max_velocity: 0.5        # Maximum expected velocity in m/s. Used to reject/dampen impossible movements.
 
   # Smoothing Parameters
-  smoothing_weight: 0.7    # Weight given to previous state (0.0-1.0). Higher = more stable/repeatable.
-  motion_sigma: 2.0        # Motion consistency sensitivity. Controls how much distant scenarios are penalized.
+  smoothing_weight: 0.8    # Weight given to previous state (0.0-1.0). Higher = more stable/repeatable.
+  motion_sigma: 1.5        # Motion consistency sensitivity. Controls how much distant scenarios are penalized.
+  confidence_temperature: 1.0  # Softmax temperature for scenario confidence. Lower = more decisive, higher = more uniform.
+  scenario_hysteresis: 0.15    # Probability bonus for the current scenario to prevent flapping. Higher = stickier.
 
 history:
   enabled: false # Enable to log history to db (Beta)

@@ -15,7 +15,7 @@ namespace ESPresense.Companion.Tests;
 
 public class FilteringTests
 {
-    private class StaticLocator(Point3D location, int confidence = 100) : ILocate
+    private class StaticLocator(Point3D location, double confidence = 1.0) : ILocate
     {
         public bool Locate(Scenario scenario)
         {
@@ -68,8 +68,8 @@ public class FilteringTests
         Assert.That(config.Filtering.ProcessNoise, Is.EqualTo(0.01));
         Assert.That(config.Filtering.MeasurementNoise, Is.EqualTo(0.1));
         Assert.That(config.Filtering.MaxVelocity, Is.EqualTo(0.5));
-        Assert.That(config.Filtering.SmoothingWeight, Is.EqualTo(0.7));
-        Assert.That(config.Filtering.MotionSigma, Is.EqualTo(2.0));
+        Assert.That(config.Filtering.SmoothingWeight, Is.EqualTo(0.8));
+        Assert.That(config.Filtering.MotionSigma, Is.EqualTo(1.5));
     }
 
     [Test]

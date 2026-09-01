@@ -14,7 +14,7 @@
 
 	function visible(d: Device) {
 		if (exclusive) return d.id === deviceId;
-		if (d.confidence <= 1 || !d.location) return false;
+		if (d.confidence <= 0.01 || !d.location) return false;
 		if ($showAllFloors) return true;
 		return d.floor?.id === floorId;
 	}

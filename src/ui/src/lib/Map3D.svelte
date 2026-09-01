@@ -44,11 +44,11 @@
 
 	// Device visualization state - different sizes for different confidence levels
 	function getDeviceGeometry(confidence: number): THREE.SphereGeometry {
-		// Scale sphere size based on confidence (0-100%)
+		// Scale sphere size based on confidence (0-1)
 		// Min size: 0.1, Max size: 0.3
 		const baseSize = 0.1;
 		const maxSize = 0.3;
-		const confidenceRatio = Math.max(0, Math.min(100, confidence)) / 100;
+		const confidenceRatio = Math.max(0, Math.min(1, confidence));
 		const radius = baseSize + (maxSize - baseSize) * confidenceRatio;
 
 		return new THREE.SphereGeometry(radius, 16, 12); // Lower poly for smaller spheres
@@ -568,7 +568,7 @@
 		const localTrackingSpheres: THREE.Mesh[] = []; // Rebuild this list each time for pulsing
 
 		devices.forEach((device) => {
-			if (!device.location || (device.confidence || 0) <= 1) return; // Skip if no location or low confidence
+			if (!device.location || (device.confidence || 0) <= 0.01) return; // Skip if no location or low confidence
 
 			currentDeviceIds.add(device.id);
 			const trackName = device.id;
@@ -636,7 +636,7 @@
 	function updateDeviceLabelElement(element: HTMLDivElement, line1: HTMLDivElement, line2: HTMLDivElement, device: Device) {
 		const displayName = device.name || device.id;
 		line1.textContent = displayName.length > 15 ? displayName.substring(0, 14) + '...' : displayName;
-		line2.textContent = `${device.confidence}% (${device.fixes} fixes)`;
+		line2.textContent = `${Math.round(device.confidence * 100)}% (${device.fixes} fixes)`;
 		// Class and margin-top are set once on creation
 	}
 
