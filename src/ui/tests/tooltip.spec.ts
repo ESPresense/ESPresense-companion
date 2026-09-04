@@ -281,4 +281,38 @@ test.describe('Tooltip', () => {
 		expect(tooltipText).toContain('Measured 3.0');
 		expect(tooltipText).toContain('Error 2.0');
 	});
+
+	test('renders calibration + tooltips without crypto.randomUUID (#1664)', async ({ page }) => {
+		const calibrationData = {
+			matrix: { 'Node A': { 'Node B': { distance: 5.0, rssi: -70, mapDistance: 4.5, diff: 0.5, percent: 0.111 } } },
+			rmse: 0.123,
+			r: 0.95
+		};
+
+		// Older HA WebViews / insecure contexts have no crypto.randomUUID
+		await page.addInitScript(() => {
+			// randomUUID lives on Crypto.prototype and is secure-context-gated
+			delete (Crypto.prototype as unknown as Record<string, unknown>).randomUUID;
+		});
+
+		await mockApi(page, { stubWebSocket: true });
+
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(calibrationData) });
+		});
+
+		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ autoOptimize: false }) });
+		});
+
+		const errors: string[] = [];
+		page.on('pageerror', (e) => errors.push(e.message));
+
+		await page.goto('/calibration');
+		await page.waitForSelector('table');
+
+		await page.locator('table tbody td').filter({ hasText: '11%' }).hover();
+		await expect(page.locator('[role="tooltip"]')).toBeVisible();
+		expect(errors).toEqual([]);
+	});
 });
