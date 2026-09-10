@@ -87,8 +87,8 @@ importers:
         specifier: ^3.23.0
         version: 3.23.0(eslint@10.8.0(jiti@2.7.0))(svelte@5.55.7(@typescript-eslint/types@8.65.0))
       globals:
-        specifier: ^17.8.0
-        version: 17.8.0
+        specifier: ^17.12.0
+        version: 17.12.0
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
@@ -1724,8 +1724,8 @@ packages:
     resolution: {integrity: sha512-c/c15i26VrJ4IRt5Z89DnIzCGDn9EcebibhAOjw5ibqEHsE1wLUgkPn9RDmNcUKyU87GeaL633nyJ+pplFR2ZQ==}
     engines: {node: '>=18'}
 
-  globals@17.8.0:
-    resolution: {integrity: sha512-Zz/LMDZScFmkakeL2cTHzf+PbWKdpU3uclqkZT7TjDG58j5WPt0PpA+n9uPI24fZtlw07q0OtEi84K+umsRzqQ==}
+  globals@17.12.0:
+    resolution: {integrity: sha512-cezEd/DTyyht9cvSSURyygXPfy04GtWO/5e6ZPvH7fCtjKz9PYOmuawphw1Ctd1f6C+5JypXfGD7ahNMXvevBA==}
     engines: {node: '>=18'}
 
   graceful-fs@4.2.11:
@@ -4069,7 +4069,7 @@ snapshots:
   eslint-plugin-playwright@2.11.0(eslint@10.8.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.8.0(jiti@2.7.0)
-      globals: 17.8.0
+      globals: 17.12.0
 
   eslint-plugin-svelte@3.23.0(eslint@10.8.0(jiti@2.7.0))(svelte@5.55.7(@typescript-eslint/types@8.65.0)):
     dependencies:
@@ -4239,7 +4239,7 @@ snapshots:
 
   globals@16.5.0: {}
 
-  globals@17.8.0: {}
+  globals@17.12.0: {}
 
   graceful-fs@4.2.11: {}
 
