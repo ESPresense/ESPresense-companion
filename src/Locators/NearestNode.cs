@@ -31,7 +31,7 @@ internal class NearestNode : ILocate
 
         // Very low confidence - this is a fallback locator
         // Other locators with trilateration will have much higher confidence
-        scenario.Confidence = 1;
+        scenario.Confidence = 0.01;
         scenario.Fixes = 1;
 
         // Find the floor containing the node's location; fall back to first configured floor
