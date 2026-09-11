@@ -30,6 +30,25 @@ export interface Floor {
 	rooms: Room[];
 }
 
+export interface TomographyFloor {
+	floorId: string;
+	floorName: string;
+	minX: number;
+	minY: number;
+	cellSize: number;
+	cols: number;
+	rows: number;
+	attenuation: number[];
+	coverage: number[];
+	links: number;
+	maxAttenuation: number;
+}
+
+export interface TomographyResult {
+	updated: string;
+	floors: TomographyFloor[];
+}
+
 export interface Node {
 	telemetry: {
 		version: string;
