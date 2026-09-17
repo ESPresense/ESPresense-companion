@@ -158,6 +158,8 @@ internal class OptimizationRunner : BackgroundService
                             Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
                                 id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
 
+                            WarnIfRailed(id, result, optimization);
+
                             var nodeSettings = _nsd.Get(id);
                             if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
                             if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
@@ -182,5 +184,35 @@ internal class OptimizationRunner : BackgroundService
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
+    }
+
+    // A value that converges exactly onto a configured min/max bound means the optimizer
+    // wanted to go further but was clamped — the calibration is being artificially pinned
+    // (the "all nodes stuck at the same absorption" degeneracy). Surface it so users know to
+    // widen the relevant limit rather than silently trusting a railed value.
+    private static void WarnIfRailed(string id, ProposedValues result, ConfigOptimization optimization)
+    {
+        const double eps = 1e-3;
+        var railed = new List<string>();
+
+        if (AtBound(result.Absorption, optimization.AbsorptionMin, optimization.AbsorptionMax, eps, out var absEdge))
+            railed.Add($"Absorption={result.Absorption:0.00} ({absEdge} {(absEdge == "min" ? optimization.AbsorptionMin : optimization.AbsorptionMax):0.0})");
+        if (AtBound(result.RxAdjRssi, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax, eps, out var rxEdge))
+            railed.Add($"RxAdjRssi={result.RxAdjRssi:0} ({rxEdge} {(rxEdge == "min" ? optimization.RxAdjRssiMin : optimization.RxAdjRssiMax):0})");
+        if (AtBound(result.TxRefRssi, optimization.TxRefRssiMin, optimization.TxRefRssiMax, eps, out var txEdge))
+            railed.Add($"TxRefRssi={result.TxRefRssi:0} ({txEdge} {(txEdge == "min" ? optimization.TxRefRssiMin : optimization.TxRefRssiMax):0})");
+
+        if (railed.Count > 0)
+            Log.Warning("Node {0} railed to optimization bound(s): {1}. A clamped value is not a true fit — review the limit or the node (note: a wider absorption range does not necessarily improve positioning).",
+                id, string.Join(", ", railed));
+    }
+
+    private static bool AtBound(double? value, double min, double max, double eps, out string edge)
+    {
+        edge = string.Empty;
+        if (value == null) return false;
+        if (value.Value <= min + eps) { edge = "min"; return true; }
+        if (value.Value >= max - eps) { edge = "max"; return true; }
+        return false;
     }
 }
