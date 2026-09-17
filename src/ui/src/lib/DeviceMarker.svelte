@@ -41,7 +41,7 @@
 	}
 </script>
 
-{#if visible && d.confidence > 1 && d.location}
+{#if visible && d.confidence > 0.01 && d.location}
 	<g in:fade={{ duration: 1000 }} out:fade={{ duration: 1000 }}>
 		{#if d.isAnchored ?? false}
 			<path role="none" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" transform="translate({$xScale($x) - 12}, {$yScale($y) - 24})" fill={$c} stroke={d.id == hovered ? 'black' : 'white'} stroke-width={$s} onmouseover={() => hover(d)} onfocus={() => select(d)} onmouseout={() => hover(null)} onblur={() => unselect()} />
