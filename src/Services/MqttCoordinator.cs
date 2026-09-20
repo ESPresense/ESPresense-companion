@@ -227,15 +227,34 @@ public class MqttCoordinator : IMqttCoordinator
             return Task.CompletedTask;
         };
 
-        var mqttClientOptions = new MqttClientOptionsBuilder()
+        var optionsBuilder = new MqttClientOptionsBuilder()
             .WithConfig(config)
             .WithClientId(config.ClientId)
             .WithWillTopic("espresense/companion/status")
             .WithWillRetain()
             .WithWillPayload("offline")
             .WithCleanSession()
-            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-            .Build();
+            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30));
+
+        if (config.Ssl == true)
+        {
+            optionsBuilder.WithTlsOptions(o =>
+            {
+                o.UseTls();
+
+                if (!string.IsNullOrEmpty(config.CaCertPath) && System.IO.File.Exists(config.CaCertPath))
+                {
+                    o.WithClientCertificates(new[] { new System.Security.Cryptography.X509Certificates.X509Certificate2(config.CaCertPath) });
+                }
+
+                if (config.Insecure == true)
+                {
+                    o.WithCertificateValidationHandler(c => true);
+                }
+            });
+        }
+
+        var mqttClientOptions = optionsBuilder.Build();
 
         _logger.LogInformation("Connecting to MQTT at {Host}{Port} as {User}",
             config.Host,
