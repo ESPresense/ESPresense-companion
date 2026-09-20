@@ -3,6 +3,8 @@ mqtt:
   host:
   port: 1883
   ssl: false
+  insecure: true
+  ca_cert_path: "/path_to_CA-Cert.crt"
   username:
   password:
   discovery_topic: homeassistant  # Home Assistant MQTT discovery topic prefix (default: homeassistant)
