@@ -241,3 +241,6 @@ test-results
 
 # Oh My ClaudeCode
 .omc/
+
+# Playwright CLI
+.playwright-cli/
