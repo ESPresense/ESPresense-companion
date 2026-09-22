@@ -30,7 +30,7 @@ public abstract class BaseMultilateralizer : ILocate
     /// <returns>True if there are enough nodes to proceed with localization</returns>
     protected bool InitializeScenario(Scenario scenario, out DeviceToNode[] nodes, out Point3D guess)
     {
-        var confidence = scenario.Confidence ?? 0;
+        var confidence = scenario.Confidence ?? 0.0;
 
         nodes = Device.Nodes.Values
             .Where(a => a.Current && (a.Node?.Floors?.Contains(Floor) ?? false))
@@ -52,7 +52,7 @@ public abstract class BaseMultilateralizer : ILocate
 
         scenario.Floor = Floor;
 
-        guess = confidence < 5
+        guess = confidence < 0.05
             ? Point3D.MidPoint(pos[0], pos[1])
             : scenario.Location;
 
@@ -65,7 +65,7 @@ public abstract class BaseMultilateralizer : ILocate
     protected void ResetScenario(Scenario scenario)
     {
         scenario.Room = null;
-        scenario.Confidence = 0;
+        scenario.Confidence = 0.0;
         scenario.Error = null;
         scenario.Floor = null;
     }
@@ -95,10 +95,12 @@ public abstract class BaseMultilateralizer : ILocate
             var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
             var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
             scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
+            scenario.Rmse = MathUtils.CalculateRMSE(calculatedDistances, measuredDistances);
         }
         else
         {
             scenario.PearsonCorrelation = null;
+            scenario.Rmse = null;
         }
     }
 
@@ -115,7 +117,7 @@ public abstract class BaseMultilateralizer : ILocate
     /// Performs final validation and room assignment
     /// </summary>
     /// <returns>True if scenario has moved and is valid</returns>
-    protected bool FinalizeScenario(Scenario scenario, int confidence)
+    protected bool FinalizeScenario(Scenario scenario, double confidence)
     {
         scenario.Confidence = confidence;
 

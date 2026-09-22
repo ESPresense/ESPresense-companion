@@ -28,12 +28,12 @@ public class BfgsMultilateralizer : BaseMultilateralizer
         if (!InitializeScenario(scenario, out var nodes, out var guess))
             return false;
 
-        int confidence = scenario.Confidence ?? 0;
+        double confidence = scenario.Confidence ?? 0.0;
         try
         {
             if (nodes.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
             {
-                confidence = 1;
+                confidence = 0.01;
                 scenario.UpdateLocation(guess);
             }
             else
@@ -94,18 +94,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                 scenario.ReasonForExit = result.ReasonForExit;
 
                 CalculateAndSetPearsonCorrelation(scenario, nodes);
-
-                // Calculate number of possible nodes for this floor
-                int nodesPossibleOnline = State.Nodes.Values
-                    .Count(n => n.Floors?.Contains(Floor) ?? false);
-
-                // Use the centralized confidence calculation
-                confidence = MathUtils.CalculateConfidence(
-                    scenario.Error,
-                    scenario.PearsonCorrelation,
-                    nodes.Length,
-                    nodesPossibleOnline
-                );
+                confidence = 0.5;
             }
         }
         catch (Exception ex)
