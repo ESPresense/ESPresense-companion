@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isEditableTarget } from './dom';
 	import { LayerCake, Svg } from 'layercake';
 	import { config } from '$lib/stores';
 	import { scaleOrdinal, schemeCategory10 } from 'd3';
@@ -71,6 +72,7 @@
 	}
 
 	function handleKeyboard(event: KeyboardEvent) {
+		if (isEditableTarget(event.target)) return;
 		const zoomFactor = event.shiftKey ? 1.005 : 1.1;
 		const translateAmount = event.shiftKey ? 1 : 50;
 		let newTransform = transform;

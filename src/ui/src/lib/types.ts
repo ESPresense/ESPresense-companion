@@ -242,13 +242,15 @@ export function isNode(d: Device | Node | null): d is Node {
 	return (d as Node)?.telemetry !== undefined;
 }
 
+/** Matches the backend DeviceHistory row (flat coordinates, one row per scenario). */
 export interface DeviceHistory {
 	id: string;
 	when: string;
-	location: { x: number; y: number; z: number };
-	confidence?: number;
-	fixes?: number;
-	scale?: number;
-	room?: string;
-	floor?: string;
+	x: number | null;
+	y: number | null;
+	z: number | null;
+	confidence: number;
+	fixes: number;
+	scenario: string | null;
+	best: boolean;
 }
