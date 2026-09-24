@@ -297,7 +297,7 @@ public class StateController : ControllerBase
                         {
                             switch (command.Command?.ToLower())
                             {
-                                case "changeFilter":
+                                case "changefilter":
                                     if (command.Type == "showAll")
                                         showAll = command.Value == "true";
                                     break;

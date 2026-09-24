@@ -111,11 +111,7 @@
 		if (positionDebounce) clearTimeout(positionDebounce);
 		if (deviceSettings?.id) {
 			wsManager.unsubscribeFromEvent('deviceMessage', handleDeviceMessage);
-			wsManager.sendMessage({
-				command: 'unsubscribe',
-				type: 'deviceMessage',
-				deviceId: deviceSettings.id
-			});
+			wsManager.unsubscribeDeviceMessage(deviceSettings.id);
 			deviceMessages = {};
 		}
 	});

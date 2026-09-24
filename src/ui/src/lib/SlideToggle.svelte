@@ -4,14 +4,16 @@
 		checked: boolean;
 		disabled?: boolean;
 		size?: 'sm' | 'md' | 'lg';
+		onchange?: (checked: boolean) => void;
 		children?: any;
 	}
 
-	let { name, checked = $bindable(), disabled = false, size = 'md', children }: Props = $props();
+	let { name, checked = $bindable(), disabled = false, size = 'md', onchange, children }: Props = $props();
 
 	function toggle() {
 		if (!disabled) {
 			checked = !checked;
+			onchange?.(checked);
 		}
 	}
 

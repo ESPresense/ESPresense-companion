@@ -13,9 +13,11 @@ export const relativeTimer = function () {
 	const { subscribe, set: setStore } = writable(0);
 
 	function start() {
+		// Drives "time since last hit" animations; 100ms is plenty and avoids
+		// re-rendering every marker several hundred times a second.
 		interval = setInterval(() => {
 			setStore(Date.now() - startTime);
-		}, 1);
+		}, 100);
 	}
 
 	function set(basis: number) {
@@ -134,17 +136,23 @@ export const devices = readable<Device[]>([], function start(set) {
 	};
 	wsManager.subscribeToEvent('time', timeCallback);
 
-	// Subscribe to showAll changes and trigger immediate poll when it changes
-	const unsubscribeShowUntracked = showAll.subscribe((value) => {
+	function sendFilter() {
 		wsManager.sendMessage({
 			command: 'changeFilter',
 			type: 'showAll',
-			value: '' + value
+			value: '' + get(showAll)
 		});
+	}
 
+	// Subscribe to showAll changes and trigger immediate poll when it changes
+	const unsubscribeShowUntracked = showAll.subscribe(() => {
+		sendFilter();
 		// Force an immediate poll when showAll changes
 		fetchDevices();
 	});
+
+	// The server-side filter is per-connection, so it must be re-sent after a reconnect
+	const unsubscribeOpen = wsManager.onOpen(sendFilter);
 
 	return () => {
 		clearInterval(pollTimer);
@@ -153,6 +161,7 @@ export const devices = readable<Device[]>([], function start(set) {
 		wsManager.unsubscribeFromEvent('configChanged', configChangedCallback);
 		wsManager.unsubscribeFromEvent('time', timeCallback);
 		unsubscribeShowUntracked();
+		unsubscribeOpen();
 	};
 });
 
@@ -185,10 +194,19 @@ export const nodes = readable<Node[]>([], function start(set) {
 
 // Calibration polling store
 export const calibration = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
+	let outstanding = false;
 	async function fetchAndSet() {
-		const response = await fetch(resolve(`/api/state/calibration`));
-		const data = await response.json();
-		set(data);
+		if (outstanding) return;
+		outstanding = true;
+		try {
+			const response = await fetch(resolve(`/api/state/calibration`));
+			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+			set(await response.json());
+		} catch (error) {
+			console.error('Error fetching calibration:', error);
+		} finally {
+			outstanding = false;
+		}
 	}
 	fetchAndSet();
 	const interval = setInterval(fetchAndSet, 1000);

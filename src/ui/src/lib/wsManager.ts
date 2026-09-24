@@ -6,7 +6,8 @@ type EventCallback<T = any> = (data: T) => void;
 interface Listeners {
 	deviceChanged: Set<EventCallback>;
 	deviceRemoved: Set<EventCallback>;
-	nodeChanged: Set<EventCallback>;
+	nodeStateChanged: Set<EventCallback>;
+	calibrationChanged: Set<EventCallback>;
 	deviceMessage: Set<EventCallback>;
 	configChanged: Set<EventCallback>;
 	time: Set<EventCallback>;
@@ -17,6 +18,8 @@ export class WSManager {
 	private listeners: Listeners;
 	private socket: WebSocket | null = null;
 	private pendingSubscriptions: Set<string> = new Set();
+	private activeSubscriptions: Set<string> = new Set();
+	private openListeners: Set<() => void> = new Set();
 	private reconnectAttempts: number = 0;
 	private reconnectTimer: number | null = null;
 	private readonly baseReconnectDelayMs: number = 1000; // 1 second
@@ -26,7 +29,8 @@ export class WSManager {
 		this.listeners = {
 			deviceChanged: new Set(),
 			deviceRemoved: new Set(),
-			nodeChanged: new Set(),
+			nodeStateChanged: new Set(),
+			calibrationChanged: new Set(),
 			deviceMessage: new Set(),
 			configChanged: new Set(),
 			time: new Set(),
@@ -72,17 +76,13 @@ export class WSManager {
 			// Reset reconnection attempts on successful connection
 			this.reconnectAttempts = 0;
 
-			// Flush any pending device message subscriptions
-			this.pendingSubscriptions.forEach((deviceId) => {
-				this.socket!.send(
-					JSON.stringify({
-						command: 'subscribe',
-						type: 'deviceMessage',
-						value: deviceId
-					})
-				);
-			});
+			// (Re)send device message subscriptions: pending ones plus any that were
+			// active before a reconnect, otherwise the feed silently stops after a drop.
+			const toSend = new Set([...this.activeSubscriptions, ...this.pendingSubscriptions]);
+			toSend.forEach((deviceId) => this.sendSubscription('subscribe', deviceId));
 			this.pendingSubscriptions.clear();
+
+			this.openListeners.forEach((cb) => cb());
 		});
 
 		this.socket.addEventListener('message', (event: MessageEvent) => {
@@ -99,8 +99,11 @@ export class WSManager {
 				case 'deviceChanged':
 					this.listeners.deviceChanged.forEach((cb) => cb(eventData.data));
 					break;
-				case 'nodeChanged':
-					this.listeners.nodeChanged.forEach((cb) => cb(eventData.data));
+				case 'nodeStateChanged':
+					this.listeners.nodeStateChanged.forEach((cb) => cb(eventData.data));
+					break;
+				case 'calibrationChanged':
+					this.listeners.calibrationChanged.forEach((cb) => cb(eventData.data));
 					break;
 				case 'deviceMessage':
 					this.listeners.deviceMessage.forEach((cb) => cb(eventData));
@@ -158,18 +161,31 @@ export class WSManager {
 		}
 	}
 
+	private sendSubscription(command: 'subscribe' | 'unsubscribe', deviceId: string) {
+		this.socket?.send(JSON.stringify({ command, type: 'deviceMessage', value: deviceId }));
+	}
+
 	public subscribeDeviceMessage(deviceId: string) {
+		this.activeSubscriptions.add(deviceId);
 		if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-			this.socket.send(
-				JSON.stringify({
-					command: 'subscribe',
-					type: 'deviceMessage',
-					value: deviceId
-				})
-			);
+			this.sendSubscription('subscribe', deviceId);
 		} else {
 			this.pendingSubscriptions.add(deviceId);
 		}
+	}
+
+	public unsubscribeDeviceMessage(deviceId: string) {
+		this.activeSubscriptions.delete(deviceId);
+		this.pendingSubscriptions.delete(deviceId);
+		if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+			this.sendSubscription('unsubscribe', deviceId);
+		}
+	}
+
+	/** Registers a callback invoked every time the socket (re)connects. Returns an unsubscribe function. */
+	public onOpen(callback: () => void): () => void {
+		this.openListeners.add(callback);
+		return () => this.openListeners.delete(callback);
 	}
 
 	public sendMessage(message: any) {

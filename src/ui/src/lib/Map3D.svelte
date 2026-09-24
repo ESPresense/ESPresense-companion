@@ -115,7 +115,8 @@
 		if (!measuredSpheresGroup) {
 			measuredSpheresGroup = new THREE.Group();
 			measuredSpheresGroup.name = 'MeasuredSpheres';
-			scene?.add(measuredSpheresGroup);
+			// Nodes live in contentGroup (centered + rotated); the spheres must too.
+			contentGroup?.add(measuredSpheresGroup);
 		}
 
 		// Clear existing spheres
@@ -583,8 +584,10 @@
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
 				// Update material to match room color
 				sphere.material = material;
-				// Update geometry to reflect confidence change
+				// Update geometry to reflect confidence change (dispose the old one to avoid a GPU leak)
+				const oldGeometry = sphere.geometry;
 				sphere.geometry = geometry;
+				oldGeometry.dispose();
 			} else {
 				// Create new sphere
 				sphere = new THREE.Mesh(geometry, material);
@@ -659,7 +662,10 @@
 		cleanupHistoryPath(); // Clear previous path
 		if (!contentGroup || history.length < 2) return;
 
-		const points = history.filter((h) => h.location).map((h) => new THREE.Vector3(h.location.x, h.location.y, h.location.z));
+		// The backend writes one row per scenario; draw the path of the winning scenario only.
+		const best = history.filter((h) => h.best);
+		const rows = best.length > 1 ? best : history;
+		const points = rows.filter((h) => h.x != null && h.y != null && h.z != null).map((h) => new THREE.Vector3(h.x!, h.y!, h.z!));
 
 		if (points.length > 1) {
 			const geometry = new THREE.BufferGeometry().setFromPoints(points);

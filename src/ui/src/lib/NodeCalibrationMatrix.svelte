@@ -103,10 +103,9 @@
 		}
 	}
 
-	async function toggleAutoOptimization() {
+	async function toggleAutoOptimization(desiredState: boolean) {
 		if (!autoOptimizationLoaded || autoOptimizationBusy) return;
 		autoOptimizationBusy = true;
-		const desiredState = autoOptimization;
 
 		try {
 			const response = await fetch(resolve('/api/state/calibration/auto-optimize'), {
@@ -216,7 +215,7 @@
 								name="auto-optimization"
 								bind:checked={autoOptimization}
 								disabled={!autoOptimizationLoaded || autoOptimizationBusy}
-								on:click={toggleAutoOptimization}
+								onchange={toggleAutoOptimization}
 							>
 								Auto Optimization
 							</SlideToggle>
