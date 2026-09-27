@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
-	import { resolve } from '$app/paths';
+	import { apiFetch, apiUrl } from '$lib/api';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
@@ -88,9 +88,7 @@
 
 	async function fetchAutoOptimizationState() {
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'));
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-			const data = await response.json();
+			const data = await apiFetch<{ autoOptimize: boolean }>('/api/state/calibration/auto-optimize');
 			autoOptimization = !!data.autoOptimize;
 		} catch (error) {
 			console.error('Error fetching auto-optimization state:', error);
@@ -108,7 +106,7 @@
 		autoOptimizationBusy = true;
 
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'), {
+			const data = await apiFetch<{ autoOptimize: boolean }>('/api/state/calibration/auto-optimize', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -116,8 +114,6 @@
 				body: JSON.stringify(desiredState)
 			});
 
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-			const data = await response.json();
 			autoOptimization = !!data.autoOptimize;
 		} catch (error) {
 			console.error('Error toggling auto-optimization:', error);
@@ -140,7 +136,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch(resolve('/api/state/calibration/reset'), { method: 'POST' });
+			const response = await fetch(apiUrl('/api/state/calibration/reset'), { method: 'POST' });
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',

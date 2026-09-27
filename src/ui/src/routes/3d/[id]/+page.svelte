@@ -1,17 +1,19 @@
 <script lang="ts">
 	// Page to display the 3D map for a SINGLE device and its history
 	import { onMount, onDestroy } from 'svelte';
+	// `$app/stores` is deprecated, but `$app/state` is not reactive under legacy `$:`/`derived()`;
+	// this page is converted to runes in Phase 4.
 	import { page } from '$app/stores'; // To get route params
 	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 	import { devices, nodes, config } from '$lib/stores';
 	import Map3D from '$lib/Map3D.svelte';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
-	import { apiUrl } from '$lib/api';
+	import { apiFetch } from '$lib/api';
 	import { derived } from 'svelte/store';
 
 	// --- Route Param ---
 	let deviceId: string | null = null;
-	$: deviceId = $page.params.id; // Get device ID from URL
+	$: deviceId = $page.params.id ?? null; // Get device ID from URL
 
 	// --- Data Stores & Derived State ---
 	// Find the specific device based on the route ID
@@ -69,10 +71,7 @@
 
 		try {
 			console.log(`Fetching history for ${deviceId} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
-			const response = await fetch(apiUrl(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`));
-			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-			const data: { history: DeviceHistory[] } = await response.json();
+			const data = await apiFetch<{ history: DeviceHistory[] }>(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
 			deviceHistoryData = data.history || [];
 			console.log(`Fetched ${deviceHistoryData.length} history points.`);
 		} catch (error) {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch } from '$lib/api';
 	import type { DeviceSetting } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { createEventDispatcher } from 'svelte';
@@ -45,15 +45,13 @@
 			}
 
 			const targetId = deviceSetting.originalId ?? deviceSetting.id;
-			const response = await fetch(resolve(`/api/device/${targetId}`), {
+			await apiFetch(`/api/device/${targetId}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify(localSettings)
 			});
-
-			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
 			toastStore.trigger({
 				message: 'Settings saved successfully!',

@@ -1,17 +1,15 @@
-import { readable, writable, derived } from 'svelte/store';
-import { resolve } from '$app/paths';
+import { readable, writable, derived, type Writable } from 'svelte/store';
+import { apiFetch, apiUrl } from '$lib/api';
 import type { FirmwareManifest, Release, WorkflowRun } from '$lib/types';
 
-export const updateMethod: SvelteStore<string> = writable('self');
-export const firmwareSource: SvelteStore<string> = writable('release');
-export const flavor: SvelteStore<string> = writable();
-export const version: SvelteStore<string> = writable();
-export const artifact: SvelteStore<string> = writable();
+export const updateMethod: Writable<string> = writable('self');
+export const firmwareSource: Writable<string> = writable('release');
+export const flavor: Writable<string> = writable();
+export const version: Writable<string> = writable();
+export const artifact: Writable<string> = writable();
 
 export const firmwareTypes = writable<FirmwareManifest | null>(null, function start(set) {
-	fetch(resolve('/api/firmware/types'))
-		.then((r) => r.json())
-		.then((r) => set(r));
+	apiFetch<FirmwareManifest>('/api/firmware/types').then((r) => set(r));
 });
 
 export const cpuNames = derived(firmwareTypes, (a) =>
@@ -142,7 +140,7 @@ export function getLocalFirmwareUrl(firmwareSource: string, version: string, art
 	const url = getFirmwareUrl(firmwareSource, version, artifact, firmware);
 	if (!url) return null;
 
-	const loc = new URL(resolve('/api/firmware/download'), window.location.href);
+	const loc = new URL(apiUrl('/api/firmware/download'), window.location.href);
 
 	const params = new URLSearchParams();
 	params.append('url', url);
@@ -154,7 +152,7 @@ export function getLocalFirmwareUrl(firmwareSource: string, version: string, art
 type Callback = (percentComplete: number, message: string) => void;
 
 export async function firmwareUpdate(id: string, url: string, callback: Callback): Promise<void> {
-	var loc = new URL(resolve(`/ws/firmware/update/${id}`), window.location.href);
+	var loc = new URL(apiUrl(`/ws/firmware/update/${id}`), window.location.href);
 	var wsUrl = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + loc.pathname + `?${new URLSearchParams({ url: url })}`;
 	const ws = new WebSocket(wsUrl);
 
