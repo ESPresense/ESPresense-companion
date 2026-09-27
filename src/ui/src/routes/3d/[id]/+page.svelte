@@ -10,8 +10,7 @@
 	import { derived } from 'svelte/store';
 
 	// --- Route Param ---
-	let deviceId: string | null = null;
-	$: deviceId = $page.params.id; // Get device ID from URL
+	let deviceId = $derived($page.params.id); // Get device ID from URL
 
 	// --- Data Stores & Derived State ---
 	// Find the specific device based on the route ID
@@ -21,12 +20,12 @@
 
 	// --- State for this page ---
 	let guiInstance: GUI | null = null;
-	let historyDurationMinutes: number = 60;
-	let deviceHistoryData: DeviceHistory[] = [];
-	let displayMode: 'current' | 'history' = 'current'; // Control what's shown
-	let showNodes = true; // Separate control for nodes on this page
-	let zRotationSpeed = 0.002; // Separate control for rotation
-	let historyDurationControl: any; // Reference to the GUI control
+	let historyDurationMinutes: number = $state(60);
+	let deviceHistoryData: DeviceHistory[] = $state([]);
+	let displayMode: 'current' | 'history' = $state('current'); // Control what's shown
+	let showNodes = $state(true); // Separate control for nodes on this page
+	let zRotationSpeed = $state(0.002); // Separate control for rotation
+	let historyDurationControl: any = $state(); // Reference to the GUI control
 
 	// Reactive controller for GUI
 	const effectController = {
@@ -47,15 +46,6 @@
 			guiInstance?.destroy();
 		};
 	});
-
-	// Refetch history when relevant parameters change
-	$: if (deviceId && displayMode === 'history') fetchDeviceHistory();
-	$: if (historyDurationMinutes && displayMode === 'history') fetchDeviceHistory();
-
-	// Show/Hide duration control based on mode
-	$: if (historyDurationControl) {
-		historyDurationControl.domElement.style.display = displayMode === 'history' ? '' : 'none';
-	}
 
 	// --- Data Fetching ---
 	async function fetchDeviceHistory() {
@@ -125,6 +115,19 @@
 
 		guiInstance.close();
 	}
+	// Refetch history when relevant parameters change
+	$effect(() => {
+		if (deviceId && displayMode === 'history') fetchDeviceHistory();
+	});
+	$effect(() => {
+		if (historyDurationMinutes && displayMode === 'history') fetchDeviceHistory();
+	});
+	// Show/Hide duration control based on mode
+	$effect(() => {
+		if (historyDurationControl) {
+			historyDurationControl.domElement.style.display = displayMode === 'history' ? '' : 'none';
+		}
+	});
 </script>
 
 <svelte:head>

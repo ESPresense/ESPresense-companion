@@ -4,9 +4,9 @@ import type { FirmwareManifest, Release, WorkflowRun } from '$lib/types';
 
 export const updateMethod: SvelteStore<string> = writable('self');
 export const firmwareSource: SvelteStore<string> = writable('release');
-export const flavor: SvelteStore<string> = writable();
-export const version: SvelteStore<string> = writable();
-export const artifact: SvelteStore<string> = writable();
+export const flavor: SvelteStore<string> = writable('-');
+export const version: SvelteStore<string> = writable('');
+export const artifact: SvelteStore<string> = writable('');
 
 export const firmwareTypes = writable<FirmwareManifest | null>(null, function start(set) {
 	fetch(resolve('/api/firmware/types'))

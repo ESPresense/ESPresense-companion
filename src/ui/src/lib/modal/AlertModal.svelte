@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { modalStore, type ModalSettings } from './modalStore.js';
 
-	export let modal: ModalSettings & { id: string };
+	interface Props {
+		modal: ModalSettings & { id: string };
+	}
+
+	let { modal }: Props = $props();
 
 	function handleConfirm() {
 		if (modal.onConfirm) {

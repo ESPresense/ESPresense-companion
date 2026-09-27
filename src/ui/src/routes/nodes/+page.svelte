@@ -7,10 +7,10 @@
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
 	import { onMount } from 'svelte';
 
-	let autoUpdate: boolean | null;
-	let prerelease: boolean | null;
-	let loading = true;
-	let saving = false;
+	let autoUpdate: boolean | null = $state(null);
+	let prerelease: boolean | null = $state(null);
+	let loading = $state(true);
+	let saving = $state(false);
 	const toastStore = getToastStore();
 
 	async function saveSettings() {

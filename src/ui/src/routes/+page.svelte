@@ -5,7 +5,7 @@
 	import { gotoDetail } from '$lib/urls';
 
 	// Local state, not a prop: SvelteKit route components only receive `data` and `form`.
-	let floorId: string | null = null;
+	let floorId: string | null = $state(null);
 </script>
 
 <svelte:head>

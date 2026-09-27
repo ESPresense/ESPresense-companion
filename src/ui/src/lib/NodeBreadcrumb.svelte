@@ -3,9 +3,13 @@
 	import { config } from '$lib/stores';
 	import type { Node } from '$lib/types';
 
-	export let nodeName: string = 'Unknown Node';
-	export let currentFloorId: string | null = null;
-	export let node: Node | undefined = undefined;
+	interface Props {
+		nodeName?: string;
+		currentFloorId?: string | null;
+		node?: Node | undefined;
+	}
+
+	let { nodeName = 'Unknown Node', currentFloorId = $bindable(null), node = undefined }: Props = $props();
 
 	// Helper function to shorten very long node IDs
 	function getDisplayName(name: string) {
@@ -19,9 +23,9 @@
 	}
 
 	// Get floors that this node is actually on
-	$: nodeFloors = node?.floors || [];
-	$: availableFloors = $config?.floors?.filter((f) => nodeFloors.includes(f.id)) || [];
-	$: showFloorSelection = availableFloors.length > 1;
+	let nodeFloors = $derived(node?.floors || []);
+	let availableFloors = $derived($config?.floors?.filter((f) => nodeFloors.includes(f.id)) || []);
+	let showFloorSelection = $derived(availableFloors.length > 1);
 </script>
 
 <div class="flex flex-col space-y-2 px-4 py-2">

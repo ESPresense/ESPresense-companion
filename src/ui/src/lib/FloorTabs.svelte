@@ -2,8 +2,14 @@
 	import { config, showAllFloors } from '$lib/stores';
 	import SlideToggle from './SlideToggle.svelte';
 
-	export let floorId: string | null = null;
-	$: if (floorId == null) floorId = $config?.floors[0].id;
+	interface Props {
+		floorId?: string | null;
+	}
+
+	let { floorId = $bindable(null) }: Props = $props();
+	$effect(() => {
+		if (floorId == null) floorId = $config?.floors[0].id;
+	});
 </script>
 
 <header>

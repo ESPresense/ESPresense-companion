@@ -6,7 +6,7 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 
-	let locatingStatus = 'Starting';
+	let locatingStatus = $state('Starting');
 
 	onMount(() => {
 		(async () => {

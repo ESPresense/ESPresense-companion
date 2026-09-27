@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { gotoCalibration } from '$lib/urls';
 
-	export let deviceName: string = '';
-	export let showDeviceLevel: boolean = true;
+	interface Props {
+		deviceName?: string;
+		showDeviceLevel?: boolean;
+	}
+
+	let { deviceName = '', showDeviceLevel = true }: Props = $props();
 </script>
 
 <div class="flex items-center space-x-2 text-sm text-surface-600-400 mb-4">
