@@ -664,7 +664,7 @@
 
 		// The backend writes one row per scenario; draw the path of the winning scenario only.
 		const best = history.filter((h) => h.best);
-		const rows = best.length > 1 ? best : history;
+		const rows = best.length > 0 ? best : history;
 		const points = rows.filter((h) => h.x != null && h.y != null && h.z != null).map((h) => new THREE.Vector3(h.x!, h.y!, h.z!));
 
 		if (points.length > 1) {

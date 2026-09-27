@@ -199,7 +199,8 @@ export const calibration = readable<CalibrationResponse>({ matrix: {} }, functio
 		if (outstanding) return;
 		outstanding = true;
 		try {
-			const response = await fetch(resolve(`/api/state/calibration`));
+			// Timeout so a stalled request can't wedge `outstanding` and stop all later polls.
+			const response = await fetch(resolve(`/api/state/calibration`), { signal: AbortSignal.timeout(10000) });
 			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 			set(await response.json());
 		} catch (error) {

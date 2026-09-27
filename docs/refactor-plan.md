@@ -4,7 +4,7 @@ _Written 2026-09-24 from a full read of `src/` (11.3k lines C#), `src/ui/` (7.7k
 
 ## 1. Honest summary
 
-The codebase is not garbage. The pipeline shape (MQTT → `DeviceTracker` channels → `MultiScenarioLocator` → MQTT/WebSocket), the strategy pattern for locators, the lease service, the Kalman filter, the reconnect logic, the accuracy harness in the Simulation project, and the tooltip/modal/toast primitives in the UI are all sound and worth keeping.
+The core is sound. The pipeline shape (MQTT → `DeviceTracker` channels → `MultiScenarioLocator` → MQTT/WebSocket), the strategy pattern for locators, the lease service, the Kalman filter, the reconnect logic, the accuracy harness in the Simulation project, and the tooltip/modal/toast primitives in the UI are all sound and worth keeping.
 
 What is wrong is everything _around_ those pieces:
 
@@ -13,7 +13,7 @@ What is wrong is everything _around_ those pieces:
 - **Persistence is MQTT retained messages** for all settings and a SQLite table for history that, until today, was never initialised and never read (see §3).
 - **Two of everything.** Two JSON stacks (Newtonsoft + System.Text.Json, sometimes on the same property), two WebSocket server implementations, two OTA paths, two event systems plus a relay, three HTTP clients, four definitions of "current", three writers of `Device.Name`, calibration math copy-pasted into MCP and already divergent.
 - **Frontend is a Svelte 4/5 hybrid** (37 components on `export let`, 5 on runes) with 41 raw `fetch` calls, a 1 ms `setInterval`, four 1 Hz pollers, ESLint that has never parsed a `.svelte` file, 83 type errors, and CI that runs only Playwright.
-- **Dead and risky bits.** Four optimizers referenced nowhere, an unregistered ingress-path middleware, an AutoMapper license key committed to a public repo that expires **2026-12-13** backing two trivial maps, the MQTT password returned to every browser via `/api/state/config` and to MCP clients, and MCP tools (`delete_node`, `restart_node`, `start_firmware_update`) exposed without auth on the directly published port.
+- **Dead and risky bits.** Four optimizers referenced nowhere, an unregistered ingress-path middleware, an AutoMapper license key committed to a public repo that expires **2026-12-13** backing two trivial maps, the MQTT password returned to every browser via `/api/state/config` and to MCP clients, and MCP tools (`delete_node`, `restart_node`, `start_firmware_update`) registered at `/api/mcp` without application-layer authorization; host-port exposure depends on deployment configuration.
 
 Nothing found is a data-loss bug. The things that hurt users today are, in order: locate work multiplied by node count (CPU), history silently broken, "works after restart" config behaviour, and the auto-optimize toggle that never called the API.
 
