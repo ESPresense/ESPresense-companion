@@ -48,6 +48,9 @@ internal sealed class DirtyDeviceSet
         {
             if (_pending.TryRemove(id, out _)) cleared++;
         }
+        // A concurrent Mark may have added to _pending but not yet to _order; drop those too so the id
+        // cannot get stuck as "pending" with no queue entry (Mark would then refuse it forever).
+        _pending.Clear();
         return cleared;
     }
 
