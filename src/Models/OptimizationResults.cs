@@ -30,6 +30,10 @@ public class OptimizationResults
                     continue;
 
                 double mapDistance = m.Rx.Location.DistanceTo(m.Tx.Location);
+                // Log10(0) is -Infinity and Log10(NaN) is NaN, which would poison the RMSE/correlation
+                // for the whole evaluation; skip degenerate measures as IsotonicRegressionOptimizer does.
+                if (mapDistance <= 0 || double.IsNaN(mapDistance) || double.IsInfinity(mapDistance))
+                    continue;
 
                 double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
                 double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;

@@ -322,6 +322,51 @@ public class DeviceSettingsStoreTests
         Assert.That(device.Check, Is.True);
     }
 
+    [Test]
+    public async Task AliasChange_Should_Prune_Stale_Alias_And_Allow_Writes_To_It()
+    {
+        _mockMqttCoordinator.Setup(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
+            .Returns(Task.CompletedTask);
+
+        // Device "keys:orig" first advertises alias "keys:alias-a"
+        RaiseDeviceConfigReceived("keys:orig", new DeviceSettings { Id = "keys:alias-a", OriginalId = "keys:orig", Name = "Keys" });
+
+        Assert.That(_deviceSettingsStore.Get("keys:alias-a"), Is.Not.Null);
+        Assert.ThrowsAsync<InvalidOperationException>(() => _deviceSettingsStore.Set("keys:alias-a", new DeviceSettings { Id = "keys:alias-a" }));
+
+        // The same device now advertises a different alias
+        RaiseDeviceConfigReceived("keys:orig", new DeviceSettings { Id = "keys:alias-b", OriginalId = "keys:orig", Name = "Keys" });
+
+        Assert.That(_deviceSettingsStore.Get("keys:alias-a"), Is.Null, "stale alias should be pruned");
+        Assert.That(_deviceSettingsStore.Get("keys:alias-b"), Is.Not.Null);
+        Assert.That(_deviceSettingsStore.Get("keys:orig")!.Id, Is.EqualTo("keys:alias-b"));
+
+        // Writing to the old alias is no longer rejected as an alias write
+        await _deviceSettingsStore.Set("keys:alias-a", new DeviceSettings { Id = "keys:alias-a", Name = "Other" });
+        _mockMqttCoordinator.Verify(x => x.EnqueueAsync("espresense/settings/keys:alias-a/config", It.IsAny<string?>(), true), Times.Once);
+    }
+
+    [Test]
+    public void AliasChange_Should_Not_Prune_Alias_Now_Owned_By_Another_Device()
+    {
+        RaiseDeviceConfigReceived("keys:one", new DeviceSettings { Id = "keys:shared", OriginalId = "keys:one" });
+        // A second device takes over the alias
+        RaiseDeviceConfigReceived("keys:two", new DeviceSettings { Id = "keys:shared", OriginalId = "keys:two" });
+        // The first device moves to a new alias; "keys:shared" must keep pointing at device two
+        RaiseDeviceConfigReceived("keys:one", new DeviceSettings { Id = "keys:one-new", OriginalId = "keys:one" });
+
+        var shared = _deviceSettingsStore.Get("keys:shared");
+        Assert.That(shared, Is.Not.Null);
+        Assert.That(shared!.OriginalId, Is.EqualTo("keys:two"));
+        Assert.That(_deviceSettingsStore.Get("keys:one-new"), Is.Not.Null);
+    }
+
+    private void RaiseDeviceConfigReceived(string deviceId, DeviceSettings deviceSettings)
+    {
+        _mockMqttCoordinator.Raise(m => m.DeviceConfigReceivedAsync += null,
+            new DeviceSettingsEventArgs { DeviceId = deviceId, Payload = deviceSettings });
+    }
+
     private async Task SimulateMqttDeviceConfig(string deviceId, DeviceSettings deviceSettings)
     {
         var storeByIdField = typeof(DeviceSettingsStore).GetField("_storeById",
