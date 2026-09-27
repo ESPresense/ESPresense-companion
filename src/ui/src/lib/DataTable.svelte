@@ -1,5 +1,4 @@
 <script lang="ts">
-
 	interface Column {
 		key: string;
 		title: string;
@@ -73,11 +72,7 @@
 	function isInteractiveTarget(target: EventTarget | null) {
 		if (!(target instanceof Element)) return false;
 
-		return (
-			target.closest(
-				'button, a[href], input, select, textarea, [role="button"], [data-prevent-row-click]'
-			) !== null
-		);
+		return target.closest('button, a[href], input, select, textarea, [role="button"], [data-prevent-row-click]') !== null;
 	}
 
 	function handleRowClick(event: MouseEvent, row: any) {
@@ -112,7 +107,7 @@
 	</thead>
 	<tbody>
 		{#each sortedRows as row}
-             <tr onclick={(event) => handleRowClick(event, row)} class="cursor-pointer">
+			<tr onclick={(event) => handleRowClick(event, row)} class="cursor-pointer">
 				{#each columns as column}
 					<td>
 						{#if column.renderComponent}

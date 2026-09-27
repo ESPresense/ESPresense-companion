@@ -46,10 +46,7 @@ export class WSManager {
 		}
 
 		// Calculate exponential backoff delay with jitter
-		const exponentialDelay = Math.min(
-			this.baseReconnectDelayMs * Math.pow(2, this.reconnectAttempts),
-			this.maxReconnectDelayMs
-		);
+		const exponentialDelay = Math.min(this.baseReconnectDelayMs * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelayMs);
 
 		// Add jitter (±25% of the delay)
 		const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1);

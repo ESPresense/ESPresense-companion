@@ -34,7 +34,6 @@
 		selected = n?.id ?? '';
 		onselected?.(n);
 	}
-
 </script>
 
 <div>

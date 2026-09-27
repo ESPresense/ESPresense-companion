@@ -117,14 +117,14 @@ export const devices = readable<Device[]>([], function start(set) {
 	};
 	wsManager.subscribeToEvent('deviceChanged', deviceChangedCallback);
 
-    const deviceRemovedCallback = (payload: any) => {
-        const id = payload?.deviceId || payload?.id || payload;
-        if (id && deviceMap.has(id)) {
-            deviceMap.delete(id);
-            updateDevicesFromMap();
-        }
-    };
-    wsManager.subscribeToEvent('deviceRemoved', deviceRemovedCallback);
+	const deviceRemovedCallback = (payload: any) => {
+		const id = payload?.deviceId || payload?.id || payload;
+		if (id && deviceMap.has(id)) {
+			deviceMap.delete(id);
+			updateDevicesFromMap();
+		}
+	};
+	wsManager.subscribeToEvent('deviceRemoved', deviceRemovedCallback);
 
 	const configChangedCallback = (data: Config) => {
 		getConfig();
@@ -157,7 +157,7 @@ export const devices = readable<Device[]>([], function start(set) {
 	return () => {
 		clearInterval(pollTimer);
 		wsManager.unsubscribeFromEvent('deviceChanged', deviceChangedCallback);
-        wsManager.unsubscribeFromEvent('deviceRemoved', deviceRemovedCallback);
+		wsManager.unsubscribeFromEvent('deviceRemoved', deviceRemovedCallback);
 		wsManager.unsubscribeFromEvent('configChanged', configChangedCallback);
 		wsManager.unsubscribeFromEvent('time', timeCallback);
 		unsubscribeShowUntracked();
