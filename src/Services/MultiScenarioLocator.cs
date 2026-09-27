@@ -233,6 +233,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         UpdateStatus("Started");
+        var hadLease = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -267,6 +268,17 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 await using (lease)
                 {
                     Log.Information("Acquired lease '{LeaseName}'", LocatingLeaseName);
+
+                    if (hadLease)
+                    {
+                        // Another instance located while we were without the lease; whatever queued up
+                        // meanwhile is stale. Drop it and start from fresh measurements.
+                        var dropped = dl.ClearLocateBacklog();
+                        if (dropped > 0)
+                            Log.Information("Discarded {Count} device(s) queued for locating while lease '{LeaseName}' was not held", dropped, LocatingLeaseName);
+                    }
+                    hadLease = true;
+
                     await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
                     {
                         if (!lease.HasLease())
