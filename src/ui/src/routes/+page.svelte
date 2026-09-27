@@ -4,7 +4,8 @@
 	import BackgroundUpload from '$lib/BackgroundUpload.svelte';
 	import { gotoDetail } from '$lib/urls';
 
-	export let floorId: string | null = null;
+	// Local state, not a prop: SvelteKit route components only receive `data` and `form`.
+	let floorId: string | null = null;
 </script>
 
 <svelte:head>

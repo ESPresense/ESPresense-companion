@@ -69,6 +69,15 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		// Should NOT include "Anchored Device" since it has no actual measurement data
 		expect(columnHeaders).not.toContain('Rx: Anchored Device');
 
+		// The rotated header label carries both the centring translate and the rotation.
+		// The style attribute used to declare `transform` twice, so the first was dropped.
+		const headerTransform = await page
+			.locator('table thead th div')
+			.first()
+			.evaluate((el) => getComputedStyle(el).transform);
+		// translateX(-50%) rotate(180deg) => matrix(-1, 0, 0, -1, -halfWidth, 0)
+		expect(headerTransform).toMatch(/^matrix\(-1, 0, 0, -1, -?\d/);
+
 		// Verify we have the expected number of receiver columns (only those with data)
 		const receiverColumns = columnHeaders.filter((header) => header?.startsWith('Rx:'));
 		expect(receiverColumns).toHaveLength(1); // Only "Receiver Node"

@@ -5,8 +5,17 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
+	import type { Readable } from 'svelte/store';
+	import type { ZoomScale } from 'd3-zoom';
 
-	const context: { padding: Readable<Object>; yRange: Readable<Object>; xScale: Readable<ZoomScale>; yScale: Readable<ZoomScale> } = getContext('LayerCake');
+	const context: {
+		width: Readable<number>;
+		height: Readable<number>;
+		padding: Readable<{ top: number; right: number; bottom: number; left: number }>;
+		yRange: Readable<number[]>;
+		xScale: Readable<ZoomScale>;
+		yScale: Readable<ZoomScale>;
+	} = getContext('LayerCake');
 	const { width, height, padding, yRange, xScale, yScale } = context;
 
 	export let transform = zoomIdentity;

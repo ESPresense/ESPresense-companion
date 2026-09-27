@@ -24,7 +24,8 @@
 		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' }
 	];
 
-	$: resolvedRoutes = routes.map((route) => ({
+	// `routes` is a module-level constant, so this never needs to re-run.
+	const resolvedRoutes = routes.map((route) => ({
 		...route,
 		resolved: resolve(route.href)
 	}));

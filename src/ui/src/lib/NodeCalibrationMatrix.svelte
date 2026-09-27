@@ -223,7 +223,7 @@
 									<th style="text-align: center; color: oklch(1 0 none);">Name</th>
 									{#each rxColumns as id}
 										<th class="h-32 whitespace-nowrap px-2 py-1 min-w-10" style="position: relative;">
-											<div style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); position: absolute; bottom: 8px; left: 50%; transform-origin: center; transform: translateX(-50%) rotate(180deg); white-space: nowrap; color: oklch(1 0 none);">Rx: {id}</div>
+											<div style="writing-mode: vertical-rl; text-orientation: mixed; position: absolute; bottom: 8px; left: 50%; transform-origin: center; transform: translateX(-50%) rotate(180deg); white-space: nowrap; color: oklch(1 0 none);">Rx: {id}</div>
 										</th>
 									{/each}
 								</tr>
