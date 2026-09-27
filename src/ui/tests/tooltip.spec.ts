@@ -40,7 +40,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find the cell with data and hover over it
 		const dataCell = page.locator('table tbody td').filter({ hasText: '12%' });
@@ -98,7 +98,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find and hover over the data cell
 		const dataCell = page.locator('table tbody td').filter({ hasText: '11%' });
@@ -154,7 +154,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find the empty cell (Node C row, Node B column)
 		const rows = page.locator('table tbody tr');
@@ -208,7 +208,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find and hover over the data cell
 		const dataCell = page.locator('table tbody td').filter({ hasText: '11%' });
@@ -263,7 +263,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Switch to the "Error (m)" view so the cell renders diff via value()
 		await page.getByRole('button', { name: 'Error (m)' }).click();
@@ -309,7 +309,7 @@ test.describe('Tooltip', () => {
 		page.on('pageerror', (e) => errors.push(e.message));
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		await page.locator('table tbody td').filter({ hasText: '11%' }).hover();
 		await expect(page.locator('[role="tooltip"]')).toBeVisible();
