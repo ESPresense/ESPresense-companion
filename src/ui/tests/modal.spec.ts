@@ -2,8 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 
 // Helper to create a test page with modal functionality
 async function setupModalTest(page: Page) {
-  // Create a simple test page with modal
-  await page.setContent(`
+	// Create a simple test page with modal
+	await page.setContent(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -146,166 +146,166 @@ async function setupModalTest(page: Page) {
 }
 
 test.describe('Modal Component', () => {
-  test('should open modal when button is clicked', async ({ page }) => {
-    await setupModalTest(page);
-    
-    // Modal should be hidden initially
-    await expect(page.locator('#modal')).toHaveClass(/hidden/);
-    
-    // Click to open modal
-    await page.click('#open-modal');
-    
-    // Modal should be visible
-    await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
-    await expect(page.locator('[role="dialog"]')).toBeVisible();
-  });
-  
-  test('should close modal when Escape key is pressed', async ({ page }) => {
-    await setupModalTest(page);
-    
-    // Open modal
-    await page.click('#open-modal');
-    await expect(page.locator('#modal')).toBeVisible();
-    
-    // Press Escape
-    await page.keyboard.press('Escape');
-    
-    // Modal should be closed
-    await expect(page.locator('#modal')).toHaveClass(/hidden/);
-  });
-  
-  test('should close modal when clicking backdrop', async ({ page }) => {
-    await setupModalTest(page);
-    
-    // Open modal
-    await page.click('#open-modal');
-    await expect(page.locator('#modal')).toBeVisible();
-    
-    // Click on backdrop area (coordinates that should be outside modal content but inside modal)
-    const modalBounds = await page.locator('#modal').boundingBox();
-    const contentBounds = await page.locator('.modal-content').boundingBox();
-    
-    if (modalBounds && contentBounds) {
-      // Click in the top-left area of the modal but outside the content
-      await page.mouse.click(modalBounds.x + 10, modalBounds.y + 10);
-    }
-    
-    // Modal should be closed
-    await expect(page.locator('#modal')).toHaveClass(/hidden/);
-  });
-  
-  test('should NOT close modal when clicking inside modal content', async ({ page }) => {
-    await setupModalTest(page);
-    
-    // Open modal
-    await page.click('#open-modal');
-    await expect(page.locator('#modal')).toBeVisible();
-    
-    // Click inside modal content
-    await page.click('.modal-content');
-    
-    // Modal should still be visible
-    await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
-  });
-  
-  test('should NOT trigger modal action when Enter is pressed in input field', async ({ page }) => {
-    await setupModalTest(page);
-    
-    const messages: string[] = [];
-    page.on('console', msg => messages.push(msg.text()));
-    
-    // Open modal
-    await page.click('#open-modal');
-    await expect(page.locator('#modal')).toBeVisible();
-    
-    // Focus on input field
-    await page.click('#modal-input');
-    
-    // Type in the input
-    await page.keyboard.type('test');
-    
-    // Press Enter while in input
-    await page.keyboard.press('Enter');
-    
-    // Modal should still be visible and no action triggered
-    await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
-    expect(messages).not.toContain('confirmed');
-    expect(messages).not.toContain('cancelled');
-  });
-  
-  test('should NOT trigger modal action when Enter is pressed in textarea', async ({ page }) => {
-    await setupModalTest(page);
-    
-    const messages: string[] = [];
-    page.on('console', msg => messages.push(msg.text()));
-    
-    // Open modal
-    await page.click('#open-modal');
-    await expect(page.locator('#modal')).toBeVisible();
-    
-    // Focus on textarea
-    await page.click('#modal-textarea');
-    
-    // Press Enter while in textarea
-    await page.keyboard.press('Enter');
-    
-    // Modal should still be visible
-    await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
-    expect(messages).not.toContain('confirmed');
-  });
-  
-  test('should NOT trigger modal action when Enter is pressed in contentEditable', async ({ page }) => {
-    await setupModalTest(page);
-    
-    const messages: string[] = [];
-    page.on('console', msg => messages.push(msg.text()));
-    
-    // Open modal
-    await page.click('#open-modal');
-    await expect(page.locator('#modal')).toBeVisible();
-    
-    // Focus on contentEditable
-    await page.click('#modal-contenteditable');
-    
-    // Press Enter while in contentEditable
-    await page.keyboard.press('Enter');
-    
-    // Modal should still be visible
-    await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
-    expect(messages).not.toContain('confirmed');
-  });
-  
-  test('should work with confirm and cancel buttons', async ({ page }) => {
-    await setupModalTest(page);
-    
-    const messages: string[] = [];
-    page.on('console', msg => messages.push(msg.text()));
-    
-    // Test confirm button
-    await page.click('#open-modal');
-    await page.click('#confirm-btn');
-    expect(messages).toContain('confirmed');
-    
-    // Test cancel button  
-    await page.click('#open-modal');
-    await page.click('#cancel-btn');
-    expect(messages).toContain('cancelled');
-  });
-  
-  test('should handle keyboard navigation properly', async ({ page }) => {
-    await setupModalTest(page);
-    
-    // Open modal
-    await page.click('#open-modal');
-    
-    // Tab through interactive elements
-    await page.keyboard.press('Tab');
-    let focused = await page.evaluate(() => document.activeElement?.id);
-    expect(['modal-input', 'modal-textarea', 'modal-contenteditable', 'modal-button', 'confirm-btn', 'cancel-btn']).toContain(focused);
-    
-    // Continue tabbing
-    await page.keyboard.press('Tab');
-    let newFocused = await page.evaluate(() => document.activeElement?.id);
-    expect(newFocused).not.toBe(focused);
-  });
+	test('should open modal when button is clicked', async ({ page }) => {
+		await setupModalTest(page);
+
+		// Modal should be hidden initially
+		await expect(page.locator('#modal')).toHaveClass(/hidden/);
+
+		// Click to open modal
+		await page.click('#open-modal');
+
+		// Modal should be visible
+		await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
+		await expect(page.locator('[role="dialog"]')).toBeVisible();
+	});
+
+	test('should close modal when Escape key is pressed', async ({ page }) => {
+		await setupModalTest(page);
+
+		// Open modal
+		await page.click('#open-modal');
+		await expect(page.locator('#modal')).toBeVisible();
+
+		// Press Escape
+		await page.keyboard.press('Escape');
+
+		// Modal should be closed
+		await expect(page.locator('#modal')).toHaveClass(/hidden/);
+	});
+
+	test('should close modal when clicking backdrop', async ({ page }) => {
+		await setupModalTest(page);
+
+		// Open modal
+		await page.click('#open-modal');
+		await expect(page.locator('#modal')).toBeVisible();
+
+		// Click on backdrop area (coordinates that should be outside modal content but inside modal)
+		const modalBounds = await page.locator('#modal').boundingBox();
+		const contentBounds = await page.locator('.modal-content').boundingBox();
+
+		if (modalBounds && contentBounds) {
+			// Click in the top-left area of the modal but outside the content
+			await page.mouse.click(modalBounds.x + 10, modalBounds.y + 10);
+		}
+
+		// Modal should be closed
+		await expect(page.locator('#modal')).toHaveClass(/hidden/);
+	});
+
+	test('should NOT close modal when clicking inside modal content', async ({ page }) => {
+		await setupModalTest(page);
+
+		// Open modal
+		await page.click('#open-modal');
+		await expect(page.locator('#modal')).toBeVisible();
+
+		// Click inside modal content
+		await page.click('.modal-content');
+
+		// Modal should still be visible
+		await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
+	});
+
+	test('should NOT trigger modal action when Enter is pressed in input field', async ({ page }) => {
+		await setupModalTest(page);
+
+		const messages: string[] = [];
+		page.on('console', (msg) => messages.push(msg.text()));
+
+		// Open modal
+		await page.click('#open-modal');
+		await expect(page.locator('#modal')).toBeVisible();
+
+		// Focus on input field
+		await page.click('#modal-input');
+
+		// Type in the input
+		await page.keyboard.type('test');
+
+		// Press Enter while in input
+		await page.keyboard.press('Enter');
+
+		// Modal should still be visible and no action triggered
+		await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
+		expect(messages).not.toContain('confirmed');
+		expect(messages).not.toContain('cancelled');
+	});
+
+	test('should NOT trigger modal action when Enter is pressed in textarea', async ({ page }) => {
+		await setupModalTest(page);
+
+		const messages: string[] = [];
+		page.on('console', (msg) => messages.push(msg.text()));
+
+		// Open modal
+		await page.click('#open-modal');
+		await expect(page.locator('#modal')).toBeVisible();
+
+		// Focus on textarea
+		await page.click('#modal-textarea');
+
+		// Press Enter while in textarea
+		await page.keyboard.press('Enter');
+
+		// Modal should still be visible
+		await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
+		expect(messages).not.toContain('confirmed');
+	});
+
+	test('should NOT trigger modal action when Enter is pressed in contentEditable', async ({ page }) => {
+		await setupModalTest(page);
+
+		const messages: string[] = [];
+		page.on('console', (msg) => messages.push(msg.text()));
+
+		// Open modal
+		await page.click('#open-modal');
+		await expect(page.locator('#modal')).toBeVisible();
+
+		// Focus on contentEditable
+		await page.click('#modal-contenteditable');
+
+		// Press Enter while in contentEditable
+		await page.keyboard.press('Enter');
+
+		// Modal should still be visible
+		await expect(page.locator('#modal')).not.toHaveClass(/hidden/);
+		expect(messages).not.toContain('confirmed');
+	});
+
+	test('should work with confirm and cancel buttons', async ({ page }) => {
+		await setupModalTest(page);
+
+		const messages: string[] = [];
+		page.on('console', (msg) => messages.push(msg.text()));
+
+		// Test confirm button
+		await page.click('#open-modal');
+		await page.click('#confirm-btn');
+		expect(messages).toContain('confirmed');
+
+		// Test cancel button
+		await page.click('#open-modal');
+		await page.click('#cancel-btn');
+		expect(messages).toContain('cancelled');
+	});
+
+	test('should handle keyboard navigation properly', async ({ page }) => {
+		await setupModalTest(page);
+
+		// Open modal
+		await page.click('#open-modal');
+
+		// Tab through interactive elements
+		await page.keyboard.press('Tab');
+		let focused = await page.evaluate(() => document.activeElement?.id);
+		expect(['modal-input', 'modal-textarea', 'modal-contenteditable', 'modal-button', 'confirm-btn', 'cancel-btn']).toContain(focused);
+
+		// Continue tabbing
+		await page.keyboard.press('Tab');
+		let newFocused = await page.evaluate(() => document.activeElement?.id);
+		expect(newFocused).not.toBe(focused);
+	});
 });

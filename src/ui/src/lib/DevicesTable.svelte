@@ -53,7 +53,6 @@
 		{ key: 'lastSeen', title: 'Last Seen', value: (d: Device) => (d.lastSeen ? (ago(new Date(d.lastSeen)) ?? 'n/a') : 'n/a'), sortValue: (d: Device) => (d.lastSeen ? new Date(d.lastSeen) : new Date(0)), sortable: true },
 		{ key: 'actions', title: '', renderComponent: { component: DeviceActions } }
 	];
-
 </script>
 
 <div>
