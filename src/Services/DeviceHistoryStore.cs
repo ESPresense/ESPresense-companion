@@ -51,7 +51,16 @@ public class DeviceHistoryStore
 
     public async Task<int> Add(DeviceHistory dh)
     {
-        if (!await Ready()) return -1;
+        // Callers are the locator loop, whose catch-all would drop its lease and restart
+        // on every write if init failed. The failure is already logged; reads surface it.
+        try
+        {
+            if (!await Ready()) return -1;
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
         return await _sqliteConnection.InsertAsync(dh);
     }
 

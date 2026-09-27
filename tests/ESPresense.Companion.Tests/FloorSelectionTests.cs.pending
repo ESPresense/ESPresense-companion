@@ -1,0 +1,501 @@
+using ESPresense.Models;
+using ESPresense.Locators;
+using ESPresense.Services;
+using ESPresense.Utils;
+using ESPresense.Controllers;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using SQLite;
+using MathNet.Spatial.Euclidean;
+
+namespace ESPresense.Companion.Tests;
+
+/// <summary>
+/// Helper to build test scenarios without needing real RSSI data.
+/// Sets Confidence/Probability/Location directly, bypassing Locate().
+/// </summary>
+internal static class ScenarioBuilder
+{
+    /// <summary>
+    /// Creates a minimal scenario on a given floor with preset confidence/probability.
+    /// The DummyLocator returns true but we never rely on it — we set metrics directly.
+    /// </summary>
+    public static Scenario Create(
+        string name,
+        Floor floor,
+        Point3D location,
+        double confidence,
+        double probability,
+        double? rmse = 1.0,
+        double? pearson = 0.8,
+        int? fixes = 4)
+    {
+        var scenario = new Scenario(null, new DummyLocator(), name)
+        {
+            LastHit = DateTime.UtcNow,
+            Floor = floor,
+            Confidence = confidence,
+            Probability = probability,
+            Rmse = rmse,
+            PearsonCorrelation = pearson,
+            Fixes = fixes,
+        };
+        // Set the Kalman location to our desired position
+        scenario.ResetLocation(location);
+        return scenario;
+    }
+
+    private class DummyLocator : ILocate
+    {
+        public bool Locate(Scenario scenario) => true;
+    }
+}
+
+/// <summary>
+/// Helper to build the MultiScenarioLocator with minimal mocked dependencies.
+/// </summary>
+internal class LocatorTestHarness
+{
+    public Mock<MqttCoordinator> MqttMock { get; }
+    public State State { get; }
+    public MultiScenarioLocator Locator { get; }
+
+    public LocatorTestHarness()
+    {
+        var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"cfg-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(workDir);
+
+        var configLoader = new ConfigLoader(workDir);
+        var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
+
+        MqttMock = new Mock<MqttCoordinator>(configLoader,
+            NullLogger<MqttCoordinator>.Instance,
+            new MqttNetLogger(),
+            supervisor);
+
+        // Allow any MQTT publish to succeed
+        MqttMock.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
+            .ReturnsAsync(true);
+        MqttMock.Setup(m => m.EnqueueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
+            .Returns(Task.CompletedTask);
+
+        State = new State(configLoader, new NodeTelemetryStore(MqttMock.Object));
+        var tele = new TelemetryService(MqttMock.Object);
+        var deviceSettingsStore = new DeviceSettingsStore(MqttMock.Object, State);
+        var tracker = new DeviceTracker(State, MqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
+        var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
+        var leaseServiceMock = new Mock<ILeaseService>();
+
+        Locator = new MultiScenarioLocator(tracker, State, MqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+    }
+}
+
+internal static class FloorFactory
+{
+    private static int _counter;
+
+    public static Floor Create(string name, double zMin = 0, double zMax = 3)
+    {
+        var floor = new Floor();
+        var id = $"floor-{Interlocked.Increment(ref _counter)}";
+        var cfg = new Config();
+        var cf = new ConfigFloor
+        {
+            Name = name,
+            Bounds = new[] { new[] { 0.0, 0.0, zMin }, new[] { 20.0, 20.0, zMax } },
+            Rooms = Array.Empty<ConfigRoom>()
+        };
+        floor.Update(cfg, cf);
+        return floor;
+    }
+}
+
+// ============================================================================
+// TEST CLASS 1: Floor Selection — Baseline tests (should pass before AND after)
+// ============================================================================
+
+[TestFixture]
+public class FloorSelectionTests
+{
+    private LocatorTestHarness _harness = null!;
+    private Floor _floor1 = null!;
+    private Floor _floor2 = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _harness = new LocatorTestHarness();
+        _floor1 = FloorFactory.Create("First Floor", zMin: 0, zMax: 3);
+        _floor2 = FloorFactory.Create("Second Floor", zMin: 3, zMax: 6);
+    }
+
+    [Test]
+    public async Task ClearWinner_HigherConfidenceFloorWins()
+    {
+        // Arrange: Floor 2 has much higher confidence
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        device.Scenarios.Add(ScenarioBuilder.Create("s1-f1", _floor1, new Point3D(5, 5, 1.5), confidence: 0.2, probability: 0.5));
+        device.Scenarios.Add(ScenarioBuilder.Create("s2-f2", _floor2, new Point3D(5, 5, 4.5), confidence: 0.8, probability: 0.5));
+
+        // Act
+        await _harness.Locator.ProcessDevice(device);
+
+        // Assert: Floor 2 should win
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor2), "Floor with higher confidence should win");
+    }
+
+    [Test]
+    public async Task Hysteresis_PreviousFloorWinsWhenClose()
+    {
+        // Arrange: Device is currently on Floor 1
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        device.Scenarios.Add(ScenarioBuilder.Create("s1-f1", _floor1, new Point3D(5, 5, 1.5), confidence: 0.45, probability: 0.5));
+        device.Scenarios.Add(ScenarioBuilder.Create("s2-f2", _floor2, new Point3D(5, 5, 4.5), confidence: 0.55, probability: 0.5));
+
+        // First cycle: establish Floor 2 as current (it has higher conf)
+        await _harness.Locator.ProcessDevice(device);
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor2), "Initial: Floor 2 wins");
+
+        // Second cycle: Floor 1 slightly higher, but hysteresis (0.15 default) keeps Floor 2
+        device.Scenarios[0].Confidence = 0.52;
+        device.Scenarios[0].LastHit = DateTime.UtcNow;
+        device.Scenarios[1].Confidence = 0.48;
+        device.Scenarios[1].LastHit = DateTime.UtcNow;
+
+        await _harness.Locator.ProcessDevice(device);
+
+        // Floor 2 conf (0.48) + hysteresis (0.15) = 0.63 > Floor 1 conf (0.52)
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor2), "Hysteresis should keep Floor 2 when margin is small");
+    }
+
+    [Test]
+    public async Task Hysteresis_DoesNotPreventClearTransition()
+    {
+        // Arrange: Device starts on Floor 1, then Floor 2 becomes clearly dominant
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        device.Scenarios.Add(ScenarioBuilder.Create("s1-f1", _floor1, new Point3D(5, 5, 1.5), confidence: 0.7, probability: 0.7));
+        device.Scenarios.Add(ScenarioBuilder.Create("s2-f2", _floor2, new Point3D(5, 5, 4.5), confidence: 0.3, probability: 0.3));
+
+        // Establish Floor 1
+        await _harness.Locator.ProcessDevice(device);
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor1));
+
+        // Now Floor 2 is clearly better (exceeds hysteresis)
+        device.Scenarios[0].Confidence = 0.2;
+        device.Scenarios[0].LastHit = DateTime.UtcNow;
+        device.Scenarios[1].Confidence = 0.8;
+        device.Scenarios[1].LastHit = DateTime.UtcNow;
+
+        await _harness.Locator.ProcessDevice(device);
+
+        // Floor 1 conf (0.2) + hysteresis (0.15) = 0.35 < Floor 2 conf (0.8)
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor2), "Clear confidence shift should overcome hysteresis");
+    }
+
+    [Test]
+    public async Task NoCurrentScenarios_SetsNotHome()
+    {
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(1))
+        {
+            ReportedState = "kitchen"
+        };
+
+        // Scenario expired 5 seconds ago, timeout is 1 second
+        var scenario = ScenarioBuilder.Create("s1", _floor1, new Point3D(5, 5, 1.5), confidence: 0.9, probability: 0.9);
+        scenario.LastHit = DateTime.UtcNow.AddSeconds(-5);
+        device.Scenarios.Add(scenario);
+
+        await _harness.Locator.ProcessDevice(device);
+
+        Assert.That(device.EnsembleFloor, Is.Null, "No current scenarios means no floor");
+        Assert.That(device.ReportedState, Is.EqualTo("not_home"));
+    }
+
+    [Test]
+    public async Task FloorConfidence_ReflectsWinningFloorRawConfidence()
+    {
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        // Two scenarios on Floor 1, one on Floor 2
+        device.Scenarios.Add(ScenarioBuilder.Create("s1a-f1", _floor1, new Point3D(3, 3, 1.5), confidence: 0.3, probability: 0.3));
+        device.Scenarios.Add(ScenarioBuilder.Create("s1b-f1", _floor1, new Point3D(7, 7, 1.5), confidence: 0.4, probability: 0.4));
+        device.Scenarios.Add(ScenarioBuilder.Create("s2-f2", _floor2, new Point3D(5, 5, 4.5), confidence: 0.3, probability: 0.3));
+
+        await _harness.Locator.ProcessDevice(device);
+
+        // Floor 1 should win (0.3 + 0.4 = 0.7 vs 0.3)
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor1));
+        // FloorConfidence should be the sum of raw confidences on winning floor
+        Assert.That(device.FloorConfidence, Is.EqualTo(0.7).Within(0.01),
+            "FloorConfidence should be TotalConfidence of winning floor");
+    }
+}
+
+// ============================================================================
+// TEST CLASS 2: Position Blending — Verify probability-weighted averaging
+// ============================================================================
+
+[TestFixture]
+public class PositionBlendingTests
+{
+    private LocatorTestHarness _harness = null!;
+    private Floor _floor1 = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _harness = new LocatorTestHarness();
+        _floor1 = FloorFactory.Create("First Floor", zMin: 0, zMax: 3);
+    }
+
+    [Test]
+    public async Task BlendedPosition_IsWeightedByProbability()
+    {
+        // Arrange: Two scenarios on same floor, different locations & probabilities
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        // s1 at (2, 2) with prob 0.75, s2 at (10, 10) with prob 0.25
+        device.Scenarios.Add(ScenarioBuilder.Create("s1", _floor1, new Point3D(2, 2, 1.5), confidence: 0.5, probability: 0.75));
+        device.Scenarios.Add(ScenarioBuilder.Create("s2", _floor1, new Point3D(10, 10, 1.5), confidence: 0.5, probability: 0.25));
+
+        await _harness.Locator.ProcessDevice(device);
+
+        // Expected blend: x = (2*0.75 + 10*0.25) / 1.0 = 4.0
+        //                 y = (2*0.75 + 10*0.25) / 1.0 = 4.0
+        // Note: Kalman filter will smooth this, but on first cycle it should be close
+        var location = device.Location;
+        Assert.That(location, Is.Not.Null);
+
+        // The blended input to Kalman was (4, 4, 1.5) — Kalman on first update should be near that
+        Assert.That(location!.Value.X, Is.EqualTo(4.0).Within(1.0),
+            "X should be probability-weighted average (closer to s1)");
+        Assert.That(location!.Value.Y, Is.EqualTo(4.0).Within(1.0),
+            "Y should be probability-weighted average (closer to s1)");
+    }
+
+    [Test]
+    public async Task PositionBlending_UseProbabilityNotConfidence()
+    {
+        // Arrange: Scenario with high confidence but low probability vs
+        //          scenario with low confidence but high probability
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        // s1: high prob (0.8), low conf (0.2) at origin
+        // s2: low prob (0.2), high conf (0.8) at (20, 20)
+        device.Scenarios.Add(ScenarioBuilder.Create("s1", _floor1, new Point3D(0, 0, 1.5), confidence: 0.2, probability: 0.8));
+        device.Scenarios.Add(ScenarioBuilder.Create("s2", _floor1, new Point3D(20, 20, 1.5), confidence: 0.8, probability: 0.2));
+
+        await _harness.Locator.ProcessDevice(device);
+
+        var location = device.Location;
+        Assert.That(location, Is.Not.Null);
+
+        // If blending used Probability: x = (0*0.8 + 20*0.2) / 1.0 = 4.0
+        // If blending used Confidence:  x = (0*0.2 + 20*0.8) / 1.0 = 16.0
+        // Position should be near 4.0 (probability-weighted), not 16.0
+        Assert.That(location!.Value.X, Is.LessThan(10.0),
+            "Blending should use Probability, pulling position toward high-prob scenario");
+    }
+}
+
+// ============================================================================
+// TEST CLASS 3: Floor Transition Responsiveness — The two-stage payoff
+// ============================================================================
+
+[TestFixture]
+public class FloorTransitionTests
+{
+    private LocatorTestHarness _harness = null!;
+    private Floor _floor1 = null!;
+    private Floor _floor2 = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _harness = new LocatorTestHarness();
+        _floor1 = FloorFactory.Create("First Floor", zMin: 0, zMax: 3);
+        _floor2 = FloorFactory.Create("Second Floor", zMin: 3, zMax: 6);
+    }
+
+    /// <summary>
+    /// Core test for two-stage floor selection:
+    /// When raw Confidence clearly shifts to a new floor, the floor selection
+    /// should respond within 1-2 cycles even though smoothed Probability
+    /// still favors the old floor.
+    ///
+    /// This test establishes a device on Floor 1 for several cycles (building up
+    /// smoothed Probability), then abruptly shifts Confidence to Floor 2.
+    /// With raw-confidence-based floor selection, the floor should switch quickly.
+    /// </summary>
+    [Test]
+    public async Task FloorSwitches_WithinTwoCycles_WhenConfidenceShifts()
+    {
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        var s1 = ScenarioBuilder.Create("s1-f1", _floor1, new Point3D(5, 5, 1.5), confidence: 0.8, probability: 0.5);
+        var s2 = ScenarioBuilder.Create("s2-f2", _floor2, new Point3D(5, 5, 4.5), confidence: 0.2, probability: 0.5);
+        device.Scenarios.Add(s1);
+        device.Scenarios.Add(s2);
+
+        // Run 10 cycles on Floor 1 to build up smoothed probability
+        for (int i = 0; i < 10; i++)
+        {
+            s1.Confidence = 0.8;
+            s1.LastHit = DateTime.UtcNow;
+            s2.Confidence = 0.2;
+            s2.LastHit = DateTime.UtcNow;
+            await _harness.Locator.ProcessDevice(device);
+        }
+
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor1), "Should be on Floor 1 after 10 cycles");
+        // By now, s1.Probability should be heavily favoring Floor 1 due to smoothing
+
+        // Now: abrupt shift — Floor 2 confidence dominates
+        s1.Confidence = 0.15;
+        s1.LastHit = DateTime.UtcNow;
+        s2.Confidence = 0.85;
+        s2.LastHit = DateTime.UtcNow;
+
+        // Cycle 1 after shift
+        await _harness.Locator.ProcessDevice(device);
+        var floorAfterCycle1 = device.EnsembleFloor;
+
+        // Cycle 2 after shift
+        s1.Confidence = 0.15;
+        s1.LastHit = DateTime.UtcNow;
+        s2.Confidence = 0.85;
+        s2.LastHit = DateTime.UtcNow;
+        await _harness.Locator.ProcessDevice(device);
+        var floorAfterCycle2 = device.EnsembleFloor;
+
+        // With raw-confidence floor selection: floor should switch by cycle 1 or 2
+        // (0.85 >> 0.15 + 0.15 hysteresis = 0.30, so Floor 2 wins immediately)
+        Assert.That(floorAfterCycle2, Is.EqualTo(_floor2),
+            "Floor should switch within 2 cycles when confidence clearly shifts. " +
+            $"After cycle 1: {floorAfterCycle1?.Name}, After cycle 2: {floorAfterCycle2?.Name}");
+    }
+
+    /// <summary>
+    /// Verify that a stationary device doesn't flap between floors
+    /// even when confidence values are moderately noisy.
+    /// </summary>
+    [Test]
+    public async Task StationaryDevice_DoesNotFlap_WithNoisyConfidence()
+    {
+        var device = new Device("test-wallet", null, TimeSpan.FromSeconds(30));
+
+        var s1 = ScenarioBuilder.Create("s1-f1", _floor1, new Point3D(5, 5, 1.5), confidence: 0.6, probability: 0.5);
+        var s2 = ScenarioBuilder.Create("s2-f2", _floor2, new Point3D(5, 5, 4.5), confidence: 0.4, probability: 0.5);
+        device.Scenarios.Add(s1);
+        device.Scenarios.Add(s2);
+
+        // Establish Floor 1
+        for (int i = 0; i < 5; i++)
+        {
+            s1.Confidence = 0.6;
+            s1.LastHit = DateTime.UtcNow;
+            s2.Confidence = 0.4;
+            s2.LastHit = DateTime.UtcNow;
+            await _harness.Locator.ProcessDevice(device);
+        }
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor1));
+
+        // Simulate 20 noisy cycles where confidence fluctuates
+        // Floor 1 stays slightly ahead on average but occasionally Floor 2 edges ahead
+        var random = new Random(42); // deterministic seed
+        int floorChanges = 0;
+        Floor? previousFloor = device.EnsembleFloor;
+
+        for (int i = 0; i < 20; i++)
+        {
+            // Floor 1 base: 0.55, Floor 2 base: 0.45, noise +/- 0.08
+            double noise = (random.NextDouble() - 0.5) * 0.16;
+            s1.Confidence = 0.55 + noise;
+            s1.LastHit = DateTime.UtcNow;
+            s2.Confidence = 0.45 - noise;
+            s2.LastHit = DateTime.UtcNow;
+
+            await _harness.Locator.ProcessDevice(device);
+
+            if (device.EnsembleFloor != previousFloor)
+            {
+                floorChanges++;
+                previousFloor = device.EnsembleFloor;
+            }
+        }
+
+        // Hysteresis (0.15) should prevent flapping when noise range is +/- 0.08
+        // Max Floor 2 conf: 0.45 + 0.08 = 0.53, Floor 1 conf: 0.55 - 0.08 + 0.15 = 0.62
+        Assert.That(floorChanges, Is.EqualTo(0),
+            $"Stationary device should not flap between floors with moderate noise. Got {floorChanges} floor changes.");
+    }
+
+    /// <summary>
+    /// Test a realistic multi-cycle transition: gradual confidence shift
+    /// simulating a person walking from one floor to another.
+    /// </summary>
+    [Test]
+    public async Task GradualTransition_FloorSwitchesAtCrossoverPoint()
+    {
+        var device = new Device("test-phone", null, TimeSpan.FromSeconds(30));
+
+        var s1 = ScenarioBuilder.Create("s1-f1", _floor1, new Point3D(5, 5, 1.5), confidence: 0.9, probability: 0.5);
+        var s2 = ScenarioBuilder.Create("s2-f2", _floor2, new Point3D(5, 5, 4.5), confidence: 0.1, probability: 0.5);
+        device.Scenarios.Add(s1);
+        device.Scenarios.Add(s2);
+
+        // Establish Floor 1 firmly
+        for (int i = 0; i < 5; i++)
+        {
+            s1.Confidence = 0.9;
+            s1.LastHit = DateTime.UtcNow;
+            s2.Confidence = 0.1;
+            s2.LastHit = DateTime.UtcNow;
+            await _harness.Locator.ProcessDevice(device);
+        }
+        Assert.That(device.EnsembleFloor, Is.EqualTo(_floor1));
+
+        // Gradual shift over 10 cycles (simulating walking upstairs)
+        int? switchCycle = null;
+        for (int cycle = 0; cycle < 10; cycle++)
+        {
+            double t = cycle / 9.0; // 0.0 → 1.0
+            s1.Confidence = 0.9 - 0.8 * t;  // 0.9 → 0.1
+            s2.Confidence = 0.1 + 0.8 * t;  // 0.1 → 0.9
+            s1.LastHit = DateTime.UtcNow;
+            s2.LastHit = DateTime.UtcNow;
+
+            await _harness.Locator.ProcessDevice(device);
+
+            if (device.EnsembleFloor == _floor2 && switchCycle == null)
+                switchCycle = cycle;
+        }
+
+        Assert.That(switchCycle, Is.Not.Null, "Floor should have switched to Floor 2 during gradual transition");
+        // With hysteresis of 0.15, the switch happens when Floor2 conf > Floor1 conf + 0.15
+        // That's approximately when t ≈ 0.6 (cycle 5-6)
+        Assert.That(switchCycle, Is.LessThanOrEqualTo(7),
+            $"Floor transition should happen by cycle 7 of the gradual shift (happened at cycle {switchCycle})");
+
+        TestContext.Out.WriteLine($"Floor switched at cycle {switchCycle}");
+    }
+}
+
+// ============================================================================
+// PARKED 2026-08-29 — does not compile against main, by design.
+//
+// This file is a spec for the unmerged softmax / two-stage floor selection.
+// It needs, none of which exist on main:
+//   Device.EnsembleFloor      (main: Device.Floor => BestScenario?.Floor)
+//   Device.FloorConfidence    (main: Device.Confidence, int? 0-100)
+//   floor hysteresis (0.15)   (main: no hysteresis)
+//   probability-weighted position blending (main: reports one best scenario)
+//   Scenario.Confidence as 0.0-1.0 double (main: int?)
+//   Scenario.Rmse             (main: Scenario.Error)
+//
+// MultiScenarioLocator on main picks argmax smoothed Probability, tie-break
+// Confidence. Rename back to .cs once the softmax work lands.
+// ============================================================================
