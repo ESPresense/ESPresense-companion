@@ -31,7 +31,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -89,7 +89,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -145,7 +145,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -199,7 +199,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -254,7 +254,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -301,7 +301,7 @@ test.describe('Tooltip', () => {
 			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(calibrationData) });
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ autoOptimize: false }) });
 		});
 

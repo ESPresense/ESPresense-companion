@@ -59,7 +59,6 @@ builder.Services.AddAutoMapper(cfg =>
 }, typeof(MappingProfile).Assembly);
 
 builder.Services.AddSingleton<HttpClient>();
-builder.Services.AddSingleton<DatabaseFactory>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttCoordinator>();
 builder.Services.AddSingleton<IMqttCoordinator>(provider => provider.GetRequiredService<MqttCoordinator>());

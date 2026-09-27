@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isEditableTarget } from './dom';
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
 	import { getToastStore } from '$lib/toast/toastStore';
@@ -47,6 +48,7 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
+		if (isEditableTarget(event.target)) return;
 		// Check for Ctrl/Cmd + C
 		if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
 			event.preventDefault();

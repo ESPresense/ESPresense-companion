@@ -6,6 +6,7 @@
 	import { devices, nodes, config } from '$lib/stores';
 	import Map3D from '$lib/Map3D.svelte';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
+	import { apiUrl } from '$lib/api';
 	import { derived } from 'svelte/store';
 
 	// --- Route Param ---
@@ -68,7 +69,7 @@
 
 		try {
 			console.log(`Fetching history for ${deviceId} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
-			const response = await fetch(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
+			const response = await fetch(apiUrl(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`));
 			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
 			const data: { history: DeviceHistory[] } = await response.json();
