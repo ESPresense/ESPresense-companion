@@ -1,7 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
+	import type { Snippet } from 'svelte';
 	import Modal from '$lib/modal/Modal.svelte';
 	import Toast from '$lib/toast/Toast.svelte';
 
@@ -13,22 +14,19 @@
 	import calibration from '$lib/images/calibration.svg';
 	import cube from '$lib/images/cube.svg';
 
-	$: current = $page.url.pathname;
+	// `$app/state` is only reactive with runes, hence $props/$derived/{@render} in this (tiny) layout.
+	const { children }: { children?: Snippet } = $props();
+	const current = $derived(page.url.pathname);
 
-	const routes = [
-		{ href: '/', name: 'map', icon: map, alt: 'Map' },
-		{ href: '/3d', name: '3d', icon: cube, alt: '3D View' },
-		{ href: '/geolocation', name: 'geolocation', icon: map, alt: 'Geolocation' },
-		{ href: '/devices', name: 'devices', icon: devices, alt: 'Devices' },
-		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
-		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' }
+	// `resolve()` is typed per route, so each href is resolved individually.
+	const resolvedRoutes = [
+		{ resolved: resolve('/'), name: 'map', icon: map, alt: 'Map' },
+		{ resolved: resolve('/3d'), name: '3d', icon: cube, alt: '3D View' },
+		{ resolved: resolve('/geolocation'), name: 'geolocation', icon: map, alt: 'Geolocation' },
+		{ resolved: resolve('/devices'), name: 'devices', icon: devices, alt: 'Devices' },
+		{ resolved: resolve('/nodes'), name: 'nodes', icon: nodes, alt: 'Nodes' },
+		{ resolved: resolve('/calibration'), name: 'calibration', icon: calibration, alt: 'Calibration' }
 	];
-
-	// `routes` is a module-level constant, so this never needs to re-run.
-	const resolvedRoutes = routes.map((route) => ({
-		...route,
-		resolved: resolve(route.href)
-	}));
 </script>
 
 <div class="app h-full">
@@ -73,7 +71,7 @@
 
 		<!-- Main Content Area -->
 		<main class="flex-1 overflow-hidden">
-			<slot />
+			{@render children?.()}
 		</main>
 	</div>
 </div>
