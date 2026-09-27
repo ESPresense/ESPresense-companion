@@ -1,12 +1,9 @@
-using System.Collections.Concurrent;
-using AutoMapper;
 using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using MathNet.Spatial.Euclidean;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ESPresense.Companion.Tests;
 
@@ -26,7 +23,7 @@ public class MappingServiceTests
         return n;
     }
 
-    private static IMapper CreateMapper()
+    private static NodeStateMapper CreateMapper()
     {
         var cfgLoader = new ConfigLoader(Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg-ms"));
         var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
@@ -35,16 +32,7 @@ public class MappingServiceTests
         var nts = new NodeTelemetryStore(mqtt.Object);
         var fs = new FirmwareTypeStore(new HttpClient());
 
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton(nts);
-        services.AddSingleton(fs);
-        services.AddAutoMapper(cfg =>
-        {
-            cfg.LicenseKey = AutoMapperLicense.Key;
-        }, typeof(MappingProfile).Assembly);
-        var provider = services.BuildServiceProvider();
-        return provider.GetRequiredService<IMapper>();
+        return new NodeStateMapper(nts, fs);
     }
 
     [Test]
@@ -58,10 +46,8 @@ public class MappingServiceTests
         // add a NodeToNode relation to verify copy
         n1.Nodes["n2"] = new NodeToNode(n1, n2) { Distance = 5.5, Rssi = -60 };
 
-        var mapper = CreateMapper();
-
         // Act
-        var mapped = mapper.Map<IEnumerable<NodeState>>(new[] { n1, n2 }).ToArray();
+        var mapped = NodeStateMapper.ToNodeStates(new[] { n1, n2 }).ToArray();
 
         // Assert
         Assert.That(mapped.Length, Is.EqualTo(2));
@@ -70,8 +56,24 @@ public class MappingServiceTests
         Assert.That(m1.Name, Is.EqualTo("Node 1"));
         Assert.That(m1.Location, Is.EqualTo(new Point3D(1, 2, 3)));
         Assert.That(m1.Floors, Is.EqualTo(new[] { "f1", "f2" }));
+        Assert.That(m1.SourceType, Is.EqualTo(NodeSourceType.Config));
         Assert.That(m1.Nodes.ContainsKey("n2"), Is.True);
         Assert.That(m1.Nodes["n2"].Distance, Is.EqualTo(5.5));
+    }
+
+    [Test]
+    public void MapNodes_NoFloors_YieldsNullFloors()
+    {
+        // Arrange
+        var n1 = new Node("n1", NodeSourceType.Discovered);
+
+        // Act
+        var mapped = NodeStateMapper.ToNodeState(n1);
+
+        // Assert
+        Assert.That(mapped.Id, Is.EqualTo("n1"));
+        Assert.That(mapped.Floors, Is.Null);
+        Assert.That(mapped.SourceType, Is.EqualTo(NodeSourceType.Discovered));
     }
 
     [Test]
@@ -83,10 +85,11 @@ public class MappingServiceTests
         var mapper = CreateMapper();
 
         // Act
-        var mapped = mapper.Map<IEnumerable<NodeStateTele>>(new[] { n1 }).Single();
+        var mapped = mapper.ToNodeStateTeles(new[] { n1 }).Single();
 
         // Assert
         Assert.That(mapped.Id, Is.EqualTo("n1"));
+        Assert.That(mapped.Floors, Is.EqualTo(new[] { "f1" }));
         Assert.That(mapped.Telemetry, Is.Null);
         Assert.That(mapped.Flavor, Is.Null);
         Assert.That(mapped.CPU, Is.Null);

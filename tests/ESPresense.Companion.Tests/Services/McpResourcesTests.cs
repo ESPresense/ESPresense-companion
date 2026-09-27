@@ -1,4 +1,3 @@
-using AutoMapper;
 using ESPresense.Models;
 using ESPresense.Services;
 using System.Text.Json;
@@ -30,7 +29,7 @@ public class McpResourcesTests
             new DeviceSettingsStore(mqtt.Object, state),
             telemetryService,
             firmwareUpdateJobs,
-            Mock.Of<IMapper>());
+            new NodeStateMapper(nodeTelemetryStore, new FirmwareTypeStore(new HttpClient())));
 
         var result = await sut.RequestNodeUpdateTool("node-1", "https://example.com/firmware.bin");
         using var json = JsonDocument.Parse(result);

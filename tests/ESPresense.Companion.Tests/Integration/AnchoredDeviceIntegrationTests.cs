@@ -1,4 +1,3 @@
-using AutoMapper;
 using ESPresense.Controllers;
 using ESPresense.Events;
 using ESPresense.Models;
@@ -236,7 +235,7 @@ public class AnchoredDeviceIntegrationTests
             mockNodeSettingsStore.Object,
             _deviceSettingsStore,
             _nodeTelemetryStore,
-            Mock.Of<IMapper>(),
+            new NodeStateMapper(_nodeTelemetryStore, new FirmwareTypeStore(new HttpClient())),
             Mock.Of<GlobalEventDispatcher>()
         );
 
@@ -298,7 +297,7 @@ public class AnchoredDeviceIntegrationTests
             mockNodeSettingsStore.Object,
             _deviceSettingsStore,
             _nodeTelemetryStore,
-            Mock.Of<IMapper>(),
+            new NodeStateMapper(_nodeTelemetryStore, new FirmwareTypeStore(new HttpClient())),
             Mock.Of<GlobalEventDispatcher>()
         );
 
