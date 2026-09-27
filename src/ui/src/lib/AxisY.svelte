@@ -8,7 +8,12 @@
 	import type { Readable } from 'svelte/store';
 	import type { ZoomScale } from 'd3-zoom';
 
-	const context: { padding: Readable<Object>; xRange: Readable<Object>; xScale: Readable<ZoomScale>; yScale: Readable<ZoomScale> } = getContext('LayerCake');
+	const context: {
+		padding: Readable<{ top: number; right: number; bottom: number; left: number }>;
+		xRange: Readable<number[]>;
+		xScale: Readable<ZoomScale>;
+		yScale: Readable<ZoomScale>;
+	} = getContext('LayerCake');
 	const { padding, xRange, xScale, yScale } = context;
 
 	export let transform = zoomIdentity;

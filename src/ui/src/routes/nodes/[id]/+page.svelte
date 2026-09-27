@@ -8,10 +8,11 @@
 	import Map from '$lib/Map.svelte';
 	import NodeBreadcrumb from '$lib/NodeBreadcrumb.svelte';
 
-	let { floorId = $bindable<string | null>(null), data = {} as NodeSettingDetails } = $props<{
-		floorId?: string | null;
+	// Only `data` is a real route prop; floorId is local state bound to child components.
+	let { data = {} as NodeSettingDetails } = $props<{
 		data?: NodeSettingDetails;
 	}>();
+	let floorId = $state<string | null>(null);
 	const node = $derived($nodes.find((d) => d.id === data.settings?.id));
 
 	// Initialize floorId to the first floor the node is actually on
@@ -25,7 +26,7 @@
 
 	let accordionValue = $state(['details']);
 
-	export const nodeDetails = readable([], (set) => {
+	const nodeDetails = readable([], (set) => {
 		async function fetchAndSet() {
 			try {
 				const response = await fetch(resolve(`/api/node/${node?.id}`));

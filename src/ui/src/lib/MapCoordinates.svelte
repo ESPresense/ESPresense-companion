@@ -6,8 +6,10 @@
 	import type { LayerCakeContext } from '$lib/types';
 	const toastStore = getToastStore();
 	export let transform = zoomIdentity;
-	$: cursorX = 0;
-	$: cursorY = 0;
+	// Plain state, not derived: the mouse handler owns these. As `$:` assignments they
+	// were liable to be re-run and reset the readout to 0.
+	let cursorX = 0;
+	let cursorY = 0;
 
 	let copiedCoords: string[] = [];
 	let hasFocus = false;

@@ -13,6 +13,10 @@
 	export let deviceSettings: DeviceSetting;
 
 	let nodeSettings: Record<string, NodeSetting | null> = {};
+	// Which nodes we've already requested. Kept separate from `nodeSettings` because a node
+	// can legitimately have null settings, and guarding on the response value meant the
+	// reactive block below re-fetched it forever. Deliberately non-reactive.
+	const nodeSettingsRequested = new Set<string>();
 
 	// Device state - adjusted to fetch based on deviceId
 	let selectedFloorId: string | null = null;
@@ -169,8 +173,9 @@
 				includedNodes[node.id] = true;
 			}
 
-			// Fetch node settings if not already fetched
-			if (!nodeSettings[node.id]) {
+			// Fetch node settings if not already requested
+			if (!nodeSettingsRequested.has(node.id)) {
+				nodeSettingsRequested.add(node.id);
 				fetchNodeSettings(node.id);
 			}
 		});

@@ -259,6 +259,7 @@
 		renderer.autoClear = true;
 		renderer.shadowMap.enabled = true;
 		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+		// eslint-disable-next-line svelte/no-dom-manipulating -- Three.js owns its canvas; Svelte never renders it
 		container.appendChild(renderer.domElement);
 
 		// Label Renderer
@@ -269,6 +270,7 @@
 		labelRenderer.domElement.style.pointerEvents = 'none';
 		labelRenderer.domElement.style.zIndex = '1';
 		labelRenderer.domElement.classList.add('css2d-renderer-map'); // Unique class
+		// eslint-disable-next-line svelte/no-dom-manipulating -- CSS2DRenderer owns this element too
 		container.appendChild(labelRenderer.domElement);
 
 		// Scene
