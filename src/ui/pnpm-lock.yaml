@@ -60,8 +60,8 @@ importers:
         specifier: ^8.70.0
         version: 8.70.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       autoprefixer:
-        specifier: ^10.5.6
-        version: 10.5.6(postcss@8.5.26)
+        specifier: ^10.6.1
+        version: 10.6.1(postcss@8.5.26)
       d3:
         specifier: ^7.9.0
         version: 7.9.0
@@ -1309,8 +1309,8 @@ packages:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
 
-  autoprefixer@10.5.6:
-    resolution: {integrity: sha512-HiH4oYNc5+DQEx/b8FPfMj+WHH/WWUBmbN5r1Uf/ixtfyFkk+wGIlfJT/RD5eAyzlwkeYRtZUCI8qrEi26pl2g==}
+  autoprefixer@10.6.1:
+    resolution: {integrity: sha512-cL1Qz6ADZhcEbny/8HPfe99J6HhNoYtpX2LFLIbhgGE7Q1hlQVkYFdetDN7Id3KiQxhDrHwzlHr/YQCnZ8+xSA==}
     engines: {node: ^10 || ^12 || >=14}
     hasBin: true
     peerDependencies:
@@ -3807,7 +3807,7 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  autoprefixer@10.5.6(postcss@8.5.26):
+  autoprefixer@10.6.1(postcss@8.5.26):
     dependencies:
       browserslist: 4.28.9
       caniuse-lite: 1.0.30001810
