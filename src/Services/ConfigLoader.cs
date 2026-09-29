@@ -98,6 +98,10 @@ public class ConfigLoader : BackgroundService
             Log.Information("Loading " + _configPath);
 
             var text = await File.ReadAllTextAsync(_configPath);
+            // An empty file deserialises to null and would otherwise be accepted as a blank Config. Our own
+            // writes are atomic (see SaveSectionAsync), but an external editor may truncate before it writes.
+            if (string.IsNullOrWhiteSpace(text))
+                throw new InvalidDataException("config.yaml is empty (delete it to regenerate from the example)");
             config = FixIds(_deserializer.Deserialize<Config>(text));
             // Assign/normalize room colors with adjacency-aware algorithm
             Utils.ColorAssigner.AssignRoomColors(config);
@@ -113,6 +117,8 @@ public class ConfigLoader : BackgroundService
         RaiseConfigChanged(config);
     }
 
+    // Runs while the caller still holds _loadLock, which is a non-reentrant SemaphoreSlim: handlers must not
+    // call LoadAsync or SaveSectionAsync synchronously (awaiting them inside a handler would deadlock).
     private void RaiseConfigChanged(Config config)
     {
         var handlers = ConfigChanged;
@@ -170,19 +176,49 @@ public class ConfigLoader : BackgroundService
             new Dictionary<string, object> { { sectionName, value } }
         ).TrimEnd('\r', '\n');
 
-        var text = await File.ReadAllTextAsync(_configPath);
+        // Hold _loadLock for the whole read-modify-write so the poll in ExecuteAsync cannot interleave.
+        // _loadLock is not reentrant: nothing inside this block may call LoadAsync.
+        await _loadLock.WaitAsync();
+        try
+        {
+            var text = await File.ReadAllTextAsync(_configPath);
 
-        // Match from ^sectionName: through all indented/blank lines until next top-level key or EOF
-        var pattern = $@"^{Regex.Escape(sectionName)}:.*(\n([ \t]+.*)|\n\s*)*";
-        var match = Regex.Match(text, pattern, RegexOptions.Multiline);
+            // Match from ^sectionName: through its indented lines (and blank lines between them), stopping
+            // before the newline that precedes the next top-level key / comment / EOF. The previous pattern's
+            // `\n\s*` swallowed that newline, producing e.g. "timeout: 60mqtt:" and corrupting the file.
+            var pattern = $@"^{Regex.Escape(sectionName)}:.*(?:(?:\n[ \t]*(?=\n))*\n[ \t]+.*)*";
+            var match = Regex.Match(text, pattern, RegexOptions.Multiline);
 
-        string replaced;
-        if (match.Success)
-            replaced = text[..match.Index] + sectionYaml + text[(match.Index + match.Length)..];
-        else
-            replaced = text.TrimEnd() + "\n\n" + sectionYaml + "\n";
+            string replaced;
+            if (match.Success)
+                replaced = text[..match.Index] + sectionYaml + text[(match.Index + match.Length)..];
+            else
+                replaced = text.TrimEnd() + "\n\n" + sectionYaml + "\n";
 
-        await File.WriteAllTextAsync(_configPath, replaced);
+            // Write to a temp file in the same directory and rename it over config.yaml: a rename is atomic,
+            // so no reader (our poll or anything else) can ever observe a truncated or half-written file.
+            var tempPath = _configPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await File.WriteAllTextAsync(tempPath, replaced);
+                File.Move(tempPath, _configPath, overwrite: true);
+            }
+            catch
+            {
+                try { File.Delete(tempPath); } catch { /* best effort cleanup; the original exception matters */ }
+                throw;
+            }
+
+            // The content definitely changed; force the reload below even on filesystems with coarse mtimes.
+            _lastModified = default;
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
+
+        // Apply the change now instead of waiting up to a second for the poll. Outside the lock: LoadAsync takes it.
+        await LoadAsync();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
