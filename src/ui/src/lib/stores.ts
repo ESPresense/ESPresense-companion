@@ -46,9 +46,15 @@ export const history = writable<string[]>(['/']);
  * Fetches configuration from the backend and updates the `config` store.
  *
  * Retrieves JSON from `/api/state/config` and sets the exported writable `config` store with the response.
+ * Called fire-and-forget (at module load and on every `configChanged` event), so failures are
+ * logged here and the store keeps its previous value.
  */
 async function getConfig() {
-	config.set(await apiFetch<Config>('/api/state/config'));
+	try {
+		config.set(await apiFetch<Config>('/api/state/config'));
+	} catch (error) {
+		console.error('Error fetching config:', error);
+	}
 }
 getConfig();
 

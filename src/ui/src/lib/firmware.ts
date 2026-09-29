@@ -9,7 +9,25 @@ export const version: Writable<string> = writable();
 export const artifact: Writable<string> = writable();
 
 export const firmwareTypes = writable<FirmwareManifest | null>(null, function start(set) {
-	apiFetch<FirmwareManifest>('/api/firmware/types').then((r) => set(r));
+	// One-shot manifest fetch with a bounded retry (same spirit as artifacts/releases below):
+	// otherwise a single non-2xx would leave the store null forever with no visible error.
+	let errors = 0;
+	let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function fetchData() {
+		apiFetch<FirmwareManifest>('/api/firmware/types')
+			.then((r) => set(r))
+			.catch((ex) => {
+				console.error('Error fetching firmware types:', ex);
+				if (++errors <= 5) retryTimer = setTimeout(fetchData, 15000);
+			});
+	}
+
+	fetchData();
+
+	return function stop() {
+		clearTimeout(retryTimer);
+	};
 });
 
 export const cpuNames = derived(firmwareTypes, (a) =>
