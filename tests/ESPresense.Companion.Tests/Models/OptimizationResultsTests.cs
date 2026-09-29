@@ -31,9 +31,10 @@ public class OptimizationResultsTests
         // Co-located with the receiver: Log10(0) would be -Infinity and poison the whole evaluation
         snapshot.Measures.Add(MeasureOf(rx, NodeAt("co-located", 0.0), -40));
 
-        var (correlation, rmse) = new OptimizationResults().Evaluate(new List<OptimizationSnapshot> { snapshot }, nss);
+        var (correlation, rmse, samples) = new OptimizationResults().Evaluate(new List<OptimizationSnapshot> { snapshot }, nss);
 
         Assert.That(double.IsFinite(correlation), Is.True);
         Assert.That(double.IsFinite(rmse), Is.True);
+        Assert.That(samples, Is.EqualTo(2), "the co-located measure must not be counted");
     }
 }
