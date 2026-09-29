@@ -1,4 +1,3 @@
-using AutoMapper;
 using ESPresense.Controllers;
 using ESPresense.Events;
 using ESPresense.Models;
@@ -237,7 +236,7 @@ public class AnchorEdgeCaseTests
             mockNodeSettingsStore.Object,
             _deviceSettingsStore,
             _nodeTelemetryStore,
-            Mock.Of<IMapper>(),
+            new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             Mock.Of<GlobalEventDispatcher>()
         );
 

@@ -8,7 +8,6 @@ using ModelContextProtocol.Protocol;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.ComponentModel;
-using AutoMapper;
 
 namespace ESPresense.Services;
 
@@ -23,7 +22,7 @@ public class McpResources
     private readonly DeviceSettingsStore _dss;
     private readonly TelemetryService _telemetryService;
     private readonly FirmwareUpdateJobService _firmwareUpdateJobs;
-    private readonly IMapper _mapper;
+    private readonly NodeStateMapper _mapper;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public McpResources(
@@ -34,7 +33,7 @@ public class McpResources
         DeviceSettingsStore dss,
         TelemetryService telemetryService,
         FirmwareUpdateJobService firmwareUpdateJobs,
-        IMapper mapper)
+        NodeStateMapper mapper)
     {
         _state = state;
         _config = config;
@@ -70,7 +69,7 @@ public class McpResources
     [Description("Get the list of nodes and their current status")]
     public Task<string> GetNodesResource()
     {
-        var nodes = _mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values);
+        var nodes = _mapper.ToNodeStateTeles(_state.Nodes.Values);
         return Task.FromResult(JsonSerializer.Serialize(nodes, _jsonOptions));
     }
 
@@ -78,7 +77,7 @@ public class McpResources
     [Description("Get the list of nodes and their status")]
     public Task<string> GetNodesTool()
     {
-        var nodes = _mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values);
+        var nodes = _mapper.ToNodeStateTeles(_state.Nodes.Values);
         return Task.FromResult(JsonSerializer.Serialize(nodes, _jsonOptions));
     }
 

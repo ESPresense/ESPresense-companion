@@ -61,9 +61,10 @@ pnpm check
 ### Development Setup
 1. Install .NET SDK 8.0 and Node.js 20
 2. Install pnpm globally: `npm install -g pnpm`
-3. Run `dotnet watch --project src` (serves backend on port 5279)
-4. During development, Vite dev server proxies `/api` and `/ws` requests to the .NET backend
-5. Browse to http://localhost:5279/
+3. Install frontend dependencies: `cd src/ui && pnpm install` (the Debug build no longer does this; `dotnet watch` launches `pnpm start`, which needs `node_modules`)
+4. Run `dotnet watch --project src` (serves backend on port 5279)
+5. During development, Vite dev server proxies `/api` and `/ws` requests to the .NET backend
+6. Browse to http://localhost:5279/
 
 ## Architecture Overview
 
