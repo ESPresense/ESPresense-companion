@@ -2,6 +2,7 @@ using ESPresense.Extensions;
 using AutoMapper;
 using ESPresense.Models;
 using ESPresense.Services;
+using ESPresense.Services.Occupancy;
 using MQTTnet.Diagnostics.Logger;
 using Serilog;
 using Serilog.Events;
@@ -85,6 +86,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSe
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddHostedService<DeviceCleanupService>();
+builder.Services.AddHostedService<RoomOccupancyPublisher>();
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
