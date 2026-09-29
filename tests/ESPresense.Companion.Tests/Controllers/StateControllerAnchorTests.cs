@@ -43,7 +43,7 @@ public class StateControllerAnchorTests
             _mockNodeSettingsStore.Object,
             _mockDeviceSettingsStore.Object,
             nodeTelemetryStore,
-            new NodeStateMapper(nodeTelemetryStore, new FirmwareTypeStore(new HttpClient())),
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             mockEventDispatcher.Object
         );
     }

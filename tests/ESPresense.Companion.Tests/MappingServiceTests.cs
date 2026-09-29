@@ -30,9 +30,7 @@ public class MappingServiceTests
         var mqtt = new Mock<MqttCoordinator>(cfgLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), supervisor);
 
         var nts = new NodeTelemetryStore(mqtt.Object);
-        var fs = new FirmwareTypeStore(new HttpClient());
-
-        return new NodeStateMapper(nts, fs);
+        return new NodeStateMapper(nts, Mock.Of<IFirmwareTypeStore>());
     }
 
     [Test]

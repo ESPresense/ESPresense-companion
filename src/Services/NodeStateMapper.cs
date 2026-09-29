@@ -15,9 +15,9 @@ namespace ESPresense.Services;
 public class NodeStateMapper
 {
     private readonly NodeTelemetryStore _nts;
-    private readonly FirmwareTypeStore _fs;
+    private readonly IFirmwareTypeStore _fs;
 
-    public NodeStateMapper(NodeTelemetryStore nts, FirmwareTypeStore fs)
+    public NodeStateMapper(NodeTelemetryStore nts, IFirmwareTypeStore fs)
     {
         _nts = nts;
         _fs = fs;

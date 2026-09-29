@@ -235,7 +235,7 @@ public class AnchoredDeviceIntegrationTests
             mockNodeSettingsStore.Object,
             _deviceSettingsStore,
             _nodeTelemetryStore,
-            new NodeStateMapper(_nodeTelemetryStore, new FirmwareTypeStore(new HttpClient())),
+            new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             Mock.Of<GlobalEventDispatcher>()
         );
 
@@ -297,7 +297,7 @@ public class AnchoredDeviceIntegrationTests
             mockNodeSettingsStore.Object,
             _deviceSettingsStore,
             _nodeTelemetryStore,
-            new NodeStateMapper(_nodeTelemetryStore, new FirmwareTypeStore(new HttpClient())),
+            new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             Mock.Of<GlobalEventDispatcher>()
         );
 

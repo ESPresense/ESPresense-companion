@@ -65,6 +65,7 @@ builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
 builder.Services.AddSingleton<FirmwareTypeStore>();
+builder.Services.AddSingleton<IFirmwareTypeStore>(provider => provider.GetRequiredService<FirmwareTypeStore>());
 builder.Services.AddSingleton<NodeStateMapper>();
 builder.Services.AddSingleton<FirmwareUpdateJobService>();
 builder.Services.AddSingleton<DeviceService>();
