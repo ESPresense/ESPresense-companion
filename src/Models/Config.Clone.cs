@@ -152,6 +152,7 @@ namespace ESPresense.Models
                 Enabled = Enabled,
                 IntervalSecs = IntervalSecs,
                 KeepSnapshotMins = KeepSnapshotMins,
+                MinSamples = MinSamples,
                 Limits = new Dictionary<string, double>(Limits)
             };
         }
