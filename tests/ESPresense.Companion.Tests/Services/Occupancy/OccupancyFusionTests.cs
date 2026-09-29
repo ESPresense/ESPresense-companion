@@ -3,55 +3,91 @@ using NUnit.Framework;
 
 namespace ESPresense.Companion.Tests.Services.Occupancy;
 
+// Mirrors occupancy_fusion.py's TestFusionRule (PR #1708 / ESPA-197 FUSION_DESIGN.md) branch
+// for branch so the C# port can't silently drift from the validated design.
 public class OccupancyFusionTests
 {
-    [Test]
-    public void Fuse_BleDevicePresent_WinsOverCsi()
-    {
-        var fusion = new OccupancyFusion();
-        var lowConfidenceCsi = new CsiOccupancySignal("node-1", DateTimeOffset.UtcNow, Variance: 1.0, Confidence: 0.05, WindowFrameCount: 1);
+    private const double Hit = 0.5;   // >= threshold
+    private const double Quiet = 0.01; // < threshold
 
-        var result = fusion.Fuse("living-room", bleDevicePresent: true, lowConfidenceCsi);
+    [Test]
+    public void Fuse_BlePresentAndCsiHit_AgreeOccupiedHighConfidence()
+    {
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: true, csiScore: Hit);
 
         Assert.That(result.IsOccupied, Is.True);
-        Assert.That(result.Confidence, Is.EqualTo(1.0));
-        Assert.That(result.Source, Is.EqualTo(OccupancySource.Ble));
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.High));
     }
 
     [Test]
-    public void Fuse_NoBle_HighConfidenceCsi_MarksOccupied()
+    public void Fuse_BlePresentAndCsiQuiet_TrustsBleMediumConfidence()
     {
-        var fusion = new OccupancyFusion();
-        var confidentCsi = new CsiOccupancySignal("node-1", DateTimeOffset.UtcNow, Variance: 20.0, Confidence: 0.9, WindowFrameCount: 12);
-
-        var result = fusion.Fuse("living-room", bleDevicePresent: false, confidentCsi);
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: true, csiScore: Quiet);
 
         Assert.That(result.IsOccupied, Is.True);
-        Assert.That(result.Confidence, Is.EqualTo(0.9));
-        Assert.That(result.Source, Is.EqualTo(OccupancySource.Csi));
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.Medium));
     }
 
     [Test]
-    public void Fuse_NoBle_LowConfidenceCsi_MarksVacant()
+    public void Fuse_BlePresentAndCsiUnavailable_TrustsBleMediumConfidence()
     {
-        var fusion = new OccupancyFusion();
-        var quietCsi = new CsiOccupancySignal("node-1", DateTimeOffset.UtcNow, Variance: 2.0, Confidence: 0.1, WindowFrameCount: 12);
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: true, csiScore: null);
 
-        var result = fusion.Fuse("living-room", bleDevicePresent: false, quietCsi);
-
-        Assert.That(result.IsOccupied, Is.False);
-        Assert.That(result.Source, Is.EqualTo(OccupancySource.Csi));
+        Assert.That(result.IsOccupied, Is.True);
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.Medium));
     }
 
     [Test]
-    public void Fuse_NoBleNoCsi_MarksVacantWithNoSource()
+    public void Fuse_BleAbsentAndCsiHit_DeviceFreeOccupantMediumConfidence()
     {
-        var fusion = new OccupancyFusion();
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: false, csiScore: Hit);
 
-        var result = fusion.Fuse("living-room", bleDevicePresent: false, csi: null);
+        Assert.That(result.IsOccupied, Is.True);
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.Medium));
+    }
+
+    [Test]
+    public void Fuse_BleAbsentAndCsiQuiet_AgreeVacantHighConfidence()
+    {
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: false, csiScore: Quiet);
 
         Assert.That(result.IsOccupied, Is.False);
-        Assert.That(result.Confidence, Is.EqualTo(0.0));
-        Assert.That(result.Source, Is.EqualTo(OccupancySource.None));
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.High));
+    }
+
+    [Test]
+    public void Fuse_BleAbsentAndCsiUnavailable_VacantMediumConfidence()
+    {
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: false, csiScore: null);
+
+        Assert.That(result.IsOccupied, Is.False);
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.Medium));
+    }
+
+    [Test]
+    public void Fuse_BleUnavailableAndCsiHit_OccupiedLowConfidence()
+    {
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: null, csiScore: Hit);
+
+        Assert.That(result.IsOccupied, Is.True);
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.Low));
+    }
+
+    [Test]
+    public void Fuse_BleUnavailableAndCsiUnavailable_VacantLowConfidence()
+    {
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: null, csiScore: null);
+
+        Assert.That(result.IsOccupied, Is.False);
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.Low));
+    }
+
+    [Test]
+    public void Fuse_BleUnavailableAndCsiQuiet_VacantMediumConfidence()
+    {
+        var result = new OccupancyFusion().Fuse("living-room", blePresent: null, csiScore: Quiet);
+
+        Assert.That(result.IsOccupied, Is.False);
+        Assert.That(result.Confidence, Is.EqualTo(OccupancyConfidence.Medium));
     }
 }

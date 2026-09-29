@@ -1,38 +1,51 @@
 namespace ESPresense.Services.Occupancy;
 
 /// <summary>
-/// Coarse, device-free occupancy signal from WiFi CSI amplitude variance (esp-radar-style
-/// presence detection — CMP-1, ESPA-197). Deliberately does not attempt pose/vitals/through-wall;
-/// that is out of scope per the ESPA-168 feasibility doc. Variance thresholds are calibrated
-/// against the synthetic ECF1 corpus (ESPA-173's ecf1.py amp_spread contract: vacant≈6, occupied≈18)
-/// and must be re-tuned once FW-1 lands a measured corpus.
+/// Coarse, device-free occupancy feature from WiFi CSI amplitude variance (esp-radar-style
+/// presence detection — CMP-1, ESPA-197). This is a faithful C# port of the validated design in
+/// FUSION_DESIGN.md / occupancy_fusion.py (tests/.../AccuracyHarness/Csi, PR #1708, stacked on
+/// QA-1/ESPA-173): mean per-subcarrier amplitude variance *across time*, sqrt'd back to an
+/// amplitude-like scale and normalized by a fixed reference ceiling. Deliberately does not
+/// attempt pose/vitals/through-wall; that is out of scope per the ESPA-168 feasibility doc.
+///
+/// The threshold and reference ceiling are placeholders calibrated against ESPA-173's synthetic
+/// ECF1 corpus (vacant clusters ~0.043-0.047, occupied-still ~0.117-0.131) and will not survive
+/// contact with a real home — CMP-3 (ESPA-199) replaces the fixed global threshold with a
+/// per-node adaptive baseline once FW-1 lands a measured corpus.
 /// </summary>
 public sealed class CsiOccupancyDetector
 {
+    /// <summary>v1 global placeholder threshold — see FUSION_DESIGN.md "Threshold, honestly".</summary>
+    public const double OccupiedThreshold = 0.08;
+
+    private const double ReferenceCeiling = 40.0;
+
     private readonly TimeSpan _window;
-    private readonly double _varianceFloor;
-    private readonly double _varianceCeiling;
     private readonly Dictionary<string, Queue<(DateTimeOffset Ts, double[] Amplitudes)>> _buffers = new();
 
-    public CsiOccupancyDetector(TimeSpan? window = null, double varianceFloor = 8.0, double varianceCeiling = 22.0)
+    public CsiOccupancyDetector(TimeSpan? window = null)
     {
         _window = window ?? TimeSpan.FromSeconds(2);
-        _varianceFloor = varianceFloor;
-        _varianceCeiling = varianceCeiling;
     }
 
     /// <summary>
     /// Feed one CSI frame's raw IQ payload (alternating int8 I/Q per subcarrier, per the
     /// firmware's binary CSI frame layout v1 / ECF1 REC_CSI payload) for a node, and get back
-    /// that node's current rolling-window occupancy signal.
+    /// that node's current rolling-window motion score.
+    ///
+    /// A node an orchestrator hasn't observed this cycle carries no signal at all — that absence,
+    /// not a score of 0, is what should reach <see cref="OccupancyFusion"/> as a null CSI score,
+    /// mirroring occupancy_fusion.py's "missing CSI reading returns None, never 0.0" rule (a
+    /// missing reading is not evidence of an empty room).
     /// </summary>
     public CsiOccupancySignal Observe(string nodeId, ReadOnlySpan<sbyte> iq, DateTimeOffset ts)
     {
         if (iq.Length % 2 != 0)
             throw new ArgumentException("IQ payload must contain an even number of I/Q bytes", nameof(iq));
 
-        var amplitudes = new double[iq.Length / 2];
-        for (var i = 0; i < amplitudes.Length; i++)
+        var subcarriers = iq.Length / 2;
+        var amplitudes = new double[subcarriers];
+        for (var i = 0; i < subcarriers; i++)
         {
             double re = iq[2 * i];
             double im = iq[2 * i + 1];
@@ -49,21 +62,38 @@ public sealed class CsiOccupancyDetector
         while (buffer.Count > 1 && ts - buffer.Peek().Ts > _window)
             buffer.Dequeue();
 
-        var flattened = buffer.SelectMany(frame => frame.Amplitudes).ToArray();
-        var variance = Variance(flattened);
-        var confidence = Math.Clamp((variance - _varianceFloor) / (_varianceCeiling - _varianceFloor), 0.0, 1.0);
+        var frames = buffer.Select(f => f.Amplitudes).ToArray();
+        var score = MotionScore(frames, subcarriers);
 
-        return new CsiOccupancySignal(nodeId, ts, variance, confidence, buffer.Count);
+        return new CsiOccupancySignal(nodeId, ts, score, buffer.Count);
     }
 
-    private static double Variance(double[] values)
+    private static double MotionScore(double[][] frames, int subcarriers)
     {
-        if (values.Length < 2) return 0.0;
-        var mean = values.Average();
-        var sumSquares = values.Sum(v => (v - mean) * (v - mean));
-        return sumSquares / (values.Length - 1);
+        var nFrames = frames.Length;
+        var meanVariance = 0.0;
+        for (var k = 0; k < subcarriers; k++)
+        {
+            var mean = 0.0;
+            for (var f = 0; f < nFrames; f++)
+                mean += frames[f][k];
+            mean /= nFrames;
+
+            var variance = 0.0;
+            for (var f = 0; f < nFrames; f++)
+            {
+                var d = frames[f][k] - mean;
+                variance += d * d;
+            }
+            variance /= nFrames;
+
+            meanVariance += variance;
+        }
+        meanVariance /= subcarriers;
+
+        return Math.Min(1.0, Math.Sqrt(meanVariance) / ReferenceCeiling);
     }
 }
 
-/// <summary>A node's rolling-window CSI amplitude-variance occupancy read.</summary>
-public readonly record struct CsiOccupancySignal(string NodeId, DateTimeOffset Timestamp, double Variance, double Confidence, int WindowFrameCount);
+/// <summary>A node's rolling-window CSI motion-score read (0..1, esp-radar-style energy feature).</summary>
+public readonly record struct CsiOccupancySignal(string NodeId, DateTimeOffset Timestamp, double MotionScore, int WindowFrameCount);
