@@ -312,6 +312,17 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         _discoveryTopic = config.DiscoveryTopic;
         _reconnectRequired = false;
 
+        // Window: a DisconnectedAsync that fired after ConnectedAsync succeeded but before the
+        // assignment above failed StartReconnectLoop's ReferenceEquals(_mqttClient, client) guard, so no
+        // reconnect loop was started for it. In normal mode the next publish would self-heal through
+        // EnsureClientConnectedAsync, but in read-only mode EnqueueAsync never gets that far, so start
+        // the loop explicitly now (StartReconnectLoop is idempotent under _reconnectSync).
+        if (!mqttClient.IsConnected)
+        {
+            _logger.LogWarning("MQTT connection dropped immediately after connecting; starting reconnect loop");
+            StartReconnectLoop(mqttClient);
+        }
+
         return mqttClient;
     }
 
