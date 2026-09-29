@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using ESPresense.Controllers;
 using ESPresense.Events;
@@ -11,6 +12,11 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     // Coalescing work sets: a device heard by N nodes is marked N times but processed/located once per pass.
     private readonly DirtyDeviceSet _toProcess = new();
     private readonly DirtyDeviceSet _toLocate = new();
+
+    // Discovery ids whose retained config we cleared ourselves (untrack). The clear echoes back through our own
+    // subscription and must not be mistaken for an external delete. Entries expire after SelfClearTtl.
+    private readonly ConcurrentDictionary<string, DateTime> _selfClearedDiscoveryIds = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan SelfClearTtl = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Attaches MQTT event handlers to manage device discovery, messages and attributes, then runs background processing loops.
@@ -89,13 +95,21 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     {
         if (arg.AutoDiscover == null)
         {
-            // The retained discovery message was cleared: remove the device it advertised. The topic only
-            // carries the discovery id, so resolve the device through the discovery entries it published.
+            if (_selfClearedDiscoveryIds.TryRemove(arg.DiscoveryId, out _))
+            {
+                // Echo of the clear we published when the device stopped being tracked; the device stays.
+                Log.Debug("Ignoring our own discovery clear for {DiscoveryId}", arg.DiscoveryId);
+                return;
+            }
+
+            // The retained discovery message was cleared externally: remove the device it advertised. The topic
+            // only carries the discovery id, so resolve the device through the discovery entries it published.
             var deviceId = arg.DeviceId ?? FindDeviceIdByDiscoveryId(arg.DiscoveryId);
             if (deviceId != null && state.Devices.TryRemove(deviceId, out var removedDevice))
             {
                 Log.Information("[-] Removed device: {Device} (disc)", removedDevice);
                 tele.UpdateDevicesCount(state.Devices.Count);
+                globalEventDispatcher.OnDeviceRemoved(removedDevice.Id);
             }
             else
             {
@@ -130,6 +144,21 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         return state.Devices.Values
             .FirstOrDefault(d => d.HassAutoDiscovery.Any(ad => ad.Component == "device_tracker" && string.Equals(ad.DiscoveryId, discoveryId, StringComparison.OrdinalIgnoreCase)))
             ?.Id;
+    }
+
+    /// <summary>
+    /// Records that we are about to clear the retained discovery config for <paramref name="discoveryId"/>, so the
+    /// echo of that clear is not treated as an external delete. Stale entries are pruned on every insert.
+    /// </summary>
+    internal void RememberSelfClear(string discoveryId)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var entry in _selfClearedDiscoveryIds)
+        {
+            if (now - entry.Value > SelfClearTtl)
+                _selfClearedDiscoveryIds.TryRemove(entry.Key, out _);
+        }
+        _selfClearedDiscoveryIds[discoveryId] = now;
     }
 
     /// <summary>
@@ -203,13 +232,22 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         {
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
 
-            var now = DateTime.UtcNow;
-            foreach (var device in state.Devices.Values)
+            MarkIdleDevices(DateTime.UtcNow);
+        }
+    }
+
+    /// <summary>
+    /// Queues every tracked device that has never been located, or was last located more than its timeout ago,
+    /// so it gets re-evaluated (and, if still tracked, re-located) even when no node is reporting it.
+    /// </summary>
+    internal void MarkIdleDevices(DateTime now)
+    {
+        foreach (var device in state.Devices.Values)
+        {
+            if (device is { Track: true, Confidence: > 0 or null }
+                && (device.LastCalculated is null || now - device.LastCalculated.Value > device.Timeout))
             {
-                if (device is { Track: true, Confidence: > 0 or null } && now - device.LastCalculated > device.Timeout)
-                {
-                    _toProcess.Mark(device.Id);
-                }
+                _toProcess.Mark(device.Id);
             }
         }
     }
@@ -264,7 +302,10 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             {
                 Log.Information("[-] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
+                {
+                    RememberSelfClear(ad.DiscoveryId);
                     await ad.Delete(mqtt);
+                }
             }
             return true;
         }

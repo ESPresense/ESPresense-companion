@@ -20,7 +20,9 @@ public class DeviceTrackerTests
     private Mock<MqttCoordinator> _mockMqttCoordinator = null!;
     private State _state = null!;
     private TelemetryService _telemetryService = null!;
+    private GlobalEventDispatcher _eventDispatcher = null!;
     private DeviceTracker _deviceTracker = null!;
+    private readonly List<string> _removedDeviceIds = new();
 
     [SetUp]
     public async Task Setup()
@@ -47,7 +49,11 @@ public class DeviceTrackerTests
         _telemetryService = new TelemetryService(_mockMqttCoordinator.Object);
         var deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object, _state);
 
-        _deviceTracker = new DeviceTracker(_state, _mockMqttCoordinator.Object, _telemetryService, new GlobalEventDispatcher(), deviceSettingsStore);
+        _eventDispatcher = new GlobalEventDispatcher();
+        _removedDeviceIds.Clear();
+        _eventDispatcher.DeviceRemoved += (_, e) => _removedDeviceIds.Add(e.DeviceId);
+
+        _deviceTracker = new DeviceTracker(_state, _mockMqttCoordinator.Object, _telemetryService, _eventDispatcher, deviceSettingsStore);
 
         // Wire the discovery handler the same way ExecuteAsync does, without starting the background loops.
         _mockMqttCoordinator.Object.PreviousDeviceDiscovered += (_, arg) => _deviceTracker.OnPreviousDeviceDiscovered(arg);
@@ -260,6 +266,7 @@ public class DeviceTrackerTests
         Assert.That(received.DeviceId, Is.Null);
         Assert.That(received.DiscoveryId, Is.EqualTo("espresense_test_device"));
         Assert.That(_state.Devices.ContainsKey("test-device"), Is.False, "device removed from State.Devices");
+        Assert.That(_removedDeviceIds, Is.EqualTo(new[] { "test-device" }), "DeviceRemoved raised so clients drop the device");
     }
 
     [Test]
@@ -286,6 +293,66 @@ public class DeviceTrackerTests
 
         Assert.That(_state.Devices.Count, Is.EqualTo(1));
         Assert.That(_state.Devices.ContainsKey("other"), Is.True);
+    }
+
+    private static Task<bool> CheckDeviceAsync(DeviceTracker tracker, Device device)
+    {
+        var checkMethod = typeof(DeviceTracker).GetMethod("CheckDeviceAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        return (Task<bool>)checkMethod!.Invoke(tracker, new object[] { device })!;
+    }
+
+    [Test]
+    public async Task UntrackClearEcho_DoesNotRemoveDevice_ButExternalClearDoes()
+    {
+        // Tracked device with no config match: the next check untracks it, which publishes a retained clear
+        // of its discovery config. That clear echoes back through our own subscription.
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30)) { Track = true, Check = true };
+        _state.Devices[device.Id] = device;
+        var discoveryId = device.HassAutoDiscovery.Single().DiscoveryId;
+        var topic = $"homeassistant/device_tracker/{discoveryId}/config";
+
+        var trackChanged = await CheckDeviceAsync(_deviceTracker, device);
+        Assert.That(trackChanged, Is.True);
+        Assert.That(device.Track, Is.False);
+        _mockMqttCoordinator.Verify(m => m.EnqueueAsync(topic, null, true), Times.Once, "untrack publishes the discovery clear");
+
+        // (a) the echo of our own clear must not evict the device
+        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(topic, "");
+        Assert.That(_state.Devices.ContainsKey("test-device"), Is.True, "self-published clear keeps the device");
+        Assert.That(_removedDeviceIds, Is.Empty);
+
+        // (b) a later clear with no registry entry is external and removes it
+        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(topic, "");
+        Assert.That(_state.Devices.ContainsKey("test-device"), Is.False, "external clear removes the device");
+        Assert.That(_removedDeviceIds, Is.EqualTo(new[] { "test-device" }));
+    }
+
+    [Test]
+    public async Task ExternalClear_WithoutRegistryEntry_RemovesDevice()
+    {
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30)) { Track = true };
+        _state.Devices[device.Id] = device;
+        var topic = $"homeassistant/device_tracker/{device.HassAutoDiscovery.Single().DiscoveryId}/config";
+
+        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(topic, "");
+
+        Assert.That(_state.Devices.ContainsKey("test-device"), Is.False);
+        Assert.That(_removedDeviceIds, Is.EqualTo(new[] { "test-device" }));
+    }
+
+    [Test]
+    public void MarkIdleDevices_QueuesTrackedDeviceThatWasNeverLocated()
+    {
+        // Message-created devices never set LastCalculated; they must still be picked up by the idle check.
+        var never = new Device("never-located", null, TimeSpan.FromSeconds(30)) { Track = true };
+        var recent = new Device("recent", null, TimeSpan.FromSeconds(30)) { Track = true, LastCalculated = DateTime.UtcNow };
+        var stale = new Device("stale", null, TimeSpan.FromSeconds(30)) { Track = true, LastCalculated = DateTime.UtcNow.AddMinutes(-5) };
+        var untracked = new Device("untracked", null, TimeSpan.FromSeconds(30)) { Track = false };
+        foreach (var d in new[] { never, recent, stale, untracked }) _state.Devices[d.Id] = d;
+
+        _deviceTracker.MarkIdleDevices(DateTime.UtcNow);
+
+        Assert.That(_deviceTracker.PendingProcessCount, Is.EqualTo(2), "never-located and stale devices are queued; recent and untracked are not");
     }
 
     [Test]
