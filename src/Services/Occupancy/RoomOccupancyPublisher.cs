@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using ESPresense.Events;
+using ESPresense.Controllers;
 using ESPresense.Models;
 using ESPresense.Services;
 using Newtonsoft.Json;

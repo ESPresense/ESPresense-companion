@@ -1,3 +1,4 @@
+using ESPresense.Controllers;
 using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Services.Occupancy;
@@ -41,8 +42,9 @@ public class RoomOccupancyPublisherTests
         _dispatcher = new GlobalEventDispatcher();
         _publisher = new RoomOccupancyPublisher(_state, _mockMqtt.Object, _dispatcher);
 
+        var kitchenPoints = new[] { new[] { 0d, 0d }, new[] { 4d, 0d }, new[] { 4d, 4d }, new[] { 0d, 4d } };
         var floor = _state.Floors.GetOrAdd("ground", _ => new Floor());
-        floor.Update(new Config(), new ConfigFloor { Id = "ground", Rooms = new[] { new ConfigRoom { Id = "kitchen", Name = "Kitchen" } } });
+        floor.Update(new Config(), new ConfigFloor { Id = "ground", Rooms = new[] { new ConfigRoom { Id = "kitchen", Name = "Kitchen", Points = kitchenPoints } } });
     }
 
     [TearDown]
