@@ -5,7 +5,7 @@
 	import { getToastStore } from '$lib/toast/toastStore';
 	import type { DeviceSetting, NodeSetting } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 
 	const toastStore = getToastStore();
 
@@ -304,7 +304,8 @@
 	// Debounced so dragging posts a sparse trail instead of one point per mousemove.
 	let positionDebounce: ReturnType<typeof setTimeout> | null = null;
 	function queueCapturePosition(..._deps: unknown[]) {
-		if (!capture?.active) return;
+		// `untrack`: the effect below must not re-run when polling reassigns `capture`.
+		if (!untrack(() => capture?.active)) return;
 		if (positionDebounce) clearTimeout(positionDebounce);
 		positionDebounce = setTimeout(() => sendCapturePosition(), 300);
 	}

@@ -115,12 +115,11 @@
 
 		guiInstance.close();
 	}
-	// Refetch history when relevant parameters change
+	// Refetch history when relevant parameters change. One effect, not one per input:
+	// fetchDeviceHistory() reads both deviceId and historyDurationMinutes synchronously,
+	// so both are tracked here, and it already bails out on a missing id or duration.
 	$effect(() => {
-		if (deviceId && displayMode === 'history') fetchDeviceHistory();
-	});
-	$effect(() => {
-		if (historyDurationMinutes && displayMode === 'history') fetchDeviceHistory();
+		if (displayMode === 'history') fetchDeviceHistory();
 	});
 	// Show/Hide duration control based on mode
 	$effect(() => {
