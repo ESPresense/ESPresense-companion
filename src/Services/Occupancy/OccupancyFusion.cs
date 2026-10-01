@@ -42,6 +42,14 @@ public sealed class OccupancyFusion
     /// <param name="csiScore">
     /// The node's <see cref="CsiOccupancySignal.MotionScore"/>, or null if no CSI reading was
     /// available this window (node offline / no data this cycle).
+    ///
+    /// <c>Fuse</c> is stateless and does not itself check <see cref="CsiOccupancySignal.Timestamp"/>
+    /// -- it trusts the caller to pass this cycle's score, not a cached stale one (flagged by
+    /// CodeRabbit on PR #1707). That's a safe assumption today because the only caller
+    /// (<c>RoomOccupancyPublisher</c>, CMP-2/ESPA-198) always passes null until FW-1 wires a real
+    /// CSI feed. Whoever lands that wiring must enforce freshness (e.g. reject
+    /// <see cref="CsiOccupancySignal"/> older than the detector's window) before extracting
+    /// <see cref="CsiOccupancySignal.MotionScore"/> here -- do not assume it for free.
     /// </param>
     public RoomOccupancy Fuse(string roomId, bool? blePresent, double? csiScore)
     {

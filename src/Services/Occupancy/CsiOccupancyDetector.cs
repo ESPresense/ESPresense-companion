@@ -21,11 +21,13 @@ public sealed class CsiOccupancyDetector
     private const double ReferenceCeiling = 40.0;
 
     private readonly TimeSpan _window;
-    private readonly Dictionary<string, Queue<(DateTimeOffset Ts, double[] Amplitudes)>> _buffers = new();
+    private readonly Dictionary<string, List<(DateTimeOffset Ts, double[] Amplitudes)>> _buffers = new();
 
     public CsiOccupancyDetector(TimeSpan? window = null)
     {
         _window = window ?? TimeSpan.FromSeconds(2);
+        if (_window <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(window), "window must be positive");
     }
 
     /// <summary>
@@ -40,8 +42,8 @@ public sealed class CsiOccupancyDetector
     /// </summary>
     public CsiOccupancySignal Observe(string nodeId, ReadOnlySpan<sbyte> iq, DateTimeOffset ts)
     {
-        if (iq.Length % 2 != 0)
-            throw new ArgumentException("IQ payload must contain an even number of I/Q bytes", nameof(iq));
+        if (iq.Length == 0 || iq.Length % 2 != 0)
+            throw new ArgumentException("IQ payload must contain a nonzero, even number of I/Q bytes", nameof(iq));
 
         var subcarriers = iq.Length / 2;
         var amplitudes = new double[subcarriers];
@@ -54,13 +56,20 @@ public sealed class CsiOccupancyDetector
 
         if (!_buffers.TryGetValue(nodeId, out var buffer))
         {
-            buffer = new Queue<(DateTimeOffset, double[])>();
+            buffer = new List<(DateTimeOffset, double[])>();
             _buffers[nodeId] = buffer;
         }
 
-        buffer.Enqueue((ts, amplitudes));
-        while (buffer.Count > 1 && ts - buffer.Peek().Ts > _window)
-            buffer.Dequeue();
+        buffer.Add((ts, amplitudes));
+        // Evict by age against the latest timestamp SEEN SO FAR, not the just-arrived one: CSI
+        // frames aren't guaranteed to arrive in order. A queue that only inspects its head can
+        // leave an out-of-order stale frame buried mid-buffer forever (reported by CodeRabbit on
+        // PR #1707). Anchoring on "just arrived" instead of "latest known" has the same hole in
+        // reverse -- a late frame whose own timestamp is older than the window's true leading
+        // edge would wrongly spare everything newer than itself. Anchoring on the max keeps the
+        // window's leading edge monotonic regardless of arrival order.
+        var latestTs = buffer.Max(f => f.Ts);
+        buffer.RemoveAll(f => latestTs - f.Ts > _window);
 
         var frames = buffer.Select(f => f.Amplitudes).ToArray();
         var score = MotionScore(frames, subcarriers);
