@@ -31,7 +31,7 @@ test('map renders with LayerCake', async ({ page }) => {
 
 	// Wait for the config to load first
 	await page.waitForFunction(() => {
-		return window.fetch && window.document.body.children.length > 0;
+		return window.document.body.children.length > 0;
 	});
 
 	// Wait for SVG to appear

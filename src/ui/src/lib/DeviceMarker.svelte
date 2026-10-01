@@ -19,7 +19,8 @@
 	const s = tweened(1, { duration: 500, easing: cubicOut });
 	const x = spring(d?.location?.x);
 	const y = spring(d?.location?.y);
-	const c = tweened(undefined, { duration: 1000, easing: cubicOut, interpolate: interpolateLab });
+	// tweened() sets an initial undefined value without interpolating, so the fallback never runs
+	const c = tweened<string | undefined>(undefined, { duration: 1000, easing: cubicOut, interpolate: (a, b) => interpolateLab(a ?? '#000', b ?? '#000') });
 
 	$: x.set(d?.location?.x);
 	$: y.set(d?.location?.y);

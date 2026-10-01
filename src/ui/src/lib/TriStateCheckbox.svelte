@@ -1,6 +1,7 @@
 <script lang="ts">
 	export let checked: boolean | null = false;
 	export let id: string;
+	export let disabled = false;
 	export let onchange: ((event: { checked: boolean | null }) => void) | undefined = undefined;
 
 	function handleClick(event: Event) {
@@ -19,10 +20,10 @@
 		onchange?.({ checked });
 	}
 
-	$: ariaChecked = checked === null ? 'mixed' : checked;
+	$: ariaChecked = checked === null ? ('mixed' as const) : checked;
 </script>
 
-<input type="checkbox" class="checkbox" {id} onclick={handleClick} checked={checked === true} indeterminate={checked === null} readOnly={checked === null} aria-checked={ariaChecked} />
+<input type="checkbox" class="checkbox" {id} {disabled} onclick={handleClick} checked={checked === true} indeterminate={checked === null} readOnly={checked === null} aria-checked={ariaChecked} />
 
 <style>
 	input[type='checkbox']:indeterminate {

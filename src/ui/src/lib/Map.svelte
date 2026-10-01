@@ -16,7 +16,7 @@
 	import MapCoordinates from './MapCoordinates.svelte';
 	import CalibrationSpot from './CalibrationSpot.svelte';
 
-	let svg: Element;
+	let svg: SVGElement;
 	let transform = zoomIdentity;
 
 	export let floorId: string | null = null;
@@ -39,7 +39,7 @@
 		];
 	}
 
-	const handler = zoom()
+	const handler = zoom<SVGElement, unknown>()
 		.scaleExtent([0.5, 40])
 		.wheelDelta((event) => {
 			// Only zoom if shift key is pressed

@@ -179,7 +179,8 @@
 		const geometries: THREE.BufferGeometry[] = [];
 		svgData.paths.forEach((path) => {
 			// Skip white background circle
-			const fill = path.userData?.style?.fill;
+			const style = path.userData?.style as { fill?: unknown } | undefined;
+			const fill = style?.fill;
 			if (fill && typeof fill === 'string' && fill.toLowerCase() === '#ffffff') return;
 			const shapes = SVGLoader.createShapes(path);
 			shapes.forEach((shape) => {

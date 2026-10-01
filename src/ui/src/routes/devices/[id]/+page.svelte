@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch } from '$lib/api';
 	import { devices } from '$lib/stores';
 	import { readable } from 'svelte/store';
 	import type { DeviceSetting } from '$lib/types';
@@ -23,9 +23,7 @@
 
 		async function fetchAndSet() {
 			try {
-				const response = await fetch(resolve(`/api/device/${deviceId}`));
-				if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-				const result = await response.json();
+				const result = await apiFetch<{ details?: DeviceDetailItem[] }>(`/api/device/${deviceId}`);
 				set(result.details || []);
 			} catch (ex) {
 				console.error(`Error fetching device details: ${ex instanceof Error ? ex.message : String(ex)}`);
