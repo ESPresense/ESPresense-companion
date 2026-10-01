@@ -46,6 +46,37 @@ public class AutoDiscovery
         Message = message;
     }
 
+    /// <summary>
+    /// A binary_sensor (device_class "occupancy") discovery entry for a room-level occupancy
+    /// read (CMP-2, ESPA-198), published the same way device_tracker entities already are.
+    /// </summary>
+    public static AutoDiscovery ForRoomOccupancy(Room room)
+    {
+        var roomId = room.Id ?? throw new ArgumentException("Room must have an Id", nameof(room));
+        var discoveryId = $"espresense-room-{roomId}-occupancy".ToSnakeCase();
+
+        var message = new DiscoveryRecord
+        {
+            Name = $"{room.Name ?? roomId} Occupancy",
+            UniqueId = $"espresense-companion-room-{roomId}-occupancy",
+            StateTopic = $"espresense/companion/rooms/{roomId}/occupancy",
+            JsonAttributesTopic = $"espresense/companion/rooms/{roomId}/occupancy/attributes",
+            EntityStatusTopic = "espresense/companion/status",
+            DeviceClass = "occupancy",
+            Device = new DeviceRecord
+            {
+                Name = room.Name ?? roomId,
+                Manufacturer = "ESPresense",
+                Model = "Companion Room",
+                SwVersion = "1.0.0",
+                Identifiers = new[] { $"espresense-room-{roomId}" }
+            },
+            Origin = new OriginRecord { Name = "ESPresense Companion" }
+        };
+
+        return new AutoDiscovery("binary_sensor", discoveryId, message);
+    }
+
     public async Task Send(IMqttCoordinator mqtt)
     {
         if (_sent) return;
@@ -124,6 +155,8 @@ public class AutoDiscovery
         [JsonProperty("origin")] public OriginRecord? Origin { get; set; }
 
         [JsonProperty("source_type")] public string? SourceType { get; set; }
+
+        [JsonProperty("device_class")] public string? DeviceClass { get; set; }
     }
 
     public class DeviceRecord
