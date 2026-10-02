@@ -5,7 +5,6 @@ using MathNet.Spatial.Euclidean;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using AutoMapper;
 
 namespace ESPresense.Companion.Tests.Controllers;
 
@@ -16,7 +15,6 @@ public class StateControllerAnchorTests
     private Mock<IMqttCoordinator> _mockMqttCoordinator;
     private Mock<NodeSettingsStore> _mockNodeSettingsStore;
     private Mock<DeviceSettingsStore> _mockDeviceSettingsStore;
-    private Mock<IMapper> _mockMapper;
     private Mock<ILogger<StateController>> _mockLogger;
     private ConfigLoader _configLoader;
     private string _configDir;
@@ -26,7 +24,6 @@ public class StateControllerAnchorTests
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
         _mockNodeSettingsStore = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, Mock.Of<ILogger<NodeSettingsStore>>()) { CallBase = true };
-        _mockMapper = new Mock<IMapper>();
         _mockLogger = new Mock<ILogger<StateController>>();
 
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
@@ -46,7 +43,7 @@ public class StateControllerAnchorTests
             _mockNodeSettingsStore.Object,
             _mockDeviceSettingsStore.Object,
             nodeTelemetryStore,
-            _mockMapper.Object,
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             mockEventDispatcher.Object
         );
     }

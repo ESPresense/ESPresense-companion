@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch, apiUrl } from '$lib/api';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import type { DeviceSetting, NodeSetting } from '$lib/types';
+	import type { DeviceSetting, NodeSetting, NodeSettingDetails } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
 	import { onMount, onDestroy, untrack } from 'svelte';
 
@@ -46,7 +46,7 @@
 	// Function to fetch device settings based on deviceId
 	async function fetchDeviceSettings() {
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}`));
+			const response = await fetch(apiUrl(`/api/device/${deviceSettings.id}`));
 			if (response.ok) {
 				deviceSettings = await response.json();
 				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
@@ -63,13 +63,10 @@
 	// Function to fetch node settings
 	async function fetchNodeSettings(nodeId: string) {
 		try {
-			const response = await fetch(resolve(`/api/node/${nodeId}`));
-			if (response.ok) {
-				const data = await response.json();
-				nodeSettings[nodeId] = data.settings;
-				// Force reactivity by creating a new object reference
-				nodeSettings = { ...nodeSettings };
-			}
+			const data = await apiFetch<NodeSettingDetails>(`/api/node/${nodeId}`);
+			nodeSettings[nodeId] = data.settings;
+			// Force reactivity by creating a new object reference
+			nodeSettings = { ...nodeSettings };
 		} catch (error) {
 			console.error(`Error fetching settings for node ${nodeId}:`, error);
 		}
@@ -141,17 +138,19 @@
 		return Math.sqrt(variance);
 	}
 
-	function calculateNodeDistances(calibrationSpot: { x: number; y: number; z: number } | null, selectedFloorId: string | null, nodes: any[] | undefined, bounds: any, calibrationSpotHeight: number) {
+	function calculateNodeDistances(calibrationSpot: { x: number; y: number; z?: number } | null, selectedFloorId: string | null, nodes: any[] | undefined, bounds: any, calibrationSpotHeight: number) {
 		if (!nodes || !calibrationSpot || !selectedFloorId) {
 			return [];
 		}
+		// Same fallback as anchorDevice/sendCapturePosition when the spot has no z yet
+		const spotZ = calibrationSpot.z ?? (bounds ? bounds[0][2] + calibrationSpotHeight : calibrationSpotHeight);
 		return nodes
 			.filter((node: any) => {
 				return node.floors.includes(selectedFloorId) && node.location.x != null && node.location.y != null;
 			})
 			.map((node: any) => {
 				// Use the relative heights for the z-component of the distance calculation
-				const distance = Math.sqrt(Math.pow(node.location.x - calibrationSpot.x, 2) + Math.pow(node.location.y - calibrationSpot.y, 2) + Math.pow(node.location.z - calibrationSpot.z, 2));
+				const distance = Math.sqrt(Math.pow(node.location.x - calibrationSpot.x, 2) + Math.pow(node.location.y - calibrationSpot.y, 2) + Math.pow(node.location.z - spotZ, 2));
 
 				const floorLowerZ = bounds ? bounds[0][2] : 0;
 				const nodeHeightFromFloor = node.location.z - floorLowerZ;
@@ -188,15 +187,11 @@
 		});
 
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+			await apiFetch(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
-
-			if (!response.ok) {
-				throw new Error('Failed to anchor device');
-			}
 
 			deviceSettings = { ...deviceSettings, x: calibrationSpot.x, y: calibrationSpot.y, z: zValue };
 			toastStore.trigger({ message: 'Device anchored to the selected location.', background: 'preset-filled-success-500' });
@@ -210,14 +205,11 @@
 		if (!deviceSettings?.id && !deviceSettings?.originalId) return;
 		const payload = buildSettingsPayload({ x: null, y: null, z: null });
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+			await apiFetch(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
-			if (!response.ok) {
-				throw new Error('Failed to clear anchor');
-			}
 
 			deviceSettings = { ...deviceSettings, x: null, y: null, z: null };
 			toastStore.trigger({ message: 'Anchor removed. Device will return to automatic positioning.', background: 'preset-filled-success-500' });
@@ -238,8 +230,7 @@
 	async function refreshCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture`));
-			capture = response.ok ? await response.json() : null;
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture`);
 		} catch {
 			capture = null;
 		}
@@ -248,9 +239,7 @@
 	async function startCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/start`), { method: 'POST' });
-			if (!response.ok) throw new Error(response.statusText);
-			capture = await response.json();
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/start`, { method: 'POST' });
 			lastSentPosition = null;
 			await sendCapturePosition();
 		} catch (error) {
@@ -262,8 +251,7 @@
 	async function stopCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/stop`), { method: 'POST' });
-			if (response.ok) capture = await response.json();
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/stop`, { method: 'POST' });
 		} catch (error) {
 			console.error('Error stopping capture:', error);
 		}
@@ -272,7 +260,7 @@
 	async function discardCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			await fetch(resolve(`/api/device/${deviceSettings.id}/capture`), { method: 'DELETE' });
+			await fetch(apiUrl(`/api/device/${deviceSettings.id}/capture`), { method: 'DELETE' });
 			capture = null;
 		} catch (error) {
 			console.error('Error discarding capture:', error);
@@ -287,12 +275,11 @@
 		if (key === lastSentPosition) return;
 		lastSentPosition = key;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/position`), {
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/position`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(position)
 			});
-			if (response.ok) capture = await response.json();
 		} catch (error) {
 			console.error('Error sending capture position:', error);
 		}
@@ -392,7 +379,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+			const response = await fetch(apiUrl(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -499,7 +486,7 @@
 			calculatedRefRssi = calculateFinalRssi();
 		}
 	});
-	let exportUrl = $derived(deviceSettings?.id ? resolve(`/api/device/${deviceSettings.id}/capture/export`) : '');
+	let exportUrl = $derived(deviceSettings?.id ? apiUrl(`/api/device/${deviceSettings.id}/capture/export`) : '');
 	$effect(() => {
 		queueCapturePosition(calibrationSpot, calibrationSpotHeight, selectedFloorId);
 	});
@@ -596,7 +583,7 @@
 						{/if}
 					{/if}
 					{#if capture && capture.count > 0}
-						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- API download URL, already built with resolve() -->
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- API download URL, already built with apiUrl() -->
 						<a class="btn preset-filled-secondary-500" href={exportUrl} download>Export JSON</a>
 						{#if !capture.active}
 							<button class="btn preset-filled-surface-500" onclick={discardCapture}>Discard</button>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch } from '$lib/api';
 	import { gotoDetail } from '$lib/urls';
 	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
@@ -22,8 +22,7 @@
 
 	async function onRestart(node: Node) {
 		try {
-			const response = await fetch(resolve(`/api/node/${node.id}/restart`), { method: 'POST' });
-			if (!response.ok) throw new Error(response.statusText || 'Failed to restart node');
+			await apiFetch(`/api/node/${node.id}/restart`, { method: 'POST' });
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to reboot`,
@@ -47,8 +46,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch(resolve(`/api/node/${encodeURIComponent(node.id)}`), { method: 'DELETE' });
-			if (!response.ok) throw new Error(response.statusText || 'Failed to delete node');
+			await apiFetch(`/api/node/${encodeURIComponent(node.id)}`, { method: 'DELETE' });
 
 			toastStore.trigger({
 				message: `${node.name || node.id} deleted`,
@@ -109,7 +107,7 @@
 				}
 			}
 
-			const response = await fetch(resolve(`/api/node/${node.id}/update`), {
+			await apiFetch(`/api/node/${node.id}/update`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -120,8 +118,6 @@
 					url: url
 				})
 			});
-
-			if (!response.ok) throw new Error(response.statusText || 'Update failed');
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to update ${updateDescription}`,
@@ -159,10 +155,7 @@
 		loadingEdit = true;
 
 		try {
-			const response = await fetch(resolve(`/api/node/${row.id}`));
-			if (!response.ok) throw new Error(`Failed to fetch node settings details: ${response.statusText}`);
-
-			const nodeSettingsDetails: NodeSettingDetails = await response.json();
+			const nodeSettingsDetails = await apiFetch<NodeSettingDetails>(`/api/node/${row.id}`);
 
 			if (!nodeSettingsDetails.settings) {
 				// Create default settings if none exist

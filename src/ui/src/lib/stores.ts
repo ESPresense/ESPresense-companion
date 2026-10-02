@@ -1,5 +1,5 @@
 import { readable, writable, derived, get } from 'svelte/store';
-import { resolve } from '$app/paths';
+import { apiFetch } from '$lib/api';
 import type { Device, Config, Node, CalibrationResponse, DeviceSetting } from './types';
 import { WSManager } from './wsManager';
 
@@ -46,10 +46,15 @@ export const history = writable<string[]>(['/']);
  * Fetches configuration from the backend and updates the `config` store.
  *
  * Retrieves JSON from `/api/state/config` and sets the exported writable `config` store with the response.
+ * Called fire-and-forget (at module load and on every `configChanged` event), so failures are
+ * logged here and the store keeps its previous value.
  */
 async function getConfig() {
-	const response = await fetch(resolve(`/api/state/config`));
-	config.set(await response.json());
+	try {
+		config.set(await apiFetch<Config>('/api/state/config'));
+	} catch (error) {
+		console.error('Error fetching config:', error);
+	}
 }
 getConfig();
 
@@ -59,9 +64,8 @@ export const deviceSettings = writable<DeviceSetting[] | null>([], function star
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
-		fetch(resolve(`/api/devices`))
-			.then((d) => d.json())
-			.then((r: DeviceSetting[]) => {
+		apiFetch<DeviceSetting[]>('/api/devices')
+			.then((r) => {
 				outstanding = false;
 				settings = r;
 				set(settings);
@@ -91,10 +95,7 @@ export const devices = readable<Device[]>([], function start(set) {
 
 		isPolling = true;
 		try {
-			const response = await fetch(resolve(`/api/state/devices?showAll=${get(showAll)}`));
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-			const devices: Device[] = await response.json();
+			const devices = await apiFetch<Device[]>(`/api/state/devices?showAll=${get(showAll)}`);
 
 			// Replace the entire map instead of accumulating devices
 			deviceMap = new Map(devices.map((device: Device) => [device.id, device]));
@@ -172,8 +173,7 @@ export const nodes = readable<Node[]>([], function start(set) {
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
-		fetch(resolve(`/api/state/nodes?includeTele=true`))
-			.then((d) => d.json())
+		apiFetch<Node[]>('/api/state/nodes?includeTele=true')
 			.then((r) => {
 				outstanding = false;
 				errors = 0;
@@ -200,9 +200,7 @@ export const calibration = readable<CalibrationResponse>({ matrix: {} }, functio
 		outstanding = true;
 		try {
 			// Timeout so a stalled request can't wedge `outstanding` and stop all later polls.
-			const response = await fetch(resolve(`/api/state/calibration`), { signal: AbortSignal.timeout(10000) });
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-			set(await response.json());
+			set(await apiFetch<CalibrationResponse>('/api/state/calibration', { signal: AbortSignal.timeout(10000) }));
 		} catch (error) {
 			console.error('Error fetching calibration:', error);
 		} finally {

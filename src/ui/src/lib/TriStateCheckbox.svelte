@@ -24,7 +24,7 @@
 		onchange?.({ checked });
 	}
 
-	let ariaChecked = $derived(checked === null ? 'mixed' : checked);
+	let ariaChecked = $derived(checked === null ? ('mixed' as const) : checked);
 </script>
 
 <input type="checkbox" class="checkbox" {id} {disabled} onclick={handleClick} checked={checked === true} indeterminate={checked === null} readOnly={checked === null} aria-checked={ariaChecked} />

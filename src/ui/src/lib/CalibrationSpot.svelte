@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { zoomIdentity, type ZoomScale } from 'd3-zoom';
+	import { zoomIdentity } from 'd3-zoom';
 	import { getContext } from 'svelte';
-	import type { Readable } from 'svelte/store';
+	import type { LayerCakeContext } from '$lib/types';
 
 	// Get the scales from the LayerCake context.
-	const context: { xScale: Readable<ZoomScale>; yScale: Readable<ZoomScale> } = getContext('LayerCake');
-	const { xScale, yScale } = context;
+	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
 
 	interface Props {
 		// The current d3 zoom transform.

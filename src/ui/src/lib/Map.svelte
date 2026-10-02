@@ -16,7 +16,7 @@
 	import MapCoordinates from './MapCoordinates.svelte';
 	import CalibrationSpot from './CalibrationSpot.svelte';
 
-	let svg: Element | undefined = $state();
+	let svg: SVGElement | undefined = $state();
 	let transform = $state(zoomIdentity);
 
 	interface Props {
@@ -39,7 +39,7 @@
 		];
 	}
 
-	const handler = zoom()
+	const handler = zoom<SVGElement, unknown>()
 		.scaleExtent([0.5, 40])
 		.wheelDelta((event) => {
 			// Only zoom if shift key is pressed
@@ -110,7 +110,7 @@
 				break;
 		}
 
-		if (newTransform !== transform) {
+		if (svg && newTransform !== transform) {
 			select(svg).call(handler.transform, newTransform);
 		}
 	}

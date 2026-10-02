@@ -5,13 +5,14 @@
 	import { showAll, wsManager } from '$lib/stores';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
+	import { apiUrl } from '$lib/api';
 
 	let locatingStatus = $state('Starting');
 
 	onMount(() => {
 		(async () => {
 			try {
-				const res = await fetch('/api/state/locator');
+				const res = await fetch(apiUrl('/api/state/locator'));
 				if (res.ok) {
 					const health = await res.json();
 					locatingStatus = health.status;
