@@ -3,6 +3,7 @@ using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Reflection;
 
 namespace ESPresense.Companion.Tests;
 
@@ -132,4 +133,58 @@ public class NodeSettingsStoreTests
         Assert.That(result.Calibration.Absorption, Is.EqualTo(3.2));
         Assert.That(result.Counting.MinMs, Is.EqualTo(30000));
     }
+
+    /// <summary>
+    /// Merge is a hand-written field-by-field copy, so a property added to NodeSettings (or to one of its
+    /// nested settings classes) would silently stop being cached without any compile error. This drives the
+    /// public Set/Get path with every nullable setting populated via reflection: any property Merge forgets
+    /// shows up here as a mismatch.
+    /// </summary>
+    [Test]
+    public async Task Set_ThenGet_CachesEveryNullableSettingOnNodeSettings()
+    {
+        var settings = new NodeSettings("node-1") { Name = "Kitchen" };
+        var expected = new Dictionary<string, object>();
+
+        foreach (var section in SettingsSections(settings))
+        {
+            var sectionValue = section.GetValue(settings)!;
+            foreach (var setting in NullableSettings(section.PropertyType))
+            {
+                // Non-zero values: Merge mirrors UpdateSetting publishing 0 as "", which echoes back as null
+                object value = setting.PropertyType == typeof(string) ? "value-" + setting.Name
+                    : setting.PropertyType == typeof(int?) ? 11
+                    : setting.PropertyType == typeof(double?) ? 1.25
+                    : setting.PropertyType == typeof(bool?) ? true
+                    : throw new InvalidOperationException($"Unhandled setting type {setting.PropertyType} on {section.Name}.{setting.Name}");
+
+                setting.SetValue(sectionValue, value);
+                expected[$"{section.Name}.{setting.Name}"] = value;
+            }
+        }
+
+        await _store.Set("node-1", settings);
+        var result = _store.Get("node-1");
+
+        Assert.Multiple(() =>
+        {
+            foreach (var (path, value) in expected)
+            {
+                var dot = path.IndexOf('.');
+                var sectionName = path[..dot];
+                var settingName = path[(dot + 1)..];
+                var actual = SettingsSections(result).Single(p => p.Name == sectionName).GetValue(result)!
+                    .GetType().GetProperty(settingName)!.GetValue(SettingsSections(result).Single(p => p.Name == sectionName).GetValue(result));
+                Assert.That(actual, Is.EqualTo(value), $"{path} was not merged into the cache");
+            }
+        });
+    }
+
+    /// <summary>The nested settings sections of <see cref="NodeSettings"/> (updating, scanning, counting, ...)</summary>
+    private static IEnumerable<PropertyInfo> SettingsSections(NodeSettings settings) =>
+        typeof(NodeSettings).GetProperties().Where(p => p.PropertyType.GetMethod("Clone") is not null);
+
+    /// <summary>The settings a <see cref="NodeSettings"/> section can carry (every nullable property)</summary>
+    private static IEnumerable<PropertyInfo> NullableSettings(Type sectionType) =>
+        sectionType.GetProperties().Where(p => p.CanWrite && (Nullable.GetUnderlyingType(p.PropertyType) is not null || p.PropertyType == typeof(string)));
 }
