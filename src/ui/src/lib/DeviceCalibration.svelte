@@ -225,7 +225,7 @@
 		const spotZ = calibrationSpot.z ?? (bounds ? bounds[0][2] + calibrationSpotHeight : calibrationSpotHeight);
 		return nodes
 			.filter((node: any) => {
-				return node.floors.includes(selectedFloorId) && node.location.x != null && node.location.y != null;
+				return node.floors?.includes(selectedFloorId) && node.location.x != null && node.location.y != null;
 			})
 			.map((node: any) => {
 				// Use the relative heights for the z-component of the distance calculation
