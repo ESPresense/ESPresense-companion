@@ -13,8 +13,6 @@
 	export let onselected: ((node: Node) => void) | undefined = undefined;
 
 	let floor: Floor | undefined;
-	// `floors` is null for nodes that aren't placed in the config yet, so it must be guarded
-	// as well as `n` — otherwise selecting a floor throws once per poll tick.
 	$: selectedNodes = $nodes?.filter((n) => !floorId || n?.floors?.includes(floorId));
 	$: floor = $config?.floors?.find((f) => f.id == floorId);
 </script>
