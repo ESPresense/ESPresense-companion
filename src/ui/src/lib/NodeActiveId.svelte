@@ -1,8 +1,12 @@
 <script lang="ts">
 	import type { Node } from '$lib/types';
-	export let row: Node;
-	export let col: string;
-	$: _ = col;
+	interface Props {
+		row: Node;
+		col: string;
+	}
+
+	let { row, col }: Props = $props();
+	let _ = $derived(col);
 </script>
 
 <div class="flex items-center gap-2">

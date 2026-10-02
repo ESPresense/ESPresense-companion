@@ -57,9 +57,9 @@
 		}
 	}
 
-	let rxColumns: Array<string> = [];
-	$: {
+	let rxColumns: Array<string> = $derived.by(() => {
 		const matrix = $calibration?.matrix ?? {};
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- temp inside $derived.by, not state
 		const rxSet = new Set<string>();
 
 		// Only include receivers that have actual data from at least one transmitter
@@ -71,20 +71,20 @@
 				}
 			});
 		});
-		rxColumns = Array.from(rxSet).sort();
-	}
+		return Array.from(rxSet).sort();
+	});
 
 	// Helper function to check if a transmitter is an anchored device
 	function isAnchored(txName: string): boolean {
 		return $calibration?.anchored?.includes(txName) ?? false;
 	}
 
-	let data_point: DataPoint = 0;
+	let data_point: DataPoint = $state(0);
 
 	const toastStore = getToastStore();
-	let autoOptimization = false;
-	let autoOptimizationLoaded = false;
-	let autoOptimizationBusy = false;
+	let autoOptimization = $state(false);
+	let autoOptimizationLoaded = $state(false);
+	let autoOptimizationBusy = $state(false);
 
 	async function fetchAutoOptimizationState() {
 		try {

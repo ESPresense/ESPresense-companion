@@ -6,16 +6,20 @@
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
 	import DeviceSettingsModal from '$lib/modals/DeviceSettingsModal.svelte';
 
-	export let col: string; // Column identifier from parent table
-	export let row: Device; // Device data for this row
+	interface Props {
+		col: string; // Column identifier from parent table
+		row: Device; // Device data for this row
+	}
+
+	let { col, row }: Props = $props();
 	var _ = col; // Suppress unused variable warning while preserving the prop
 
 	const toastStore = getToastStore();
-	let loadingEdit = false;
-	let loadingDelete = false;
+	let loadingEdit = $state(false);
+	let loadingDelete = $state(false);
 
 	// Determine if device is active based on lastSeen and timeout
-	$: isActive = row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000);
+	let isActive = $derived(row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000));
 
 	async function handleEdit() {
 		loadingEdit = true;

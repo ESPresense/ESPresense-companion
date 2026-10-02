@@ -10,10 +10,14 @@
 	import { getRoomColor } from '$lib/colors';
 
 	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
-	export let d: Device;
-	export let visible: boolean;
-	export let onhovered: ((device: Device | null) => void) | undefined = undefined;
-	export let onselected: ((device: Device) => void) | undefined = undefined;
+	interface Props {
+		d: Device;
+		visible: boolean;
+		onhovered?: ((device: Device | null) => void) | undefined;
+		onselected?: ((device: Device) => void) | undefined;
+	}
+
+	let { d, visible, onhovered = undefined, onselected = undefined }: Props = $props();
 
 	const r = spring(5, { stiffness: 0.15, damping: 0.3 });
 	const s = tweened(1, { duration: 500, easing: cubicOut });
@@ -22,11 +26,17 @@
 	// tweened() sets an initial undefined value without interpolating, so the fallback never runs
 	const c = tweened<string | undefined>(undefined, { duration: 1000, easing: cubicOut, interpolate: (a, b) => interpolateLab(a ?? '#000', b ?? '#000') });
 
-	$: x.set(d?.location?.x);
-	$: y.set(d?.location?.y);
-	$: c.set(visible && d?.room?.id ? getRoomColor($config, d?.room?.id) : '#000');
+	$effect(() => {
+		x.set(d?.location?.x);
+	});
+	$effect(() => {
+		y.set(d?.location?.y);
+	});
+	$effect(() => {
+		c.set(visible && d?.room?.id ? getRoomColor($config, d?.room?.id) : '#000');
+	});
 
-	let hovered = '';
+	let hovered = $state('');
 
 	function hover(d: Device | null) {
 		r.set(d == null ? 5 : 10);

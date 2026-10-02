@@ -4,9 +4,11 @@ import type { FirmwareManifest, Release, WorkflowRun } from '$lib/types';
 
 export const updateMethod: Writable<string> = writable('self');
 export const firmwareSource: Writable<string> = writable('release');
-export const flavor: Writable<string> = writable();
-export const version: Writable<string> = writable();
-export const artifact: Writable<string> = writable();
+// Initial values match VersionPicker's prop fallbacks; Svelte 5 refuses to bind
+// undefined to a prop that declares a fallback (props_invalid_value).
+export const flavor: Writable<string> = writable('-');
+export const version: Writable<string> = writable('');
+export const artifact: Writable<string> = writable('');
 
 export const firmwareTypes = writable<FirmwareManifest | null>(null, function start(set) {
 	// One-shot manifest fetch with a bounded retry (same spirit as artifacts/releases below):

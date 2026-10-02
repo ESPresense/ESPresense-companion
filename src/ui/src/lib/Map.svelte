@@ -16,20 +16,20 @@
 	import MapCoordinates from './MapCoordinates.svelte';
 	import CalibrationSpot from './CalibrationSpot.svelte';
 
-	let svg: SVGElement;
-	let transform = zoomIdentity;
+	let svg: SVGElement | undefined = $state();
+	let transform = $state(zoomIdentity);
 
-	export let floorId: string | null = null;
-	export let deviceId: string | null = null;
-	export let nodeId: string | null = null;
-	export let exclusive: boolean = false;
-	export let calibrate: boolean = false;
-	export let calibrationSpot: { x: number; y: number } | null = null;
-	export let onselected: ((item: Device | Node) => void) | undefined = undefined;
+	interface Props {
+		floorId?: string | null;
+		deviceId?: string | null;
+		nodeId?: string | null;
+		exclusive?: boolean;
+		calibrate?: boolean;
+		calibrationSpot?: { x: number; y: number } | null;
+		onselected?: ((item: Device | Node) => void) | undefined;
+	}
 
-	$: floor = $config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null);
-	$: bounds = floor?.bounds;
-	$: squareBounds = bounds ? makeSquareBounds(bounds) : undefined;
+	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), exclusive = false, calibrate = false, calibrationSpot = $bindable(null), onselected = undefined }: Props = $props();
 
 	function makeSquareBounds(bounds: number[][]): number[][] {
 		const maxDim = Math.max(bounds[1][0], bounds[1][1]);
@@ -110,16 +110,12 @@
 				break;
 		}
 
-		if (newTransform !== transform) {
+		if (svg && newTransform !== transform) {
 			select(svg).call(handler.transform, newTransform);
 		}
 	}
 
 	setContext('colors', scaleOrdinal(schemeCategory10));
-
-	$: {
-		if (svg) select(svg).call(handler);
-	}
 
 	function getXRange({ height, width }: { height: number; width: number }) {
 		const min = 0;
@@ -132,6 +128,12 @@
 		const max = Math.min(height, width);
 		return $config?.map?.flipY ? [max, min] : [min, max];
 	}
+	let floor = $derived($config?.floors.find((f) => f.id === floorId) ?? $config?.floors.find((f) => f != null));
+	let bounds = $derived(floor?.bounds);
+	let squareBounds = $derived(bounds ? makeSquareBounds(bounds) : undefined);
+	$effect(() => {
+		if (svg) select(svg).call(handler);
+	});
 </script>
 
 <svelte:window onkeydown={handleKeyboard} />

@@ -8,19 +8,20 @@
 	import type { Device } from '$lib/types';
 	import ago from 's-ago';
 
-	$: filteredDevices =
+	let filteredDevices = $derived(
 		$devices?.filter((device) => {
 			// Check if device is active based on lastSeen and timeout
 			if (device.lastSeen == null) return false;
 			const timeout = device.timeout !== null && device.timeout !== undefined ? device.timeout : 30000;
 			return new Date().getTime() - new Date(device.lastSeen).getTime() < timeout;
-		}) || [];
+		}) || []
+	);
 
-	$: calibrationStats = {
+	let calibrationStats = $derived({
 		total: filteredDevices.length,
 		calibrated: filteredDevices.filter((d) => d['rssi@1m'] != null).length,
 		needsCalibration: filteredDevices.filter((d) => d['rssi@1m'] == null).length
-	};
+	});
 
 	function isDeviceActive(device: Device): boolean {
 		if (device.lastSeen == null) return false;

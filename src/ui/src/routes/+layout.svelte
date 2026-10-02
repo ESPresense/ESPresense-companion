@@ -13,6 +13,9 @@
 	import devices from '$lib/images/devices.svg';
 	import calibration from '$lib/images/calibration.svg';
 	import cube from '$lib/images/cube.svg';
+	interface Props {
+		children?: import('svelte').Snippet;
+	}
 
 	// `$app/state` is only reactive with runes, hence $props/$derived/{@render} in this (tiny) layout.
 	const { children }: { children?: Snippet } = $props();
@@ -45,6 +48,7 @@
 			<!-- Navigation Rail -->
 			<nav class="flex flex-col flex-1 items-center space-y-2 px-2">
 				{#each resolvedRoutes as route}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- href is pre-resolved in resolvedRoutes above -->
 					<a href={route.resolved} class="flex flex-col items-center justify-center w-12 h-12 rounded-lg transition-all duration-200 group relative {current === route.resolved ? 'bg-primary-500 text-white shadow-lg' : 'text-surface-700-300 hover:bg-surface-200-800 hover:text-surface-950-50'}" title={route.alt}>
 						<img src={route.icon} class="w-6 h-6 transition-transform group-hover:scale-110" alt={route.alt} />
 

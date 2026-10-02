@@ -1,8 +1,12 @@
 <script lang="ts">
 	import type { DeviceSetting } from './types';
 
-	export let settings: DeviceSetting; // Parent handles loading
-	export let anchorEnabled = false;
+	interface Props {
+		settings: DeviceSetting; // Parent handles loading
+		anchorEnabled?: boolean;
+	}
+
+	let { settings = $bindable(), anchorEnabled = $bindable(false) }: Props = $props();
 </script>
 
 {#if settings}

@@ -5,16 +5,21 @@
 
 	import NodeMarker from './NodeMarker.svelte';
 
-	export let transform = zoomIdentity;
-	export let floorId: string | null = null;
-	export let deviceId: string | null = null;
-	export let nodeId: string | null = null;
-	export let onhovered: ((node: Node | null) => void) | undefined = undefined;
-	export let onselected: ((node: Node) => void) | undefined = undefined;
+	interface Props {
+		transform?: any;
+		floorId?: string | null;
+		deviceId?: string | null;
+		nodeId?: string | null;
+		onhovered?: ((node: Node | null) => void) | undefined;
+		onselected?: ((node: Node) => void) | undefined;
+	}
 
-	let floor: Floor | undefined;
-	$: selectedNodes = $nodes?.filter((n) => !floorId || n?.floors?.includes(floorId));
-	$: floor = $config?.floors?.find((f) => f.id == floorId);
+	let { transform = zoomIdentity, floorId = null, deviceId = null, nodeId = null, onhovered = undefined, onselected = undefined }: Props = $props();
+
+	let floor: Floor | undefined = $derived($config?.floors?.find((f) => f.id == floorId));
+	// `floors` is null for nodes that aren't placed in the config yet, so it must be guarded
+	// as well as `n` — otherwise selecting a floor throws once per poll tick.
+	let selectedNodes = $derived($nodes?.filter((n) => !floorId || n?.floors?.includes(floorId)));
 </script>
 
 <g transform={transform.toString()}>

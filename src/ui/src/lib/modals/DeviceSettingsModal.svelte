@@ -2,22 +2,25 @@
 	import { apiFetch } from '$lib/api';
 	import type { DeviceSetting } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import { createEventDispatcher } from 'svelte';
 	import DeviceSettings from '../DeviceSettings.svelte'; // Import the refactored component
 
-	// Props
-	export let parent: any = undefined; // The Svelte parent component that triggered the modal (for backward compatibility)
-	export let deviceSetting: DeviceSetting; // Passed in from trigger
+	interface Props {
+		// Props
+		parent?: any; // The Svelte parent component that triggered the modal (for backward compatibility)
+		deviceSetting: DeviceSetting; // Passed in from trigger
+		onclose?: () => void; // supplied by ComponentModal
+	}
 
-	const dispatch = createEventDispatcher();
+	let { parent = undefined, deviceSetting, onclose }: Props = $props();
+
 	const toastStore = getToastStore();
 
 	// Create a local copy to avoid directly mutating the prop
-	let localSettings = { ...deviceSetting };
-	let isSaving = false; // Track saving state
+	let localSettings = $state({ ...deviceSetting });
+	let isSaving = $state(false); // Track saving state
 
 	// Reactive anchor toggle - keeps checkbox in sync with coordinate values
-	let anchorEnabled = localSettings.x != null && localSettings.y != null && localSettings.z != null;
+	let anchorEnabled = $state(localSettings.x != null && localSettings.y != null && localSettings.z != null);
 
 	async function save() {
 		try {
@@ -67,7 +70,7 @@
 			if (parent && parent.onClose) {
 				parent.onClose();
 			} else {
-				dispatch('close');
+				onclose?.();
 			}
 		} catch (error) {
 			console.error('Error saving settings:', error);
@@ -91,7 +94,7 @@
 		if (parent && parent.onClose) {
 			parent.onClose();
 		} else {
-			dispatch('close');
+			onclose?.();
 		}
 	}
 </script>

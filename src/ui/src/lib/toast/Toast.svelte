@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { toastStore, type ToastSettings } from './toastStore.js';
 	import { fly } from 'svelte/transition';
-	import { createEventDispatcher } from 'svelte';
-
-	const dispatch = createEventDispatcher();
 
 	function handleClose(id: string) {
 		toastStore.close(id);

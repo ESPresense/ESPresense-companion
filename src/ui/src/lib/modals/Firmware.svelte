@@ -4,13 +4,17 @@
 	import type { Node } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
 
-	export let firmwareSource: string;
-	export let node: Node;
-	export let flavor: string;
-	export let cpu: string;
-	export let version: string;
-	export let artifact: string;
-	export let parent: any;
+	interface Props {
+		firmwareSource: string;
+		node: Node;
+		flavor: string;
+		cpu: string;
+		version: string;
+		artifact: string;
+		parent: any;
+	}
+
+	let { firmwareSource, node, flavor = $bindable(), cpu = $bindable(), version, artifact, parent }: Props = $props();
 
 	enum Progress {
 		Form,
@@ -44,14 +48,13 @@
 		return str.replace(/\d+/g, '');
 	}
 
-	let progress: Progress = Progress.Form;
-	let percentComplete: number = 0;
-	let firmware: string;
-	let url: string;
-	let log: string[] = [];
+	let progress: Progress = $state(Progress.Form);
+	let percentComplete: number = $state(0);
+	let firmware: string = $state()!;
+	let url: string = $derived(getFirmwareUrl(firmwareSource, version, artifact, firmware) ?? '#ERR');
+	let log: string[] = $state([]);
 	let lastNonNumericLog: string | null = null;
-	let hasFlavorSelection: boolean;
-	$: url = getFirmwareUrl(firmwareSource, version, artifact, firmware) ?? '#ERR';
+	let hasFlavorSelection: boolean = $derived(flavor !== undefined && flavor !== null);
 
 	async function onFormSubmit(): Promise<void> {
 		if (!isValidForm) return;
@@ -81,10 +84,10 @@
 		}
 	}
 
-	$: selectedFlavor = $firmwareTypes?.flavors?.find((d) => d.value === flavor);
-	$: possibleFirmware = $firmwareTypes?.firmware?.filter((d) => d.cpu === cpu && d.flavor == flavor);
-	$: hasFlavorSelection = flavor !== undefined && flavor !== null;
-	$: isValidForm = Boolean($firmwareTypes && hasFlavorSelection && cpu && firmware && url && url !== '#ERR');
+	let selectedFlavor = $derived($firmwareTypes?.flavors?.find((d) => d.value === flavor));
+	let possibleFirmware = $derived($firmwareTypes?.firmware?.filter((d) => d.cpu === cpu && d.flavor == flavor));
+
+	let isValidForm = $derived(Boolean($firmwareTypes && hasFlavorSelection && cpu && firmware && url && url !== '#ERR'));
 
 	// Base Classes
 	const cBase = 'w-modal space-y-4';

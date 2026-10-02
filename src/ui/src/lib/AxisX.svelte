@@ -16,53 +16,45 @@
 		yRange: Readable<number[]>;
 		xScale: Readable<AxisScale>;
 	} = getContext('LayerCake');
-	const { width, height, padding, yRange, xScale, yScale } = context;
+	const { width, height, padding, yRange, xScale } = context;
 
-	export let transform = zoomIdentity;
+	interface Props {
+		/** The current d3-zoom transform; the x-scale is rescaled through it so the axis follows pan/zoom. */
+		transform?: typeof zoomIdentity;
+		/** Extend lines from the ticks into the chart space */
+		gridlines?: boolean;
+		/** Show a vertical mark for each tick. */
+		tickMarks?: boolean;
+		/** Show a solid line at the bottom. */
+		baseline?: boolean;
+		/** Instead of centering the text on the first and the last items, align them to the edges of the chart. */
+		snapTicks?: boolean;
+		/** A function that passes the current tick value and expects a nicely formatted value in return. */
+		formatTick?: (d: number) => string | number;
+		/** If this is a number, it passes that along to the [d3Scale.ticks](https://github.com/d3/d3-scale) function. If this is an array, hardcodes the ticks to those values. If it's a function, passes along the default tick values and expects an array of tick values in return. If nothing, it uses the default ticks supplied by the D3 function. */
+		ticks?: Ticks;
+		/** TK */
+		xTick?: number;
+		/** The distance from the baseline to place each tick value. */
+		yTick?: number;
+		/** Any optional value passed to the `dx` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+		dxTick?: number;
+		/** Any optional value passed to the `dy` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+		dyTick?: number;
+	}
 
-	let x = $xScale;
-	let y = $yScale;
-	$: x = transform.rescaleX($xScale);
-	$: y = transform.rescaleY($yScale);
+	let { transform = zoomIdentity, gridlines = false, tickMarks = true, baseline = true, snapTicks = false, formatTick = (d) => d, ticks = undefined, xTick = 0, yTick = -16, dxTick = 4, dyTick = 16 }: Props = $props();
 
-	/** @type {Boolean} [gridlines=true] - Extend lines from the ticks into the chart space */
-	export let gridlines = false;
-
-	/** @type {Boolean} [tickMarks=false] - Show a vertical mark for each tick. */
-	export let tickMarks = true;
-
-	/** @type {Boolean} [baseline=false] – Show a solid line at the bottom. */
-	export let baseline = true;
-
-	/** @type {Boolean} [snapTicks=false] - Instead of centering the text on the first and the last items, align them to the edges of the chart. */
-	export let snapTicks = false;
-
-	/** A function that passes the current tick value and expects a nicely formatted value in return. */
-	export let formatTick: (d: number) => string | number = (d) => d;
-
-	/** If this is a number, it passes that along to the [d3Scale.ticks](https://github.com/d3/d3-scale) function. If this is an array, hardcodes the ticks to those values. If it's a function, passes along the default tick values and expects an array of tick values in return. If nothing, it uses the default ticks supplied by the D3 function. */
-	export let ticks: Ticks = undefined;
-
-	/** @type {Number} [xTick=0] - TK */
-	export let xTick = 0;
-
-	/** @type {Number} [yTick=16] - The distance from the baseline to place each tick value. */
-	export let yTick = -16;
-
-	/** @type {Number} [dxTick=0] - Any optional value passed to the `dx` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
-	export let dxTick = 4;
-
-	/** @type {Number} [dyTick=-4] - Any optional value passed to the `dy` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
-	export let dyTick = 16;
-
-	$: isBandwidth = typeof x.bandwidth === 'function';
-	$: halfBand = x.bandwidth ? x.bandwidth() / 2 : 0;
-
-	$: tickVals = Array.isArray(ticks) ? ticks : isBandwidth ? x.domain() : typeof ticks === 'function' ? ticks(x.ticks()) : x.ticks(ticks);
+	let x = $derived(transform.rescaleX($xScale));
 
 	function textAnchor(i: number) {
 		return 'start';
 	}
+
+	let isBandwidth = $derived(typeof x.bandwidth === 'function');
+	/** Half the band width, to centre marks within the band on ordinal scales; 0 otherwise. */
+	let halfBand = $derived(x.bandwidth ? x.bandwidth() / 2 : 0);
+	let tickVals = $derived(Array.isArray(ticks) ? ticks : isBandwidth ? x.domain() : typeof ticks === 'function' ? ticks(x.ticks()) : x.ticks(ticks));
 </script>
 
 <g class="axis x-axis" class:snapTicks transform="translate(0, {$padding.bottom})">

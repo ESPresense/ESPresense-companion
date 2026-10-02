@@ -7,7 +7,11 @@
 	import NodeActiveId from './NodeActiveId.svelte';
 	import VersionPicker from './VersionPicker.svelte';
 
-	export let onselected: ((node: Node) => void) | undefined = undefined;
+	interface Props {
+		onselected?: ((node: Node) => void) | undefined;
+	}
+
+	let { onselected = undefined }: Props = $props();
 
 	let columns = [
 		{

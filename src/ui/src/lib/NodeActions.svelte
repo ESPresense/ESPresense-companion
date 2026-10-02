@@ -9,12 +9,16 @@
 	import Firmware from '$lib/modals/Firmware.svelte';
 	import NodeSettingsModal from '$lib/modals/NodeSettingsModal.svelte';
 
-	export let row: Node; // Node data for this row
-	export let col: string; // Column identifier from parent table
-	$: _ = col; // Suppress unused variable warning while preserving the prop
+	interface Props {
+		row: Node; // Node data for this row
+		col: string; // Column identifier from parent table
+	}
+
+	let { row, col }: Props = $props();
+	let _ = $derived(col); // Suppress unused variable warning while preserving the prop
 
 	const toastStore = getToastStore();
-	let loadingEdit = false;
+	let loadingEdit = $state(false);
 
 	async function onRestart(node: Node) {
 		try {

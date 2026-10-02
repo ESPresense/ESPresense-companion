@@ -16,46 +16,38 @@
 		xRange: Readable<number[]>;
 		yScale: Readable<AxisScale>;
 	} = getContext('LayerCake');
-	const { padding, xRange, xScale, yScale } = context;
+	const { padding, xRange, yScale } = context;
 
-	export let transform = zoomIdentity;
+	interface Props {
+		/** The current d3-zoom transform; the y-scale is rescaled through it so the axis follows pan/zoom. */
+		transform?: typeof zoomIdentity;
+		/** Extend lines from the ticks into the chart space */
+		gridlines?: boolean;
+		/** Show a vertical mark for each tick. */
+		tickMarks?: boolean;
+		/** A function that passes the current tick value and expects a nicely formatted value in return. */
+		formatTick?: (d: number) => string | number;
+		/** If this is a number, it passes that along to the [d3Scale.ticks](https://github.com/d3/d3-scale) function. If this is an array, hardcodes the ticks to those values. If it's a function, passes along the default tick values and expects an array of tick values in return. */
+		ticks?: Ticks;
+		/** How far over to position the text marker. */
+		xTick?: number;
+		/** How far up and down to position the text marker. */
+		yTick?: number;
+		/** Any optional value passed to the `dx` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+		dxTick?: number;
+		/** Any optional value passed to the `dy` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+		dyTick?: number;
+		textAnchor?: string;
+	}
 
-	let x = $xScale;
-	let y = $yScale;
-	$: x = transform.rescaleX($xScale);
-	$: y = transform.rescaleY($yScale);
+	let { transform = zoomIdentity, gridlines = false, tickMarks = true, formatTick = (d) => d, ticks = undefined, xTick = 0, yTick = 0, dxTick = 0, dyTick = -4, textAnchor = 'start' }: Props = $props();
 
-	/** @type {Boolean} [gridlines=true] - Extend lines from the ticks into the chart space */
-	export let gridlines = false;
+	let y = $derived(transform.rescaleY($yScale));
 
-	/** @type {Boolean} [tickMarks=false] - Show a vertical mark for each tick. */
-	export let tickMarks = true;
-
-	/** A function that passes the current tick value and expects a nicely formatted value in return. */
-	export let formatTick: (d: number) => string | number = (d) => d;
-
-	/** If this is a number, it passes that along to the [d3Scale.ticks](https://github.com/d3/d3-scale) function. If this is an array, hardcodes the ticks to those values. If it's a function, passes along the default tick values and expects an array of tick values in return. */
-	export let ticks: Ticks = undefined;
-
-	/** @type {Number} [xTick=0] - How far over to position the text marker. */
-	export let xTick = 0;
-
-	/** @type {Number} [yTick=0] - How far up and down to position the text marker. */
-	export let yTick = 0;
-
-	/** @type {Number} [dxTick=0] - Any optional value passed to the `dx` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
-	export let dxTick = 0;
-
-	/** @type {Number} [dyTick=-4] - Any optional value passed to the `dy` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
-	export let dyTick = -4;
-
-	/** @type {String} [textAnchor='start'] The CSS `text-anchor` passed to the label. This is automatically set to "end" if the scale has a bandwidth method, like in ordinal scales. */
-	export let textAnchor = 'start';
-
-	$: isBandwidth = typeof y.bandwidth === 'function';
-	$: halfBand = y.bandwidth ? y.bandwidth() / 2 : 0;
-
-	$: tickVals = Array.isArray(ticks) ? ticks : isBandwidth ? y.domain() : typeof ticks === 'function' ? ticks(y.ticks()) : y.ticks(ticks);
+	let isBandwidth = $derived(typeof y.bandwidth === 'function');
+	/** Half the band width, to centre marks within the band on ordinal scales; 0 otherwise. */
+	let halfBand = $derived(y.bandwidth ? y.bandwidth() / 2 : 0);
+	let tickVals = $derived(Array.isArray(ticks) ? ticks : isBandwidth ? y.domain() : typeof ticks === 'function' ? ticks(y.ticks()) : y.ticks(ticks));
 </script>
 
 <g class="axis y-axis" transform="translate({-$padding.left}, 0)">

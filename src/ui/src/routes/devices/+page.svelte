@@ -7,7 +7,7 @@
 	import { get } from 'svelte/store';
 	import { apiUrl } from '$lib/api';
 
-	let locatingStatus = 'Starting';
+	let locatingStatus = $state('Starting');
 
 	onMount(() => {
 		(async () => {
