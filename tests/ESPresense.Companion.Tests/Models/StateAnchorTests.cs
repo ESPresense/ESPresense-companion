@@ -72,7 +72,7 @@ public class StateAnchorTests
         Assert.That(scenarios, Has.Count.EqualTo(1));
         var scenario = scenarios[0];
         Assert.That(scenario.Name, Is.EqualTo("Anchored"));
-        Assert.That(scenario.Confidence, Is.EqualTo(100));
+        Assert.That(scenario.Confidence, Is.EqualTo(1.0));
         Assert.That(scenario.Floor, Is.EqualTo(anchor.Floor));
         Assert.That(scenario.Room, Is.EqualTo(anchor.Room));
     }
@@ -110,7 +110,7 @@ public class StateAnchorTests
 
         // Assert
         Assert.That(scenario.Location, Is.EqualTo(anchorLocation));
-        Assert.That(scenario.Confidence, Is.EqualTo(100));
+        Assert.That(scenario.Confidence, Is.EqualTo(1.0));
         Assert.That(moved, Is.True); // Should have moved from null to anchor location
     }
 

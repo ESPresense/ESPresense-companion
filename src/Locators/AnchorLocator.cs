@@ -37,7 +37,7 @@ public class AnchorLocator : ILocate
         scenario.Error = 0.0;
         scenario.Iterations = 0;
         scenario.ResetLocation(_anchorLocation);
-        scenario.Confidence = 100;
+        scenario.Confidence = 1.0;
 
         // Prefer explicit floor/room if provided, otherwise try to find them spatially
         if (_floor != null || _room != null)

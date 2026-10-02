@@ -13,7 +13,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
     private readonly KalmanLocation _kalmanLocation = new();
 
     public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
-    public int? Confidence { get; set; }
+    public double? Confidence { get; set; }
 
     /// <summary>
     /// Confidence value weighted by motion consistency with the predicted location
@@ -30,6 +30,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
     public string? Name { get; } = name;
     public Room? Room { get; set; }
     public double? Error { get; set; }
+    public double? Rmse { get; set; }
     public int? Iterations { get; set; }
     public ExitCondition ReasonForExit { get; set; }
     public Floor? Floor { get; set; }

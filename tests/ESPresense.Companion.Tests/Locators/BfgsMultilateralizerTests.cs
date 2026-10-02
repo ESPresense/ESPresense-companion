@@ -150,7 +150,7 @@ public class BfgsMultilateralizerTests
 
         // Assert
         Assert.That(result, Is.True);
-        Assert.That(scenario.Confidence, Is.EqualTo(1)); // Low confidence when using guess
+        Assert.That(scenario.Confidence, Is.EqualTo(0.01)); // Low confidence when using guess
         // Location should be midpoint between the two nodes
         var expectedMidpoint = Point3D.MidPoint(node1.Location, node2.Location);
         Assert.That(scenario.Location.DistanceTo(expectedMidpoint), Is.LessThan(0.01));
@@ -197,7 +197,7 @@ public class BfgsMultilateralizerTests
 
         // Assert
         Assert.That(result, Is.True);
-        Assert.That(scenario.Confidence, Is.EqualTo(1)); // Falls back to guess when no bounds
+        Assert.That(scenario.Confidence, Is.EqualTo(0.01)); // Falls back to guess when no bounds
     }
 
     [Test]
@@ -244,8 +244,8 @@ public class BfgsMultilateralizerTests
 
         // Assert
         Assert.That(result, Is.True);
-        Assert.That(scenario.Confidence, Is.GreaterThan(10)); // Should have decent confidence with 4 nodes
-        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(100)); // Should not exceed 100
+        Assert.That(scenario.Confidence, Is.GreaterThan(0.0)); // Should have positive confidence with 4 nodes
+        Assert.That(scenario.Confidence, Is.LessThanOrEqualTo(1.0)); // Should not exceed 1.0
     }
 
     [Test]

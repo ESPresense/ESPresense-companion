@@ -139,7 +139,7 @@ public class NearestNodeTests
         // Assert
         Assert.That(moved, Is.True);
         Assert.That(scenario.Location, Is.EqualTo(location));
-        Assert.That(scenario.Confidence, Is.EqualTo(1));
+        Assert.That(scenario.Confidence, Is.EqualTo(0.01));
         Assert.That(scenario.Fixes, Is.EqualTo(1));
         Assert.That(scenario.Floor, Is.EqualTo(insideFloor));
         Assert.That(scenario.Room, Is.EqualTo(insideFloor.Rooms.Values.First()));
