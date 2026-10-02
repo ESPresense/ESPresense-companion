@@ -13,7 +13,7 @@
 	export let onselected: ((node: Node) => void) | undefined = undefined;
 
 	let floor: Floor | undefined;
-	$: selectedNodes = $nodes?.filter((n) => !floorId || n?.floors.includes(floorId));
+	$: selectedNodes = $nodes?.filter((n) => !floorId || n?.floors?.includes(floorId));
 	$: floor = $config?.floors?.find((f) => f.id == floorId);
 </script>
 
