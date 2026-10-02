@@ -17,7 +17,9 @@
 	let { transform = zoomIdentity, floorId = null, deviceId = null, nodeId = null, onhovered = undefined, onselected = undefined }: Props = $props();
 
 	let floor: Floor | undefined = $derived($config?.floors?.find((f) => f.id == floorId));
-	let selectedNodes = $derived($nodes?.filter((n) => !floorId || n?.floors.includes(floorId)));
+	// `floors` is null for nodes that aren't placed in the config yet, so it must be guarded
+	// as well as `n` — otherwise selecting a floor throws once per poll tick.
+	let selectedNodes = $derived($nodes?.filter((n) => !floorId || n?.floors?.includes(floorId)));
 </script>
 
 <g transform={transform.toString()}>
