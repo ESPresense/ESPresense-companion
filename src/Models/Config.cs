@@ -171,6 +171,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "legacy"; // Options: global_absorption, per_node_absorption, legacy
         [YamlMember(Alias = "interval_secs")] public int IntervalSecs { get; set; } = 60;
         [YamlMember(Alias = "keep_snapshot_mins")] public int KeepSnapshotMins { get; set; } = 5;
+        [YamlMember(Alias = "min_samples")] public int MinSamples { get; set; } = 5; // Minimum measurements an optimizer result must be evaluated on before it can be applied
         [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set; } = new();
         [YamlMember(Alias = "weights")] public Dictionary<string, double> Weights { get; set; } = new();
 

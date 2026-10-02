@@ -97,6 +97,50 @@ namespace ESPresense.Services
 
             if (ds.Calibration.RxRefRssi != null && ds.Calibration.RxRefRssi != old.Calibration.RxRefRssi)
                 await mqtt.UpdateSetting(id, "ref_rssi", ds.Calibration.RxRefRssi, retain, old.Calibration.RxRefRssi);
+
+            // Optimistically apply the requested values to the in-memory cache so a Get() right after
+            // Set() reflects them instead of being stale until the broker echoes each setting back.
+            // Merge against the latest entry to preserve unrelated updates received while publishing.
+            // The echo path in ExecuteAsync still overwrites the cache with whatever the broker retains.
+            _storeById.AddOrUpdate(id,
+                _ => Merge(new NodeSettings(id), ds),
+                (_, current) => Merge(current, ds));
+        }
+
+        /// <summary>
+        /// Returns a copy of <paramref name="current"/> with every non-null value of <paramref name="incoming"/> applied,
+        /// mirroring what the broker will echo back for a <see cref="Set"/> of <paramref name="incoming"/>.
+        /// </summary>
+        private static NodeSettings Merge(NodeSettings current, NodeSettings incoming)
+        {
+            var merged = current.Clone();
+
+            merged.Name = incoming.Name ?? merged.Name;
+
+            merged.Updating.AutoUpdate = incoming.Updating.AutoUpdate ?? merged.Updating.AutoUpdate;
+            merged.Updating.Prerelease = incoming.Updating.Prerelease ?? merged.Updating.Prerelease;
+
+            merged.Scanning.ForgetAfterMs = incoming.Scanning.ForgetAfterMs ?? merged.Scanning.ForgetAfterMs;
+
+            merged.Counting.IdPrefixes = incoming.Counting.IdPrefixes ?? merged.Counting.IdPrefixes;
+            merged.Counting.MinDistance = incoming.Counting.MinDistance ?? merged.Counting.MinDistance;
+            merged.Counting.MaxDistance = incoming.Counting.MaxDistance ?? merged.Counting.MaxDistance;
+            merged.Counting.MinMs = incoming.Counting.MinMs ?? merged.Counting.MinMs;
+
+            merged.Filtering.IncludeIds = incoming.Filtering.IncludeIds ?? merged.Filtering.IncludeIds;
+            merged.Filtering.ExcludeIds = incoming.Filtering.ExcludeIds ?? merged.Filtering.ExcludeIds;
+            merged.Filtering.MaxDistance = incoming.Filtering.MaxDistance ?? merged.Filtering.MaxDistance;
+            merged.Filtering.SkipDistance = incoming.Filtering.SkipDistance ?? merged.Filtering.SkipDistance;
+            merged.Filtering.SkipMs = incoming.Filtering.SkipMs ?? merged.Filtering.SkipMs;
+
+            // MqttCoordinatorExtensions.UpdateSetting publishes 0 as "" for absorption, rx_adj_rssi and
+            // tx_ref_rssi, which the echo parses back as null; mirror that so the cache matches the echo.
+            merged.Calibration.Absorption = incoming.Calibration.Absorption is 0.0 ? null : incoming.Calibration.Absorption ?? merged.Calibration.Absorption;
+            merged.Calibration.RxAdjRssi = incoming.Calibration.RxAdjRssi is 0 ? null : incoming.Calibration.RxAdjRssi ?? merged.Calibration.RxAdjRssi;
+            merged.Calibration.TxRefRssi = incoming.Calibration.TxRefRssi is 0 ? null : incoming.Calibration.TxRefRssi ?? merged.Calibration.TxRefRssi;
+            merged.Calibration.RxRefRssi = incoming.Calibration.RxRefRssi ?? merged.Calibration.RxRefRssi;
+
+            return merged;
         }
 
         /// <summary>
@@ -118,68 +162,84 @@ namespace ESPresense.Services
                     return Task.CompletedTask;
                 try
                 {
-                    var ns = Get(arg.NodeId);
-                    switch (arg.Setting)
+                    // Retry against the latest entry if a Set or another MQTT update wins the race.
+                    while (true)
                     {
-                        case "name":
-                            ns.Name = arg.Payload;
-                            break;
+                        var exists = _storeById.TryGetValue(arg.NodeId, out var current);
+                        var ns = current?.Clone() ?? new NodeSettings(arg.NodeId);
+                        switch (arg.Setting)
+                        {
+                            case "name":
+                                ns.Name = arg.Payload;
+                                break;
 
-                        // Updating settings
-                        case "auto_update":
-                            ns.Updating.AutoUpdate = ParseBool(arg.Payload);
-                            break;
-                        case "prerelease":
-                            ns.Updating.Prerelease = ParseBool(arg.Payload);
-                            break;
+                            // Updating settings
+                            case "auto_update":
+                                ns.Updating.AutoUpdate = ParseBool(arg.Payload);
+                                break;
+                            case "prerelease":
+                                ns.Updating.Prerelease = ParseBool(arg.Payload);
+                                break;
 
-                        // Counting settings
-                        case "count_ids":
-                            ns.Counting.IdPrefixes = arg.Payload;
-                            break;
-                        case "count_min_dist":
-                            ns.Counting.MinDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "count_max_dist":
-                            ns.Counting.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
+                            // Scanning settings
+                            case "forget_after_ms":
+                                ns.Scanning.ForgetAfterMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
 
-                        // Filtering settings
-                        case "include":
-                            ns.Filtering.IncludeIds = arg.Payload;
-                            break;
-                        case "exclude":
-                            ns.Filtering.ExcludeIds = arg.Payload;
-                            break;
-                        case "max_distance":
-                            ns.Filtering.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "skip_distance":
-                            ns.Filtering.SkipDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "skip_ms":
-                            ns.Filtering.SkipMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
+                            // Counting settings
+                            case "count_ids":
+                                ns.Counting.IdPrefixes = arg.Payload;
+                                break;
+                            case "count_min_dist":
+                                ns.Counting.MinDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "count_max_dist":
+                                ns.Counting.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "count_ms":
+                                ns.Counting.MinMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
 
-                        // Calibration settings
-                        case "absorption":
-                            ns.Calibration.Absorption = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "rx_adj_rssi":
-                            ns.Calibration.RxAdjRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
-                        case "tx_ref_rssi":
-                            ns.Calibration.TxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
-                        case "ref_rssi":
-                            ns.Calibration.RxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
+                            // Filtering settings
+                            case "include":
+                                ns.Filtering.IncludeIds = arg.Payload;
+                                break;
+                            case "exclude":
+                                ns.Filtering.ExcludeIds = arg.Payload;
+                                break;
+                            case "max_distance":
+                                ns.Filtering.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "skip_distance":
+                                ns.Filtering.SkipDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "skip_ms":
+                                ns.Filtering.SkipMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
 
-                        default:
-                            return Task.CompletedTask;
+                            // Calibration settings
+                            case "absorption":
+                                ns.Calibration.Absorption = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "rx_adj_rssi":
+                                ns.Calibration.RxAdjRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
+                            case "tx_ref_rssi":
+                                ns.Calibration.TxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
+                            case "ref_rssi":
+                                ns.Calibration.RxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
+
+                            default:
+                                return Task.CompletedTask;
+                        }
+
+                        if (exists
+                            ? _storeById.TryUpdate(arg.NodeId, ns, current!)
+                            : _storeById.TryAdd(arg.NodeId, ns))
+                            break;
                     }
-
-                    _storeById.AddOrUpdate(arg.NodeId, _ => ns, (_, _) => ns);
                 }
                 catch (Exception ex)
                 {

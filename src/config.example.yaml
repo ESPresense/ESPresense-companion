@@ -35,6 +35,7 @@ optimization:
   enabled: true
   interval_secs: 3600
   keep_snapshot_mins: 5   # How long to keep optimization snapshots (default: 5 minutes)
+  min_samples: 5          # Minimum measurements an optimizer result must be evaluated on before it is applied (default: 5)
   optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:
     absorption_min: 2.5

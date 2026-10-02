@@ -6,11 +6,17 @@ using System.Linq;
 
 namespace ESPresense.Models;
 
+/// <summary>
+/// Outcome of <see cref="OptimizationResults.Evaluate"/>: fit quality plus the number of measurements it was computed from,
+/// so callers can refuse to act on a fit that is only supported by a handful of samples.
+/// </summary>
+public readonly record struct OptimizationEvaluation(double Correlation, double RMSE, int Samples);
+
 public class OptimizationResults
 {
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
-    public (double Correlation, double RMSE) Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss)
+    public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss)
     {
         List<double> predictedValues = new();
         List<double> measuredValues = new();
@@ -30,6 +36,10 @@ public class OptimizationResults
                     continue;
 
                 double mapDistance = m.Rx.Location.DistanceTo(m.Tx.Location);
+                // Log10(0) is -Infinity and Log10(NaN) is NaN, which would poison the RMSE/correlation
+                // for the whole evaluation; skip degenerate measures as IsotonicRegressionOptimizer does.
+                if (mapDistance <= 0 || double.IsNaN(mapDistance) || double.IsInfinity(mapDistance))
+                    continue;
 
                 double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
                 double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;
@@ -46,6 +56,6 @@ public class OptimizationResults
         var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
         var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
 
-        return (correlation, rmse);
+        return new OptimizationEvaluation(correlation, rmse, predictedValues.Count);
     }
 }
