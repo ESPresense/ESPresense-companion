@@ -12,20 +12,26 @@ public class NodeSettingsStoreTests
 {
     private Mock<IMqttCoordinator> _mqtt = null!;
     private NodeSettingsStore _store = null!;
+    private Func<NodeSettingReceivedEventArgs, Task> _receive = null!;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mqtt = new Mock<IMqttCoordinator>();
         _mqtt.Setup(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
             .Returns(Task.CompletedTask);
 
+        var subscribed = new TaskCompletionSource<Func<NodeSettingReceivedEventArgs, Task>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _mqtt.SetupAdd(m => m.NodeSettingReceivedAsync += It.IsAny<Func<NodeSettingReceivedEventArgs, Task>>())
+            .Callback<Func<NodeSettingReceivedEventArgs, Task>>(handler => subscribed.TrySetResult(handler));
+
         _store = new NodeSettingsStore(_mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
 
-        // Start the background service so it subscribes to NodeSettingReceivedAsync
-        var startTask = _store.StartAsync(CancellationToken.None);
-        startTask.Wait(TimeSpan.FromSeconds(1));
-        Assert.That(startTask.IsCompleted, Is.True, "Service should start within 1 second");
+        // StartAsync can complete before ExecuteAsync subscribes. Capture the handler so tests
+        // wait for readiness and do not depend on the mock's event-registration timing either.
+        await _store.StartAsync(CancellationToken.None);
+        _receive = await subscribed.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [TearDown]
@@ -37,8 +43,8 @@ public class NodeSettingsStoreTests
 
     private void Receive(string nodeId, string setting, string payload)
     {
-        _mqtt.Raise(m => m.NodeSettingReceivedAsync += null,
-            new NodeSettingReceivedEventArgs { NodeId = nodeId, Setting = setting, Payload = payload });
+        _receive(new NodeSettingReceivedEventArgs { NodeId = nodeId, Setting = setting, Payload = payload })
+            .GetAwaiter().GetResult();
     }
 
     [Test]
