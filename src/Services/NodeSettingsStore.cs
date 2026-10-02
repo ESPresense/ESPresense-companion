@@ -100,9 +100,11 @@ namespace ESPresense.Services
 
             // Optimistically apply the requested values to the in-memory cache so a Get() right after
             // Set() reflects them instead of being stale until the broker echoes each setting back.
+            // Merge against the latest entry to preserve unrelated updates received while publishing.
             // The echo path in ExecuteAsync still overwrites the cache with whatever the broker retains.
-            var merged = Merge(old, ds);
-            _storeById.AddOrUpdate(id, _ => merged, (_, _) => merged);
+            _storeById.AddOrUpdate(id,
+                _ => Merge(new NodeSettings(id), ds),
+                (_, current) => Merge(current, ds));
         }
 
         /// <summary>
@@ -160,76 +162,84 @@ namespace ESPresense.Services
                     return Task.CompletedTask;
                 try
                 {
-                    var ns = Get(arg.NodeId);
-                    switch (arg.Setting)
+                    // Retry against the latest entry if a Set or another MQTT update wins the race.
+                    while (true)
                     {
-                        case "name":
-                            ns.Name = arg.Payload;
-                            break;
+                        var exists = _storeById.TryGetValue(arg.NodeId, out var current);
+                        var ns = current?.Clone() ?? new NodeSettings(arg.NodeId);
+                        switch (arg.Setting)
+                        {
+                            case "name":
+                                ns.Name = arg.Payload;
+                                break;
 
-                        // Updating settings
-                        case "auto_update":
-                            ns.Updating.AutoUpdate = ParseBool(arg.Payload);
-                            break;
-                        case "prerelease":
-                            ns.Updating.Prerelease = ParseBool(arg.Payload);
-                            break;
+                            // Updating settings
+                            case "auto_update":
+                                ns.Updating.AutoUpdate = ParseBool(arg.Payload);
+                                break;
+                            case "prerelease":
+                                ns.Updating.Prerelease = ParseBool(arg.Payload);
+                                break;
 
-                        // Scanning settings
-                        case "forget_after_ms":
-                            ns.Scanning.ForgetAfterMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
+                            // Scanning settings
+                            case "forget_after_ms":
+                                ns.Scanning.ForgetAfterMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
 
-                        // Counting settings
-                        case "count_ids":
-                            ns.Counting.IdPrefixes = arg.Payload;
-                            break;
-                        case "count_min_dist":
-                            ns.Counting.MinDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "count_max_dist":
-                            ns.Counting.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "count_ms":
-                            ns.Counting.MinMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
+                            // Counting settings
+                            case "count_ids":
+                                ns.Counting.IdPrefixes = arg.Payload;
+                                break;
+                            case "count_min_dist":
+                                ns.Counting.MinDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "count_max_dist":
+                                ns.Counting.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "count_ms":
+                                ns.Counting.MinMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
 
-                        // Filtering settings
-                        case "include":
-                            ns.Filtering.IncludeIds = arg.Payload;
-                            break;
-                        case "exclude":
-                            ns.Filtering.ExcludeIds = arg.Payload;
-                            break;
-                        case "max_distance":
-                            ns.Filtering.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "skip_distance":
-                            ns.Filtering.SkipDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "skip_ms":
-                            ns.Filtering.SkipMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
+                            // Filtering settings
+                            case "include":
+                                ns.Filtering.IncludeIds = arg.Payload;
+                                break;
+                            case "exclude":
+                                ns.Filtering.ExcludeIds = arg.Payload;
+                                break;
+                            case "max_distance":
+                                ns.Filtering.MaxDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "skip_distance":
+                                ns.Filtering.SkipDistance = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "skip_ms":
+                                ns.Filtering.SkipMs = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
 
-                        // Calibration settings
-                        case "absorption":
-                            ns.Calibration.Absorption = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
-                            break;
-                        case "rx_adj_rssi":
-                            ns.Calibration.RxAdjRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
-                        case "tx_ref_rssi":
-                            ns.Calibration.TxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
-                        case "ref_rssi":
-                            ns.Calibration.RxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
-                            break;
+                            // Calibration settings
+                            case "absorption":
+                                ns.Calibration.Absorption = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
+                                break;
+                            case "rx_adj_rssi":
+                                ns.Calibration.RxAdjRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
+                            case "tx_ref_rssi":
+                                ns.Calibration.TxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
+                            case "ref_rssi":
+                                ns.Calibration.RxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
 
-                        default:
-                            return Task.CompletedTask;
+                            default:
+                                return Task.CompletedTask;
+                        }
+
+                        if (exists
+                            ? _storeById.TryUpdate(arg.NodeId, ns, current!)
+                            : _storeById.TryAdd(arg.NodeId, ns))
+                            break;
                     }
-
-                    _storeById.AddOrUpdate(arg.NodeId, _ => ns, (_, _) => ns);
                 }
                 catch (Exception ex)
                 {

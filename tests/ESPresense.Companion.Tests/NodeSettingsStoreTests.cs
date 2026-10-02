@@ -134,6 +134,44 @@ public class NodeSettingsStoreTests
         Assert.That(result.Counting.MinMs, Is.EqualTo(30000));
     }
 
+    [TestCase("Kitchen")]
+    [TestCase("")]
+    public async Task Set_PreservesBrokerUpdateReceivedWhilePublishing(string name)
+    {
+        Receive("node-1", "name", "Original");
+        var publish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _mqtt.Setup(m => m.EnqueueAsync("espresense/rooms/node-1/count_ms/set", "30000", false))
+            .Returns(publish.Task);
+
+        var pending = _store.Set("node-1", new NodeSettings("node-1") { Counting = { MinMs = 30000 } });
+        Assert.That(pending.IsCompleted, Is.False);
+        Receive("node-1", "name", name);
+        publish.SetResult();
+        await pending;
+
+        var result = _store.Get("node-1");
+        Assert.That(result.Name, Is.EqualTo(name));
+        Assert.That(result.Counting.MinMs, Is.EqualTo(30000));
+    }
+
+    [Test]
+    public async Task Set_PreservesAnotherSetCompletedWhilePublishing()
+    {
+        var publish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _mqtt.Setup(m => m.EnqueueAsync("espresense/rooms/node-1/count_ms/set", "30000", false))
+            .Returns(publish.Task);
+
+        var pending = _store.Set("node-1", new NodeSettings("node-1") { Counting = { MinMs = 30000 } });
+        Assert.That(pending.IsCompleted, Is.False);
+        await _store.Set("node-1", new NodeSettings("node-1") { Name = "Kitchen" });
+        publish.SetResult();
+        await pending;
+
+        var result = _store.Get("node-1");
+        Assert.That(result.Name, Is.EqualTo("Kitchen"));
+        Assert.That(result.Counting.MinMs, Is.EqualTo(30000));
+    }
+
     /// <summary>
     /// Merge is a hand-written field-by-field copy, so a property added to NodeSettings (or to one of its
     /// nested settings classes) would silently stop being cached without any compile error. This drives the
