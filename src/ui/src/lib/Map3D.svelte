@@ -259,8 +259,6 @@
 		renderer.setClearColor(0x1e293b, 1); // Back to slate-800
 		renderer.autoClear = true;
 		renderer.shadowMap.enabled = true;
-		// PCFSoftShadowMap was removed from three's shadow renderer; it already fell back to
-		// PCFShadowMap at runtime, so this is the behaviour we've been getting, minus the warning.
 		renderer.shadowMap.type = THREE.PCFShadowMap;
 		// eslint-disable-next-line svelte/no-dom-manipulating -- Three.js owns its canvas; Svelte never renders it
 		container.appendChild(renderer.domElement);
