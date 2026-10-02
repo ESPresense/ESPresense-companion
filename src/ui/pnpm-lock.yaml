@@ -105,8 +105,8 @@ importers:
         specifier: ^10.0.3
         version: 10.0.3(svelte@5.57.0(@typescript-eslint/types@8.70.0))
       ol:
-        specifier: ^10.9.0
-        version: 10.9.0
+        specifier: ^10.10.0
+        version: 10.10.0
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
@@ -1727,8 +1727,8 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
-  geotiff@3.0.5:
-    resolution: {integrity: sha512-OWcL9S9+yDZ6iAlXMt32T1iwUApJM8UiD47xbm6ZP1h33d10fqkPs14EG/ttT5EnefpZSx3G15iDFC5FxUNUwA==}
+  geotiff@3.1.0-beta.0:
+    resolution: {integrity: sha512-wbVwOaQYuN+ywly5NoMXn37nHslwkQg5EFHqMeUTtjDACrSag0EEVlFsc+2DK3Pzmmp6XzJW2RTZOamPsBM6ng==}
     engines: {node: '>=10.19'}
 
   glob-parent@6.0.2:
@@ -1981,8 +1981,8 @@ packages:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
 
-  ol@10.9.0:
-    resolution: {integrity: sha512-svbbgVQUmEHaKpLQ8kRySojs59Brvgl2zYIrqG9eQNXGfsbi55rQasZIDpwpQzDL6OlzrUb0H4hQaiX9wDoGmA==}
+  ol@10.10.0:
+    resolution: {integrity: sha512-tLPKn6zl+6uWdPufYlqG/lQzuVUTVmfwahQqVr5+wZNyZecyAtIhMTyOtKpu7ooNDLY2sEjKZNXw9HL+sOjC1A==}
 
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
@@ -2016,8 +2016,8 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
-  pbf@4.0.1:
-    resolution: {integrity: sha512-SuLdBvS42z33m8ejRbInMapQe8n0D3vN/Xd5fmWM3tufNgRQFBpaW2YVJxQZV4iPNqb0vEFvssMEo5w9c6BTIA==}
+  pbf@5.1.2:
+    resolution: {integrity: sha512-mnvGdvOrIvJOBGUEdGkrVXjN8E/VkIJCkf2eS1DH2yv82ORUlLttmDt0rWY38yYZmVwciZwBUvHM20qxBZf40w==}
     hasBin: true
 
   picocolors@1.1.1:
@@ -4244,7 +4244,7 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  geotiff@3.0.5:
+  geotiff@3.1.0-beta.0:
     dependencies:
       '@petamoriken/float16': 3.9.3
       lerc: 3.0.0
@@ -4453,12 +4453,12 @@ snapshots:
 
   obug@2.1.4: {}
 
-  ol@10.9.0:
+  ol@10.10.0:
     dependencies:
       '@types/rbush': 4.0.0
       earcut: 3.0.2
-      geotiff: 3.0.5
-      pbf: 4.0.1
+      geotiff: 3.1.0-beta.0
+      pbf: 5.1.2
       rbush: 4.0.1
       zarrita: 0.7.3
 
@@ -4493,7 +4493,7 @@ snapshots:
 
   pathe@2.0.3: {}
 
-  pbf@4.0.1:
+  pbf@5.1.2:
     dependencies:
       resolve-protobuf-schema: 2.1.0
 
