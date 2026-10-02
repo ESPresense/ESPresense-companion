@@ -182,7 +182,7 @@
 			const style = path.userData?.style as { fill?: unknown } | undefined;
 			const fill = style?.fill;
 			if (fill && typeof fill === 'string' && fill.toLowerCase() === '#ffffff') return;
-			const shapes = SVGLoader.createShapes(path);
+			const shapes = path.toShapes();
 			shapes.forEach((shape) => {
 				geometries.push(new THREE.ExtrudeGeometry(shape, extrudeSettings));
 			});
@@ -259,7 +259,9 @@
 		renderer.setClearColor(0x1e293b, 1); // Back to slate-800
 		renderer.autoClear = true;
 		renderer.shadowMap.enabled = true;
-		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+		// PCFSoftShadowMap was removed from three's shadow renderer; it already fell back to
+		// PCFShadowMap at runtime, so this is the behaviour we've been getting, minus the warning.
+		renderer.shadowMap.type = THREE.PCFShadowMap;
 		// eslint-disable-next-line svelte/no-dom-manipulating -- Three.js owns its canvas; Svelte never renders it
 		container.appendChild(renderer.domElement);
 
