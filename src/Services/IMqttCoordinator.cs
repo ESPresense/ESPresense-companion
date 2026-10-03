@@ -25,23 +25,25 @@ public interface IMqttCoordinator
     // Methods
 
     /// <summary>
-    /// Enqueues an MQTT message for delivery (or logs intent when coordinator is in read-only mode).
+    /// Publishes an MQTT message and awaits the publish (there is no outbound queue despite the name;
+    /// the call completes when the message has been sent, or throws). In read-only mode the message is
+    /// not sent and the intent is logged instead.
     /// </summary>
     /// <param name="topic">MQTT topic to publish to.</param>
     /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
     /// <param name="retain">If true, the broker will retain the message.</param>
-    /// <returns>A task that completes when the message has been enqueued or the intent has been logged.</returns>
+    /// <returns>A task that completes when the message has been published or the intent has been logged.</returns>
     Task EnqueueAsync(string topic, string? payload, bool retain = false);
 
     /// <summary>
-    /// Attempts to enqueue an MQTT message for delivery without throwing exceptions.
-    /// Logs errors but returns success/failure status instead of propagating exceptions.
+    /// Publishes an MQTT message like <see cref="EnqueueAsync"/> but never throws (except for cancellation).
+    /// Logs errors and returns success/failure status instead of propagating exceptions.
     /// Use this for best-effort publishes (telemetry, status updates) that shouldn't crash background services.
     /// </summary>
     /// <param name="topic">MQTT topic to publish to.</param>
     /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
     /// <param name="retain">If true, the broker will retain the message.</param>
-    /// <returns>True if the message was enqueued successfully, false if an error occurred.</returns>
+    /// <returns>True if the message was published (or logged in read-only mode), false if an error occurred.</returns>
     Task<bool> TryEnqueueAsync(string topic, string? payload, bool retain = false);
 
     /// <summary>
