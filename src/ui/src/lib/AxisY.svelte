@@ -6,65 +6,60 @@
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
 	import type { Readable } from 'svelte/store';
-	import type { ZoomScale } from 'd3-zoom';
+	import type { LayerCakeContext } from '$lib/types';
 
-	const context: {
-		padding: Readable<{ top: number; right: number; bottom: number; left: number }>;
+	/** LayerCake scales are linear here, but ordinal (band) scales are detected at runtime. */
+	type AxisScale = LayerCakeContext['yScale'] extends Readable<infer S> ? S & { bandwidth?: () => number } : never;
+	type Ticks = number | number[] | ((defaultTicks: number[]) => number[]) | undefined;
+
+	const context: Pick<LayerCakeContext, 'padding' | 'xScale'> & {
 		xRange: Readable<number[]>;
-		xScale: Readable<ZoomScale>;
-		yScale: Readable<ZoomScale>;
+		yScale: Readable<AxisScale>;
 	} = getContext('LayerCake');
-	const { padding, xRange, xScale, yScale } = context;
+	const { padding, xRange, yScale } = context;
 
-	export let transform = zoomIdentity;
+	interface Props {
+		/** The current d3-zoom transform; the y-scale is rescaled through it so the axis follows pan/zoom. */
+		transform?: typeof zoomIdentity;
+		/** Extend lines from the ticks into the chart space */
+		gridlines?: boolean;
+		/** Show a vertical mark for each tick. */
+		tickMarks?: boolean;
+		/** A function that passes the current tick value and expects a nicely formatted value in return. */
+		formatTick?: (d: number) => string | number;
+		/** If this is a number, it passes that along to the [d3Scale.ticks](https://github.com/d3/d3-scale) function. If this is an array, hardcodes the ticks to those values. If it's a function, passes along the default tick values and expects an array of tick values in return. */
+		ticks?: Ticks;
+		/** How far over to position the text marker. */
+		xTick?: number;
+		/** How far up and down to position the text marker. */
+		yTick?: number;
+		/** Any optional value passed to the `dx` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+		dxTick?: number;
+		/** Any optional value passed to the `dy` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
+		dyTick?: number;
+		textAnchor?: string;
+	}
 
-	let x = $xScale;
-	let y = $yScale;
-	$: x = transform.rescaleX($xScale);
-	$: y = transform.rescaleY($yScale);
+	let { transform = zoomIdentity, gridlines = false, tickMarks = true, formatTick = (d) => d, ticks = undefined, xTick = 0, yTick = 0, dxTick = 0, dyTick = -4, textAnchor = 'start' }: Props = $props();
 
-	/** @type {Boolean} [gridlines=true] - Extend lines from the ticks into the chart space */
-	export let gridlines = false;
+	let y = $derived(transform.rescaleY($yScale));
 
-	/** @type {Boolean} [tickMarks=false] - Show a vertical mark for each tick. */
-	export let tickMarks = true;
-
-	/** @type {Function} [formatTick=d => d] - A function that passes the current tick value and expects a nicely formatted value in return. */
-	export let formatTick = (d) => d;
-
-	/** @type {Number|Array|Function} [ticks=4] - If this is a number, it passes that along to the [d3Scale.ticks](https://github.com/d3/d3-scale) function. If this is an array, hardcodes the ticks to those values. If it's a function, passes along the default tick values and expects an array of tick values in return. */
-	export let ticks = undefined;
-
-	/** @type {Number} [xTick=0] - How far over to position the text marker. */
-	export let xTick = 0;
-
-	/** @type {Number} [yTick=0] - How far up and down to position the text marker. */
-	export let yTick = 0;
-
-	/** @type {Number} [dxTick=0] - Any optional value passed to the `dx` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
-	export let dxTick = 0;
-
-	/** @type {Number} [dyTick=-4] - Any optional value passed to the `dy` attribute on the text marker and tick mark (if visible). This is ignored on the text marker if your scale is ordinal. */
-	export let dyTick = -4;
-
-	/** @type {String} [textAnchor='start'] The CSS `text-anchor` passed to the label. This is automatically set to "end" if the scale has a bandwidth method, like in ordinal scales. */
-	export let textAnchor = 'start';
-
-	$: isBandwidth = typeof y.bandwidth === 'function';
-
-	$: tickVals = Array.isArray(ticks) ? ticks : isBandwidth ? y.domain() : typeof ticks === 'function' ? ticks(y.ticks()) : y.ticks(ticks);
+	let isBandwidth = $derived(typeof y.bandwidth === 'function');
+	/** Half the band width, to centre marks within the band on ordinal scales; 0 otherwise. */
+	let halfBand = $derived(y.bandwidth ? y.bandwidth() / 2 : 0);
+	let tickVals = $derived(Array.isArray(ticks) ? ticks : isBandwidth ? y.domain() : typeof ticks === 'function' ? ticks(y.ticks()) : y.ticks(ticks));
 </script>
 
 <g class="axis y-axis" transform="translate({-$padding.left}, 0)">
 	{#each tickVals as tick (tick)}
 		<g class="tick tick-{tick}" transform="translate({$xRange[0] + (isBandwidth ? $padding.left : 0)}, {y(tick)})">
 			{#if gridlines !== false}
-				<line class="gridline" x2="100%" y1={yTick + (isBandwidth ? y.bandwidth() / 2 : 0)} y2={yTick + (isBandwidth ? y.bandwidth() / 2 : 0)}></line>
+				<line class="gridline" x2="100%" y1={yTick + (isBandwidth ? halfBand : 0)} y2={yTick + (isBandwidth ? halfBand : 0)}></line>
 			{/if}
 			{#if tickMarks === true}
-				<line class="tick-mark" x1="0" x2={isBandwidth ? -6 : 6} y1={yTick + (isBandwidth ? y.bandwidth() / 2 : 0)} y2={yTick + (isBandwidth ? y.bandwidth() / 2 : 0)}></line>
+				<line class="tick-mark" x1="0" x2={isBandwidth ? -6 : 6} y1={yTick + (isBandwidth ? halfBand : 0)} y2={yTick + (isBandwidth ? halfBand : 0)}></line>
 			{/if}
-			<text x={xTick} y={yTick + (isBandwidth ? y.bandwidth() / 2 : 0)} dx={isBandwidth ? -9 : dxTick} dy={isBandwidth ? 4 : dyTick} style="text-anchor:{isBandwidth ? 'end' : textAnchor};">{formatTick(tick)}</text>
+			<text x={xTick} y={yTick + (isBandwidth ? halfBand : 0)} dx={isBandwidth ? -9 : dxTick} dy={isBandwidth ? 4 : dyTick} style="text-anchor:{isBandwidth ? 'end' : textAnchor};">{formatTick(tick)}</text>
 		</g>
 	{/each}
 </g>

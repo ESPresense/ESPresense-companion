@@ -43,21 +43,6 @@ export default [
 		}
 	},
 	{
-		files: ['**/*.svelte'],
-		rules: {
-			// Reads `$:` blocks in source order, but Svelte sorts them by dependency: Room.svelte
-			// legitimately consumes on line 14 a value assigned on line 20.
-			'no-useless-assignment': 'off',
-			// A runes-mode rule. Every hit in this (still mostly Svelte 4) codebase is a local
-			// cache or a temp inside a `$:` block, where reactivity would be wrong. Revisit
-			// with the runes migration in docs/refactor-plan.md.
-			'svelte/prefer-svelte-reactivity': 'off',
-			// Cannot see through `routes.map((r) => ({ resolved: resolve(r.href) }))`, and flags
-			// blob hrefs on download links.
-			'svelte/no-navigation-without-resolve': 'off'
-		}
-	},
-	{
 		ignores: ['.svelte-kit', 'build', 'package', 'coverage', 'node_modules', 'playwright.config.js']
 	}
 ];

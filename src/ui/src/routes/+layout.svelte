@@ -1,7 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
+	import type { Snippet } from 'svelte';
 	import Modal from '$lib/modal/Modal.svelte';
 	import Toast from '$lib/toast/Toast.svelte';
 
@@ -12,23 +13,23 @@
 	import devices from '$lib/images/devices.svg';
 	import calibration from '$lib/images/calibration.svg';
 	import cube from '$lib/images/cube.svg';
+	interface Props {
+		children?: import('svelte').Snippet;
+	}
 
-	$: current = $page.url.pathname;
+	// `$app/state` is only reactive with runes, hence $props/$derived/{@render} in this (tiny) layout.
+	const { children }: { children?: Snippet } = $props();
+	const current = $derived(page.url.pathname);
 
-	const routes = [
-		{ href: '/', name: 'map', icon: map, alt: 'Map' },
-		{ href: '/3d', name: '3d', icon: cube, alt: '3D View' },
-		{ href: '/geolocation', name: 'geolocation', icon: map, alt: 'Geolocation' },
-		{ href: '/devices', name: 'devices', icon: devices, alt: 'Devices' },
-		{ href: '/nodes', name: 'nodes', icon: nodes, alt: 'Nodes' },
-		{ href: '/calibration', name: 'calibration', icon: calibration, alt: 'Calibration' }
+	// `resolve()` is typed per route, so each href is resolved individually.
+	const resolvedRoutes = [
+		{ resolved: resolve('/'), name: 'map', icon: map, alt: 'Map' },
+		{ resolved: resolve('/3d'), name: '3d', icon: cube, alt: '3D View' },
+		{ resolved: resolve('/geolocation'), name: 'geolocation', icon: map, alt: 'Geolocation' },
+		{ resolved: resolve('/devices'), name: 'devices', icon: devices, alt: 'Devices' },
+		{ resolved: resolve('/nodes'), name: 'nodes', icon: nodes, alt: 'Nodes' },
+		{ resolved: resolve('/calibration'), name: 'calibration', icon: calibration, alt: 'Calibration' }
 	];
-
-	// `routes` is a module-level constant, so this never needs to re-run.
-	const resolvedRoutes = routes.map((route) => ({
-		...route,
-		resolved: resolve(route.href)
-	}));
 </script>
 
 <div class="app h-full">
@@ -47,6 +48,7 @@
 			<!-- Navigation Rail -->
 			<nav class="flex flex-col flex-1 items-center space-y-2 px-2">
 				{#each resolvedRoutes as route}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- href is pre-resolved in resolvedRoutes above -->
 					<a href={route.resolved} class="flex flex-col items-center justify-center w-12 h-12 rounded-lg transition-all duration-200 group relative {current === route.resolved ? 'bg-primary-500 text-white shadow-lg' : 'text-surface-700-300 hover:bg-surface-200-800 hover:text-surface-950-50'}" title={route.alt}>
 						<img src={route.icon} class="w-6 h-6 transition-transform group-hover:scale-110" alt={route.alt} />
 
@@ -73,7 +75,7 @@
 
 		<!-- Main Content Area -->
 		<main class="flex-1 overflow-hidden">
-			<slot />
+			{@render children?.()}
 		</main>
 	</div>
 </div>

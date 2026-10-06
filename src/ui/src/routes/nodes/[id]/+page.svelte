@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch } from '$lib/api';
 	import { nodes } from '$lib/stores';
 	import { readable } from 'svelte/store';
 	import type { NodeSettingDetails } from '$lib/types';
@@ -26,11 +26,15 @@
 
 	let accordionValue = $state(['details']);
 
-	const nodeDetails = readable([], (set) => {
+	const nodeDetails = readable<NodeSettingDetails['details']>([], (set) => {
 		async function fetchAndSet() {
+			// `node` is looked up in the nodes store, which is empty on first paint, so this
+			// polled GET used to go to /api/node/undefined. The route's own data always has
+			// the id — it's what `node` is found by — so use that and skip the tick without it.
+			const id = data.settings?.id;
+			if (!id) return;
 			try {
-				const response = await fetch(resolve(`/api/node/${node?.id}`));
-				const result = await response.json();
+				const result = await apiFetch<NodeSettingDetails>(`/api/node/${id}`);
 				set(result.details);
 			} catch (ex) {
 				console.error(ex);

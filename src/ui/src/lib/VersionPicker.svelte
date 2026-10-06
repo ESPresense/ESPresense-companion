@@ -1,10 +1,16 @@
 <script>
 	import { releases, artifacts } from './firmware';
-	export let version = '';
-	export let artifact = '';
-	export let flavor = '-';
-	export let updateMethod = 'self'; // 'self', 'manual', 'recovery'
-	export let firmwareSource = 'release'; // 'release', 'artifact'
+	/**
+	 * @typedef {Object} Props
+	 * @property {string} [version]
+	 * @property {string} [artifact]
+	 * @property {string} [flavor]
+	 * @property {string} [updateMethod] - 'self', 'manual', 'recovery'
+	 * @property {string} [firmwareSource] - 'release', 'artifact'
+	 */
+
+	/** @type {Props} */
+	let { version = $bindable(''), artifact = $bindable(''), flavor = $bindable('-'), updateMethod = $bindable('self'), firmwareSource = $bindable('release') } = $props();
 </script>
 
 <div class="card mb-6 space-y-6 border border-surface-300-700 bg-surface-50-950 p-6 shadow-lg rounded-lg">

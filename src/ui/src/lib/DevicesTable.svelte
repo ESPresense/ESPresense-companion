@@ -6,7 +6,11 @@
 	import DataTable from '$lib/DataTable.svelte';
 	import ago from 's-ago';
 
-	export let onselected: ((device: Device) => void) | undefined = undefined;
+	interface Props {
+		onselected?: ((device: Device) => void) | undefined;
+	}
+
+	let { onselected = undefined }: Props = $props();
 	let selected = '';
 
 	function select(d: Device) {

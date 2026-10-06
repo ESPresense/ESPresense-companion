@@ -3,7 +3,7 @@
 	import DeviceCalibrationManager from '$lib/DeviceCalibrationManager.svelte';
 	import CalibrationTabs from '$lib/CalibrationTabs.svelte';
 
-	let calibrationType = 'node';
+	let calibrationType = $state('node');
 </script>
 
 <svelte:head>

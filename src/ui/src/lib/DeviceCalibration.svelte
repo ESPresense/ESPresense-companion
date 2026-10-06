@@ -1,35 +1,38 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch, apiUrl } from '$lib/api';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import type { DeviceSetting, NodeSetting } from '$lib/types';
+	import type { DeviceSetting, NodeSetting, NodeSettingDetails } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 
 	const toastStore = getToastStore();
 
-	// Changed from 'export let deviceId' to 'export let deviceSettings'
-	export let deviceSettings: DeviceSetting;
+	interface Props {
+		// The device's persisted settings, supplied by the route.
+		deviceSettings: DeviceSetting;
+	}
 
-	let nodeSettings: Record<string, NodeSetting | null> = {};
+	let { deviceSettings = $bindable() }: Props = $props();
+
+	let nodeSettings: Record<string, NodeSetting | null> = $state({});
 	// Which nodes we've already requested. Kept separate from `nodeSettings` because a node
 	// can legitimately have null settings, and guarding on the response value meant the
 	// reactive block below re-fetched it forever. Deliberately non-reactive.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- must NOT be reactive: a reactive Set would re-trigger the effect below into a fetch loop
 	const nodeSettingsRequested = new Set<string>();
 
 	// Device state - adjusted to fetch based on deviceId
-	let selectedFloorId: string | null = null;
-	let calibrationSpot: { x: number; y: number; z?: number } | null = null;
-	let calibrationSpotHeight = 1.0; // Default height in meters
-	let currentRefRssi: number | null = null; // Will set after fetch
+	let selectedFloorId: string | null = $state(null);
+	let calibrationSpot: { x: number; y: number; z?: number } | null = $state(null);
+	let calibrationSpotHeight = $state(1.0); // Default height in meters
+	let currentRefRssi: number | null = $state(null); // Will set after fetch
 
 	// Local storage for all device messages (keyed by nodeId)
-	let deviceMessages: Record<string, DeviceMessage[]> = {};
+	let deviceMessages: Record<string, DeviceMessage[]> = $state({});
 
-	$: isAnchored = deviceSettings?.x != null && deviceSettings?.y != null && deviceSettings?.z != null;
-
-	let showInstructions = false;
+	let showInstructions = $state(false);
 
 	function toggleInstructions() {
 		showInstructions = !showInstructions;
@@ -43,7 +46,7 @@
 	// Function to fetch device settings based on deviceId
 	async function fetchDeviceSettings() {
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}`));
+			const response = await fetch(apiUrl(`/api/device/${deviceSettings.id}`));
 			if (response.ok) {
 				deviceSettings = await response.json();
 				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
@@ -60,13 +63,10 @@
 	// Function to fetch node settings
 	async function fetchNodeSettings(nodeId: string) {
 		try {
-			const response = await fetch(resolve(`/api/node/${nodeId}`));
-			if (response.ok) {
-				const data = await response.json();
-				nodeSettings[nodeId] = data.settings;
-				// Force reactivity by creating a new object reference
-				nodeSettings = { ...nodeSettings };
-			}
+			const data = await apiFetch<NodeSettingDetails>(`/api/node/${nodeId}`);
+			nodeSettings[nodeId] = data.settings;
+			// Force reactivity by creating a new object reference
+			nodeSettings = { ...nodeSettings };
 		} catch (error) {
 			console.error(`Error fetching settings for node ${nodeId}:`, error);
 		}
@@ -121,91 +121,9 @@
 	});
 
 	// Calibration metrics and related reactive state
-	let nodeDistances: { id: string; name: string; distance: number; nodeZ?: number }[] = [];
-	let rssiValues: { [key: string]: number | null } = {};
-	let includedNodes: { [key: string]: boolean } = {};
-	let calculatedRefRssi: number | null = null;
-
-	// Error handling adjusted for fetched settings
-	$: if (deviceSettings?.error) {
-		toastStore.trigger({ message: deviceSettings.error, background: 'preset-filled-error-500' });
-	}
-
-	// Reactive device and floor lookup
-	$: device = $devices?.find((d: any) => d.id === deviceSettings.id);
-	$: floor = $config?.floors.find((f: any) => f.id === selectedFloorId);
-	$: bounds = floor?.bounds;
-
-	// Initialize from device data when available
-	$: if ($devices && deviceSettings?.id && !calibrationSpot) {
-		const device = $devices?.find((d: any) => d.id === deviceSettings.id);
-		if (device) {
-			if (device.floor !== null) {
-				selectedFloorId = device.floor.id;
-			}
-			if (device.location?.x != null && device.location?.y != null) {
-				calibrationSpot = { x: device.location.x, y: device.location.y };
-			}
-		}
-	}
-
-	// Reset data on floor change
-	$: if (selectedFloorId && calibrationSpot) {
-		rssiValues = {};
-		calculatedRefRssi = null;
-	}
-
-	// Update Z coordinate when height changes
-	$: if (calibrationSpot && calibrationSpotHeight) {
-		const floorLowerZ = bounds ? bounds[0][2] : 0;
-		calibrationSpot.z = floorLowerZ + calibrationSpotHeight;
-	}
-
-	// Calculate node distances whenever calibration spot or floor changes
-	$: nodeDistances = calculateNodeDistances(calibrationSpot, selectedFloorId, $nodes, bounds, calibrationSpotHeight);
-
-	// Set default inclusion for nodes
-	$: {
-		// Fetch settings for each node
-		nodeDistances.forEach((node) => {
-			// Set default inclusion
-			if (includedNodes[node.id] === undefined) {
-				includedNodes[node.id] = true;
-			}
-
-			// Fetch node settings if not already requested
-			if (!nodeSettingsRequested.has(node.id)) {
-				nodeSettingsRequested.add(node.id);
-				fetchNodeSettings(node.id);
-			}
-		});
-	}
-
-	// Update RSSI values using all available messages for each node
-	$: if (nodeDistances.length > 0) {
-		const newRssiValues: { [key: string]: number | null } = {};
-		nodeDistances.forEach((node) => {
-			if (node.id in deviceMessages && deviceMessages[node.id].length > 0) {
-				// Use all messages for this node to calculate average RSSI
-				const messages = deviceMessages[node.id];
-				const validRssiValues = messages.map((msg) => msg.rssi).filter((rssi) => rssi !== null && rssi !== undefined) as number[];
-
-				if (validRssiValues.length > 0) {
-					// Calculate the average RSSI from all messages
-					const avgRssi = validRssiValues.reduce((sum, val) => sum + val, 0) / validRssiValues.length;
-					newRssiValues[node.id] = avgRssi;
-				}
-			}
-		});
-		if (Object.keys(newRssiValues).length > 0) {
-			rssiValues = newRssiValues;
-		}
-	}
-
-	// Calculate final RSSI using all device messages when enough data is collected
-	$: if (Object.values(deviceMessages).some((msgs) => msgs.length >= 5)) {
-		calculatedRefRssi = calculateFinalRssi();
-	}
+	let rssiValues: { [key: string]: number | null } = $state({});
+	let includedNodes: { [key: string]: boolean } = $state({});
+	let calculatedRefRssi: number | null = $state(null);
 
 	// --- Helper functions ---
 
@@ -220,17 +138,19 @@
 		return Math.sqrt(variance);
 	}
 
-	function calculateNodeDistances(calibrationSpot: { x: number; y: number; z: number } | null, selectedFloorId: string | null, nodes: any[] | undefined, bounds: any, calibrationSpotHeight: number) {
+	function calculateNodeDistances(calibrationSpot: { x: number; y: number; z?: number } | null, selectedFloorId: string | null, nodes: any[] | undefined, bounds: any, calibrationSpotHeight: number) {
 		if (!nodes || !calibrationSpot || !selectedFloorId) {
 			return [];
 		}
+		// Same fallback as anchorDevice/sendCapturePosition when the spot has no z yet
+		const spotZ = calibrationSpot.z ?? (bounds ? bounds[0][2] + calibrationSpotHeight : calibrationSpotHeight);
 		return nodes
 			.filter((node: any) => {
-				return node.floors.includes(selectedFloorId) && node.location.x != null && node.location.y != null;
+				return node.floors?.includes(selectedFloorId) && node.location.x != null && node.location.y != null;
 			})
 			.map((node: any) => {
 				// Use the relative heights for the z-component of the distance calculation
-				const distance = Math.sqrt(Math.pow(node.location.x - calibrationSpot.x, 2) + Math.pow(node.location.y - calibrationSpot.y, 2) + Math.pow(node.location.z - calibrationSpot.z, 2));
+				const distance = Math.sqrt(Math.pow(node.location.x - calibrationSpot.x, 2) + Math.pow(node.location.y - calibrationSpot.y, 2) + Math.pow(node.location.z - spotZ, 2));
 
 				const floorLowerZ = bounds ? bounds[0][2] : 0;
 				const nodeHeightFromFloor = node.location.z - floorLowerZ;
@@ -267,15 +187,11 @@
 		});
 
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+			await apiFetch(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
-
-			if (!response.ok) {
-				throw new Error('Failed to anchor device');
-			}
 
 			deviceSettings = { ...deviceSettings, x: calibrationSpot.x, y: calibrationSpot.y, z: zValue };
 			toastStore.trigger({ message: 'Device anchored to the selected location.', background: 'preset-filled-success-500' });
@@ -289,14 +205,11 @@
 		if (!deviceSettings?.id && !deviceSettings?.originalId) return;
 		const payload = buildSettingsPayload({ x: null, y: null, z: null });
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+			await apiFetch(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
-			if (!response.ok) {
-				throw new Error('Failed to clear anchor');
-			}
 
 			deviceSettings = { ...deviceSettings, x: null, y: null, z: null };
 			toastStore.trigger({ message: 'Anchor removed. Device will return to automatic positioning.', background: 'preset-filled-success-500' });
@@ -310,17 +223,14 @@
 
 	type CaptureStatus = { deviceId: string; active: boolean; count: number; positions: number; started: string; ended?: string; truncated: boolean };
 
-	let capture: CaptureStatus | null = null;
+	let capture: CaptureStatus | null = $state(null);
 	let captureInterval: ReturnType<typeof setInterval> | null = null;
 	let lastSentPosition: string | null = null;
-
-	$: exportUrl = deviceSettings?.id ? resolve(`/api/device/${deviceSettings.id}/capture/export`) : '';
 
 	async function refreshCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture`));
-			capture = response.ok ? await response.json() : null;
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture`);
 		} catch {
 			capture = null;
 		}
@@ -329,9 +239,7 @@
 	async function startCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/start`), { method: 'POST' });
-			if (!response.ok) throw new Error(response.statusText);
-			capture = await response.json();
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/start`, { method: 'POST' });
 			lastSentPosition = null;
 			await sendCapturePosition();
 		} catch (error) {
@@ -343,8 +251,7 @@
 	async function stopCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/stop`), { method: 'POST' });
-			if (response.ok) capture = await response.json();
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/stop`, { method: 'POST' });
 		} catch (error) {
 			console.error('Error stopping capture:', error);
 		}
@@ -353,7 +260,7 @@
 	async function discardCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			await fetch(resolve(`/api/device/${deviceSettings.id}/capture`), { method: 'DELETE' });
+			await fetch(apiUrl(`/api/device/${deviceSettings.id}/capture`), { method: 'DELETE' });
 			capture = null;
 		} catch (error) {
 			console.error('Error discarding capture:', error);
@@ -368,12 +275,11 @@
 		if (key === lastSentPosition) return;
 		lastSentPosition = key;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings.id}/capture/position`), {
+			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/position`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(position)
 			});
-			if (response.ok) capture = await response.json();
 		} catch (error) {
 			console.error('Error sending capture position:', error);
 		}
@@ -384,9 +290,9 @@
 	// posts — otherwise every open tab would push its own stale marker position.
 	// Debounced so dragging posts a sparse trail instead of one point per mousemove.
 	let positionDebounce: ReturnType<typeof setTimeout> | null = null;
-	$: queueCapturePosition(calibrationSpot, calibrationSpotHeight, selectedFloorId);
 	function queueCapturePosition(..._deps: unknown[]) {
-		if (!capture?.active) return;
+		// `untrack`: the effect below must not re-run when polling reassigns `capture`.
+		if (!untrack(() => capture?.active)) return;
 		if (positionDebounce) clearTimeout(positionDebounce);
 		positionDebounce = setTimeout(() => sendCapturePosition(), 300);
 	}
@@ -440,8 +346,6 @@
 		includedNodes = { ...includedNodes }; // Trigger reactivity
 	}
 
-	$: messageStats = calculateMessageStats(deviceMessages);
-
 	// Get message statistics for display
 	function calculateMessageStats(deviceMessages: Record<string, DeviceMessage[]>) {
 		const stats: Record<string, { count: number; avgRssi: number | null; minRssi: number | null; maxRssi: number | null; stdDev: number | null }> = {};
@@ -475,7 +379,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(resolve(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+			const response = await fetch(apiUrl(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -497,6 +401,96 @@
 			toastStore.trigger({ message: error.message, background: 'preset-filled-error-500' });
 		}
 	}
+	let isAnchored = $derived(deviceSettings?.x != null && deviceSettings?.y != null && deviceSettings?.z != null);
+	// Error handling adjusted for fetched settings
+	$effect(() => {
+		if (deviceSettings?.error) {
+			toastStore.trigger({ message: deviceSettings.error, background: 'preset-filled-error-500' });
+		}
+	});
+	// Reactive device and floor lookup
+	let device = $derived($devices?.find((d: any) => d.id === deviceSettings.id));
+	// Initialize from device data when available
+	$effect.pre(() => {
+		if ($devices && deviceSettings?.id && !calibrationSpot) {
+			const device = $devices?.find((d: any) => d.id === deviceSettings.id);
+			if (device) {
+				if (device.floor !== null) {
+					selectedFloorId = device.floor.id;
+				}
+				if (device.location?.x != null && device.location?.y != null) {
+					calibrationSpot = { x: device.location.x, y: device.location.y };
+				}
+			}
+		}
+	});
+	let floor = $derived($config?.floors.find((f: any) => f.id === selectedFloorId));
+	let bounds = $derived(floor?.bounds);
+	// Declared after `bounds` so the derivation doesn't reference it before initialisation.
+	let nodeDistances: { id: string; name: string; distance: number; nodeZ?: number }[] = $derived(calculateNodeDistances(calibrationSpot, selectedFloorId, $nodes, bounds, calibrationSpotHeight));
+	// Reset data on floor change
+	$effect.pre(() => {
+		if (selectedFloorId && calibrationSpot) {
+			rssiValues = {};
+			calculatedRefRssi = null;
+		}
+	});
+	// Update Z coordinate when height changes
+	$effect.pre(() => {
+		if (calibrationSpot && calibrationSpotHeight) {
+			const floorLowerZ = bounds ? bounds[0][2] : 0;
+			calibrationSpot.z = floorLowerZ + calibrationSpotHeight;
+		}
+	});
+	// Set default inclusion for nodes
+	$effect.pre(() => {
+		// Fetch settings for each node
+		nodeDistances.forEach((node) => {
+			// Set default inclusion
+			if (includedNodes[node.id] === undefined) {
+				includedNodes[node.id] = true;
+			}
+
+			// Fetch node settings if not already requested
+			if (!nodeSettingsRequested.has(node.id)) {
+				nodeSettingsRequested.add(node.id);
+				fetchNodeSettings(node.id);
+			}
+		});
+	});
+	// Update RSSI values using all available messages for each node
+	$effect.pre(() => {
+		if (nodeDistances.length > 0) {
+			const newRssiValues: { [key: string]: number | null } = {};
+			nodeDistances.forEach((node) => {
+				if (node.id in deviceMessages && deviceMessages[node.id].length > 0) {
+					// Use all messages for this node to calculate average RSSI
+					const messages = deviceMessages[node.id];
+					const validRssiValues = messages.map((msg) => msg.rssi).filter((rssi) => rssi !== null && rssi !== undefined) as number[];
+
+					if (validRssiValues.length > 0) {
+						// Calculate the average RSSI from all messages
+						const avgRssi = validRssiValues.reduce((sum, val) => sum + val, 0) / validRssiValues.length;
+						newRssiValues[node.id] = avgRssi;
+					}
+				}
+			});
+			if (Object.keys(newRssiValues).length > 0) {
+				rssiValues = newRssiValues;
+			}
+		}
+	});
+	// Calculate final RSSI using all device messages when enough data is collected
+	$effect.pre(() => {
+		if (Object.values(deviceMessages).some((msgs) => msgs.length >= 5)) {
+			calculatedRefRssi = calculateFinalRssi();
+		}
+	});
+	let exportUrl = $derived(deviceSettings?.id ? apiUrl(`/api/device/${deviceSettings.id}/capture/export`) : '');
+	$effect(() => {
+		queueCapturePosition(calibrationSpot, calibrationSpotHeight, selectedFloorId);
+	});
+	let messageStats = $derived(calculateMessageStats(deviceMessages));
 </script>
 
 <svelte:head>
@@ -589,6 +583,7 @@
 						{/if}
 					{/if}
 					{#if capture && capture.count > 0}
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- API download URL, already built with apiUrl() -->
 						<a class="btn preset-filled-secondary-500" href={exportUrl} download>Export JSON</a>
 						{#if !capture.active}
 							<button class="btn preset-filled-surface-500" onclick={discardCapture}>Discard</button>

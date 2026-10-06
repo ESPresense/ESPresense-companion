@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
-	import { resolve } from '$app/paths';
+	import { apiFetch, apiUrl } from '$lib/api';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
@@ -57,9 +57,9 @@
 		}
 	}
 
-	let rxColumns: Array<string> = [];
-	$: {
+	let rxColumns: Array<string> = $derived.by(() => {
 		const matrix = $calibration?.matrix ?? {};
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- temp inside $derived.by, not state
 		const rxSet = new Set<string>();
 
 		// Only include receivers that have actual data from at least one transmitter
@@ -71,26 +71,24 @@
 				}
 			});
 		});
-		rxColumns = Array.from(rxSet).sort();
-	}
+		return Array.from(rxSet).sort();
+	});
 
 	// Helper function to check if a transmitter is an anchored device
 	function isAnchored(txName: string): boolean {
 		return $calibration?.anchored?.includes(txName) ?? false;
 	}
 
-	let data_point: DataPoint = 0;
+	let data_point: DataPoint = $state(0);
 
 	const toastStore = getToastStore();
-	let autoOptimization = false;
-	let autoOptimizationLoaded = false;
-	let autoOptimizationBusy = false;
+	let autoOptimization = $state(false);
+	let autoOptimizationLoaded = $state(false);
+	let autoOptimizationBusy = $state(false);
 
 	async function fetchAutoOptimizationState() {
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'));
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-			const data = await response.json();
+			const data = await apiFetch<{ autoOptimize: boolean }>('/api/state/calibration/auto-optimize');
 			autoOptimization = !!data.autoOptimize;
 		} catch (error) {
 			console.error('Error fetching auto-optimization state:', error);
@@ -108,7 +106,7 @@
 		autoOptimizationBusy = true;
 
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'), {
+			const data = await apiFetch<{ autoOptimize: boolean }>('/api/state/calibration/auto-optimize', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -116,8 +114,6 @@
 				body: JSON.stringify(desiredState)
 			});
 
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-			const data = await response.json();
 			autoOptimization = !!data.autoOptimize;
 		} catch (error) {
 			console.error('Error toggling auto-optimization:', error);
@@ -140,7 +136,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch(resolve('/api/state/calibration/reset'), { method: 'POST' });
+			const response = await fetch(apiUrl('/api/state/calibration/reset'), { method: 'POST' });
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',

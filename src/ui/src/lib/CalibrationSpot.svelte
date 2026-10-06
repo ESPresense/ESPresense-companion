@@ -1,23 +1,31 @@
 <script lang="ts">
-	import { zoomIdentity, type ZoomScale } from 'd3-zoom';
-	import { createEventDispatcher, getContext } from 'svelte';
-	import type { Readable } from 'svelte/store';
-
-	const dispatch = createEventDispatcher();
+	import { zoomIdentity } from 'd3-zoom';
+	import { getContext } from 'svelte';
+	import type { LayerCakeContext } from '$lib/types';
 
 	// Get the scales from the LayerCake context.
-	const context: { xScale: Readable<ZoomScale>; yScale: Readable<ZoomScale> } = getContext('LayerCake');
-	const { xScale, yScale } = context;
+	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
 
-	// The current d3 zoom transform.
-	export let transform = zoomIdentity;
-	// The calibration spot's logical (data) position.
-	export let position = { x: 0, y: 0 };
-	// Data-space bounds.
-	export let bounds: number[][] = [
-		[0, 0],
-		[500, 500]
-	];
+	interface Props {
+		// The current d3 zoom transform.
+		transform?: any;
+		// The calibration spot's logical (data) position.
+		position?: any;
+		// Data-space bounds.
+		bounds?: number[][];
+		// Called when a drag completes.
+		ondragend?: (detail: { position: { x: number; y: number } }) => void;
+	}
+
+	let {
+		transform = zoomIdentity,
+		position = $bindable({ x: 0, y: 0 }),
+		bounds = [
+			[0, 0],
+			[500, 500]
+		],
+		ondragend
+	}: Props = $props();
 
 	let isDragging = false;
 	// Offset (in screen space) from the pointer to the marker's center.
@@ -112,7 +120,7 @@
 			window.removeEventListener('touchcancel', handlePointerUp, { capture: true });
 
 			// Notify that dragging has completed
-			dispatch('dragend', { position });
+			ondragend?.({ position });
 		}
 	}
 </script>

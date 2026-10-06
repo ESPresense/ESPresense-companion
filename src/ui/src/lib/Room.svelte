@@ -7,17 +7,21 @@
 
 	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
 
-	export let room: Room;
+	interface Props {
+		room: Room;
+	}
+
+	let { room }: Props = $props();
+	let wallThickness = $derived($config?.map?.wallThickness ?? 0);
 	// Use shared color util so 2D/3D match and config overrides apply
 
 	// Calculate the scaled stroke width based on the wall thickness
-	$: scaledStrokeWidth = wallThickness == 0 ? 1 : Math.abs($xScale(wallThickness) - $xScale(0));
-	$: centroid = polygonCentroid(room.points);
-	$: scaledRoom = room.points.map((p) => [$xScale(p[0]), $yScale(p[1])]);
-	$: baseColor = getRoomColor($config, room.id);
-	$: wallColor = $config?.map?.wallColor ?? baseColor;
-	$: wallOpacity = $config?.map?.wallOpacity ?? 0.35;
-	$: wallThickness = $config?.map?.wallThickness ?? 0;
+	let scaledStrokeWidth = $derived(wallThickness == 0 ? 1 : Math.abs($xScale(wallThickness) - $xScale(0)));
+	let centroid = $derived(polygonCentroid(room.points));
+	let scaledRoom = $derived(room.points.map((p) => [$xScale(p[0]), $yScale(p[1])]));
+	let baseColor = $derived(getRoomColor($config, room.id));
+	let wallColor = $derived($config?.map?.wallColor ?? baseColor);
+	let wallOpacity = $derived($config?.map?.wallOpacity ?? 0.35);
 </script>
 
 <path d={`M${scaledRoom.join('L')}Z`} fill={`url(#${room.id})`} fill-opacity="0.25" stroke={wallColor} stroke-opacity={wallOpacity} stroke-width={scaledStrokeWidth} stroke-linejoin="miter-clip" />

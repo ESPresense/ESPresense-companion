@@ -1,16 +1,16 @@
 <script lang="ts">
 	import NodesTable from '$lib/NodesTable.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import { resolve } from '$app/paths';
+	import { apiFetch } from '$lib/api';
 	import { gotoDetail } from '$lib/urls';
 	import type { NodeSettingDetails } from '$lib/types';
 	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
 	import { onMount } from 'svelte';
 
-	let autoUpdate: boolean | null;
-	let prerelease: boolean | null;
-	let loading = true;
-	let saving = false;
+	let autoUpdate: boolean | null = $state(null);
+	let prerelease: boolean | null = $state(null);
+	let loading = $state(true);
+	let saving = $state(false);
 	const toastStore = getToastStore();
 
 	async function saveSettings() {
@@ -23,15 +23,13 @@
 				}
 			};
 
-			const response = await fetch(resolve('/api/node/*'), {
+			await apiFetch('/api/node/*', {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify(settings)
 			});
-
-			if (!response.ok) throw new Error('Failed to save settings');
 
 			// Optional: Show success toast
 			toastStore.trigger({
@@ -53,11 +51,9 @@
 	async function loadSettings() {
 		try {
 			loading = true;
-			const response = await fetch(resolve('/api/node/*'));
+			const data = await apiFetch<NodeSettingDetails>('/api/node/*');
+			if (!data.settings) throw new Error('Failed to load settings');
 
-			if (!response.ok) throw new Error('Failed to load settings');
-
-			const data: NodeSettingDetails = await response.json();
 			autoUpdate = data.settings.updating.autoUpdate;
 			prerelease = data.settings.updating.prerelease;
 		} catch (error) {

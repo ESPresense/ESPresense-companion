@@ -129,6 +129,17 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         bool isNode = discoveredId.StartsWith("node:");
         if (isNode) return;
 
+        // Discovery is how an excluded device comes back from the dead: we hold no state across
+        // restarts, so we rebuild from retained discovery messages -- including ones we published
+        // before the device was excluded. Creating it here with Track=true republishes it to Home
+        // Assistant, and only the next check untracks and deletes it again, so every restart
+        // resurrects the entity it just removed. Honour the exclusion before it exists.
+        if (state.IsExcluded(discoveredId, autoDiscover.Message?.Name))
+        {
+            Log.Debug("Ignoring excluded device {DeviceId} (disc)", discoveredId);
+            return;
+        }
+
         state.Devices.GetOrAdd(discoveredId, id =>
         {
             var d = new Device(id, autoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = autoDiscover.Message?.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
