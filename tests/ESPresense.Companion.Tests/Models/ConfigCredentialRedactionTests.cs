@@ -3,6 +3,8 @@ using ESPresense.Models;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using StjJsonSerializer = System.Text.Json.JsonSerializer;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 
 namespace ESPresense.Companion.Tests.Models;
@@ -76,5 +78,41 @@ public class ConfigCredentialRedactionTests
 
         Assert.That(config.Mqtt.Password, Is.EqualTo("super-secret"));
         Assert.That(config.Clone().Mqtt.Password, Is.EqualTo("super-secret"));
+    }
+
+    [Test]
+    public void Password_IsNotSerialized_WithMvcDefaultOptions()
+    {
+        // ASP.NET Core MVC serializes action results with JsonSerializerDefaults.Web
+        // (camelCase). This mirrors the exact options the /api/state/config and MCP
+        // endpoints use, proving the response body is redacted in production shape.
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals
+        };
+        var json = StjJsonSerializer.Serialize(BuildConfig(), options);
+
+        Assert.That(json, Does.Not.Contain("super-secret"));
+        Assert.That(json, Does.Not.Contain("password").IgnoreCase);
+        // Sanity: the camelCased shape is what we think it is.
+        Assert.That(json, Does.Contain("broker.local"));
+    }
+
+    [Test]
+    public void Password_StillLoadsFromYaml()
+    {
+        // The JSON ignore attributes must not affect YamlDotNet, which is how the
+        // password actually arrives from config.yaml at startup.
+        const string yaml = "mqtt:\n  host: broker.local\n  username: mqtt-user\n  password: yaml-secret\n";
+        var deserializer = new DeserializerBuilder()
+            .IgnoreUnmatchedProperties()
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
+            .Build();
+
+        var config = deserializer.Deserialize<Config>(yaml);
+
+        Assert.That(config.Mqtt.Host, Is.EqualTo("broker.local"));
+        Assert.That(config.Mqtt.Password, Is.EqualTo("yaml-secret"),
+            "YAML deserialization must still populate the password for the broker connection");
     }
 }
