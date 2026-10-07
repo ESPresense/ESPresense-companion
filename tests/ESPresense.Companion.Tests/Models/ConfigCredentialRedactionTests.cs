@@ -251,6 +251,35 @@ public class ConfigCredentialRedactionTests
         }
     }
 
+    [Test]
+    public async Task SaveSection_ProtectedMapSection_IsRejected()
+    {
+        // SaveSectionAsync is the only product path that writes config back to disk;
+        // the map section is protected so the API cannot rewrite it. Guard that here so
+        // a future refactor cannot silently open an arbitrary-section write.
+        var dir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfgprot", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "config.yaml");
+
+        try
+        {
+            await File.WriteAllTextAsync(path, "mqtt:\n  host: broker.local\n");
+
+            var loader = new ESPresense.Services.ConfigLoader(dir);
+            await loader.ConfigAsync();
+
+            Assert.ThrowsAsync<InvalidOperationException>(
+                () => loader.SaveSectionAsync("map", new { x = 1 }));
+
+            await loader.StopAsync(CancellationToken.None);
+            loader.Dispose();
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
     private static async Task WriteSharedAsync(string path, string contents)
     {
         for (var attempt = 0; ; attempt++)

@@ -43,6 +43,14 @@ public class MqttEventDispatchTests
         return new MqttApplicationMessageReceivedEventArgs("test-client", message, new MqttPublishPacket(), null!);
     }
 
+    private static MqttApplicationMessageReceivedEventArgs Message(string topic, string? payload)
+    {
+        var message = new MqttApplicationMessage { Topic = topic };
+        if (payload != null)
+            message.PayloadSegment = new ArraySegment<byte>(Encoding.UTF8.GetBytes(payload));
+        return new MqttApplicationMessageReceivedEventArgs("test-client", message, new MqttPublishPacket(), null!);
+    }
+
     [Test]
     public async Task OnMqttMessageReceived_InvokesAndAwaits_AllDeviceMessageHandlers()
     {
@@ -232,16 +240,151 @@ public class MqttEventDispatchTests
     }
 
     [Test]
-    public async Task OnMqttMessageReceived_ConcurrentSubscriptionsDuringDispatch_DoNotThrow()
+    public async Task OnMqttMessageReceived_TelemetryTopic_AwaitsNonLastHandler()
     {
         var coordinator = CreateCoordinator();
-        coordinator.DeviceMessageReceivedAsync += _ => Task.CompletedTask;
+        var slowFinished = false;
 
-        var dispatch = coordinator.OnMqttMessageReceived(DeviceMessage("dev-c", "node-c", "{\"rssi\":-55}"));
-        coordinator.DeviceMessageReceivedAsync += _ => Task.CompletedTask; // mutate during dispatch
+        coordinator.NodeTelemetryReceivedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.NodeTelemetryReceivedAsync += _ => Task.CompletedTask;
 
-        Assert.DoesNotThrowAsync(() => dispatch);
-        await dispatch;
+        await coordinator.OnMqttMessageReceived(
+            Message("espresense/rooms/node-1/telemetry", "{\"ip\":\"1.2.3.4\",\"uptime\":10}"));
+
+        Assert.That(slowFinished, Is.True, "telemetry dispatch must await the non-last handler");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_StatusTopic_AwaitsNonLastHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+
+        coordinator.NodeStatusReceivedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.NodeStatusReceivedAsync += _ => Task.CompletedTask;
+
+        await coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/status", "online"));
+
+        Assert.That(slowFinished, Is.True, "status dispatch must await the non-last handler");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_StatusCleared_AwaitsNonLastRemovedHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+
+        coordinator.NodeStatusRemovedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.NodeStatusRemovedAsync += _ => Task.CompletedTask;
+
+        // Null payload => retained message cleared => node removed.
+        await coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/status", null));
+
+        Assert.That(slowFinished, Is.True, "status-removed dispatch must await the non-last handler");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_TelemetryCleared_AwaitsNonLastRemovedHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+
+        coordinator.NodeTelemetryRemovedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.NodeTelemetryRemovedAsync += _ => Task.CompletedTask;
+
+        await coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/telemetry", null));
+
+        Assert.That(slowFinished, Is.True, "telemetry-removed dispatch must await the non-last handler");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_SettingsConfigTopic_AwaitsNonLastHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+
+        coordinator.DeviceConfigReceivedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.DeviceConfigReceivedAsync += _ => Task.CompletedTask;
+
+        await coordinator.OnMqttMessageReceived(
+            Message("espresense/settings/dev-1/config", "{\"name\":\"beacon\"}"));
+
+        Assert.That(slowFinished, Is.True, "settings-config dispatch must await the non-last handler");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_NodeSettingTopic_AwaitsNonLastHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+
+        coordinator.NodeSettingReceivedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.NodeSettingReceivedAsync += _ => Task.CompletedTask;
+
+        await coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/foo", "bar"));
+
+        Assert.That(slowFinished, Is.True, "node-setting dispatch must await the non-last handler");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_AttributesTopic_AwaitsNonLastHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+
+        coordinator.DeviceAttributesReceivedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.DeviceAttributesReceivedAsync += _ => Task.CompletedTask;
+
+        await coordinator.OnMqttMessageReceived(
+            Message("espresense/companion/dev-1/attributes", "{\"foo\":\"bar\"}"));
+
+        Assert.That(slowFinished, Is.True, "attributes dispatch must await the non-last handler");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_UnknownTopic_AwaitsNonLastMqttHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+
+        coordinator.MqttMessageReceivedAsync += async _ =>
+        {
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.MqttMessageReceivedAsync += _ => Task.CompletedTask;
+
+        await coordinator.OnMqttMessageReceived(Message("some/other/topic", "payload"));
+
+        Assert.That(slowFinished, Is.True, "default-topic dispatch must await the non-last handler");
     }
 
     [Test]
