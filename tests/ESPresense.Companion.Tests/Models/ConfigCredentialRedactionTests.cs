@@ -117,6 +117,27 @@ public class ConfigCredentialRedactionTests
     }
 
     [Test]
+    public void Clone_PreservesMqttPassword()
+    {
+        // ConfigMqtt.Clone() is hand-written (not JSON-based). MqttCoordinator relies on
+        // it for the "did config change?" comparison, so the password must survive the
+        // copy even though it is now [JsonIgnore]d.
+        var original = BuildConfig();
+        original.Mqtt.Password = "clone-secret";
+
+        var clone = original.Clone();
+
+        Assert.That(clone.Mqtt.Password, Is.EqualTo("clone-secret"),
+            "cloning must retain the password so reconnect change-detection still works");
+        Assert.Multiple(() =>
+        {
+            Assert.That(clone.Mqtt.Host, Is.EqualTo(original.Mqtt.Host));
+            Assert.That(clone.Mqtt.Username, Is.EqualTo(original.Mqtt.Username));
+            Assert.That(clone.Mqtt.Port, Is.EqualTo(original.Mqtt.Port));
+        });
+    }
+
+    [Test]
     public async Task SaveSection_LeavesMqttPasswordInFile()
     {
         // SaveSectionAsync only ever writes the section it's given (e.g. optimization).

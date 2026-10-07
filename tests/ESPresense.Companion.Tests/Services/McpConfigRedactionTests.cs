@@ -67,6 +67,46 @@ public class McpConfigRedactionTests
         configLoader.Dispose();
     }
 
+    [Test]
+    public async Task GetConfigResource_DoesNotReturnMqttPassword()
+    {
+        // state://config is a separate MCP entry point from the get_config tool and
+        // must be redacted too.
+        var configLoader = new ConfigLoader(_configDir);
+        await configLoader.ConfigAsync();
+
+        var mqtt = new Mock<IMqttCoordinator>().Object;
+        var nodeTelemetryStore = new NodeTelemetryStore(mqtt);
+        var state = new State(configLoader, nodeTelemetryStore);
+        var nodeSettingsStore = new NodeSettingsStore(mqtt, Mock.Of<Microsoft.Extensions.Logging.ILogger<NodeSettingsStore>>());
+        var firmwareUpdateJobs = new FirmwareUpdateJobService(
+            nodeSettingsStore,
+            nodeTelemetryStore,
+            new HttpClient(),
+            Mock.Of<Microsoft.Extensions.Logging.ILogger<FirmwareUpdateJobService>>());
+
+        var sut = new McpResources(
+            state,
+            configLoader,
+            nodeSettingsStore,
+            nodeTelemetryStore,
+            new DeviceSettingsStore(mqtt, state),
+            new TelemetryService(CreateCoordinator()),
+            firmwareUpdateJobs,
+            Mock.Of<IMapper>());
+
+        var result = await sut.GetConfigResource();
+
+        Assert.That(configLoader.Config!.Mqtt.Password, Is.EqualTo("mcp-secret"),
+            "precondition: the password really is loaded from YAML");
+        Assert.That(result, Does.Not.Contain("mcp-secret"), "MCP state://config resource leaked the broker password");
+        Assert.That(result, Does.Not.Contain("password").IgnoreCase, "MCP state://config resource emitted a password key");
+        Assert.That(result, Does.Contain("broker.local"));
+
+        await configLoader.StopAsync(CancellationToken.None);
+        configLoader.Dispose();
+    }
+
     private static MqttCoordinator CreateCoordinator()
     {
         var configLoader = new Mock<ConfigLoader>("test-config-dir");

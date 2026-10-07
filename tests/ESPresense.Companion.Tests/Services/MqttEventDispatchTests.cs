@@ -243,4 +243,62 @@ public class MqttEventDispatchTests
         Assert.DoesNotThrowAsync(() => dispatch);
         await dispatch;
     }
+
+    [Test]
+    public async Task InvokeAllAsync_TrueConcurrentDispatches_AwaitEveryHandlerEachTime()
+    {
+        var coordinator = CreateCoordinator();
+        const int dispatches = 200;
+        const int handlersPerDispatch = 4;
+
+        var perHandlerCounts = new int[handlersPerDispatch];
+        Func<DeviceMessageEventArgs, Task> handlers = null!;
+        for (var i = 0; i < handlersPerDispatch; i++)
+        {
+            var index = i;
+            Func<DeviceMessageEventArgs, Task> h = async _ =>
+            {
+                await Task.Yield();
+                Interlocked.Increment(ref perHandlerCounts[index]);
+            };
+            handlers = handlers == null ? h : handlers + h;
+        }
+
+        // Fire many independent dispatches on the thread pool at once.
+        var tasks = Enumerable.Range(0, dispatches)
+            .Select(_ => Task.Run(() => coordinator.InvokeAllAsync(handlers, new DeviceMessageEventArgs())))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        Assert.That(perHandlerCounts, Is.All.EqualTo(dispatches),
+            "every handler must be awaited on every concurrent dispatch");
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_FailingHandler_IsDrainedAndReportedAsMalformed()
+    {
+        // OnMqttMessageReceived deliberately absorbs handler exceptions so one bad
+        // message cannot kill the MQTT receive loop. The contract is: the exception is
+        // awaited and pulled out of the handler (not left unobserved), the later handler
+        // still runs, and MqttMessageMalformed is raised.
+        var coordinator = CreateCoordinator();
+        var malformed = 0;
+        var lastRan = false;
+
+        coordinator.MqttMessageMalformed += (_, _) => Interlocked.Increment(ref malformed);
+        coordinator.DeviceMessageReceivedAsync += _ => throw new InvalidOperationException("boom");
+        coordinator.DeviceMessageReceivedAsync += _ =>
+        {
+            lastRan = true;
+            return Task.CompletedTask;
+        };
+
+        Assert.DoesNotThrowAsync(
+            () => coordinator.OnMqttMessageReceived(DeviceMessage("dev-x", "node-x", "{\"rssi\":-60}")));
+
+        await Task.Yield();
+        Assert.That(lastRan, Is.True, "later handlers must still run after an earlier one fails");
+        Assert.That(malformed, Is.EqualTo(1), "a handler failure must surface as MqttMessageMalformed");
+    }
 }
