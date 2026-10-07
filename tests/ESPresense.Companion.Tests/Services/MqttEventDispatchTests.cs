@@ -172,4 +172,75 @@ public class MqttEventDispatchTests
 
         Assert.That(ex!.InnerExceptions, Has.Count.EqualTo(2));
     }
+
+    [Test]
+    public async Task InvokeAllAsync_HandlerUnsubscribesDuringDispatch_StillCompletesAllInvokedHandlers()
+    {
+        var coordinator = CreateCoordinator();
+        var firstRan = false;
+        var secondRan = false;
+
+        // Handlers are composed into a multicast delegate snapshot before dispatch.
+        // Removing a handler from the live event inside another handler must not
+        // change the snapshot that is already being dispatched.
+        Func<DeviceMessageEventArgs, Task> second = _ =>
+        {
+            secondRan = true;
+            return Task.CompletedTask;
+        };
+        Func<DeviceMessageEventArgs, Task> first = _ =>
+        {
+            firstRan = true;
+            coordinator.DeviceMessageReceivedAsync -= second; // mutate the live event
+            return Task.CompletedTask;
+        };
+
+        coordinator.DeviceMessageReceivedAsync += first;
+        coordinator.DeviceMessageReceivedAsync += second;
+
+        Func<DeviceMessageEventArgs, Task> snapshot = first;
+        snapshot += second;
+
+        await coordinator.InvokeAllAsync(snapshot, new DeviceMessageEventArgs());
+
+        Assert.That(firstRan, Is.True);
+        Assert.That(secondRan, Is.True, "handlers present at dispatch time must all run");
+    }
+
+    [Test]
+    public async Task InvokeAllAsync_ReentrantDispatch_DoesNotDeadlock()
+    {
+        var coordinator = CreateCoordinator();
+        var depth = 0;
+
+        Func<DeviceMessageEventArgs, Task> handler = null!;
+        handler = async _ =>
+        {
+            depth++;
+            if (depth == 1)
+            {
+                // Re-enter dispatch from within a handler.
+                await coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs());
+            }
+        };
+
+        var task = coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs());
+
+        var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.That(completed, Is.SameAs(task), "reentrant dispatch must not deadlock");
+        await task;
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_ConcurrentSubscriptionsDuringDispatch_DoNotThrow()
+    {
+        var coordinator = CreateCoordinator();
+        coordinator.DeviceMessageReceivedAsync += _ => Task.CompletedTask;
+
+        var dispatch = coordinator.OnMqttMessageReceived(DeviceMessage("dev-c", "node-c", "{\"rssi\":-55}"));
+        coordinator.DeviceMessageReceivedAsync += _ => Task.CompletedTask; // mutate during dispatch
+
+        Assert.DoesNotThrowAsync(() => dispatch);
+        await dispatch;
+    }
 }

@@ -115,4 +115,34 @@ public class ConfigCredentialRedactionTests
         Assert.That(config.Mqtt.Password, Is.EqualTo("yaml-secret"),
             "YAML deserialization must still populate the password for the broker connection");
     }
+
+    [Test]
+    public async Task SaveSection_LeavesMqttPasswordInFile()
+    {
+        // SaveSectionAsync only ever writes the section it's given (e.g. optimization).
+        // Writing a section must not disturb the mqtt block, password included.
+        var dir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfgsave", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "config.yaml");
+        await File.WriteAllTextAsync(path,
+            "mqtt:\n  host: broker.local\n  username: mqtt-user\n  password: persist-secret\noptimization:\n  enabled: false\n");
+
+        try
+        {
+            var loader = new ESPresense.Services.ConfigLoader(dir);
+            await loader.ConfigAsync();
+            await loader.SaveSectionAsync("optimization", new ConfigOptimization { Enabled = true });
+
+            var text = await File.ReadAllTextAsync(path);
+            Assert.That(text, Does.Contain("persist-secret"), "saving a section dropped the mqtt password");
+            Assert.That(text, Does.Contain("broker.local"));
+
+            await loader.StopAsync(CancellationToken.None);
+            loader.Dispose();
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+        }
+    }
 }
