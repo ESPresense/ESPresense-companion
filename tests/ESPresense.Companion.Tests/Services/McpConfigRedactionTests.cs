@@ -1,4 +1,3 @@
-using AutoMapper;
 using ESPresense.Models;
 using ESPresense.Services;
 using Moq;
@@ -53,7 +52,7 @@ public class McpConfigRedactionTests
             new DeviceSettingsStore(mqtt, state),
             new TelemetryService(CreateCoordinator()),
             firmwareUpdateJobs,
-            Mock.Of<IMapper>());
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()));
 
         var result = await sut.GetConfigTool();
 
@@ -93,7 +92,7 @@ public class McpConfigRedactionTests
             new DeviceSettingsStore(mqtt, state),
             new TelemetryService(CreateCoordinator()),
             firmwareUpdateJobs,
-            Mock.Of<IMapper>());
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()));
 
         var result = await sut.GetConfigResource();
 

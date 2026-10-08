@@ -1,5 +1,4 @@
 using System.Text.Json;
-using AutoMapper;
 using ESPresense.Controllers;
 using ESPresense.Models;
 using ESPresense.Services;
@@ -52,7 +51,7 @@ public class StateControllerConfigRedactionTests
             nodeSettingsStore.Object,
             deviceSettingsStore.Object,
             nodeTelemetryStore,
-            Mock.Of<IMapper>(),
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             new GlobalEventDispatcher());
 
         // Call the real action method.
