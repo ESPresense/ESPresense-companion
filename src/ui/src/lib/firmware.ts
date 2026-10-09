@@ -46,15 +46,15 @@ export const flavorNames = derived(firmwareTypes, (a) =>
 	}, new Map<string, string>())
 );
 
-export type GitHubData<T> = { data: Map<string, T[]> | null; error: string | null };
+export type Listing<T> = { data: Map<string, T[]> | null; error: string | null };
 
 /**
- * Polls an unauthenticated GitHub API endpoint (60 req/hr per IP, shared by every tab and by
- * releases + artifacts). Non-2xx responses surface as `error` instead of leaving the UI spinning,
- * and a rate-limit response waits until GitHub's reset time before retrying.
+ * Polls an espresense.com firmware listing. espresense.com caches GitHub's API at the edge, so
+ * browsers no longer spend their own 60/hour unauthenticated GitHub allowance. Failures surface as
+ * `error` (keeping the last good data) instead of leaving the picker spinning.
  */
-function githubStore<T>(url: string, intervalMs: number, transform: (json: any) => Map<string, T[]>) {
-	return readable<GitHubData<T>>({ data: null, error: null }, function start(set) {
+function listingStore<T>(url: string, intervalMs: number, transform: (json: any) => Map<string, T[]>) {
+	return readable<Listing<T>>({ data: null, error: null }, function start(set) {
 		let data: Map<string, T[]> | null = null;
 		let errors = 0;
 		let timer: ReturnType<typeof setTimeout> | undefined;
@@ -65,24 +65,16 @@ function githubStore<T>(url: string, intervalMs: number, transform: (json: any) 
 			try {
 				const res = await fetch(url);
 				if (!res.ok) {
-					const remaining = res.headers.get('x-ratelimit-remaining');
-					const reset = Number(res.headers.get('x-ratelimit-reset'));
-					if ((res.status === 403 || res.status === 429) && remaining === '0' && reset) {
-						const resetAt = new Date(reset * 1000);
-						delay = Math.max(resetAt.getTime() - Date.now(), 0) + 5000;
-						throw new Error(`GitHub API rate limit exceeded; retrying at ${resetAt.toLocaleTimeString()}`);
-					}
 					const body = await res.json().catch(() => null);
-					throw new Error(`GitHub API error ${res.status}${body?.message ? `: ${body.message}` : ''}`);
+					throw new Error(`HTTP ${res.status}${body?.error ? `: ${body.error}` : ''}`);
 				}
 				data = transform(await res.json());
 				errors = 0;
 				set({ data, error: null });
 			} catch (ex) {
 				console.error(`Error fetching ${url}:`, ex);
-				// Back off quickly-then-slowly for transient failures, but never faster than a rate-limit reset.
-				if (delay === intervalMs) delay = Math.min(15000 * 2 ** errors, intervalMs);
-				errors++;
+				// Retry quickly at first, backing off to the normal interval
+				delay = Math.min(15000 * 2 ** errors++, intervalMs);
 				set({ data, error: ex instanceof Error ? ex.message : String(ex) });
 			}
 			if (!stopped) timer = setTimeout(fetchData, delay);
@@ -107,7 +99,7 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
 	}, new Map<string, T[]>());
 }
 
-export const artifacts = githubStore<WorkflowRun>('https://api.github.com/repos/ESPresense/ESPresense/actions/workflows/build.yml/runs?status=success&per_page=100', 5 * 60000, (json: { workflow_runs: WorkflowRun[] }) =>
+export const artifacts = listingStore<WorkflowRun>('https://espresense.com/artifacts/runs', 5 * 60000, (json: { workflow_runs: WorkflowRun[] }) =>
 	groupBy(
 		json.workflow_runs.filter((i) => i.head_repository.full_name === 'ESPresense/ESPresense' && i.status == 'completed' && (i.pull_requests.length > 0 || (i.head_branch == 'main' && Date.now() - +new Date(i.created_at) < 1000 * 60 * 60 * 24 * 7))),
 		(i) => i.head_branch
@@ -115,7 +107,7 @@ export const artifacts = githubStore<WorkflowRun>('https://api.github.com/repos/
 );
 
 // Releases with more than 5 assets, grouped into "Beta" (prerelease) and "Release".
-export const releases = githubStore<Release>('https://api.github.com/repos/ESPresense/ESPresense/releases', 15 * 60000, (json: Release[]) =>
+export const releases = listingStore<Release>('https://espresense.com/releases/list', 15 * 60000, (json: Release[]) =>
 	groupBy(
 		json.filter((i) => i.assets.length > 5),
 		(i) => (i.prerelease ? 'Beta' : 'Release')
