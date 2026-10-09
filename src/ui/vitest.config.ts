@@ -6,8 +6,7 @@ export default defineConfig({
 	test: {
 		include: ['src/**/*.{test,spec,vitest}.{js,ts}'],
 		globals: false, // Don't use global expect, import explicitly
-		environment: 'jsdom',
-		setupFiles: ['./src/test/setup.ts']
+		environment: 'jsdom'
 	},
 	define: {
 		// Ensure we're in browser mode for Svelte
