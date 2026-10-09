@@ -101,7 +101,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 	const demoReleases = options.releases;
 
 	if (demoReleases) {
-		await page.route('https://api.github.com/repos/ESPresense/ESPresense/releases', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demoReleases) }));
+		await page.route('https://espresense.com/releases/list', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(demoReleases) }));
 	}
 
 	if (demoFirmwareTypes) {
