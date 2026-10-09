@@ -59,9 +59,11 @@ public class FirmwareCatalogService
                 Branch = r.GetProperty("head_branch").GetString() ?? "",
                 PullRequests = r.GetProperty("pull_requests").EnumerateArray().Select(p => p.GetProperty("number").GetInt32()).ToArray(),
                 Sha = r.GetProperty("head_sha").GetString() ?? "",
-                Title = r.TryGetProperty("head_commit", out var commit) && commit.TryGetProperty("message", out var message)
-                    ? message.GetString()?.Split('\n')[0]
-                    : null,
+                Title = r.TryGetProperty("display_title", out var title) && title.ValueKind == JsonValueKind.String
+                    ? title.GetString()
+                    : r.TryGetProperty("head_commit", out var commit) && commit.TryGetProperty("message", out var message)
+                        ? message.GetString()?.Split('\n')[0]
+                        : null,
                 CreatedAt = r.GetProperty("created_at").GetDateTime()
             })
             .Where(r => pullRequest == null || r.PullRequests.Contains(pullRequest.Value))

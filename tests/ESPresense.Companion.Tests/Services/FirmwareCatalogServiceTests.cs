@@ -92,7 +92,7 @@ public class FirmwareCatalogServiceTests
             ["/artifacts/runs"] = """
                 {"workflow_runs":[
                   {"id":3,"head_branch":"main","head_sha":"ccc","head_commit":{"message":"main\nbody"},"created_at":"2026-10-09T04:00:00Z","pull_requests":[],"head_repository":{"full_name":"ESPresense/ESPresense"}},
-                  {"id":2,"head_branch":"feat/relay","head_sha":"bbb","head_commit":{"message":"relay\nbody"},"created_at":"2026-10-09T03:06:39Z","pull_requests":[{"number":2530}],"head_repository":{"full_name":"ESPresense/ESPresense"}},
+                  {"id":2,"head_branch":"feat/relay","head_sha":"bbb","display_title":"feat: relay (#1316)","head_commit":{"message":"relay\nbody"},"created_at":"2026-10-09T03:06:39Z","pull_requests":[{"number":2530}],"head_repository":{"full_name":"ESPresense/ESPresense"}},
                   {"id":1,"head_branch":"feat/relay","head_sha":"aaa","head_commit":{"message":"fork\nbody"},"created_at":"2026-10-08T03:06:39Z","pull_requests":[{"number":2530}],"head_repository":{"full_name":"someone/ESPresense"}}
                 ]}
                 """
@@ -101,7 +101,8 @@ public class FirmwareCatalogServiceTests
 
         Assert.That((await sut.GetArtifactsAsync(pullRequest: 2530)).Select(a => a.ArtifactId), Is.EqualTo(new[] { 2L }));
         Assert.That((await sut.GetArtifactsAsync(branch: "main")).Select(a => a.ArtifactId), Is.EqualTo(new[] { 3L }));
-        Assert.That((await sut.GetArtifactsAsync(pullRequest: 2530))[0].Title, Is.EqualTo("relay"));
+        Assert.That((await sut.GetArtifactsAsync(pullRequest: 2530))[0].Title, Is.EqualTo("feat: relay (#1316)"));
+        Assert.That((await sut.GetArtifactsAsync(branch: "main"))[0].Title, Is.EqualTo("main"), "falls back to the commit subject");
         Assert.That(handler.Requests, Has.Count.EqualTo(1), "listing should be cached");
         Assert.That(handler.UserAgents, Has.All.Not.Empty);
     }
