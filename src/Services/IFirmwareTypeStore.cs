@@ -7,4 +7,5 @@ public interface IFirmwareTypeStore
 {
     Flavor? GetFlavor(string? firmware);
     CPU? GetCpu(string? firmware);
+    FirmwareTypes? Get();
 }

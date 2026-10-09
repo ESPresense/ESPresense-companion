@@ -22,6 +22,7 @@ public class McpResources
     private readonly DeviceSettingsStore _dss;
     private readonly TelemetryService _telemetryService;
     private readonly FirmwareUpdateJobService _firmwareUpdateJobs;
+    private readonly FirmwareCatalogService _firmwareCatalog;
     private readonly NodeStateMapper _mapper;
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -33,6 +34,7 @@ public class McpResources
         DeviceSettingsStore dss,
         TelemetryService telemetryService,
         FirmwareUpdateJobService firmwareUpdateJobs,
+        FirmwareCatalogService firmwareCatalog,
         NodeStateMapper mapper)
     {
         _state = state;
@@ -42,6 +44,7 @@ public class McpResources
         _dss = dss;
         _telemetryService = telemetryService;
         _firmwareUpdateJobs = firmwareUpdateJobs;
+        _firmwareCatalog = firmwareCatalog;
         _mapper = mapper;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -194,12 +197,65 @@ public class McpResources
         return JsonSerializer.Serialize(new { ok = true, nodeId }, _jsonOptions);
     }
 
+    [McpServerTool(Name = "get_firmware_types")]
+    [Description("List firmware binaries (CPU and flavor) available in each release/artifact")]
+    public Task<string> GetFirmwareTypesTool()
+    {
+        return Task.FromResult(JsonSerializer.Serialize(_firmwareCatalog.GetTypes(), _jsonOptions));
+    }
+
+    [McpServerTool(Name = "list_firmware_releases")]
+    [Description("List ESPresense firmware releases (newest first). Use the version with start_firmware_update.")]
+    public async Task<string> ListFirmwareReleasesTool(
+        [Description("Include beta (prerelease) versions")] bool includePrerelease = true,
+        [Description("Maximum number of releases to return")] int limit = 10)
+    {
+        try
+        {
+            var releases = await _firmwareCatalog.GetReleasesAsync(includePrerelease, limit);
+            return JsonSerializer.Serialize(new { ok = true, releases }, _jsonOptions);
+        }
+        catch (HttpRequestException ex)
+        {
+            return JsonSerializer.Serialize(new { ok = false, error = ex.Message }, _jsonOptions);
+        }
+    }
+
+    [McpServerTool(Name = "list_firmware_artifacts")]
+    [Description("List successful ESPresense CI firmware builds (newest first), e.g. to test a pull request. Use the artifactId with start_firmware_update.")]
+    public async Task<string> ListFirmwareArtifactsTool(
+        [Description("Only builds for this ESPresense pull request number")] int? pullRequest = null,
+        [Description("Only builds for this branch, e.g. main")] string? branch = null,
+        [Description("Maximum number of builds to return")] int limit = 10)
+    {
+        try
+        {
+            var artifacts = await _firmwareCatalog.GetArtifactsAsync(pullRequest, branch, limit);
+            return JsonSerializer.Serialize(new { ok = true, artifacts }, _jsonOptions);
+        }
+        catch (HttpRequestException ex)
+        {
+            return JsonSerializer.Serialize(new { ok = false, error = ex.Message }, _jsonOptions);
+        }
+    }
+
     [McpServerTool(Name = "start_firmware_update")]
-    [Description("Start an OTA firmware update job for a node. Returns a job id for polling.")]
+    [Description("Start an OTA firmware update job for a node. Pass a release version or a CI artifactId (or an explicit url). The firmware binary defaults to the node's current CPU/flavor. Returns a job id for polling.")]
     public Task<string> StartFirmwareUpdateTool(
         [Description("Node identifier")] string nodeId,
-        [Description("Firmware binary URL (ESPresense GitHub URLs only)")] string url)
+        [Description("Release version tag, from list_firmware_releases")] string? version = null,
+        [Description("CI build id, from list_firmware_artifacts")] long? artifactId = null,
+        [Description("Firmware binary name, e.g. esp32-verbose.bin (default: node's current firmware)")] string? firmware = null,
+        [Description("Explicit firmware binary URL (ESPresense GitHub URLs only); overrides version/artifactId")] string? url = null)
     {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            var (resolved, _, resolveError) = _firmwareCatalog.ResolveFirmwareUrl(nodeId, version, artifactId, firmware);
+            if (resolveError != null)
+                return Task.FromResult(JsonSerializer.Serialize(new { ok = false, error = resolveError }, _jsonOptions));
+            url = resolved!;
+        }
+
         var (job, error) = _firmwareUpdateJobs.Start(nodeId, url);
         if (error != null)
         {
