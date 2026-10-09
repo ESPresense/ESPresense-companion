@@ -235,7 +235,12 @@ namespace ESPresense.Models
         [JsonProperty("username")]
         public string? Username { get; set; }
 
-        [JsonProperty("password")]
+        // Never serialize the broker password to API responses, MCP clients, or logs.
+        // Both JSON stacks are ignored because Config is returned by StateController
+        // (System.Text.Json) and McpResources, while Newtonsoft is used elsewhere.
+        // YamlDotNet has its own attributes, so YAML round-tripping is unaffected.
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public string? Password { get; set; }
 
         [JsonProperty("client_id")]
