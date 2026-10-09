@@ -421,18 +421,15 @@ public class MqttCoordinator : IMqttCoordinator
     /// the captured invocation list, so a subscriber that unsubscribes mid-dispatch does not
     /// skew the iteration, and exceptions from one handler do not stop the others.
     /// </remarks>
-    internal Task InvokeAllAsync<T>(Func<T, Task>? handlers, T args, [System.Runtime.CompilerServices.CallerMemberName] string? eventName = null)
+    internal Task InvokeAllAsync<T>(Func<T, Task>? handlers, T args, string eventName)
     {
         if (handlers == null)
             return Task.CompletedTask;
 
         var invocations = handlers.GetInvocationList();
-        if (invocations.Length == 1)
-            return ((Func<T, Task>)invocations[0])(args);
-
         return AwaitAll(invocations, args, eventName);
 
-        async Task AwaitAll(Delegate[] list, T arg, string? name)
+        async Task AwaitAll(Delegate[] list, T arg, string name)
         {
             List<Exception>? errors = null;
             foreach (var invocation in list)
@@ -444,7 +441,6 @@ public class MqttCoordinator : IMqttCoordinator
                 catch (Exception ex)
                 {
                     (errors ??= new()).Add(ex);
-                    _logger.LogError(ex, "Handler for {EventName} threw an exception", name);
                 }
             }
 
@@ -494,7 +490,7 @@ public class MqttCoordinator : IMqttCoordinator
                     break;
                 default:
                     if (MqttMessageReceivedAsync != null)
-                        await InvokeAllAsync(MqttMessageReceivedAsync, arg);
+                        await InvokeAllAsync(MqttMessageReceivedAsync, arg, nameof(MqttMessageReceivedAsync));
                     break;
             }
         }
@@ -644,7 +640,7 @@ public class MqttCoordinator : IMqttCoordinator
                 await InvokeAllAsync(NodeTelemetryRemovedAsync, new NodeTelemetryRemovedEventArgs
                 {
                     NodeId = nodeId
-                });
+                }, nameof(NodeTelemetryRemovedAsync));
             }
             return;
         }
@@ -666,7 +662,7 @@ public class MqttCoordinator : IMqttCoordinator
             {
                 NodeId = nodeId,
                 Payload = telemetry
-            });
+            }, nameof(NodeTelemetryReceivedAsync));
         }
         catch (JsonException ex)
         {
@@ -703,7 +699,7 @@ public class MqttCoordinator : IMqttCoordinator
                 await InvokeAllAsync(NodeStatusRemovedAsync, new NodeStatusRemovedEventArgs
                 {
                     NodeId = nodeId
-                });
+                }, nameof(NodeStatusRemovedAsync));
             }
         }
         else
@@ -716,7 +712,7 @@ public class MqttCoordinator : IMqttCoordinator
                 {
                     NodeId = nodeId,
                     Online = online
-                });
+                }, nameof(NodeStatusReceivedAsync));
             }
         }
     }
@@ -750,7 +746,7 @@ public class MqttCoordinator : IMqttCoordinator
                 DeviceId = deviceId,
                 NodeId = nodeId,
                 Payload = deviceMessage
-            });
+            }, nameof(DeviceMessageReceivedAsync));
         }
         catch (JsonException ex)
         {
@@ -773,7 +769,7 @@ public class MqttCoordinator : IMqttCoordinator
                 {
                     DeviceId = deviceId,
                     Payload = deviceSettings
-                });
+                }, nameof(DeviceConfigReceivedAsync));
         }
         catch (JsonException ex)
         {
@@ -794,7 +790,7 @@ public class MqttCoordinator : IMqttCoordinator
             NodeId = nodeId,
             Setting = setting,
             Payload = payload
-        });
+        }, nameof(NodeSettingReceivedAsync));
     }
 
     private async Task ProcessDiscoveryMessage(string topic, string? payload)
@@ -842,7 +838,7 @@ public class MqttCoordinator : IMqttCoordinator
             {
                 DeviceId = deviceId,
                 Attributes = attributes
-            });
+            }, nameof(DeviceAttributesReceivedAsync));
         }
         catch (JsonException ex)
         {

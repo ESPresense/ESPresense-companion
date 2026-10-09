@@ -154,9 +154,21 @@ public class MqttEventDispatchTests
             return Task.CompletedTask;
         };
 
-        await coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs { DeviceId = "d", NodeId = "n", Payload = new DeviceMessage() });
+        await coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs { DeviceId = "d", NodeId = "n", Payload = new DeviceMessage() }, "TestEvent");
 
         Assert.That(calls, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void InvokeAllAsync_SingleHandlerThrowsSynchronously_ReturnsFaultedTask()
+    {
+        var coordinator = CreateCoordinator();
+        Func<DeviceMessageEventArgs, Task> handler = _ => throw new InvalidOperationException("boom");
+
+        Task? task = null;
+        Assert.DoesNotThrow(() => task = coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs(), "TestEvent"));
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => task!);
     }
 
     [Test]
@@ -165,7 +177,7 @@ public class MqttEventDispatchTests
         var coordinator = CreateCoordinator();
 
         Assert.DoesNotThrowAsync(() =>
-            coordinator.InvokeAllAsync<DeviceMessageEventArgs>(null, new DeviceMessageEventArgs()));
+            coordinator.InvokeAllAsync<DeviceMessageEventArgs>(null, new DeviceMessageEventArgs(), "TestEvent"));
     }
 
     [Test]
@@ -176,7 +188,7 @@ public class MqttEventDispatchTests
         handlers += _ => throw new InvalidOperationException("b");
 
         var ex = Assert.ThrowsAsync<AggregateException>(
-            () => coordinator.InvokeAllAsync(handlers, new DeviceMessageEventArgs()));
+            () => coordinator.InvokeAllAsync(handlers, new DeviceMessageEventArgs(), "TestEvent"));
 
         Assert.That(ex!.InnerExceptions, Has.Count.EqualTo(2));
     }
@@ -209,7 +221,7 @@ public class MqttEventDispatchTests
         Func<DeviceMessageEventArgs, Task> snapshot = first;
         snapshot += second;
 
-        await coordinator.InvokeAllAsync(snapshot, new DeviceMessageEventArgs());
+        await coordinator.InvokeAllAsync(snapshot, new DeviceMessageEventArgs(), "TestEvent");
 
         Assert.That(firstRan, Is.True);
         Assert.That(secondRan, Is.True, "handlers present at dispatch time must all run");
@@ -228,11 +240,11 @@ public class MqttEventDispatchTests
             if (depth == 1)
             {
                 // Re-enter dispatch from within a handler.
-                await coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs());
+                await coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs(), "TestEvent");
             }
         };
 
-        var task = coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs());
+        var task = coordinator.InvokeAllAsync(handler, new DeviceMessageEventArgs(), "TestEvent");
 
         var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
         Assert.That(completed, Is.SameAs(task), "reentrant dispatch must not deadlock");
@@ -409,7 +421,7 @@ public class MqttEventDispatchTests
 
         // Fire many independent dispatches on the thread pool at once.
         var tasks = Enumerable.Range(0, dispatches)
-            .Select(_ => Task.Run(() => coordinator.InvokeAllAsync(handlers, new DeviceMessageEventArgs())))
+            .Select(_ => Task.Run(() => coordinator.InvokeAllAsync(handlers, new DeviceMessageEventArgs(), "TestEvent")))
             .ToArray();
 
         await Task.WhenAll(tasks);
