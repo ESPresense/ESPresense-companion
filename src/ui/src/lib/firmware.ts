@@ -46,101 +46,81 @@ export const flavorNames = derived(firmwareTypes, (a) =>
 	}, new Map<string, string>())
 );
 
-export const artifacts = readable<Map<string, WorkflowRun[]>>(new Map(), function start(set) {
-	let errors = 0;
-	let outstanding = false;
+export type GitHubData<T> = { data: Map<string, T[]> | null; error: string | null };
 
-	async function fetchData() {
-		try {
-			const res = await fetch('https://api.github.com/repos/ESPresense/ESPresense/actions/workflows/build.yml/runs?status=success&per_page=100', { credentials: 'same-origin' });
-			const data: { workflow_runs: WorkflowRun[] } = await res.json();
-			const wf = data.workflow_runs.filter((i) => i.head_repository.full_name === 'ESPresense/ESPresense' && i.status == 'completed' && (i.pull_requests.length > 0 || (i.head_branch == 'main' && Date.now() - +new Date(i.created_at) < 1000 * 60 * 60 * 24 * 7)));
+/**
+ * Polls an unauthenticated GitHub API endpoint (60 req/hr per IP, shared by every tab and by
+ * releases + artifacts). Non-2xx responses surface as `error` instead of leaving the UI spinning,
+ * and a rate-limit response waits until GitHub's reset time before retrying.
+ */
+function githubStore<T>(url: string, intervalMs: number, transform: (json: any) => Map<string, T[]>) {
+	return readable<GitHubData<T>>({ data: null, error: null }, function start(set) {
+		let data: Map<string, T[]> | null = null;
+		let errors = 0;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let stopped = false;
 
-			set(
-				wf.reduce((p: Map<string, WorkflowRun[]>, c) => {
-					if (p.has(c.head_branch)) {
-						p.get(c.head_branch)?.push(c);
-					} else {
-						p.set(c.head_branch, [c]);
+		async function fetchData() {
+			let delay = intervalMs;
+			try {
+				const res = await fetch(url);
+				if (!res.ok) {
+					const remaining = res.headers.get('x-ratelimit-remaining');
+					const reset = Number(res.headers.get('x-ratelimit-reset'));
+					if ((res.status === 403 || res.status === 429) && remaining === '0' && reset) {
+						const resetAt = new Date(reset * 1000);
+						delay = Math.max(resetAt.getTime() - Date.now(), 0) + 5000;
+						throw new Error(`GitHub API rate limit exceeded; retrying at ${resetAt.toLocaleTimeString()}`);
 					}
-					return p;
-				}, new Map<string, WorkflowRun[]>())
-			);
-
-			errors = 0;
-			outstanding = false;
-		} catch (ex) {
-			outstanding = false;
-			if (++errors > 5) set(new Map<string, WorkflowRun[]>());
-			console.log(ex);
+					const body = await res.json().catch(() => null);
+					throw new Error(`GitHub API error ${res.status}${body?.message ? `: ${body.message}` : ''}`);
+				}
+				data = transform(await res.json());
+				errors = 0;
+				set({ data, error: null });
+			} catch (ex) {
+				console.error(`Error fetching ${url}:`, ex);
+				// Back off quickly-then-slowly for transient failures, but never faster than a rate-limit reset.
+				if (delay === intervalMs) delay = Math.min(15000 * 2 ** errors, intervalMs);
+				errors++;
+				set({ data, error: ex instanceof Error ? ex.message : String(ex) });
+			}
+			if (!stopped) timer = setTimeout(fetchData, delay);
 		}
-	}
 
-	const interval = setInterval(() => {
-		if (outstanding) return;
-		outstanding = true;
 		fetchData();
-	}, 60000);
 
-	fetchData();
+		return function stop() {
+			stopped = true;
+			clearTimeout(timer);
+		};
+	});
+}
 
-	return function stop() {
-		clearInterval(interval);
-	};
-});
+function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
+	return items.reduce((p, c) => {
+		const k = key(c);
+		const list = p.get(k);
+		if (list) list.push(c);
+		else p.set(k, [c]);
+		return p;
+	}, new Map<string, T[]>());
+}
 
-export const releases = readable<Map<string, Release[]>>(new Map(), function start(set) {
-	let errors = 0;
-	let outstanding = false;
+export const artifacts = githubStore<WorkflowRun>('https://api.github.com/repos/ESPresense/ESPresense/actions/workflows/build.yml/runs?status=success&per_page=100', 5 * 60000, (json: { workflow_runs: WorkflowRun[] }) =>
+	groupBy(
+		json.workflow_runs.filter((i) => i.head_repository.full_name === 'ESPresense/ESPresense' && i.status == 'completed' && (i.pull_requests.length > 0 || (i.head_branch == 'main' && Date.now() - +new Date(i.created_at) < 1000 * 60 * 60 * 24 * 7))),
+		(i) => i.head_branch
+	)
+);
 
-	/**
-	 * Fetches releases from the ESPresense GitHub repository, filters and groups them, and updates the releases store.
-	 *
-	 * Fetches https://api.github.com/repos/ESPresense/ESPresense/releases, keeps only releases with more than 5 assets,
-	 * groups them into a Map keyed by "Beta" (prerelease) or "Release" (non-prerelease), and calls `set` with that Map.
-	 * On success resets the local `errors` counter and clears `outstanding`. On failure increments `errors`, logs the
-	 * exception, clears `outstanding`, and if errors exceed 5 replaces the store with an empty Map.
-	 */
-	async function fetchData() {
-		try {
-			const res = await fetch('https://api.github.com/repos/ESPresense/ESPresense/releases', { credentials: 'same-origin' });
-			const data: Release[] = await res.json();
-
-			const response = data
-				.filter((i) => i.assets.length > 5)
-				.reduce((p: Map<string, Release[]>, c) => {
-					const key = c.prerelease ? 'Beta' : 'Release';
-					if (p.get(key)) {
-						p.get(key)?.push(c);
-					} else {
-						p.set(key, [c]);
-					}
-					return p;
-				}, new Map<string, Release[]>());
-
-			set(response);
-
-			errors = 0;
-			outstanding = false;
-		} catch (ex) {
-			outstanding = false;
-			if (++errors > 5) set(new Map<string, Release[]>());
-			console.log(ex);
-		}
-	}
-
-	const interval = setInterval(() => {
-		if (outstanding) return;
-		outstanding = true;
-		fetchData();
-	}, 15 * 60000);
-
-	fetchData();
-
-	return function stop() {
-		clearInterval(interval);
-	};
-});
+// Releases with more than 5 assets, grouped into "Beta" (prerelease) and "Release".
+export const releases = githubStore<Release>('https://api.github.com/repos/ESPresense/ESPresense/releases', 15 * 60000, (json: Release[]) =>
+	groupBy(
+		json.filter((i) => i.assets.length > 5),
+		(i) => (i.prerelease ? 'Beta' : 'Release')
+	)
+);
 
 export function getFirmwareUrl(firmwareSource: string, version: string, artifact: string, firmware: string): string | null {
 	if (firmware) {
