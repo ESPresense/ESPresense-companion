@@ -250,6 +250,14 @@ namespace ESPresense.Models
         [JsonProperty("discovery_topic")]
         [YamlMember(Alias = "discovery_topic")]
         public string DiscoveryTopic { get; set; } = "homeassistant";
+
+        /// <summary>
+        /// When true the companion subscribes and processes messages but never publishes; each publish
+        /// is logged at Information level instead. Defaults to false.
+        /// </summary>
+        [JsonProperty("read_only")]
+        [YamlMember(Alias = "read_only")]
+        public bool ReadOnly { get; set; }
     }
 
     public partial class ConfigDevice

@@ -209,7 +209,8 @@ namespace ESPresense.Models
                 Username = Username,
                 Password = Password,
                 ClientId = ClientId,
-                DiscoveryTopic = DiscoveryTopic
+                DiscoveryTopic = DiscoveryTopic,
+                ReadOnly = ReadOnly
             };
         }
     }

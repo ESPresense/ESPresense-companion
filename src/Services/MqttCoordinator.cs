@@ -26,7 +26,7 @@ public class MqttMessageProcessingException : Exception
     }
 }
 
-public class MqttCoordinator : IMqttCoordinator
+public class MqttCoordinator : IMqttCoordinator, IDisposable
 {
     private readonly ConfigLoader _cfg;
     private readonly ILogger<MqttCoordinator> _logger;
@@ -35,11 +35,15 @@ public class MqttCoordinator : IMqttCoordinator
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
     private readonly object _reconnectSync = new();
-    private IMqttClient? _mqttClient;
+    // Cancelled on Dispose (host shutdown) so a reconnect back-off does not outlive the host.
+    private readonly CancellationTokenSource _shutdownCts = new();
+    // Written from the config-change callback / GetClient and read from publishers and the reconnect loop
+    // without a common lock, so both must be volatile to guarantee visibility across threads.
+    private volatile IMqttClient? _mqttClient;
     private Task<IMqttClient>? _initTask;
     private Task? _reconnectTask;
     private ConfigMqtt? _lastConfig;
-    private bool _reconnectRequired;
+    private volatile bool _reconnectRequired;
     private string _discoveryTopic = "homeassistant";
     private volatile TaskCompletionSource _connectionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -72,6 +76,8 @@ public class MqttCoordinator : IMqttCoordinator
               !string.Equals(_lastConfig.Username, config.Username) ||
               !string.Equals(_lastConfig.Password, config.Password) ||
               _lastConfig.Ssl != config.Ssl ||
+              !string.Equals(_lastConfig.ClientId, config.ClientId) ||
+              _lastConfig.ReadOnly != config.ReadOnly ||
               !string.Equals(_lastConfig.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -86,31 +92,37 @@ public class MqttCoordinator : IMqttCoordinator
 
     private async Task<IMqttClient> GetClient()
     {
-        if (_mqttClient != null && !_reconnectRequired)
+        // Snapshot the volatile field once per check so a concurrent reset cannot turn the
+        // "not null" test into a null return.
+        var client = _mqttClient;
+        if (client != null && !_reconnectRequired)
         {
-            return _mqttClient;
+            return client;
         }
 
         await _initLock.WaitAsync();
         try
         {
-            if (_mqttClient != null && !_reconnectRequired)
+            client = _mqttClient;
+            if (client != null && !_reconnectRequired)
             {
-                return _mqttClient;
+                return client;
             }
 
-            if (_reconnectRequired && _mqttClient != null)
+            if (_reconnectRequired && client != null)
             {
                 try
                 {
-                    await _mqttClient.DisconnectAsync().ConfigureAwait(false);
+                    await client.DisconnectAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Error disconnecting MQTT client during reconnection");
                 }
 
-                _mqttClient.Dispose();
+                // Publishers that already hold this reference will get ObjectDisposedException
+                // and retry once via GetClient() (see EnqueueAsync).
+                client.Dispose();
                 _mqttClient = null;
                 _initTask = null;
 
@@ -158,13 +170,27 @@ public class MqttCoordinator : IMqttCoordinator
 
         mqttClient.ApplicationMessageReceivedAsync += OnMqttMessageReceived;
 
+        var readOnlyReason = GetReadOnlyReason(config);
+
         mqttClient.ConnectedAsync += async _ =>
         {
             _logger.LogInformation("MQTT connected!");
 
+            switch (readOnlyReason)
+            {
+                case ReadOnlyReason.ConfigFlag:
+                    _logger.LogInformation("MQTT read-only mode is active (mqtt.read_only: true); nothing will be published");
+                    break;
+                case ReadOnlyReason.ClientIdHeuristic:
+                    _logger.LogInformation(
+                        "MQTT read-only mode is active because client_id '{ClientId}' contains \"read\" (legacy heuristic); set mqtt.read_only: true explicitly, or choose a different client_id to publish",
+                        config.ClientId);
+                    break;
+            }
+
             try
             {
-                if (!IsReadOnlyClient(config.ClientId))
+                if (readOnlyReason == ReadOnlyReason.None)
                 {
                     await mqttClient.PublishStringAsync("espresense/companion/status", "online").ConfigureAwait(false);
                 }
@@ -177,9 +203,22 @@ public class MqttCoordinator : IMqttCoordinator
                 await mqttClient.SubscribeAsync("espresense/companion/+/attributes").ConfigureAwait(false);
                 await mqttClient.SubscribeAsync("espresense/companion/lease/+").ConfigureAwait(false);
             }
-            catch (MQTTnet.Exceptions.MqttClientNotConnectedException ex)
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during MQTT post-connection subscription");
+                // The session is not usable without its subscriptions, so the connection TCS is
+                // deliberately left pending (WaitForConnectionAsync keeps waiting for a good session).
+                //
+                // Rethrowing is the safe way to drop the session with MQTTnet 5: ConnectedAsync is awaited
+                // inside MqttClient.ConnectAsync's try block, so the exception makes ConnectAsync tear the
+                // connection down itself (DisconnectInternal -> our DisconnectedAsync handler, which starts
+                // the reconnect loop) and then surface the failure to whoever called ConnectAsync:
+                // InitializeClientAsync disposes the client so the next GetClient() builds a fresh one
+                // (no reconnect loop is started for it: _mqttClient is only published after success),
+                // ReconnectLoopAsync logs and retries after its back-off, EnsureClientConnectedAsync
+                // propagates to the publisher. Calling DisconnectAsync from inside this handler would
+                // instead make ConnectAsync report success for a session that is already gone.
+                _logger.LogError(ex, "MQTT post-connect setup failed (status publish / subscriptions); dropping the connection so it is retried");
+                throw;
             }
 
             _connectionTcs.TrySetResult();
@@ -242,8 +281,6 @@ public class MqttCoordinator : IMqttCoordinator
             config.Port.HasValue ? ":" + config.Port : "",
             string.IsNullOrEmpty(config.Username) ? "<anonymous>" : config.Username);
 
-        _mqttClient = mqttClient;
-
         try
         {
             await mqttClient.ConnectAsync(mqttClientOptions).ConfigureAwait(false);
@@ -251,28 +288,40 @@ public class MqttCoordinator : IMqttCoordinator
         catch (MQTTnet.Exceptions.MqttClientNotConnectedException ex)
         {
             _logger.LogError(ex, "MQTT client not connected after connect attempt. Broker may be rejecting the connection (check protocol version).");
-            _mqttClient = null;
             mqttClient.Dispose();
             throw;
         }
         catch (MQTTnet.Exceptions.MqttCommunicationException ex)
         {
             _logger.LogError(ex, "MQTT connection failed: {Message}. Check broker address, port, and TLS settings.", ex.Message);
-            _mqttClient = null;
             mqttClient.Dispose();
             throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "MQTT connection failed unexpectedly: {Type} - {Message}", ex.GetType().Name, ex.Message);
-            _mqttClient = null;
             mqttClient.Dispose();
             throw;
         }
 
+        // Publish the client only once the initial connect (including post-connect setup) succeeded.
+        // A DisconnectedAsync raised while ConnectAsync is still unwinding a failed connect therefore
+        // does not start a reconnect loop on a client that is about to be disposed above.
+        _mqttClient = mqttClient;
         _lastConfig = config.Clone();
         _discoveryTopic = config.DiscoveryTopic;
         _reconnectRequired = false;
+
+        // Window: a DisconnectedAsync that fired after ConnectedAsync succeeded but before the
+        // assignment above failed StartReconnectLoop's ReferenceEquals(_mqttClient, client) guard, so no
+        // reconnect loop was started for it. In normal mode the next publish would self-heal through
+        // EnsureClientConnectedAsync, but in read-only mode EnqueueAsync never gets that far, so start
+        // the loop explicitly now (StartReconnectLoop is idempotent under _reconnectSync).
+        if (!mqttClient.IsConnected)
+        {
+            _logger.LogWarning("MQTT connection dropped immediately after connecting; starting reconnect loop");
+            StartReconnectLoop(mqttClient);
+        }
 
         return mqttClient;
     }
@@ -291,7 +340,8 @@ public class MqttCoordinator : IMqttCoordinator
                 return;
             }
 
-            var reconnectTask = Task.Run(() => ReconnectLoopAsync(client));
+            var shutdownToken = _shutdownCts.Token;
+            var reconnectTask = Task.Run(() => ReconnectLoopAsync(client, shutdownToken));
             _reconnectTask = reconnectTask;
 
             reconnectTask.ContinueWith(_ =>
@@ -307,9 +357,9 @@ public class MqttCoordinator : IMqttCoordinator
         }
     }
 
-    private async Task ReconnectLoopAsync(IMqttClient client)
+    private async Task ReconnectLoopAsync(IMqttClient client, CancellationToken shutdownToken)
     {
-        while (!_reconnectRequired)
+        while (!_reconnectRequired && !shutdownToken.IsCancellationRequested)
         {
             if (!ReferenceEquals(_mqttClient, client))
             {
@@ -353,10 +403,11 @@ public class MqttCoordinator : IMqttCoordinator
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(30), shutdownToken).ConfigureAwait(false);
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
+                // Host is shutting down; stop retrying.
                 return;
             }
         }
@@ -396,6 +447,18 @@ public class MqttCoordinator : IMqttCoordinator
     {
         var tcs = _connectionTcs;
         await tcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Called by the DI container on host shutdown. Stops any pending reconnect back-off so shutdown is
+    /// not held up. The client is intentionally not disconnected cleanly: letting the socket drop makes
+    /// the broker publish the "offline" will message on espresense/companion/status.
+    /// </summary>
+    public void Dispose()
+    {
+        // The CTS is not disposed on purpose: a reconnect loop may still read the token afterwards.
+        _shutdownCts.Cancel();
+        GC.SuppressFinalize(this);
     }
 
     public event Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceivedAsync;
@@ -511,55 +574,105 @@ public class MqttCoordinator : IMqttCoordinator
         }
     }
 
-    private bool ReadOnly => IsReadOnlyClient(_lastConfig?.ClientId ?? _mqttClient?.Options?.ClientId);
+    /// <summary>Why the coordinator is (or is not) in read-only mode.</summary>
+    internal enum ReadOnlyReason
+    {
+        None,
+        /// <summary><c>mqtt.read_only: true</c> in config.</summary>
+        ConfigFlag,
+        /// <summary>Legacy heuristic: the client id contains "read".</summary>
+        ClientIdHeuristic
+    }
 
-    private static bool IsReadOnlyClient(string? clientId)
+    private bool ReadOnly
+    {
+        get
+        {
+            var config = _lastConfig;
+            if (config != null)
+                return GetReadOnlyReason(config) != ReadOnlyReason.None;
+
+            // No successful connect yet (e.g. mocked coordinator): fall back to the client options.
+            return IsReadOnlyClient(_mqttClient?.Options?.ClientId);
+        }
+    }
+
+    /// <summary>
+    /// Decides read-only mode for a config: the explicit <see cref="ConfigMqtt.ReadOnly"/> flag wins;
+    /// otherwise the legacy client-id heuristic is applied for backward compatibility.
+    /// </summary>
+    internal static ReadOnlyReason GetReadOnlyReason(ConfigMqtt config)
+    {
+        if (config.ReadOnly) return ReadOnlyReason.ConfigFlag;
+        if (IsReadOnlyClient(config.ClientId)) return ReadOnlyReason.ClientIdHeuristic;
+        return ReadOnlyReason.None;
+    }
+
+    /// <summary>
+    /// Legacy heuristic kept for backward compatibility: a client id containing "read"
+    /// (case-insensitive) puts the coordinator in read-only mode. Prefer <see cref="ConfigMqtt.ReadOnly"/>.
+    /// </summary>
+    internal static bool IsReadOnlyClient(string? clientId)
     {
         return clientId?.Contains("read", StringComparison.OrdinalIgnoreCase) ?? false;
     }
 
+    private static string Sanitize(string value) =>
+        value.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
+
     /// <summary>
-    /// Enqueues an MQTT message for delivery (or logs intent when coordinator is in read-only mode).
+    /// Publishes an MQTT message and awaits the publish (there is no outbound queue: the call
+    /// completes when the underlying client has sent the message, or throws). Connects the client
+    /// on demand and reconnects it if it has dropped. In read-only mode the message is not sent;
+    /// the intent is logged at Information level instead.
     /// </summary>
     /// <param name="topic">MQTT topic to publish to.</param>
     /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
     /// <param name="retain">If true, the broker will retain the message.</param>
-    /// <returns>A task that completes when the message has been enqueued or the intent has been logged.</returns>
-    /// <exception cref="Exception">Propagates exceptions thrown by the underlying MQTT client when publishing fails.</exception>
+    /// <returns>A task that completes when the message has been published or the intent has been logged.</returns>
+    /// <exception cref="Exception">Propagates exceptions thrown by the underlying MQTT client when connecting or publishing fails.</exception>
     public virtual async Task EnqueueAsync(string topic, string? payload, bool retain = false)
     {
-        var client = await GetClient().ConfigureAwait(false);
+        // At most one retry: a config reload (GetClient) may dispose the client after we took the
+        // reference, which surfaces as ObjectDisposedException; the replacement client is then used.
+        for (var attempt = 0; ; attempt++)
+        {
+            var client = await GetClient().ConfigureAwait(false);
 
-        if (ReadOnly)
-        {
-            var sanitizedTopic = topic.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-            var sanitizedPayload = payload?.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-            _logger.LogInformation("ReadOnly, would have sent to {Topic}: {Payload}", sanitizedTopic, sanitizedPayload);
-            return;
-        }
+            if (ReadOnly)
+            {
+                var sanitizedPayload = payload == null ? null : Sanitize(payload);
+                _logger.LogInformation("ReadOnly, would have sent to {Topic}: {Payload}", Sanitize(topic), sanitizedPayload);
+                return;
+            }
 
-        try
-        {
-            await EnsureClientConnectedAsync(client).ConfigureAwait(false);
-            await client.PublishStringAsync(topic, payload, retain: retain).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            var sanitizedTopic = topic.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-            _logger.LogError(ex, "Failed to enqueue MQTT message to {Topic}", sanitizedTopic);
-            throw;
+            try
+            {
+                await EnsureClientConnectedAsync(client).ConfigureAwait(false);
+                await client.PublishStringAsync(topic, payload, retain: retain).ConfigureAwait(false);
+                return;
+            }
+            catch (ObjectDisposedException ex) when (attempt == 0)
+            {
+                _logger.LogDebug(ex, "MQTT client was replaced while publishing to {Topic}; retrying once with the new client", Sanitize(topic));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to publish MQTT message to {Topic}", Sanitize(topic));
+                throw;
+            }
         }
     }
 
     /// <summary>
-    /// Attempts to enqueue an MQTT message for delivery without throwing exceptions.
-    /// Logs errors but returns success/failure status instead of propagating exceptions.
+    /// Publishes an MQTT message like <see cref="EnqueueAsync"/> but never throws (except for cancellation).
+    /// Logs errors and returns success/failure status instead of propagating exceptions.
     /// Use this for best-effort publishes (telemetry, status updates) that shouldn't crash background services.
     /// </summary>
     /// <param name="topic">MQTT topic to publish to.</param>
     /// <param name="payload">Message payload; may be null to clear retained messages for the topic.</param>
     /// <param name="retain">If true, the broker will retain the message.</param>
-    /// <returns>True if the message was enqueued successfully, false if an error occurred.</returns>
+    /// <returns>True if the message was published (or logged in read-only mode), false if an error occurred.</returns>
     public virtual async Task<bool> TryEnqueueAsync(string topic, string? payload, bool retain = false)
     {
         try
