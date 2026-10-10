@@ -793,23 +793,39 @@ public class MqttCoordinator : IMqttCoordinator
         }, nameof(NodeSettingReceivedAsync));
     }
 
-    private async Task ProcessDiscoveryMessage(string topic, string? payload)
+    internal async Task ProcessDiscoveryMessage(string topic, string? payload)
     {
         try
         {
             _logger.LogTrace($"Received discovery message on topic: {topic}");
 
-            if (payload == null)
+            // <discovery prefix>/<component>/<discovery id>/config
+            var parts = topic.Split('/');
+            var discoveryId = parts.Length == 4 ? parts[2] : topic;
+
+            if (string.IsNullOrWhiteSpace(payload))
             {
-                // Null payload indicates deletion of retained message
-                PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs { AutoDiscover = null });
+                // A retained discovery message is cleared by publishing an empty payload (delivered as "" or null)
+                PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs
+                {
+                    Topic = topic,
+                    DiscoveryId = discoveryId,
+                    DeviceId = null,
+                    AutoDiscover = null
+                });
                 return;
             }
 
-            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, _discoveryTopic))
+            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, _discoveryTopic) || msg == null)
                 throw new MqttMessageProcessingException("Failed to deserialize discovery message", topic, payload, "Discovery");
 
-            PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs { AutoDiscover = msg });
+            PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs
+            {
+                Topic = topic,
+                DiscoveryId = msg.DiscoveryId,
+                DeviceId = msg.Message?.StateTopic?.Split('/').Last(),
+                AutoDiscover = msg
+            });
         }
         catch (Exception ex) when (ex is not MqttMessageProcessingException)
         {
