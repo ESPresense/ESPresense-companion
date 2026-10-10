@@ -227,15 +227,53 @@ public class MqttCoordinator : IMqttCoordinator
             return Task.CompletedTask;
         };
 
-        var mqttClientOptions = new MqttClientOptionsBuilder()
+        var optionsBuilder = new MqttClientOptionsBuilder()
             .WithConfig(config)
             .WithClientId(config.ClientId)
             .WithWillTopic("espresense/companion/status")
             .WithWillRetain()
             .WithWillPayload("offline")
             .WithCleanSession()
-            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-            .Build();
+            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30));
+        
+        if (config.Ssl == true)
+        {
+            optionsBuilder.WithTlsOptions(o =>
+            {
+                o.UseTls();
+        
+                if (config.Insecure == true)
+                {
+                    o.WithCertificateValidationHandler(c => true);
+                }
+                else if (!string.IsNullOrEmpty(config.CaCertPath) &&
+                         System.IO.File.Exists(config.CaCertPath))
+                {
+                    var caCertificate =
+                        new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                            config.CaCertPath);
+        
+                    o.WithCertificateValidationHandler((certificate, chain, sslPolicyErrors) =>
+                    {
+                        using var customChain =
+                            new System.Security.Cryptography.X509Certificates.X509Chain();
+        
+                        customChain.ChainPolicy.TrustMode =
+                            System.Security.Cryptography.X509Certificates.X509ChainTrustMode.CustomRootTrust;
+        
+                        customChain.ChainPolicy.CustomTrustStore.Add(caCertificate);
+        
+                        customChain.ChainPolicy.RevocationMode =
+                            System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+        
+                        return customChain.Build(certificate);
+                    });
+                }
+            });
+        }
+        
+        var mqttClientOptions = optionsBuilder.Build();
+
 
         _logger.LogInformation("Connecting to MQTT at {Host}{Port} as {User}",
             config.Host,
