@@ -1,7 +1,7 @@
 <script lang="ts">
-	let backgroundImage: string | null = null;
-	let fileInput: HTMLInputElement;
-	let rotation = 0;
+	let backgroundImage: string | null = $state(null);
+	let fileInput: HTMLInputElement | undefined = $state();
+	let rotation = $state(0);
 
 	function handleFileUpload(event: Event) {
 		const file = (event.target as HTMLInputElement).files?.[0];

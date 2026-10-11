@@ -269,11 +269,18 @@ public class State
         return false;
     }
 
-    private bool IsExcluded(Device device)
+    private bool IsExcluded(Device device) => IsExcluded(device.Id, device.Name);
+
+    /// <summary>
+    /// Whether exclude_devices matches this id or name. Takes the raw pair rather than a Device so
+    /// callers can decide before constructing one -- autodiscovery needs that, or it resurrects an
+    /// excluded device from its own leftover discovery message.
+    /// </summary>
+    public bool IsExcluded(string? id, string? name)
     {
         return Config?.ExcludeDevices.Any(d =>
-            (!string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(device.Id) && Glob.Parse(d.Id, GlobOpts).IsMatch(device.Id)) ||
-            (!string.IsNullOrWhiteSpace(d.Name) && !string.IsNullOrWhiteSpace(device.Name) && Glob.Parse(d.Name, GlobOpts).IsMatch(device.Name))
+            (!string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(id) && Glob.Parse(d.Id, GlobOpts).IsMatch(id)) ||
+            (!string.IsNullOrWhiteSpace(d.Name) && !string.IsNullOrWhiteSpace(name) && Glob.Parse(d.Name, GlobOpts).IsMatch(name))
         ) ?? false;
     }
 }

@@ -1,17 +1,18 @@
 <script lang="ts">
 	// Page to display the 3D map for a SINGLE device and its history
 	import { onMount, onDestroy } from 'svelte';
+	// `$app/stores` is deprecated, but `$app/state` is not reactive under legacy `$:`/`derived()`;
+	// this page is converted to runes in Phase 4.
 	import { page } from '$app/stores'; // To get route params
 	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 	import { devices, nodes, config } from '$lib/stores';
 	import Map3D from '$lib/Map3D.svelte';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
-	import { apiUrl } from '$lib/api';
+	import { apiFetch } from '$lib/api';
 	import { derived } from 'svelte/store';
 
 	// --- Route Param ---
-	let deviceId: string | null = null;
-	$: deviceId = $page.params.id; // Get device ID from URL
+	let deviceId = $derived($page.params.id ?? null); // Get device ID from URL
 
 	// --- Data Stores & Derived State ---
 	// Find the specific device based on the route ID
@@ -21,12 +22,12 @@
 
 	// --- State for this page ---
 	let guiInstance: GUI | null = null;
-	let historyDurationMinutes: number = 60;
-	let deviceHistoryData: DeviceHistory[] = [];
-	let displayMode: 'current' | 'history' = 'current'; // Control what's shown
-	let showNodes = true; // Separate control for nodes on this page
-	let zRotationSpeed = 0.002; // Separate control for rotation
-	let historyDurationControl: any; // Reference to the GUI control
+	let historyDurationMinutes: number = $state(60);
+	let deviceHistoryData: DeviceHistory[] = $state([]);
+	let displayMode: 'current' | 'history' = $state('current'); // Control what's shown
+	let showNodes = $state(true); // Separate control for nodes on this page
+	let zRotationSpeed = $state(0.002); // Separate control for rotation
+	let historyDurationControl: any = $state(); // Reference to the GUI control
 
 	// Reactive controller for GUI
 	const effectController = {
@@ -48,15 +49,6 @@
 		};
 	});
 
-	// Refetch history when relevant parameters change
-	$: if (deviceId && displayMode === 'history') fetchDeviceHistory();
-	$: if (historyDurationMinutes && displayMode === 'history') fetchDeviceHistory();
-
-	// Show/Hide duration control based on mode
-	$: if (historyDurationControl) {
-		historyDurationControl.domElement.style.display = displayMode === 'history' ? '' : 'none';
-	}
-
 	// --- Data Fetching ---
 	async function fetchDeviceHistory() {
 		if (!deviceId || historyDurationMinutes <= 0) {
@@ -69,10 +61,7 @@
 
 		try {
 			console.log(`Fetching history for ${deviceId} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
-			const response = await fetch(apiUrl(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`));
-			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-			const data: { history: DeviceHistory[] } = await response.json();
+			const data = await apiFetch<{ history: DeviceHistory[] }>(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
 			deviceHistoryData = data.history || [];
 			console.log(`Fetched ${deviceHistoryData.length} history points.`);
 		} catch (error) {
@@ -125,6 +114,18 @@
 
 		guiInstance.close();
 	}
+	// Refetch history when relevant parameters change. One effect, not one per input:
+	// fetchDeviceHistory() reads both deviceId and historyDurationMinutes synchronously,
+	// so both are tracked here, and it already bails out on a missing id or duration.
+	$effect(() => {
+		if (displayMode === 'history') fetchDeviceHistory();
+	});
+	// Show/Hide duration control based on mode
+	$effect(() => {
+		if (historyDurationControl) {
+			historyDurationControl.domElement.style.display = displayMode === 'history' ? '' : 'none';
+		}
+	});
 </script>
 
 <svelte:head>

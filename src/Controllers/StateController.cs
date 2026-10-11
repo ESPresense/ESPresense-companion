@@ -9,7 +9,6 @@ using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
 using Serilog;
-using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
 using ESPresense.Events;
@@ -25,10 +24,10 @@ public class StateController : ControllerBase
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
     private readonly DeviceSettingsStore _dss;
-    private readonly IMapper _mapper;
+    private readonly NodeStateMapper _mapper;
     private readonly GlobalEventDispatcher _eventDispatcher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, IMapper mapper, GlobalEventDispatcher eventDispatcher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, NodeStateMapper mapper, GlobalEventDispatcher eventDispatcher)
     {
         _logger = logger;
         _state = state;
@@ -69,7 +68,8 @@ public class StateController : ControllerBase
     [HttpGet("api/state/nodes")]
     public IEnumerable<NodeState> GetNodes(bool includeTele = true)
     {
-        return includeTele ? _mapper.Map<IEnumerable<NodeStateTele>>(_state.Nodes.Values) : _mapper.Map<IEnumerable<NodeState>>(_state.Nodes.Values);
+        if (includeTele) return _mapper.ToNodeStateTeles(_state.Nodes.Values);
+        return NodeStateMapper.ToNodeStates(_state.Nodes.Values);
     }
 
     // GET: api/rooms

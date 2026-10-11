@@ -5,12 +5,16 @@
 	import DeviceMarker from './DeviceMarker.svelte';
 	import type { Device } from './types';
 
-	export let transform = zoomIdentity;
-	export let floorId: string | null = null;
-	export let deviceId: string | null = null;
-	export let exclusive: boolean = false;
-	export let onhovered: ((device: Device | null) => void) | undefined = undefined;
-	export let onselected: ((device: Device) => void) | undefined = undefined;
+	interface Props {
+		transform?: any;
+		floorId?: string | null;
+		deviceId?: string | null;
+		exclusive?: boolean;
+		onhovered?: ((device: Device | null) => void) | undefined;
+		onselected?: ((device: Device) => void) | undefined;
+	}
+
+	let { transform = zoomIdentity, floorId = null, deviceId = null, exclusive = false, onhovered = undefined, onselected = undefined }: Props = $props();
 
 	function visible(d: Device) {
 		if (exclusive) return d.id === deviceId;

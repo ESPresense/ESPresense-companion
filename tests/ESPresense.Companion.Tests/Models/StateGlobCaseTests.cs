@@ -60,4 +60,32 @@ public class StateGlobCaseTests
         var device = new Device("xyz:1", null, TimeSpan.FromSeconds(30)) { Name = name };
         Assert.That(_state.ShouldTrack(device), Is.EqualTo(expected));
     }
+
+    // Autodiscovery has only the id and name off the wire, before any Device exists. A rotating-MAC
+    // advertiser arrives under either shape depending on how the node fingerprinted it -- "name:x" as
+    // the id, or a bare MAC id carrying the name -- so both must be excludable.
+    [TestCase("iBeacon:BBBB-1", null, true)]
+    [TestCase("IBEACON:BBBB-1", null, true)]        // case-insensitive, like the Device overload
+    [TestCase("c0ffee001122", "Phone GUEST 7", true)]  // id says nothing; the name is what matches
+    [TestCase("iBeacon:AAAA-1", null, false)]
+    [TestCase("c0ffee001122", "Phone Bob", false)]
+    [TestCase(null, null, false)]
+    [TestCase("", "", false)]
+    public void IsExcluded_MatchesOnIdOrNameWithoutADevice(string? id, string? name, bool expected)
+    {
+        Assert.That(_state.IsExcluded(id, name), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void IsExcluded_AgreesWithShouldTrackForExcludedDevices()
+    {
+        // The pair overload is what discovery consults; it must not disagree with the Device path,
+        // or an excluded device gets created and republished before the check untracks it.
+        var device = new Device("iBeacon:BBBB-9", null, TimeSpan.FromSeconds(30));
+        Assert.Multiple(() =>
+        {
+            Assert.That(_state.IsExcluded(device.Id, device.Name), Is.True);
+            Assert.That(_state.ShouldTrack(device), Is.False);
+        });
+    }
 }

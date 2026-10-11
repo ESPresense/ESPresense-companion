@@ -14,30 +14,19 @@
 	const r = tweened(0, { duration: 100, easing: cubicOut });
 	const v = tweened(0, { duration: 1000, easing: cubicOut });
 
-	export let deviceId: string | null = null;
-	export let nodeId: string | null = null;
-	export let floor: Floor | undefined = undefined;
-	export let n: Node;
-	export let onhovered: ((node: Node | null) => void) | undefined = undefined;
-	export let onselected: ((node: Node) => void) | undefined = undefined;
+	interface Props {
+		deviceId?: string | null;
+		nodeId?: string | null;
+		floor?: Floor | undefined;
+		n: Node;
+		onhovered?: ((node: Node | null) => void) | undefined;
+		onselected?: ((node: Node) => void) | undefined;
+	}
 
-	$: radarDevice = $devices?.find((d) => d.id === deviceId);
-	$: radarNode = $nodes?.find((d) => d.id === nodeId);
-	$: radarDist = radarDevice?.nodes[n.id]?.dist || radarNode?.nodes[n.id]?.dist;
-	$: radarVar = radarDevice?.nodes[n.id]?.var || radarNode?.nodes[n.id]?.var;
-	$: radarLastHit = $relative - (radarDevice?.nodes[n.id]?.lh || radarNode?.nodes[n.id]?.lh || 0);
-	$: radarTimeout = radarDevice?.timeout || 30000;
-	$: v.set(fixRadiusFromHeight(Math.sqrt(radarVar ?? 0)));
-	$: r.set(fixRadiusFromHeight(radarDist));
+	let { deviceId = null, nodeId = null, floor = undefined, n, onhovered = undefined, onselected = undefined }: Props = $props();
 
-	let innerStop: number = 0;
-	let outerStop: number = 1;
-	let hit: number = 1;
-
-	$: innerStop = 0.5 * ($r / ($r + $v));
-	$: outerStop = 1 - innerStop;
-	$: hit = Math.min(1, Math.max(0, radarTimeout - radarLastHit) / radarTimeout);
-	$: hr = hit * $r;
+	let innerStop: number = $derived(0.5 * ($r / ($r + $v)));
+	let outerStop: number = $derived(1 - innerStop);
 
 	function fixRadiusFromHeight(dr: number | undefined): number {
 		if (dr == undefined) return 0;
@@ -58,6 +47,20 @@
 	function select(n: Node) {
 		onselected?.(n);
 	}
+	let radarDevice = $derived($devices?.find((d) => d.id === deviceId));
+	let radarNode = $derived($nodes?.find((d) => d.id === nodeId));
+	let radarDist = $derived(radarDevice?.nodes[n.id]?.dist || radarNode?.nodes[n.id]?.dist);
+	let radarVar = $derived(radarDevice?.nodes[n.id]?.var || radarNode?.nodes[n.id]?.var);
+	let radarLastHit = $derived($relative - (radarDevice?.nodes[n.id]?.lh || radarNode?.nodes[n.id]?.lh || 0));
+	let radarTimeout = $derived(radarDevice?.timeout || 30000);
+	let hit: number = $derived(Math.min(1, Math.max(0, radarTimeout - radarLastHit) / radarTimeout));
+	$effect(() => {
+		v.set(fixRadiusFromHeight(Math.sqrt(radarVar ?? 0)));
+	});
+	$effect(() => {
+		r.set(fixRadiusFromHeight(radarDist));
+	});
+	let hr = $derived(hit * $r);
 </script>
 
 <defs>

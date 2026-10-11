@@ -5,9 +5,14 @@
 	import type { Node } from '$lib/types';
 	import NodeActions from './NodeActions.svelte';
 	import NodeActiveId from './NodeActiveId.svelte';
+	import NodeIp from './NodeIp.svelte';
 	import VersionPicker from './VersionPicker.svelte';
 
-	export let onselected: ((node: Node) => void) | undefined = undefined;
+	interface Props {
+		onselected?: ((node: Node) => void) | undefined;
+	}
+
+	let { onselected = undefined }: Props = $props();
 
 	let columns = [
 		{
@@ -21,10 +26,11 @@
 				return `${d.online ? '0' : '1'}_${d.name || d.id}`;
 			}
 		},
+		{ key: 'telemetry.board', title: 'Board', value: (d: Node) => d.telemetry?.board || 'n/a', sortable: true },
 		{ key: 'telemetry.version', title: 'Version', value: (d: Node) => d.telemetry?.version ?? 'n/a', sortable: true },
 		{ key: 'cpu.name', title: 'CPU', value: (d: Node) => d.cpu?.name ?? 'n/a', sortable: true },
 		{ key: 'flavor.name', title: 'Flavor', value: (d: Node) => d.flavor?.name ?? 'n/a', sortable: true },
-		{ key: 'telemetry.ip', title: 'IP', value: (d: Node) => d.telemetry?.ip ?? 'n/a', sortable: true },
+		{ key: 'telemetry.ip', title: 'IP', value: (d: Node) => d.telemetry?.ip ?? 'n/a', renderComponent: { component: NodeIp }, sortable: true },
 		{ key: 'actions', title: '', renderComponent: { component: NodeActions } }
 	];
 

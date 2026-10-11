@@ -1,31 +1,30 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch } from '$lib/api';
 	import { gotoDetail, gotoCalibration } from '$lib/urls';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showComponent, showConfirm } from '$lib/modal/modalStore';
 	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
 	import DeviceSettingsModal from '$lib/modals/DeviceSettingsModal.svelte';
 
-	export let col: string; // Column identifier from parent table
-	export let row: Device; // Device data for this row
+	interface Props {
+		col: string; // Column identifier from parent table
+		row: Device; // Device data for this row
+	}
+
+	let { col, row }: Props = $props();
 	var _ = col; // Suppress unused variable warning while preserving the prop
 
 	const toastStore = getToastStore();
-	let loadingEdit = false;
-	let loadingDelete = false;
+	let loadingEdit = $state(false);
+	let loadingDelete = $state(false);
 
 	// Determine if device is active based on lastSeen and timeout
-	$: isActive = row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000);
+	let isActive = $derived(row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000));
 
 	async function handleEdit() {
 		loadingEdit = true;
 		try {
-			const response = await fetch(resolve(`/api/device/${row.id}`));
-			if (!response.ok) {
-				throw new Error(`Failed to fetch settings details: ${response.statusText}`);
-			}
-
-			const deviceSettingsDetails: DeviceSettingsDetails = await response.json();
+			const deviceSettingsDetails = await apiFetch<DeviceSettingsDetails>(`/api/device/${row.id}`);
 
 			if (!deviceSettingsDetails.settings) {
 				throw new Error('Device settings not found in API response.');
@@ -57,10 +56,7 @@
 
 		loadingDelete = true;
 		try {
-			const resp = await fetch(resolve(`/api/device/${encodeURIComponent(row.id)}`), { method: 'DELETE' });
-			if (!resp.ok && resp.status !== 204) {
-				throw new Error(`Failed to delete: ${resp.status} ${resp.statusText}`);
-			}
+			await apiFetch(`/api/device/${encodeURIComponent(row.id)}`, { method: 'DELETE' });
 			toastStore.trigger({ message: 'Device deleted', background: 'preset-filled-success-500' });
 		} catch (ex) {
 			console.error('Delete failed', ex);

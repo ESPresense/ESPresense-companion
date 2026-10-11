@@ -1,17 +1,35 @@
-import { readable, writable, derived } from 'svelte/store';
-import { resolve } from '$app/paths';
+import { readable, writable, derived, type Writable } from 'svelte/store';
+import { apiFetch, apiUrl } from '$lib/api';
 import type { FirmwareManifest, Release, WorkflowRun } from '$lib/types';
 
-export const updateMethod: SvelteStore<string> = writable('self');
-export const firmwareSource: SvelteStore<string> = writable('release');
-export const flavor: SvelteStore<string> = writable();
-export const version: SvelteStore<string> = writable();
-export const artifact: SvelteStore<string> = writable();
+export const updateMethod: Writable<string> = writable('self');
+export const firmwareSource: Writable<string> = writable('release');
+// Initial values match VersionPicker's prop fallbacks; Svelte 5 refuses to bind
+// undefined to a prop that declares a fallback (props_invalid_value).
+export const flavor: Writable<string> = writable('-');
+export const version: Writable<string> = writable('');
+export const artifact: Writable<string> = writable('');
 
 export const firmwareTypes = writable<FirmwareManifest | null>(null, function start(set) {
-	fetch(resolve('/api/firmware/types'))
-		.then((r) => r.json())
-		.then((r) => set(r));
+	// One-shot manifest fetch with a bounded retry (same spirit as artifacts/releases below):
+	// otherwise a single non-2xx would leave the store null forever with no visible error.
+	let errors = 0;
+	let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function fetchData() {
+		apiFetch<FirmwareManifest>('/api/firmware/types')
+			.then((r) => set(r))
+			.catch((ex) => {
+				console.error('Error fetching firmware types:', ex);
+				if (++errors <= 5) retryTimer = setTimeout(fetchData, 15000);
+			});
+	}
+
+	fetchData();
+
+	return function stop() {
+		clearTimeout(retryTimer);
+	};
 });
 
 export const cpuNames = derived(firmwareTypes, (a) =>
@@ -28,101 +46,73 @@ export const flavorNames = derived(firmwareTypes, (a) =>
 	}, new Map<string, string>())
 );
 
-export const artifacts = readable<Map<string, WorkflowRun[]>>(new Map(), function start(set) {
-	let errors = 0;
-	let outstanding = false;
+export type Listing<T> = { data: Map<string, T[]> | null; error: string | null };
 
-	async function fetchData() {
-		try {
-			const res = await fetch('https://api.github.com/repos/ESPresense/ESPresense/actions/workflows/build.yml/runs?status=success&per_page=100', { credentials: 'same-origin' });
-			const data: { workflow_runs: WorkflowRun[] } = await res.json();
-			const wf = data.workflow_runs.filter((i) => i.head_repository.full_name === 'ESPresense/ESPresense' && i.status == 'completed' && (i.pull_requests.length > 0 || (i.head_branch == 'main' && Date.now() - +new Date(i.created_at) < 1000 * 60 * 60 * 24 * 7)));
+/**
+ * Polls an espresense.com firmware listing. espresense.com caches GitHub's API at the edge, so
+ * browsers no longer spend their own 60/hour unauthenticated GitHub allowance. Failures surface as
+ * `error` (keeping the last good data) instead of leaving the picker spinning.
+ */
+function listingStore<T>(url: string, intervalMs: number, transform: (json: any) => Map<string, T[]>) {
+	return readable<Listing<T>>({ data: null, error: null }, function start(set) {
+		let data: Map<string, T[]> | null = null;
+		let errors = 0;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let stopped = false;
 
-			set(
-				wf.reduce((p: Map<string, WorkflowRun[]>, c) => {
-					if (p.has(c.head_branch)) {
-						p.get(c.head_branch)?.push(c);
-					} else {
-						p.set(c.head_branch, [c]);
-					}
-					return p;
-				}, new Map<string, WorkflowRun[]>())
-			);
-
-			errors = 0;
-			outstanding = false;
-		} catch (ex) {
-			outstanding = false;
-			if (++errors > 5) set(new Map<string, WorkflowRun[]>());
-			console.log(ex);
+		async function fetchData() {
+			let delay = intervalMs;
+			try {
+				const res = await fetch(url);
+				if (!res.ok) {
+					const body = await res.json().catch(() => null);
+					throw new Error(`HTTP ${res.status}${body?.error ? `: ${body.error}` : ''}`);
+				}
+				data = transform(await res.json());
+				errors = 0;
+				set({ data, error: null });
+			} catch (ex) {
+				console.error(`Error fetching ${url}:`, ex);
+				// Retry quickly at first, backing off to the normal interval
+				delay = Math.min(15000 * 2 ** errors++, intervalMs);
+				set({ data, error: ex instanceof Error ? ex.message : String(ex) });
+			}
+			if (!stopped) timer = setTimeout(fetchData, delay);
 		}
-	}
 
-	const interval = setInterval(() => {
-		if (outstanding) return;
-		outstanding = true;
 		fetchData();
-	}, 60000);
 
-	fetchData();
+		return function stop() {
+			stopped = true;
+			clearTimeout(timer);
+		};
+	});
+}
 
-	return function stop() {
-		clearInterval(interval);
-	};
-});
+function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
+	return items.reduce((p, c) => {
+		const k = key(c);
+		const list = p.get(k);
+		if (list) list.push(c);
+		else p.set(k, [c]);
+		return p;
+	}, new Map<string, T[]>());
+}
 
-export const releases = readable<Map<string, Release[]>>(new Map(), function start(set) {
-	let errors = 0;
-	let outstanding = false;
+export const artifacts = listingStore<WorkflowRun>('https://espresense.com/artifacts/runs', 5 * 60000, (json: { workflow_runs: WorkflowRun[] }) =>
+	groupBy(
+		json.workflow_runs.filter((i) => i.head_repository.full_name === 'ESPresense/ESPresense' && i.status == 'completed' && (i.pull_requests.length > 0 || (i.head_branch == 'main' && Date.now() - +new Date(i.created_at) < 1000 * 60 * 60 * 24 * 7))),
+		(i) => i.head_branch
+	)
+);
 
-	/**
-	 * Fetches releases from the ESPresense GitHub repository, filters and groups them, and updates the releases store.
-	 *
-	 * Fetches https://api.github.com/repos/ESPresense/ESPresense/releases, keeps only releases with more than 5 assets,
-	 * groups them into a Map keyed by "Beta" (prerelease) or "Release" (non-prerelease), and calls `set` with that Map.
-	 * On success resets the local `errors` counter and clears `outstanding`. On failure increments `errors`, logs the
-	 * exception, clears `outstanding`, and if errors exceed 5 replaces the store with an empty Map.
-	 */
-	async function fetchData() {
-		try {
-			const res = await fetch('https://api.github.com/repos/ESPresense/ESPresense/releases', { credentials: 'same-origin' });
-			const data: Release[] = await res.json();
-
-			const response = data
-				.filter((i) => i.assets.length > 5)
-				.reduce((p: Map<string, Release[]>, c) => {
-					const key = c.prerelease ? 'Beta' : 'Release';
-					if (p.get(key)) {
-						p.get(key)?.push(c);
-					} else {
-						p.set(key, [c]);
-					}
-					return p;
-				}, new Map<string, Release[]>());
-
-			set(response);
-
-			errors = 0;
-			outstanding = false;
-		} catch (ex) {
-			outstanding = false;
-			if (++errors > 5) set(new Map<string, Release[]>());
-			console.log(ex);
-		}
-	}
-
-	const interval = setInterval(() => {
-		if (outstanding) return;
-		outstanding = true;
-		fetchData();
-	}, 15 * 60000);
-
-	fetchData();
-
-	return function stop() {
-		clearInterval(interval);
-	};
-});
+// Releases with more than 5 assets, grouped into "Beta" (prerelease) and "Release".
+export const releases = listingStore<Release>('https://espresense.com/releases/list', 15 * 60000, (json: Release[]) =>
+	groupBy(
+		json.filter((i) => i.assets.length > 5),
+		(i) => (i.prerelease ? 'Beta' : 'Release')
+	)
+);
 
 export function getFirmwareUrl(firmwareSource: string, version: string, artifact: string, firmware: string): string | null {
 	if (firmware) {
@@ -142,7 +132,7 @@ export function getLocalFirmwareUrl(firmwareSource: string, version: string, art
 	const url = getFirmwareUrl(firmwareSource, version, artifact, firmware);
 	if (!url) return null;
 
-	const loc = new URL(resolve('/api/firmware/download'), window.location.href);
+	const loc = new URL(apiUrl('/api/firmware/download'), window.location.href);
 
 	const params = new URLSearchParams();
 	params.append('url', url);
@@ -154,7 +144,7 @@ export function getLocalFirmwareUrl(firmwareSource: string, version: string, art
 type Callback = (percentComplete: number, message: string) => void;
 
 export async function firmwareUpdate(id: string, url: string, callback: Callback): Promise<void> {
-	var loc = new URL(resolve(`/ws/firmware/update/${id}`), window.location.href);
+	var loc = new URL(apiUrl(`/ws/firmware/update/${id}`), window.location.href);
 	var wsUrl = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + loc.pathname + `?${new URLSearchParams({ url: url })}`;
 	const ws = new WebSocket(wsUrl);
 

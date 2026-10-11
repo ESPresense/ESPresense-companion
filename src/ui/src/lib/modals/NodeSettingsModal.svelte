@@ -1,15 +1,18 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+	import { apiFetch } from '$lib/api';
 	import type { NodeSetting } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import { createEventDispatcher } from 'svelte';
 	import NodeSettings from '../NodeSettings.svelte'; // Import the fields component
 
-	// Props
-	export let parent: any = undefined; // The Svelte parent component that triggered the modal (for backward compatibility)
-	export let nodeSetting: NodeSetting; // Passed in from trigger
+	interface Props {
+		// Props
+		parent?: any; // The Svelte parent component that triggered the modal (for backward compatibility)
+		nodeSetting: NodeSetting; // Passed in from trigger
+		onclose?: () => void; // supplied by ComponentModal
+	}
 
-	const dispatch = createEventDispatcher();
+	let { parent = undefined, nodeSetting, onclose }: Props = $props();
+
 	const toastStore = getToastStore();
 
 	// Create a local copy to avoid directly mutating the prop
@@ -20,7 +23,7 @@
 		// Add any necessary validation or data transformation here if needed
 
 		try {
-			const response = await fetch(resolve(`/api/node/${nodeSetting.id}`), {
+			await apiFetch(`/api/node/${nodeSetting.id}`, {
 				// Use original nodeSetting.id for the PUT request URL
 				method: 'PUT',
 				headers: {
@@ -28,8 +31,6 @@
 				},
 				body: JSON.stringify(localSettings) // Send the local copy
 			});
-
-			if (!response.ok) throw new Error(`Save failed: ${response.statusText}`);
 
 			toastStore.trigger({ message: 'Node settings saved successfully!', background: 'preset-filled-success-500' });
 
@@ -42,7 +43,7 @@
 			if (parent && parent.onClose) {
 				parent.onClose();
 			} else {
-				dispatch('close');
+				onclose?.();
 			}
 		} catch (e) {
 			console.error('Error saving node settings:', e);
@@ -59,7 +60,7 @@
 		if (parent && parent.onClose) {
 			parent.onClose();
 		} else {
-			dispatch('close');
+			onclose?.();
 		}
 	}
 </script>

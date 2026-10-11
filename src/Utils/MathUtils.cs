@@ -26,11 +26,13 @@ namespace ESPresense.Utils
         /// </summary>
         /// <param name="x">The first list of values.</param>
         /// <param name="y">The second list of values.</param>
-        /// <returns>The Pearson correlation coefficient, or 0 if calculation is not possible.</returns>
+        /// <returns>The Pearson correlation coefficient, or 0 when it is undefined (fewer than two pairs, zero variance, or non-finite input).</returns>
         public static double CalculatePearsonCorrelation(List<double> x, List<double> y)
         {
+            // Single sentinel: every "undefined" case returns 0, never NaN, so callers can feed the
+            // result straight into CalculateConfidence / composite scores without NaN checks.
             if (x == null || y == null || x.Count != y.Count || x.Count < 2)
-                return double.NaN;
+                return 0;
 
             double sumX = 0;
             double sumY = 0;
@@ -51,8 +53,12 @@ namespace ESPresense.Utils
             double numerator = n * sumXY - sumX * sumY;
             double denominator = Math.Sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
 
-            // Avoid division by zero if variance is zero
-            return (denominator != 0) ? numerator / denominator : 0;
+            // Zero variance (denominator 0), or a NaN from non-finite / rounding-degenerate input,
+            // leaves the coefficient undefined: return the 0 sentinel rather than dividing.
+            if (!(denominator > 0) || double.IsNaN(numerator))
+                return 0;
+
+            return numerator / denominator;
         }
 
         /// <summary>
@@ -74,13 +80,18 @@ namespace ESPresense.Utils
             // Calculate coverage component (0-50 points)
             double coveragePart = 50.0 * nodeCount / possibleNodeCount;
 
-            // Calculate error score (0-1 range, 1 is best)
-            double errScore = error.HasValue
+            // Calculate error score (0-1 range, 1 is best).
+            // A NaN or infinite error is treated as the worst case (0): Math.Clamp(NaN, ..) is NaN and
+            // (int)Math.Round(NaN) is unspecified, so it must not reach the final rounding.
+            double errScore = error.HasValue && double.IsFinite(error.Value)
                 ? Math.Clamp(1.0 - (error.Value / MaxErr), 0.0, 1.0)
                 : 0.0;
 
-            // Calculate correlation score (0-1 range, 1 is best)
-            double rScore = Math.Max(0.0, pearsonCorrelation ?? 0.0);
+            // Calculate correlation score (0-1 range, 1 is best).
+            // A NaN or infinite correlation is treated as 0; note Math.Max(0.0, NaN) is NaN.
+            double rScore = pearsonCorrelation.HasValue && double.IsFinite(pearsonCorrelation.Value)
+                ? Math.Clamp(pearsonCorrelation.Value, 0.0, 1.0)
+                : 0.0;
 
             // Calculate quality component (0-50 points)
             double qualityPart = 50.0 * (AlphaErr * errScore + BetaR * rScore);

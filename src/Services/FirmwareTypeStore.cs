@@ -3,7 +3,7 @@ using Polly;
 
 namespace ESPresense.Services
 {
-    public class FirmwareTypeStore
+    public class FirmwareTypeStore : IFirmwareTypeStore
     {
         private readonly HttpClient _httpClient;
         private FirmwareTypes? _firmwareTypes;

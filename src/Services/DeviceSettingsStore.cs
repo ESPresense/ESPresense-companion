@@ -37,6 +37,13 @@ namespace ESPresense.Services
         {
             mqtt.DeviceConfigReceivedAsync += async arg =>
             {
+                // If this device previously advertised a different alias, drop that alias entry (only while it
+                // still points at the previous settings object, so an alias taken over by another device is
+                // left alone). Otherwise Get(oldAlias) keeps resolving here and Set(oldAlias) keeps throwing
+                // "Cannot write to alias".
+                if (_storeById.TryGetValue(arg.DeviceId, out var previous) && previous.Id != null && previous.Id != arg.Payload.Id)
+                    _storeByAlias.TryRemove(new KeyValuePair<string, DeviceSettings>(previous.Id, previous));
+
                 _storeById.AddOrUpdate(arg.DeviceId, _ => arg.Payload, (_, _) => arg.Payload);
                 if (arg.Payload.Id != null) _storeByAlias.AddOrUpdate(arg.Payload.Id, _ => arg.Payload, (_, _) => arg.Payload);
                 ApplyToDevice(arg.DeviceId, arg.Payload);

@@ -53,6 +53,15 @@ jobs:
     - name: Install frontend dependencies
       run: pnpm -C src/ui install --frozen-lockfile
 
+    - name: Type check frontend
+      run: pnpm -C src/ui check
+
+    - name: Lint frontend
+      run: pnpm -C src/ui lint
+
+    - name: Unit test frontend
+      run: pnpm -C src/ui test:unit -- --run
+
     - name: Cache Playwright browsers
       uses: actions/cache@v6
       with:

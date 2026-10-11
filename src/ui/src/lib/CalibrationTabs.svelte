@@ -1,5 +1,9 @@
 <script lang="ts">
-	export let calibrationType: string = 'node';
+	interface Props {
+		calibrationType?: string;
+	}
+
+	let { calibrationType = $bindable('node') }: Props = $props();
 </script>
 
 <header>
