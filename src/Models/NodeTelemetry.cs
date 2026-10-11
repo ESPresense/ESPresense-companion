@@ -13,6 +13,8 @@ public class NodeTelemetry
     [JsonProperty("firm")]
     public string? Firmware { get; set; }
 
+    [JsonProperty("board")]
+    public string? Board { get; set; }
 
     [JsonProperty("rssi")]
     public int Rssi { get; set; }

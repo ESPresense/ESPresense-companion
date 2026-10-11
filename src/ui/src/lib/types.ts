@@ -34,6 +34,7 @@ export interface Node {
 	telemetry: {
 		version: string;
 		ip: string;
+		board?: string | null;
 	};
 	cpu: CPU;
 	flavor: Flavor;
