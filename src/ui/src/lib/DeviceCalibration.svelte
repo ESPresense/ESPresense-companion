@@ -422,6 +422,12 @@
 					calibrationSpot = { x: device.location.x, y: device.location.y };
 				}
 			}
+			// A device that has never been located (untracked, or heard by too few nodes) has no floor and
+			// no location, and with no spot there was nothing to drag, so it could never be anchored from
+			// here (#1730). Fall back to the first floor and the middle of it.
+			if (!selectedFloorId) selectedFloorId = $config?.floors?.[0]?.id ?? null;
+			const b = $config?.floors?.find((f: any) => f.id === selectedFloorId)?.bounds;
+			if (!calibrationSpot && b) calibrationSpot = { x: (b[0][0] + b[1][0]) / 2, y: (b[0][1] + b[1][1]) / 2 };
 		}
 	});
 	let floor = $derived($config?.floors.find((f: any) => f.id === selectedFloorId));
