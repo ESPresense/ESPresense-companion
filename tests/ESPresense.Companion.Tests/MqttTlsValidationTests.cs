@@ -69,6 +69,7 @@ public class MqttTlsValidationTests
     {
         var options = new MqttClientOptionsBuilder().WithConfig(new ConfigMqtt { Host = "localhost", Ssl = true }).Build();
         Assert.That(options.ChannelOptions.TlsOptions.AllowUntrustedCertificates, Is.True);
+        Assert.That(options.ChannelOptions.TlsOptions.CertificateValidationHandler, Is.Not.Null);
     }
 
     [Test]
@@ -76,6 +77,7 @@ public class MqttTlsValidationTests
     {
         var options = new MqttClientOptionsBuilder().WithConfig(new ConfigMqtt { Host = "localhost", Ssl = true, Insecure = false }).Build();
         Assert.That(options.ChannelOptions.TlsOptions.AllowUntrustedCertificates, Is.False);
+        Assert.That(options.ChannelOptions.TlsOptions.CertificateValidationHandler, Is.Null);
     }
 
     private static X509Certificate2 CreateCa(string subject)

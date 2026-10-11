@@ -41,7 +41,9 @@ public static class MqttClientOptionsBuilderExtensions
             else if (mqtt.Insecure == null)
             {
                 // Legacy behavior: ssl without explicit insecure setting accepted untrusted certificates.
+                // MQTTnet 5.2.0.1603's default handler ignores AllowUntrustedCertificates, so accept explicitly.
                 o.WithAllowUntrustedCertificates();
+                o.WithCertificateValidationHandler(_ => true);
             }
         });
         return mcob;
