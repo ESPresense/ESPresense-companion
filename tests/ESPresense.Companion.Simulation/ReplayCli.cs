@@ -54,32 +54,58 @@ public static class ReplayCli
         string? calibrationFile = null;
         double? ransac = null;
 
-        for (int i = 1; i < args.Length; i++)
+        try
         {
-            switch (args[i])
+            for (int i = 1; i < args.Length; i++)
             {
-                case "--locator": locator = args[++i]; break;
-                case "--absorption": absorptions.Add(double.Parse(args[++i], CultureInfo.InvariantCulture)); break;
-                case "--ref-delta": refDelta = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
-                case "--step": step = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
-                case "--stale": stale = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
-                case "--calibration": calibrationFile = args[++i]; break;
-                // --ransac [threshold]; threshold defaults to 2.0m if the next token is another flag
-                case "--ransac":
-                    if (i + 1 < args.Length && double.TryParse(args[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var rt))
-                    { ransac = rt; i++; }
-                    else ransac = 2.0;
-                    break;
+                switch (args[i])
+                {
+                    case "--locator": locator = NextArg(args, ref i); break;
+                    case "--absorption": absorptions.Add(NextDouble(args, ref i)); break;
+                    case "--ref-delta": refDelta = NextDouble(args, ref i); break;
+                    case "--step": step = NextDouble(args, ref i); break;
+                    case "--stale": stale = NextDouble(args, ref i); break;
+                    case "--calibration": calibrationFile = NextArg(args, ref i); break;
+                    // --ransac [threshold]; threshold defaults to 2.0m if the next token is another flag
+                    case "--ransac":
+                        if (i + 1 < args.Length && double.TryParse(args[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var rt))
+                        { ransac = rt; i++; }
+                        else ransac = 2.0;
+                        break;
+                    default:
+                        throw new ArgumentException($"Unknown option: {args[i]}");
+                }
             }
         }
+        catch (ArgumentException ex)
+        {
+            stderr.WriteLine(ex.Message);
+            return 2;
+        }
+        if (step <= 0 || double.IsNaN(step)) { stderr.WriteLine("--step must be > 0 seconds."); return 2; }
+        if (absorptions.Any(a => a <= 0 || double.IsNaN(a))) { stderr.WriteLine("--absorption must be > 0."); return 2; }
 
         // Optional per-node absorption map (e.g. an optimizer's actual output): {"laundry":3.84,...}
         Dictionary<string, double>? perNode = null;
         if (calibrationFile != null)
         {
             if (!File.Exists(calibrationFile)) { stderr.WriteLine($"Calibration file not found: {calibrationFile}"); return 2; }
-            perNode = JsonSerializer.Deserialize<Dictionary<string, double>>(File.ReadAllText(calibrationFile),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            try
+            {
+                var loaded = JsonSerializer.Deserialize<Dictionary<string, double>>(File.ReadAllText(calibrationFile),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                perNode = loaded == null ? null : new Dictionary<string, double>(loaded, StringComparer.OrdinalIgnoreCase);
+            }
+            catch (JsonException ex)
+            {
+                stderr.WriteLine($"Invalid calibration JSON: {ex.Message}");
+                return 2;
+            }
+            if (perNode != null && perNode.Values.Any(v => v <= 0 || double.IsNaN(v)))
+            {
+                stderr.WriteLine("Calibration absorption values must be > 0.");
+                return 2;
+            }
         }
 
         Capture? cap;
@@ -102,6 +128,11 @@ public static class ReplayCli
         if (cap.Positions == null || cap.Positions.Length == 0)
         {
             stderr.WriteLine("Capture has no ground-truth positions; cannot score accuracy.");
+            return 2;
+        }
+        if (cap.Nodes.Any(n => n.Point == null || n.Point.Length < 3))
+        {
+            stderr.WriteLine("Capture contains node(s) without 3D point coordinates.");
             return 2;
         }
 
@@ -163,6 +194,21 @@ public static class ReplayCli
         return 0;
     }
 
+    private static string NextArg(string[] args, ref int i)
+    {
+        if (i + 1 >= args.Length) throw new ArgumentException($"Missing value for {args[i]}");
+        return args[++i];
+    }
+
+    private static double NextDouble(string[] args, ref int i)
+    {
+        var name = args[i];
+        var raw = NextArg(args, ref i);
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+            throw new ArgumentException($"Invalid number for {name}: {raw}");
+        return v;
+    }
+
     private static double Recompute(Msg m, double absorption, double refDelta)
         => Math.Max(0.1, Math.Pow(10, ((m.RefRssi + refDelta) - m.Rssi) / (10.0 * absorption)));
 
@@ -180,21 +226,39 @@ public static class ReplayCli
         var files = new List<string>();
         double ransacDb = 6.0, step = 1.0, stale = 30.0;
         string locator = "neldermead";
-        for (int i = 0; i < args.Length; i++)
+        try
         {
-            switch (args[i])
+            for (int i = 0; i < args.Length; i++)
             {
-                case "--ransac": ransacDb = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
-                case "--step": step = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
-                case "--stale": stale = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
-                case "--locator": locator = args[++i]; break;
-                default: if (File.Exists(args[i])) files.Add(args[i]); break;
+                switch (args[i])
+                {
+                    case "--ransac": ransacDb = NextDouble(args, ref i); break;
+                    case "--step": step = NextDouble(args, ref i); break;
+                    case "--stale": stale = NextDouble(args, ref i); break;
+                    case "--locator": locator = NextArg(args, ref i); break;
+                    default:
+                        if (args[i].StartsWith("--")) throw new ArgumentException($"Unknown option: {args[i]}");
+                        if (!File.Exists(args[i])) throw new ArgumentException($"Capture file not found: {args[i]}");
+                        files.Add(args[i]);
+                        break;
+                }
             }
         }
+        catch (ArgumentException ex)
+        {
+            stderr.WriteLine(ex.Message);
+            return 2;
+        }
+        if (step <= 0 || double.IsNaN(step)) { stderr.WriteLine("--step must be > 0 seconds."); return 2; }
         if (files.Count < 2) { stderr.WriteLine("calval needs >=2 capture files (leave-one-out)."); return 2; }
 
-        var caps = files.Select(f => (name: Path.GetFileName(f), cap: LoadCapture(f)))
-                        .Where(x => x.cap?.Nodes?.Length > 0 && x.cap.Messages?.Length > 0 && x.cap.Positions?.Length > 0)
+        var caps = files.Select(f =>
+                        {
+                            try { return (name: Path.GetFileName(f), cap: LoadCapture(f)); }
+                            catch (JsonException ex) { stderr.WriteLine($"Skipping {f}: invalid capture JSON: {ex.Message}"); return (name: Path.GetFileName(f), cap: (Capture?)null); }
+                        })
+                        .Where(x => x.cap?.Nodes?.Length > 0 && x.cap.Messages?.Length > 0 && x.cap.Positions?.Length > 0
+                                    && x.cap.Nodes.All(n => n.Point != null && n.Point.Length >= 3))
                         .Select(x => (x.name, cap: x.cap!)).ToList();
         if (caps.Count < 2) { stderr.WriteLine("Fewer than 2 valid captures (need nodes, messages, and ground-truth positions)."); return 2; }
 
@@ -265,6 +329,13 @@ public static class ReplayCli
     // RANSAC line fit y = a + b*x. Returns (a, b, inlierCount) or null if no usable model.
     private static (double a, double b, int inliers)? RansacLine(List<(double x, double y)> pts, double thr)
     {
+        // Exhaustive pair search is O(n^3); thin out large pools so it stays tractable.
+        const int maxPoints = 400;
+        if (pts.Count > maxPoints)
+        {
+            int stride = (int)Math.Ceiling(pts.Count / (double)maxPoints);
+            pts = pts.Where((_, idx) => idx % stride == 0).ToList();
+        }
         int n = pts.Count;
         if (n < 4 || pts.Select(p => Math.Round(p.x, 3)).Distinct().Count() < 2) return null;
 
