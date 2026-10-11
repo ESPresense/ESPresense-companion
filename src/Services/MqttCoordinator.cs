@@ -266,15 +266,23 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
             return Task.CompletedTask;
         };
 
-        var mqttClientOptions = new MqttClientOptionsBuilder()
+        var optionsBuilder = new MqttClientOptionsBuilder()
             .WithConfig(config)
             .WithClientId(config.ClientId)
-            .WithWillTopic("espresense/companion/status")
-            .WithWillRetain()
-            .WithWillPayload("offline")
             .WithCleanSession()
-            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-            .Build();
+            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30));
+
+        // A read-only session never publishes "online", so it must not register a retained "offline"
+        // will either: an unclean drop would otherwise mark a real, publishing companion as offline.
+        if (readOnlyReason == ReadOnlyReason.None)
+        {
+            optionsBuilder = optionsBuilder
+                .WithWillTopic("espresense/companion/status")
+                .WithWillRetain()
+                .WithWillPayload("offline");
+        }
+
+        var mqttClientOptions = optionsBuilder.Build();
 
         _logger.LogInformation("Connecting to MQTT at {Host}{Port} as {User}",
             config.Host,
