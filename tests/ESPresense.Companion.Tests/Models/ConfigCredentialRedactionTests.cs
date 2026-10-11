@@ -164,8 +164,7 @@ public class ConfigCredentialRedactionTests
         ESPresense.Services.ConfigLoader? loader = null;
         try
         {
-            // Write the file first: ConfigLoader's constructor kicks off an immediate
-            // Load(), which would otherwise race with this write.
+            // Write the file before constructing the loader so the initial load sees it.
             await WriteSharedAsync(path,
                 "mqtt:\n  host: broker.local\n  username: mqtt-user\n  password: first-secret\n");
 
@@ -235,7 +234,7 @@ public class ConfigCredentialRedactionTests
         try
         {
             var loader = new ESPresense.Services.ConfigLoader(dir);
-            await loader.ConfigAsync();
+            await loader.LoadAsync(); // the constructor no longer loads
             await loader.SaveSectionAsync("optimization", new ConfigOptimization { Enabled = true });
 
             var text = await File.ReadAllTextAsync(path);
@@ -266,7 +265,7 @@ public class ConfigCredentialRedactionTests
             await File.WriteAllTextAsync(path, "mqtt:\n  host: broker.local\n");
 
             var loader = new ESPresense.Services.ConfigLoader(dir);
-            await loader.ConfigAsync();
+            await loader.LoadAsync(); // the constructor no longer loads
 
             Assert.ThrowsAsync<InvalidOperationException>(
                 () => loader.SaveSectionAsync("map", new { x = 1 }));

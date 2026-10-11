@@ -49,7 +49,7 @@ public class SelfCalibrationTests
     };
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         var mqtt = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
@@ -58,8 +58,8 @@ public class SelfCalibrationTests
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
 
-        // ConfigLoader loads asynchronously; the optimizers need Config.Optimization.
-        for (var i = 0; i < 200 && _configLoader.Config == null; i++) Thread.Sleep(10);
+        // The constructor no longer loads; the optimizers need Config.Optimization.
+        await _configLoader.LoadAsync();
         Assert.That(_configLoader.Config, Is.Not.Null, "config did not load");
     }
 
