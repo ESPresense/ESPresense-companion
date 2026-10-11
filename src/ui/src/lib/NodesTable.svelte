@@ -25,6 +25,7 @@
 				return `${d.online ? '0' : '1'}_${d.name || d.id}`;
 			}
 		},
+		{ key: 'telemetry.board', title: 'Board', value: (d: Node) => d.telemetry?.board || 'n/a', sortable: true },
 		{ key: 'telemetry.version', title: 'Version', value: (d: Node) => d.telemetry?.version ?? 'n/a', sortable: true },
 		{ key: 'cpu.name', title: 'CPU', value: (d: Node) => d.cpu?.name ?? 'n/a', sortable: true },
 		{ key: 'flavor.name', title: 'Flavor', value: (d: Node) => d.flavor?.name ?? 'n/a', sortable: true },
