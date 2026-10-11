@@ -7,28 +7,34 @@
 
 	// --- State for GUI Controls ---
 	let guiInstance: GUI | null = null;
-	let showNodes = true;
-	let showDevices = true;
-	let zRotationSpeed = 0.002;
+	let showNodes = $state(true);
+	let showDevices = $state(true);
+	let zRotationSpeed = $state(0.002);
 
-	const effectController = {
+	const effectController = $state({
 		zRotationSpeed: 0.002,
 		showNodes: true,
 		showDevices: true
-	};
+	});
 
 	// --- Reactive synchronization ---
-	$: if (effectController && effectController.zRotationSpeed !== zRotationSpeed) {
-		effectController.zRotationSpeed = zRotationSpeed;
-	}
+	$effect(() => {
+		if (effectController && effectController.zRotationSpeed !== zRotationSpeed) {
+			effectController.zRotationSpeed = zRotationSpeed;
+		}
+	});
 
-	$: if (effectController && effectController.showNodes !== showNodes) {
-		effectController.showNodes = showNodes;
-	}
+	$effect(() => {
+		if (effectController && effectController.showNodes !== showNodes) {
+			effectController.showNodes = showNodes;
+		}
+	});
 
-	$: if (effectController && effectController.showDevices !== showDevices) {
-		effectController.showDevices = showDevices;
-	}
+	$effect(() => {
+		if (effectController && effectController.showDevices !== showDevices) {
+			effectController.showDevices = showDevices;
+		}
+	});
 
 	// --- Lifecycle ---
 	onMount(() => {

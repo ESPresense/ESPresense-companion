@@ -6,7 +6,11 @@
 	import DataTable from '$lib/DataTable.svelte';
 	import ago from 's-ago';
 
-	export let onselected: ((device: Device) => void) | undefined = undefined;
+	interface Props {
+		onselected?: ((device: Device) => void) | undefined;
+	}
+
+	let { onselected = undefined }: Props = $props();
 	let selected = '';
 
 	function select(d: Device) {
@@ -53,7 +57,6 @@
 		{ key: 'lastSeen', title: 'Last Seen', value: (d: Device) => (d.lastSeen ? (ago(new Date(d.lastSeen)) ?? 'n/a') : 'n/a'), sortValue: (d: Device) => (d.lastSeen ? new Date(d.lastSeen) : new Date(0)), sortable: true },
 		{ key: 'actions', title: '', renderComponent: { component: DeviceActions } }
 	];
-
 </script>
 
 <div>

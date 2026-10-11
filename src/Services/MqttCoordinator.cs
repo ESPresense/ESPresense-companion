@@ -411,7 +411,47 @@ public class MqttCoordinator : IMqttCoordinator
     public event EventHandler<PreviousDeviceDiscoveredEventArgs>? PreviousDeviceDiscovered;
     public event Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceivedAsync;
 
-    private async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
+    /// <summary>
+    /// Awaits every subscriber of an async multicast event.
+    /// </summary>
+    /// <remarks>
+    /// <c>await SomeEvent(args)</c> only awaits the <em>last</em> subscriber's task; earlier
+    /// handlers run but their tasks (and exceptions) are unobserved. This helper awaits each
+    /// handler so all subscribers complete and any failure surfaces. Handlers are invoked on
+    /// the captured invocation list, so a subscriber that unsubscribes mid-dispatch does not
+    /// skew the iteration, and exceptions from one handler do not stop the others.
+    /// </remarks>
+    internal Task InvokeAllAsync<T>(Func<T, Task>? handlers, T args, string eventName)
+    {
+        if (handlers == null)
+            return Task.CompletedTask;
+
+        var invocations = handlers.GetInvocationList();
+        return AwaitAll(invocations, args, eventName);
+
+        async Task AwaitAll(Delegate[] list, T arg, string name)
+        {
+            List<Exception>? errors = null;
+            foreach (var invocation in list)
+            {
+                try
+                {
+                    await ((Func<T, Task>)invocation)(arg).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    (errors ??= new()).Add(ex);
+                }
+            }
+
+            if (errors is { Count: 1 })
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+            else if (errors is { Count: > 1 })
+                throw new AggregateException($"One or more handlers for {name} failed", errors);
+        }
+    }
+
+    internal async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
         var parts = arg.ApplicationMessage.Topic.Split('/');
         var payload = arg.ApplicationMessage.ConvertPayloadToString();
@@ -450,7 +490,7 @@ public class MqttCoordinator : IMqttCoordinator
                     break;
                 default:
                     if (MqttMessageReceivedAsync != null)
-                        await MqttMessageReceivedAsync(arg);
+                        await InvokeAllAsync(MqttMessageReceivedAsync, arg, nameof(MqttMessageReceivedAsync));
                     break;
             }
         }
@@ -597,10 +637,10 @@ public class MqttCoordinator : IMqttCoordinator
         {
             if (NodeTelemetryRemovedAsync != null)
             {
-                await NodeTelemetryRemovedAsync(new NodeTelemetryRemovedEventArgs
+                await InvokeAllAsync(NodeTelemetryRemovedAsync, new NodeTelemetryRemovedEventArgs
                 {
                     NodeId = nodeId
-                });
+                }, nameof(NodeTelemetryRemovedAsync));
             }
             return;
         }
@@ -618,11 +658,11 @@ public class MqttCoordinator : IMqttCoordinator
                     payload,
                     "Telemetry");
 
-            await NodeTelemetryReceivedAsync(new NodeTelemetryReceivedEventArgs
+            await InvokeAllAsync(NodeTelemetryReceivedAsync, new NodeTelemetryReceivedEventArgs
             {
                 NodeId = nodeId,
                 Payload = telemetry
-            });
+            }, nameof(NodeTelemetryReceivedAsync));
         }
         catch (JsonException ex)
         {
@@ -656,10 +696,10 @@ public class MqttCoordinator : IMqttCoordinator
             // Retained message cleared - node removed
             if (NodeStatusRemovedAsync != null)
             {
-                await NodeStatusRemovedAsync(new NodeStatusRemovedEventArgs
+                await InvokeAllAsync(NodeStatusRemovedAsync, new NodeStatusRemovedEventArgs
                 {
                     NodeId = nodeId
-                });
+                }, nameof(NodeStatusRemovedAsync));
             }
         }
         else
@@ -668,11 +708,11 @@ public class MqttCoordinator : IMqttCoordinator
             if (NodeStatusReceivedAsync != null)
             {
                 var online = payload == "online";
-                await NodeStatusReceivedAsync(new NodeStatusReceivedEventArgs
+                await InvokeAllAsync(NodeStatusReceivedAsync, new NodeStatusReceivedEventArgs
                 {
                     NodeId = nodeId,
                     Online = online
-                });
+                }, nameof(NodeStatusReceivedAsync));
             }
         }
     }
@@ -701,12 +741,12 @@ public class MqttCoordinator : IMqttCoordinator
             if (deviceMessage == null)
                 throw new MqttMessageProcessingException("Device message was null after deserialization", $"espresense/devices/{deviceId}/{nodeId}", payload, "DeviceMessage");
 
-            await DeviceMessageReceivedAsync(new DeviceMessageEventArgs
+            await InvokeAllAsync(DeviceMessageReceivedAsync, new DeviceMessageEventArgs
             {
                 DeviceId = deviceId,
                 NodeId = nodeId,
                 Payload = deviceMessage
-            });
+            }, nameof(DeviceMessageReceivedAsync));
         }
         catch (JsonException ex)
         {
@@ -725,11 +765,11 @@ public class MqttCoordinator : IMqttCoordinator
 
             deviceSettings.OriginalId = deviceId;
             if (DeviceConfigReceivedAsync != null)
-                await DeviceConfigReceivedAsync(new DeviceSettingsEventArgs
+                await InvokeAllAsync(DeviceConfigReceivedAsync, new DeviceSettingsEventArgs
                 {
                     DeviceId = deviceId,
                     Payload = deviceSettings
-                });
+                }, nameof(DeviceConfigReceivedAsync));
         }
         catch (JsonException ex)
         {
@@ -745,12 +785,12 @@ public class MqttCoordinator : IMqttCoordinator
     private async Task ProcessNodeSettingMessage(string nodeId, string setting, string? payload)
     {
         if (NodeSettingReceivedAsync == null) return;
-        await NodeSettingReceivedAsync(new NodeSettingReceivedEventArgs
+        await InvokeAllAsync(NodeSettingReceivedAsync, new NodeSettingReceivedEventArgs
         {
             NodeId = nodeId,
             Setting = setting,
             Payload = payload
-        });
+        }, nameof(NodeSettingReceivedAsync));
     }
 
     private async Task ProcessDiscoveryMessage(string topic, string? payload)
@@ -794,11 +834,11 @@ public class MqttCoordinator : IMqttCoordinator
                     payload,
                     "DeviceAttributes");
 
-            await DeviceAttributesReceivedAsync(new DeviceAttributesEventArgs
+            await InvokeAllAsync(DeviceAttributesReceivedAsync, new DeviceAttributesEventArgs
             {
                 DeviceId = deviceId,
                 Attributes = attributes
-            });
+            }, nameof(DeviceAttributesReceivedAsync));
         }
         catch (JsonException ex)
         {

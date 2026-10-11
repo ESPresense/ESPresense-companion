@@ -31,7 +31,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -40,7 +40,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find the cell with data and hover over it
 		const dataCell = page.locator('table tbody td').filter({ hasText: '12%' });
@@ -89,7 +89,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -98,7 +98,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find and hover over the data cell
 		const dataCell = page.locator('table tbody td').filter({ hasText: '11%' });
@@ -145,7 +145,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -154,7 +154,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find the empty cell (Node C row, Node B column)
 		const rows = page.locator('table tbody tr');
@@ -199,7 +199,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -208,7 +208,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Find and hover over the data cell
 		const dataCell = page.locator('table tbody td').filter({ hasText: '11%' });
@@ -254,7 +254,7 @@ test.describe('Tooltip', () => {
 			});
 		});
 
-		await page.route('**/api/state/calibration/autoOptimize', (route) => {
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
 			route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -263,7 +263,7 @@ test.describe('Tooltip', () => {
 		});
 
 		await page.goto('/calibration');
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Switch to the "Error (m)" view so the cell renders diff via value()
 		await page.getByRole('button', { name: 'Error (m)' }).click();
@@ -280,5 +280,39 @@ test.describe('Tooltip', () => {
 		expect(tooltipText).toContain('Map Distance 5.0');
 		expect(tooltipText).toContain('Measured 3.0');
 		expect(tooltipText).toContain('Error 2.0');
+	});
+
+	test('renders calibration + tooltips without crypto.randomUUID (#1664)', async ({ page }) => {
+		const calibrationData = {
+			matrix: { 'Node A': { 'Node B': { distance: 5.0, rssi: -70, mapDistance: 4.5, diff: 0.5, percent: 0.111 } } },
+			rmse: 0.123,
+			r: 0.95
+		};
+
+		// Older HA WebViews / insecure contexts have no crypto.randomUUID
+		await page.addInitScript(() => {
+			// randomUUID lives on Crypto.prototype and is secure-context-gated
+			delete (Crypto.prototype as unknown as Record<string, unknown>).randomUUID;
+		});
+
+		await mockApi(page, { stubWebSocket: true });
+
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(calibrationData) });
+		});
+
+		await page.route('**/api/state/calibration/auto-optimize', (route) => {
+			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ autoOptimize: false }) });
+		});
+
+		const errors: string[] = [];
+		page.on('pageerror', (e) => errors.push(e.message));
+
+		await page.goto('/calibration');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
+
+		await page.locator('table tbody td').filter({ hasText: '11%' }).hover();
+		await expect(page.locator('[role="tooltip"]')).toBeVisible();
+		expect(errors).toEqual([]);
 	});
 });

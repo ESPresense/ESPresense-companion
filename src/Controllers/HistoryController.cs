@@ -1,44 +1,26 @@
-﻿using ESPresense.Models;
-using ESPresense.Services;
+using ESPresense.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ESPresense.Controllers
 {
     [Route("api/history")]
     [ApiController]
-    public class HistoryController : ControllerBase
+    public class HistoryController(DeviceHistoryStore deviceHistory) : ControllerBase
     {
-        private readonly ILogger<DeviceController> _logger;
-        private readonly DeviceSettingsStore _deviceSettingsStore;
-        private readonly State _state;
-        private readonly DatabaseFactory _databaseFactory;
-
-        public HistoryController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, State state, DatabaseFactory databaseFactory)
-        {
-            _logger = logger;
-            _deviceSettingsStore = deviceSettingsStore;
-            _state = state;
-            _databaseFactory = databaseFactory;
-        }
-
         [HttpGet("{id}")]
         public async Task<DeviceHistoryResponse> Get(string id)
         {
-            var dh = await _databaseFactory.GetDeviceHistory();
-            var history = await dh.List(id) ?? new List<DeviceHistory>();
+            var history = await deviceHistory.List(id) ?? new List<DeviceHistory>();
             return new DeviceHistoryResponse(history);
         }
 
         [HttpGet("{id}/range")]
         public async Task<DeviceHistoryResponse> GetRange(string id, [FromQuery] DateTime start, [FromQuery] DateTime end)
         {
-            var dh = await _databaseFactory.GetDeviceHistory();
-            var history = await dh.List(id, start, end) ?? new List<DeviceHistory>(); // Return empty list if null
+            var history = await deviceHistory.List(id, start, end) ?? new List<DeviceHistory>();
             return new DeviceHistoryResponse(history);
         }
-
     }
 
-    public  record DeviceHistoryResponse(IList<DeviceHistory> history);
-
+    public record DeviceHistoryResponse(IList<DeviceHistory> history);
 }

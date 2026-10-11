@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { calibration } from '$lib/stores';
-	import { resolve } from '$app/paths';
+	import { apiFetch, apiUrl } from '$lib/api';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
@@ -57,9 +57,9 @@
 		}
 	}
 
-	let rxColumns: Array<string> = [];
-	$: {
+	let rxColumns: Array<string> = $derived.by(() => {
 		const matrix = $calibration?.matrix ?? {};
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- temp inside $derived.by, not state
 		const rxSet = new Set<string>();
 
 		// Only include receivers that have actual data from at least one transmitter
@@ -71,26 +71,24 @@
 				}
 			});
 		});
-		rxColumns = Array.from(rxSet).sort();
-	}
+		return Array.from(rxSet).sort();
+	});
 
 	// Helper function to check if a transmitter is an anchored device
 	function isAnchored(txName: string): boolean {
 		return $calibration?.anchored?.includes(txName) ?? false;
 	}
 
-	let data_point: DataPoint = 0;
+	let data_point: DataPoint = $state(0);
 
 	const toastStore = getToastStore();
-	let autoOptimization = false;
-	let autoOptimizationLoaded = false;
-	let autoOptimizationBusy = false;
+	let autoOptimization = $state(false);
+	let autoOptimizationLoaded = $state(false);
+	let autoOptimizationBusy = $state(false);
 
 	async function fetchAutoOptimizationState() {
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'));
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-			const data = await response.json();
+			const data = await apiFetch<{ autoOptimize: boolean }>('/api/state/calibration/auto-optimize');
 			autoOptimization = !!data.autoOptimize;
 		} catch (error) {
 			console.error('Error fetching auto-optimization state:', error);
@@ -103,13 +101,12 @@
 		}
 	}
 
-	async function toggleAutoOptimization() {
+	async function toggleAutoOptimization(desiredState: boolean) {
 		if (!autoOptimizationLoaded || autoOptimizationBusy) return;
 		autoOptimizationBusy = true;
-		const desiredState = autoOptimization;
 
 		try {
-			const response = await fetch(resolve('/api/state/calibration/auto-optimize'), {
+			const data = await apiFetch<{ autoOptimize: boolean }>('/api/state/calibration/auto-optimize', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -117,8 +114,6 @@
 				body: JSON.stringify(desiredState)
 			});
 
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-			const data = await response.json();
 			autoOptimization = !!data.autoOptimize;
 		} catch (error) {
 			console.error('Error toggling auto-optimization:', error);
@@ -141,7 +136,7 @@
 		if (!confirmed) return;
 
 		try {
-			const response = await fetch(resolve('/api/state/calibration/reset'), { method: 'POST' });
+			const response = await fetch(apiUrl('/api/state/calibration/reset'), { method: 'POST' });
 			if (response.ok) {
 				toastStore.trigger({
 					message: 'Calibration reset successfully',
@@ -169,93 +164,87 @@
 	<div class="w-full px-4 py-2">
 		<!-- Active Optimizers -->
 		{#if $calibration?.optimizerState?.optimizers}
-		<div class="mb-4">
-			<span class="text-sm font-semibold text-surface-600-400">Active Optimizers:</span>
-			<span class="text-surface-900-100 ml-2">{$calibration.optimizerState.optimizers}</span>
-		</div>
+			<div class="mb-4">
+				<span class="text-sm font-semibold text-surface-600-400">Active Optimizers:</span>
+				<span class="text-surface-900-100 ml-2">{$calibration.optimizerState.optimizers}</span>
+			</div>
 		{/if}
 
 		<!-- Calibration Statistics -->
 		{#if $calibration?.optimizerState}
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-			<div class="card p-4 preset-tonal">
-				<div class="text-2xl font-bold text-primary-500">{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</div>
-				<div class="text-sm text-surface-600-400">RMSE</div>
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+				<div class="card p-4 preset-tonal">
+					<div class="text-2xl font-bold text-primary-500">{$calibration?.rmse?.toFixed(3) ?? 'n/a'}</div>
+					<div class="text-sm text-surface-600-400">RMSE</div>
+				</div>
+				<div class="card p-4 preset-tonal">
+					<div class="text-2xl font-bold text-primary-500">{$calibration?.r?.toFixed(3) ?? 'n/a'}</div>
+					<div class="text-sm text-surface-600-400">R</div>
+				</div>
+				<div class="card p-4 preset-tonal">
+					<div class="text-2xl font-bold text-success-500">{$calibration?.optimizerState?.bestRMSE?.toFixed(3) ?? 'n/a'}</div>
+					<div class="text-sm text-surface-600-400">Best RMSE</div>
+				</div>
+				<div class="card p-4 preset-tonal">
+					<div class="text-2xl font-bold text-success-500">{$calibration?.optimizerState?.bestR?.toFixed(3) ?? 'n/a'}</div>
+					<div class="text-sm text-surface-600-400">Best R</div>
+				</div>
 			</div>
-			<div class="card p-4 preset-tonal">
-				<div class="text-2xl font-bold text-primary-500">{$calibration?.r?.toFixed(3) ?? 'n/a'}</div>
-				<div class="text-sm text-surface-600-400">R</div>
-			</div>
-			<div class="card p-4 preset-tonal">
-				<div class="text-2xl font-bold text-success-500">{$calibration?.optimizerState?.bestRMSE?.toFixed(3) ?? 'n/a'}</div>
-				<div class="text-sm text-surface-600-400">Best RMSE</div>
-			</div>
-			<div class="card p-4 preset-tonal">
-				<div class="text-2xl font-bold text-success-500">{$calibration?.optimizerState?.bestR?.toFixed(3) ?? 'n/a'}</div>
-				<div class="text-sm text-surface-600-400">Best R</div>
-			</div>
-		</div>
 		{/if}
 
 		{#if $calibration?.matrix}
-		<div class="card">
-			<header class="text-lg font-semibold mb-4">Node Calibration</header>
-			<div class="space-y-4">
-				<div class="flex flex-col gap-6 rounded-lg border border-surface-300-700 bg-surface-50-950 p-4 shadow-sm">
-					<div class="flex flex-wrap items-center justify-between gap-3">
-						<div class="flex flex-wrap items-center gap-2">
-							<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 0)}>Error %</button>
-							<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 1)}>Error (m)</button>
-							<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 2)}>Absorption</button>
-							<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
-							<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
-							<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
-						</div>
-						<div class="flex flex-wrap items-center gap-3">
-							<SlideToggle
-								name="auto-optimization"
-								bind:checked={autoOptimization}
-								disabled={!autoOptimizationLoaded || autoOptimizationBusy}
-								on:click={toggleAutoOptimization}
-							>
-								Auto Optimization
-							</SlideToggle>
-							<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
+			<div class="card">
+				<header class="text-lg font-semibold mb-4">Node Calibration</header>
+				<div class="space-y-4">
+					<div class="flex flex-col gap-6 rounded-lg border border-surface-300-700 bg-surface-50-950 p-4 shadow-sm">
+						<div class="flex flex-wrap items-center justify-between gap-3">
+							<div class="flex flex-wrap items-center gap-2">
+								<button class="btn {data_point === 0 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 0)}>Error %</button>
+								<button class="btn {data_point === 1 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 1)}>Error (m)</button>
+								<button class="btn {data_point === 2 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 2)}>Absorption</button>
+								<button class="btn {data_point === 3 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 3)}>Rx Rssi Adj</button>
+								<button class="btn {data_point === 4 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 4)}>Tx Rssi Ref</button>
+								<button class="btn {data_point === 5 ? 'preset-filled-primary-500' : 'preset-ghost-surface-500'}" onclick={() => (data_point = 5)}>Variance (m)</button>
+							</div>
+							<div class="flex flex-wrap items-center gap-3">
+								<SlideToggle name="auto-optimization" bind:checked={autoOptimization} disabled={!autoOptimizationLoaded || autoOptimizationBusy} onchange={toggleAutoOptimization}>Auto Optimization</SlideToggle>
+								<button class="btn preset-filled-warning-500" onclick={resetCalibration}> Reset Calibration </button>
+							</div>
 						</div>
 					</div>
-				</div>
-				<div class="overflow-x-auto">
-					<table class="table">
-						<thead>
-							<tr>
-								<th style="text-align: center; color: oklch(1 0 none);">Name</th>
-								{#each rxColumns as id}
-									<th class="h-32 whitespace-nowrap px-2 py-1 min-w-10" style="position: relative;">
-										<div style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); position: absolute; bottom: 8px; left: 50%; transform-origin: center; transform: translateX(-50%) rotate(180deg); white-space: nowrap; color: oklch(1 0 none);">Rx: {id}</div>
-									</th>
-								{/each}
-							</tr>
-						</thead>
-						<tbody>
-							{#each Object.entries($calibration.matrix).sort((a, b) => a[0].localeCompare(b[0])) as [id1, n1] (id1)}
+					<div class="overflow-x-auto">
+						<table class="table">
+							<thead>
 								<tr>
-									<td style="text-align: right; white-space: nowrap;">Tx: {id1}{#if isAnchored(id1)} 📍{/if}</td>
-									{#each rxColumns as id2 (id2)}
-										<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${n1[id2].mapDistance?.toFixed(1)} - Measured ${n1[id2]?.distance?.toFixed(1)} = Error ${n1[id2]?.diff?.toFixed(1)}` : 'No beacon Received in last 30 seconds'}
-											>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
-										>
+									<th style="text-align: center; color: oklch(1 0 none);">Name</th>
+									{#each rxColumns as id}
+										<th class="h-32 whitespace-nowrap px-2 py-1 min-w-10" style="position: relative;">
+											<div style="writing-mode: vertical-rl; text-orientation: mixed; position: absolute; bottom: 8px; left: 50%; transform-origin: center; transform: translateX(-50%) rotate(180deg); white-space: nowrap; color: oklch(1 0 none);">Rx: {id}</div>
+										</th>
 									{/each}
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{#each Object.entries($calibration.matrix).sort((a, b) => a[0].localeCompare(b[0])) as [id1, n1] (id1)}
+									<tr>
+										<td style="text-align: right; white-space: nowrap;"
+											>Tx: {id1}{#if isAnchored(id1)}
+												📍{/if}</td
+										>
+										{#each rxColumns as id2 (id2)}
+											<td style="text-align: center; {coloring(n1[id2]?.percent)}" use:tooltip={n1[id2] ? `Map Distance ${n1[id2].mapDistance?.toFixed(1)} - Measured ${n1[id2]?.distance?.toFixed(1)} = Error ${n1[id2]?.diff?.toFixed(1)}` : 'No beacon Received in last 30 seconds'}
+												>{#if n1[id2]}{value(n1[id2], data_point)}{/if}</td
+											>
+										{/each}
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
 				</div>
 			</div>
-		</div>
 		{:else}
-		<div class="text-center py-8 text-surface-600-400">
-			Loading calibration data...
-		</div>
+			<div class="text-center py-8 text-surface-600-400">Loading calibration data...</div>
 		{/if}
 	</div>
 </div>

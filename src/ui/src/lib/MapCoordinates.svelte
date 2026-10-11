@@ -1,12 +1,15 @@
 <script lang="ts">
+	import { isEditableTarget } from './dom';
 	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import type { LayerCakeContext } from '$lib/types';
 	const toastStore = getToastStore();
-	export let transform = zoomIdentity;
-	$: cursorX = 0;
-	$: cursorY = 0;
+	let { transform = zoomIdentity } = $props();
+	// Plain state, not derived: the mouse handler owns these. As `$:` assignments they
+	// were liable to be re-run and reset the readout to 0.
+	let cursorX = $state(0);
+	let cursorY = $state(0);
 
 	let copiedCoords: string[] = [];
 	let hasFocus = false;
@@ -47,6 +50,7 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
+		if (isEditableTarget(event.target)) return;
 		// Check for Ctrl/Cmd + C
 		if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
 			event.preventDefault();

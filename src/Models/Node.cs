@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using ESPresense.Converters;
 using MathNet.Spatial.Euclidean;
+using Serilog;
 using SQLite;
 using ESPresense.Extensions;
 
@@ -57,9 +58,18 @@ public class Node(string id, NodeSourceType sourceType)
         Floors = floors.ToArray();
         double[]? point = cn.Point?.EnsureLength(3);
         Location = new Point3D(point?[0] ?? 0, point?[1] ?? 0, point?[2] ?? 0);
+        ZOutOfBounds = point != null && Floors.Any(f => f.Bounds is { Length: >= 2 }) && !Floors.Any(f => f.Contained(Location.Z));
+        if (ZOutOfBounds)
+            Log.Warning("Node {Node} z={Z} is outside the z-range of its floor(s) {Floors}. Coordinates are absolute: z must include the floor's base elevation (a node 1.7m up on a floor whose bounds start at z=3 has z=4.7). This node will be excluded from locating on those floors.",
+                Name ?? Id, Location.Z,
+                string.Join(", ", Floors.Where(f => f.Bounds is { Length: >= 2 }).Select(f => $"{f.Id} [{f.Bounds![0].Z}..{f.Bounds[1].Z}]")));
         Stationary = cn.Stationary;
         SourceType = NodeSourceType.Config;
     }
+
+    /// <summary>True when a configured point's z falls outside the z-range of every floor this node is assigned to (a common sign of floor-relative instead of absolute coordinates).</summary>
+    [Ignore]
+    public bool ZOutOfBounds { get; private set; }
 
     public Floor[]? Floors { get; private set; }
 

@@ -23,8 +23,8 @@
 	import Stroke from 'ol/style/Stroke';
 	import Text from 'ol/style/Text';
 
-	let mapElement: HTMLDivElement;
-	let map: Map | null = null;
+	let mapElement: HTMLDivElement | undefined = $state();
+	let map: Map | null = $state(null);
 
 	// Sources for map features
 	const floorplanSource = new VectorSource();
@@ -115,23 +115,6 @@
 			map = null;
 		};
 	});
-
-	// --- Reactive Updates ---
-
-	// Update Floorplan Layer
-	$: if (map && $config?.floors && $config?.gps) {
-		updateFloorplanFeatures($config.floors, $config.gps);
-	}
-
-	// Update Devices Layer
-	$: if (map && $devices && $config?.gps) {
-		updateDeviceFeatures($devices, $config.gps);
-	}
-
-	// Update Nodes Layer
-	$: if (map && $nodes && $config?.gps) {
-		updateNodeFeatures($nodes, $config.gps);
-	}
 
 	// --- Helper Functions ---
 
@@ -247,6 +230,26 @@
 			}
 		}
 	}
+	// --- Reactive Updates ---
+
+	// Update Floorplan Layer
+	$effect(() => {
+		if (map && $config?.floors && $config?.gps) {
+			updateFloorplanFeatures($config.floors, $config.gps);
+		}
+	});
+	// Update Devices Layer
+	$effect(() => {
+		if (map && $devices && $config?.gps) {
+			updateDeviceFeatures($devices, $config.gps);
+		}
+	});
+	// Update Nodes Layer
+	$effect(() => {
+		if (map && $nodes && $config?.gps) {
+			updateNodeFeatures($nodes, $config.gps);
+		}
+	});
 </script>
 
 <svelte:head>

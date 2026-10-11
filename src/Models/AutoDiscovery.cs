@@ -117,7 +117,7 @@ public class AutoDiscovery
 
         [JsonProperty("json_attributes_topic")] public string? JsonAttributesTopic { get; set; }
 
-        [JsonProperty("status_topic")] public string? EntityStatusTopic { get; set; }
+        [JsonProperty("availability_topic")] public string? EntityStatusTopic { get; set; }
 
         [JsonProperty("device")] public DeviceRecord? Device { get; set; }
 

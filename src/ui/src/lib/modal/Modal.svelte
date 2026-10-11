@@ -6,18 +6,18 @@
 
 	function isInsideInteractive(element: HTMLElement | null): boolean {
 		if (!element) return false;
-		
+
 		// Check if the element itself is interactive
 		const interactiveTags = ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT', 'A'];
 		if (interactiveTags.includes(element.tagName)) return true;
-		
+
 		// Check if the element is contentEditable
 		if (element.isContentEditable) return true;
-		
+
 		// Check if the element has interactive attributes
 		if (element.hasAttribute('tabindex') && element.getAttribute('tabindex') !== '-1') return true;
 		if (element.getAttribute('role') === 'button' || element.getAttribute('role') === 'link') return true;
-		
+
 		// Check parent elements up the tree
 		return isInsideInteractive(element.parentElement);
 	}

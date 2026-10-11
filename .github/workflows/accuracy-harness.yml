@@ -40,14 +40,14 @@ jobs:
     name: Accuracy baseline regression guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Pin the SDK exact-version. Patch-rev drift can quietly shift libm
       # which moves the baseline within tolerance; an unpinned SDK makes
       # that drift impossible to attribute. Bumping this is an explicit
       # decision that needs to ship with a re-baseline.
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.421
 
@@ -69,7 +69,7 @@ jobs:
 
       - name: Upload accuracy report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: accuracy-report-${{ github.sha }}
           path: accuracy-report/

@@ -1,12 +1,16 @@
 import type { Action } from 'svelte/action';
 import { computePosition, offset, flip, shift, autoUpdate } from '@floating-ui/dom';
 
+// ponytail: plain counter, not crypto.randomUUID() — ids only need to be unique
+// within the document, and randomUUID() is absent in insecure contexts (#1664).
+let tooltipSeq = 0;
+
 // A lightweight tooltip action that opens on hover/focus
 export const tooltip: Action<HTMLElement, string> = (node, content) => {
 	let tooltipEl: HTMLDivElement | null = null;
 	let cleanupAutoUpdate: (() => void) | null = null;
 	// Generate a unique, stable ID for this tooltip instance
-	const tooltipId = `tooltip-${crypto.randomUUID()}`;
+	const tooltipId = `tooltip-${++tooltipSeq}`;
 
 	/**
 	 * Ensure the tooltip DOM element exists, creating and initializing it if needed.

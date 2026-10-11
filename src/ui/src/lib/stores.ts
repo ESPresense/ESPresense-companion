@@ -1,5 +1,5 @@
 import { readable, writable, derived, get } from 'svelte/store';
-import { resolve } from '$app/paths';
+import { apiFetch } from '$lib/api';
 import type { Device, Config, Node, CalibrationResponse, DeviceSetting } from './types';
 import { WSManager } from './wsManager';
 
@@ -13,9 +13,11 @@ export const relativeTimer = function () {
 	const { subscribe, set: setStore } = writable(0);
 
 	function start() {
+		// Drives "time since last hit" animations; 100ms is plenty and avoids
+		// re-rendering every marker several hundred times a second.
 		interval = setInterval(() => {
 			setStore(Date.now() - startTime);
-		}, 1);
+		}, 100);
 	}
 
 	function set(basis: number) {
@@ -44,10 +46,15 @@ export const history = writable<string[]>(['/']);
  * Fetches configuration from the backend and updates the `config` store.
  *
  * Retrieves JSON from `/api/state/config` and sets the exported writable `config` store with the response.
+ * Called fire-and-forget (at module load and on every `configChanged` event), so failures are
+ * logged here and the store keeps its previous value.
  */
 async function getConfig() {
-	const response = await fetch(resolve(`/api/state/config`));
-	config.set(await response.json());
+	try {
+		config.set(await apiFetch<Config>('/api/state/config'));
+	} catch (error) {
+		console.error('Error fetching config:', error);
+	}
 }
 getConfig();
 
@@ -57,9 +64,8 @@ export const deviceSettings = writable<DeviceSetting[] | null>([], function star
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
-		fetch(resolve(`/api/devices`))
-			.then((d) => d.json())
-			.then((r: DeviceSetting[]) => {
+		apiFetch<DeviceSetting[]>('/api/devices')
+			.then((r) => {
 				outstanding = false;
 				settings = r;
 				set(settings);
@@ -89,10 +95,7 @@ export const devices = readable<Device[]>([], function start(set) {
 
 		isPolling = true;
 		try {
-			const response = await fetch(resolve(`/api/state/devices?showAll=${get(showAll)}`));
-			if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-			const devices: Device[] = await response.json();
+			const devices = await apiFetch<Device[]>(`/api/state/devices?showAll=${get(showAll)}`);
 
 			// Replace the entire map instead of accumulating devices
 			deviceMap = new Map(devices.map((device: Device) => [device.id, device]));
@@ -115,14 +118,14 @@ export const devices = readable<Device[]>([], function start(set) {
 	};
 	wsManager.subscribeToEvent('deviceChanged', deviceChangedCallback);
 
-    const deviceRemovedCallback = (payload: any) => {
-        const id = payload?.deviceId || payload?.id || payload;
-        if (id && deviceMap.has(id)) {
-            deviceMap.delete(id);
-            updateDevicesFromMap();
-        }
-    };
-    wsManager.subscribeToEvent('deviceRemoved', deviceRemovedCallback);
+	const deviceRemovedCallback = (payload: any) => {
+		const id = payload?.deviceId || payload?.id || payload;
+		if (id && deviceMap.has(id)) {
+			deviceMap.delete(id);
+			updateDevicesFromMap();
+		}
+	};
+	wsManager.subscribeToEvent('deviceRemoved', deviceRemovedCallback);
 
 	const configChangedCallback = (data: Config) => {
 		getConfig();
@@ -134,25 +137,32 @@ export const devices = readable<Device[]>([], function start(set) {
 	};
 	wsManager.subscribeToEvent('time', timeCallback);
 
-	// Subscribe to showAll changes and trigger immediate poll when it changes
-	const unsubscribeShowUntracked = showAll.subscribe((value) => {
+	function sendFilter() {
 		wsManager.sendMessage({
 			command: 'changeFilter',
 			type: 'showAll',
-			value: '' + value
+			value: '' + get(showAll)
 		});
+	}
 
+	// Subscribe to showAll changes and trigger immediate poll when it changes
+	const unsubscribeShowUntracked = showAll.subscribe(() => {
+		sendFilter();
 		// Force an immediate poll when showAll changes
 		fetchDevices();
 	});
 
+	// The server-side filter is per-connection, so it must be re-sent after a reconnect
+	const unsubscribeOpen = wsManager.onOpen(sendFilter);
+
 	return () => {
 		clearInterval(pollTimer);
 		wsManager.unsubscribeFromEvent('deviceChanged', deviceChangedCallback);
-        wsManager.unsubscribeFromEvent('deviceRemoved', deviceRemovedCallback);
+		wsManager.unsubscribeFromEvent('deviceRemoved', deviceRemovedCallback);
 		wsManager.unsubscribeFromEvent('configChanged', configChangedCallback);
 		wsManager.unsubscribeFromEvent('time', timeCallback);
 		unsubscribeShowUntracked();
+		unsubscribeOpen();
 	};
 });
 
@@ -163,8 +173,7 @@ export const nodes = readable<Node[]>([], function start(set) {
 	const interval = setInterval(() => {
 		if (outstanding) return;
 		outstanding = true;
-		fetch(resolve(`/api/state/nodes?includeTele=true`))
-			.then((d) => d.json())
+		apiFetch<Node[]>('/api/state/nodes?includeTele=true')
 			.then((r) => {
 				outstanding = false;
 				errors = 0;
@@ -185,10 +194,18 @@ export const nodes = readable<Node[]>([], function start(set) {
 
 // Calibration polling store
 export const calibration = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
+	let outstanding = false;
 	async function fetchAndSet() {
-		const response = await fetch(resolve(`/api/state/calibration`));
-		const data = await response.json();
-		set(data);
+		if (outstanding) return;
+		outstanding = true;
+		try {
+			// Timeout so a stalled request can't wedge `outstanding` and stop all later polls.
+			set(await apiFetch<CalibrationResponse>('/api/state/calibration', { signal: AbortSignal.timeout(10000) }));
+		} catch (error) {
+			console.error('Error fetching calibration:', error);
+		} finally {
+			outstanding = false;
+		}
 	}
 	fetchAndSet();
 	const interval = setInterval(fetchAndSet, 1000);

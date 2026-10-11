@@ -1,7 +1,7 @@
-import { resolve } from '$app/paths';
+import { apiUrl } from '$lib/api';
 
 export async function load({ fetch, params }) {
-	return await fetch(resolve(`/api/node/${params.id}`))
+	return await fetch(apiUrl(`/api/node/${params.id}`))
 		.then((response) => {
 			if (!response.ok) throw new Error(response.statusText);
 			var data = response.json();

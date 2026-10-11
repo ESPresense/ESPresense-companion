@@ -1,6 +1,7 @@
 using ESPresense.Extensions;
 using ESPresense.Models;
 using ESPresense.Utils;
+using MathNet.Numerics.LinearAlgebra;
 using MathNet.Spatial.Euclidean;
 using Serilog;
 
@@ -100,6 +101,26 @@ public abstract class BaseMultilateralizer : ILocate
         {
             scenario.PearsonCorrelation = null;
         }
+    }
+
+    /// <summary>
+    /// Per-axis step used to seed the optimizer's simplex when the guess already sits on the target
+    /// </summary>
+    protected const double FallbackPerturbation = 0.1;
+
+    /// <summary>
+    /// Unit vector pointing from <paramref name="from"/> to <paramref name="to"/>, used to seed the
+    /// optimizer's initial simplex. When the two points coincide the difference is the zero vector,
+    /// whose normalization is degenerate (zero or NaN) and would collapse the simplex, so a fixed
+    /// small perturbation is returned instead.
+    /// </summary>
+    protected static Vector<double> DirectionOrFallback(Vector<double> from, Vector<double> to)
+    {
+        var direction = to.Subtract(from);
+        var norm = direction.L2Norm();
+        if (!(norm > 1e-9) || double.IsInfinity(norm))
+            return Vector<double>.Build.Dense(direction.Count, FallbackPerturbation);
+        return direction.Divide(norm);
     }
 
     /// <summary>

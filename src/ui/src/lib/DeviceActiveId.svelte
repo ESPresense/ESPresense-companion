@@ -1,11 +1,15 @@
 <script lang="ts">
 	import type { Device } from '$lib/types';
-	export let row: Device;
-	export let col: string;
-	$: _ = col;
+	interface Props {
+		row: Device;
+		col: string;
+	}
+
+	let { row, col }: Props = $props();
+	let _ = $derived(col);
 
 	// Determine if device is active based on lastSeen and timeout
-	$: isActive = row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000);
+	let isActive = $derived(row.lastSeen && new Date().getTime() - new Date(row.lastSeen).getTime() < (row.timeout || 30000));
 </script>
 
 <div class="flex items-center gap-2">

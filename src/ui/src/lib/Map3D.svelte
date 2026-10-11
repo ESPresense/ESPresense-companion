@@ -14,25 +14,15 @@
 	import { gotoDetail3d } from '$lib/urls';
 	import logoSvg from '$lib/images/logo.svg?raw';
 
-	// --- Props ---
-	export let devicesToShow: Device[] = [];
-	export let nodesToShow: Node[] = [];
-	export let config: Config | null = null;
-	export let historyData: DeviceHistory[] = [];
-	export let showNodes: boolean = true;
-	export let showDevices: boolean = true;
-	export let showHistoryPath: boolean = false;
-	export let zRotationSpeed: number = 0.002;
-
 	// --- Internal State ---
-	let container: HTMLDivElement;
-	let scene: THREE.Scene;
+	let container: HTMLDivElement = $state()!;
+	let scene: THREE.Scene = $state()!;
 	let camera: THREE.PerspectiveCamera;
 	let renderer: THREE.WebGLRenderer;
 	let labelRenderer: CSS2DRenderer;
 	let controls: OrbitControls;
 	let rotationPivot: THREE.Group;
-	let contentGroup: THREE.Group;
+	let contentGroup: THREE.Group = $state()!;
 	let isAnimating = false;
 	let animationFrameId: number;
 	let lastTime: number | null = null; // For rotation animation delta
@@ -55,6 +45,7 @@
 	}
 
 	// Cache for device materials to avoid recreating them constantly
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- plain cache of Three.js materials, never rendered from
 	const deviceMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
 
 	// Function to get room-based device material
@@ -115,7 +106,8 @@
 		if (!measuredSpheresGroup) {
 			measuredSpheresGroup = new THREE.Group();
 			measuredSpheresGroup.name = 'MeasuredSpheres';
-			scene?.add(measuredSpheresGroup);
+			// Nodes live in contentGroup (centered + rotated); the spheres must too.
+			contentGroup?.add(measuredSpheresGroup);
 		}
 
 		// Clear existing spheres
@@ -158,6 +150,19 @@
 	};
 
 	import { hexToThreeNumber, getRoomColor as getRoomColor2D } from '$lib/colors';
+	interface Props {
+		// --- Props ---
+		devicesToShow?: Device[];
+		nodesToShow?: Node[];
+		config?: Config | null;
+		historyData?: DeviceHistory[];
+		showNodes?: boolean;
+		showDevices?: boolean;
+		showHistoryPath?: boolean;
+		zRotationSpeed?: number;
+	}
+
+	let { devicesToShow = [], nodesToShow = [], config = null, historyData = [], showNodes = $bindable(true), showDevices = $bindable(true), showHistoryPath = false, zRotationSpeed = $bindable(0.002) }: Props = $props();
 	let roomGroup: THREE.Group | null = null;
 
 	// Node visualization state
@@ -178,9 +183,10 @@
 		const geometries: THREE.BufferGeometry[] = [];
 		svgData.paths.forEach((path) => {
 			// Skip white background circle
-			const fill = path.userData?.style?.fill;
+			const style = path.userData?.style as { fill?: unknown } | undefined;
+			const fill = style?.fill;
 			if (fill && typeof fill === 'string' && fill.toLowerCase() === '#ffffff') return;
-			const shapes = SVGLoader.createShapes(path);
+			const shapes = path.toShapes();
 			shapes.forEach((shape) => {
 				geometries.push(new THREE.ExtrudeGeometry(shape, extrudeSettings));
 			});
@@ -200,11 +206,6 @@
 	const CAM_START_Z = 23;
 	const CONTROLS_MIN_DISTANCE = 5;
 	const CONTROLS_MAX_DISTANCE = 40;
-
-	// --- Lifecycle ---
-	// Watch for prop changes to update the scene
-	$: if (scene && contentGroup) updateSceneObjects(devicesToShow, nodesToShow, historyData, showDevices, showNodes, showHistoryPath);
-	$: if (config && scene && contentGroup) setupRooms(); // Re-setup rooms if config changes
 
 	onMount(() => {
 		// Precompute node logo geometry once to avoid expensive SVG parsing
@@ -257,7 +258,8 @@
 		renderer.setClearColor(0x1e293b, 1); // Back to slate-800
 		renderer.autoClear = true;
 		renderer.shadowMap.enabled = true;
-		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+		renderer.shadowMap.type = THREE.PCFShadowMap;
+		// eslint-disable-next-line svelte/no-dom-manipulating -- Three.js owns its canvas; Svelte never renders it
 		container.appendChild(renderer.domElement);
 
 		// Label Renderer
@@ -268,6 +270,7 @@
 		labelRenderer.domElement.style.pointerEvents = 'none';
 		labelRenderer.domElement.style.zIndex = '1';
 		labelRenderer.domElement.classList.add('css2d-renderer-map'); // Unique class
+		// eslint-disable-next-line svelte/no-dom-manipulating -- CSS2DRenderer owns this element too
 		container.appendChild(labelRenderer.domElement);
 
 		// Scene
@@ -471,6 +474,7 @@
 		}
 
 		const existingNodeIds = new Set(Object.keys(nodeLabels));
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
 		const currentNodeIds = new Set<string>();
 
 		nodes.forEach((node) => {
@@ -564,6 +568,7 @@
 		}
 
 		const existingDeviceIds = new Set(Object.keys(deviceLabels));
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
 		const currentDeviceIds = new Set<string>();
 		const localTrackingSpheres: THREE.Mesh[] = []; // Rebuild this list each time for pulsing
 
@@ -583,8 +588,10 @@
 				sphere.position.set(device.location.x, device.location.y, device.location.z);
 				// Update material to match room color
 				sphere.material = material;
-				// Update geometry to reflect confidence change
+				// Update geometry to reflect confidence change (dispose the old one to avoid a GPU leak)
+				const oldGeometry = sphere.geometry;
 				sphere.geometry = geometry;
+				oldGeometry.dispose();
 			} else {
 				// Create new sphere
 				sphere = new THREE.Mesh(geometry, material);
@@ -659,7 +666,10 @@
 		cleanupHistoryPath(); // Clear previous path
 		if (!contentGroup || history.length < 2) return;
 
-		const points = history.filter((h) => h.location).map((h) => new THREE.Vector3(h.location.x, h.location.y, h.location.z));
+		// The backend writes one row per scenario; draw the path of the winning scenario only.
+		const best = history.filter((h) => h.best);
+		const rows = best.length > 0 ? best : history;
+		const points = rows.filter((h) => h.x != null && h.y != null && h.z != null).map((h) => new THREE.Vector3(h.x!, h.y!, h.z!));
 
 		if (points.length > 1) {
 			const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -832,6 +842,14 @@
 			historyPathLine = null;
 		}
 	}
+	// --- Lifecycle ---
+	// Watch for prop changes to update the scene
+	$effect(() => {
+		if (scene && contentGroup) updateSceneObjects(devicesToShow, nodesToShow, historyData, showDevices, showNodes, showHistoryPath);
+	});
+	$effect(() => {
+		if (config && scene && contentGroup) setupRooms();
+	}); // Re-setup rooms if config changes
 </script>
 
 <div class="w-full h-full relative" bind:this={container}>

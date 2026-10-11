@@ -59,7 +59,7 @@ test.describe('Devices Table Sorting', () => {
 		await page.goto('/devices');
 
 		// Wait for the table to load
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Get initial order (should be by ID initially since that's the default sort)
 		const initialRows = await page.$$eval('tbody tr', (rows) =>
@@ -152,7 +152,7 @@ test.describe('Devices Table Sorting', () => {
 		await page.goto('/devices');
 
 		// Wait for the table to load
-		await page.waitForSelector('table');
+		await expect(page.locator('table tbody tr').first()).toBeVisible();
 
 		// Click the lastSeen column header to sort ascending (oldest first)
 		const lastSeenHeader = page.locator('th').filter({ hasText: 'Last Seen' });

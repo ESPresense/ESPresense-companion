@@ -26,6 +26,14 @@ export default [
 		}
 	},
 	{
+		// svelte-eslint-parser needs an inner parser for <script lang="ts">, or every
+		// .svelte file fails to parse and is silently never linted.
+		files: ['**/*.svelte'],
+		languageOptions: {
+			parserOptions: { parser: tsEslint.parser }
+		}
+	},
+	{
 		rules: {
 			'@typescript-eslint/no-explicit-any': 'off',
 			'@typescript-eslint/no-unused-vars': 'off',

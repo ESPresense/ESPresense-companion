@@ -74,7 +74,7 @@ public class MLEMultilateralizer : BaseMultilateralizer
                     scenario.Scale ?? 1.0
                 });
                 var centroid = Point3D.Centroid(nodes.Select(n => n.Node!.Location).Take(3)).ToVector();
-                var vectorToCentroid = centroid.Subtract(initialGuess.SubVector(0, 3)).Normalize(2);
+                var vectorToCentroid = DirectionOrFallback(initialGuess.SubVector(0, 3), centroid);
                 var scaleDelta = 0.05 * initialGuess[3];
                 var initialPerturbation = Vector<double>.Build.DenseOfEnumerable(vectorToCentroid.Append(scaleDelta));
                 var solver = new NelderMeadSimplex(1e-7, 10000);

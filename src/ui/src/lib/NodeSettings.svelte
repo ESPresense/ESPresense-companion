@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { NodeSetting } from './types';
 
-	export let settings: NodeSetting; // Assume parent handles loading and provides this
+	interface Props {
+		settings: NodeSetting; // Assume parent handles loading and provides this
+	}
+
+	let { settings = $bindable() }: Props = $props();
 </script>
 
 {#if settings}

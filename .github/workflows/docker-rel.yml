@@ -10,12 +10,12 @@ jobs:
     environment: CI - release environment
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Git Semantic Version
         id: version
-        uses: paulhatch/semantic-version@v6.0.2
+        uses: paulhatch/semantic-version@v6.0.4
         with:
           version_format: "${major}.${minor}.${patch}"
 
