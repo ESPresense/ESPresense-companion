@@ -80,6 +80,9 @@
 
 		if (isInteractiveTarget(event.target)) return;
 
+		// A drag that selected text isn't a click on the row
+		if (window.getSelection()?.toString()) return;
+
 		onclickRow?.({ row });
 	}
 
