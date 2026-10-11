@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mockApi } from './mock-api';
 
 // The motivating case (#1730): an unnamed BLE device shows up only as a raw MAC, and
@@ -45,14 +45,14 @@ const devices = [
 	}
 ];
 
-async function openDevices(page) {
+async function openDevices(page: Page) {
 	await mockApi(page, { stubWebSocket: true });
 	await page.route('**/api/state/devices**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(devices) }));
 	await page.goto('/devices');
 	await expect(page.locator('table tbody tr').first()).toBeVisible();
 }
 
-const bodyRows = (page) => page.locator('table tbody tr');
+const bodyRows = (page: Page) => page.locator('table tbody tr');
 
 test('filters an unnamed device down by its raw MAC', async ({ page }) => {
 	await openDevices(page);
