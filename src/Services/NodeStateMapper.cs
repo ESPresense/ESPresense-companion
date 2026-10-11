@@ -41,6 +41,7 @@ public class NodeStateMapper
             dest.CPU = _fs.GetCpu(dest.Telemetry.Firmware);
         }
         dest.Online = _nts.Online(src.Id);
+        dest.UpdateError = _nts.UpdateError(src.Id);
         return dest;
     }
 
