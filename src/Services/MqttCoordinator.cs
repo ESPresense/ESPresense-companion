@@ -228,7 +228,7 @@ public class MqttCoordinator : IMqttCoordinator
         };
 
         var mqttClientOptions = new MqttClientOptionsBuilder()
-            .WithConfig(config)
+            .WithConfig(config, _logger)
             .WithClientId(config.ClientId)
             .WithWillTopic("espresense/companion/status")
             .WithWillRetain()
