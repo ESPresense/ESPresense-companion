@@ -49,7 +49,7 @@
 				return `${isActive ? '0' : '1'}_${d.name || d.id}`;
 			}
 		},
-		{ key: 'room', title: 'Room / Floor', value: (d: Device) => displayRoomFloor(d), sortValue: (d: Device) => baseRoomFloor(d), sortable: true },
+		{ key: 'room', title: 'Room / Floor', value: (d: Device) => displayRoomFloor(d), sortValue: (d: Device) => baseRoomFloor(d), sortable: true, searchable: true },
 		{ key: 'location', title: 'Location (X, Y, Z)', value: (d: Device) => formatLocation(d), sortable: false },
 		{ key: 'fixes', title: 'Fixes', value: (d: Device) => d.fixes ?? 'n/a', sortable: true },
 		{ key: 'scale', title: 'Scale', value: (d: Device) => d.scale?.toFixed(3) ?? 'n/a', sortable: true },
@@ -61,6 +61,6 @@
 
 <div>
 	{#if $devices}
-		<DataTable {columns} classNameTable="table  table-compact" rows={$devices} onclickRow={(event) => select(event.row)} />
+		<DataTable {columns} classNameTable="table  table-compact" rows={$devices} search searchPlaceholder="Filter by name, id or room…" onclickRow={(event) => select(event.row)} />
 	{/if}
 </div>
