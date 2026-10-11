@@ -289,6 +289,24 @@ public class MqttEventDispatchTests
     }
 
     [Test]
+    public async Task OnMqttMessageReceived_UpdateError_RaisesEventAndNullOnClear()
+    {
+        var coordinator = CreateCoordinator();
+        var errors = new List<string?>();
+        coordinator.NodeUpdateErrorAsync += arg =>
+        {
+            Assert.That(arg.NodeId, Is.EqualTo("node-1"));
+            errors.Add(arg.Error);
+            return Task.CompletedTask;
+        };
+
+        await coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/update_error", "http 404 https://example/x.bin"));
+        await coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/update_error", null));
+
+        Assert.That(errors, Is.EqualTo(new string?[] { "http 404 https://example/x.bin", null }));
+    }
+
+    [Test]
     public async Task OnMqttMessageReceived_StatusCleared_AwaitsNonLastRemovedHandler()
     {
         var coordinator = CreateCoordinator();

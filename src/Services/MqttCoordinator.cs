@@ -407,6 +407,7 @@ public class MqttCoordinator : IMqttCoordinator
     public event Func<NodeTelemetryRemovedEventArgs, Task>? NodeTelemetryRemovedAsync;
     public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
     public event Func<NodeStatusRemovedEventArgs, Task>? NodeStatusRemovedAsync;
+    public event Func<NodeUpdateErrorEventArgs, Task>? NodeUpdateErrorAsync;
     public event EventHandler? MqttMessageMalformed;
     public event EventHandler<PreviousDeviceDiscoveredEventArgs>? PreviousDeviceDiscovered;
     public event Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceivedAsync;
@@ -472,6 +473,9 @@ public class MqttCoordinator : IMqttCoordinator
                     break;
                 case ["espresense", "rooms", _, "status"]:
                     await ProcessStatusMessage(parts[2], payload);
+                    break;
+                case ["espresense", "rooms", _, "update_error"]:
+                    await ProcessUpdateErrorMessage(parts[2], payload);
                     break;
                 case ["espresense", "rooms", "*", _, "set"]:
                     await ProcessNodeSettingMessage(parts[2], parts[3], payload);
@@ -673,6 +677,21 @@ public class MqttCoordinator : IMqttCoordinator
                 "Telemetry",
                 ex);
         }
+    }
+
+    /// <summary>
+    /// Handles a node's retained <c>update_error</c> message; an empty payload means the error was cleared.
+    /// </summary>
+    private async Task ProcessUpdateErrorMessage(string nodeId, string? payload)
+    {
+        if (NodeUpdateErrorAsync == null)
+            return;
+
+        await InvokeAllAsync(NodeUpdateErrorAsync, new NodeUpdateErrorEventArgs
+        {
+            NodeId = nodeId,
+            Error = string.IsNullOrEmpty(payload) ? null : payload
+        }, nameof(NodeUpdateErrorAsync));
     }
 
     /// <summary>

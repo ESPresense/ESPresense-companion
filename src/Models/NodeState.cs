@@ -28,6 +28,9 @@ public class NodeStateTele : NodeState
 {
     public NodeTelemetry? Telemetry { get; set; }
     public bool Online { get; set; }
+
+    /// <summary>Last firmware update failure reported by the node (retained <c>update_error</c> topic); null when none.</summary>
+    public string? UpdateError { get; set; }
     public Flavor? Flavor { get; set; }
     public CPU? CPU { get; set; }
 }
