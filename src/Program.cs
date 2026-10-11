@@ -116,15 +116,15 @@ app.UseSerilogRequestLogging(o =>
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");
 app.UseSwaggerUI(c => c.RoutePrefix = "api/swagger");
 
-// The UI bundle is served with no Cache-Control, so browsers (and the HA ingress iframe) heuristically cached
-// index.html and _app/version.json off Last-Modified and kept running the previous build after an add-on
-// update. Hashed assets never change; everything else must revalidate (ETag makes that a cheap 304).
+// Without Cache-Control, browsers (and the HA ingress iframe) heuristically cached index.html off Last-Modified
+// and kept running the previous build after an add-on update. Hashed assets never change. Everything else is
+// good for a minute, then revalidates (ETag makes that a cheap 304). Not "public": ingress responses are per-user.
 var spaFiles = new StaticFileOptions
 {
     OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl =
         ctx.Context.Request.Path.StartsWithSegments("/_app/immutable")
             ? "public, max-age=31536000, immutable"
-            : "no-cache"
+            : "max-age=60, must-revalidate"
 };
 app.UseStaticFiles(spaFiles);
 app.UseRouting();
