@@ -68,6 +68,7 @@ builder.Services.AddSingleton<FirmwareTypeStore>();
 builder.Services.AddSingleton<IFirmwareTypeStore>(provider => provider.GetRequiredService<FirmwareTypeStore>());
 builder.Services.AddSingleton<NodeStateMapper>();
 builder.Services.AddSingleton<FirmwareUpdateJobService>();
+builder.Services.AddSingleton<FirmwareCatalogService>();
 builder.Services.AddSingleton<DeviceService>();
 builder.Services.AddSingleton<DeviceCaptureService>();
 builder.Services.AddSingleton<LeaseService>();

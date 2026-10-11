@@ -20,6 +20,9 @@ public class ESPOta
     private readonly string _fileMd5;
     private readonly long _contentSize;
 
+    /// <summary>How long to wait for the node's final OK/error after the image is written.</summary>
+    public TimeSpan ResponseTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
     public ESPOta(Stream fs, int? localPort, Func<string, int, Task>? progress = default)
     {
         _fs = fs;
@@ -57,7 +60,7 @@ public class ESPOta
                 if (t == acceptTask)
                 {
                     using var client = await acceptTask;
-                    if (await Handle(client)) return true;
+                    return await Handle(client);
                 }
             }
 
@@ -73,19 +76,21 @@ public class ESPOta
             using var s = client.GetStream();
             using var sr = new StreamReader(s, Encoding.UTF8);
             var response = "";
+            // Nodes sometimes reboot without closing the socket, so the final response read must time out.
+            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var reader = Task.Run(async () =>
             {
                 while (true)
                 {
                     var buf = new char[32];
-                    var r = await sr.ReadAsync(buf, 0, buf.Length);
+                    var r = await sr.ReadAsync(buf.AsMemory(), readCts.Token);
                     if (r == 0) break;
                     var s = new string(buf, 0, r);
                     foreach (var c in s)
                         if (!char.IsDigit(c))
                             response += c;
                 }
-            }, ct);
+            }, readCts.Token);
             try
             {
                 var ip = client.Client.RemoteEndPoint as IPEndPoint;
@@ -102,7 +107,15 @@ public class ESPOta
             }
             finally
             {
-                await reader;
+                readCts.CancelAfter(ResponseTimeout);
+                try
+                {
+                    await reader;
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    await _progress("No final response from node; it may have rebooted before confirming", 100);
+                }
             }
             DateTime startTime = DateTime.UtcNow;
             await _progress("Response: " + response, 100);

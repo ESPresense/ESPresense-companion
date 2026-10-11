@@ -34,10 +34,12 @@ export interface Node {
 	telemetry: {
 		version: string;
 		ip: string;
+		board?: string | null;
 	};
 	cpu: CPU;
 	flavor: Flavor;
 	online: boolean;
+	updateError?: string | null;
 	id: string;
 	name: string;
 	location: { x: number; y: number; z: number };

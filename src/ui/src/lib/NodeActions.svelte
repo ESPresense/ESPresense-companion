@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { apiFetch } from '$lib/api';
 	import { gotoDetail } from '$lib/urls';
-	import link from '$lib/images/link.svg';
 	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showComponent, showConfirm } from '$lib/modal/modalStore';
@@ -224,13 +223,6 @@
 
 		{#if row.telemetry}
 			<button onclick={(e) => onRestart(row)} class="btn btn-sm preset-filled-warning-500" aria-label="Restart node"> Restart </button>
-		{/if}
-
-		{#if row.telemetry?.ip}
-			<a href="http://{row.telemetry?.ip}" target="_blank" class="btn btn-sm preset-filled-surface-500" aria-label="Open node web interface">
-				<span>Visit</span>
-				<span><img class="w-4" src={link} alt="External Link" /></span>
-			</a>
 		{/if}
 	{:else}
 		{#if row.sourceType === 'Config'}

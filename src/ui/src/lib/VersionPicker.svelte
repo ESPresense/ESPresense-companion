@@ -60,7 +60,11 @@
 					{#if firmwareSource === 'release'}
 						<label class="block" for="version">
 							<span class="block text-sm font-medium text-surface-700-300 mb-2">Version</span>
-							{#if $releases.size === 0}
+							{#if !$releases.data?.size && $releases.error}
+								<div class="flex items-center h-10 px-3 bg-surface-100-800 border border-error-500 rounded-md text-sm text-error-500" role="alert">
+									Failed to load releases: {$releases.error}
+								</div>
+							{:else if !$releases.data}
 								<div class="flex items-center justify-center h-10 bg-surface-100-800 border border-surface-300-600 rounded-md">
 									<span class="text-sm text-surface-500-400 flex items-center gap-2">
 										<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -70,9 +74,11 @@
 										Loading releases...
 									</span>
 								</div>
+							{:else if $releases.data.size === 0}
+								<div class="flex items-center h-10 px-3 bg-surface-100-800 border border-surface-300-600 rounded-md text-sm text-surface-500-400">No releases found</div>
 							{:else}
 								<select id="version" class="select w-full bg-surface-100-900 border-surface-300-600 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 rounded-md" bind:value={version}>
-									{#each Array.from($releases.entries()).reverse() as [key, value]}
+									{#each Array.from($releases.data.entries()).reverse() as [key, value]}
 										<optgroup label={key}>
 											{#each value as item}
 												<option value={item.tag_name}>{item.name}</option>
@@ -87,7 +93,11 @@
 					{#if firmwareSource === 'artifact'}
 						<label class="block" for="artifact">
 							<span class="block text-sm font-medium text-surface-700-300 mb-2">Artifact</span>
-							{#if $artifacts.size === 0}
+							{#if !$artifacts.data?.size && $artifacts.error}
+								<div class="flex items-center h-10 px-3 bg-surface-100-800 border border-error-500 rounded-md text-sm text-error-500" role="alert">
+									Failed to load artifacts: {$artifacts.error}
+								</div>
+							{:else if !$artifacts.data}
 								<div class="flex items-center justify-center h-10 bg-surface-100-800 border border-surface-300-600 rounded-md">
 									<span class="text-sm text-surface-500-400 flex items-center gap-2">
 										<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -97,9 +107,11 @@
 										Loading artifacts...
 									</span>
 								</div>
+							{:else if $artifacts.data.size === 0}
+								<div class="flex items-center h-10 px-3 bg-surface-100-800 border border-surface-300-600 rounded-md text-sm text-surface-500-400">No artifacts found</div>
 							{:else}
 								<select id="artifact" class="select w-full bg-surface-100-900 border-surface-300-600 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 rounded-md" bind:value={artifact}>
-									{#each Array.from($artifacts.entries()).reverse() as [key, value]}
+									{#each Array.from($artifacts.data.entries()).reverse() as [key, value]}
 										<optgroup label={key}>
 											{#each value as item}
 												<option value={item.id}>

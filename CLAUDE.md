@@ -59,7 +59,7 @@ pnpm check
 ```
 
 ### Development Setup
-1. Install .NET SDK 8.0 and Node.js 20
+1. Install .NET SDK 8.0 and Node.js 22
 2. Install pnpm globally: `npm install -g pnpm`
 3. Install frontend dependencies: `cd src/ui && pnpm install` (the Debug build no longer does this; `dotnet watch` launches `pnpm start`, which needs `node_modules`)
 4. Run `dotnet watch --project src` (serves backend on port 5279)
