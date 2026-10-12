@@ -3,8 +3,9 @@ mqtt:
   host:
   port: 1883
   ssl: false
-  # insecure: false  # true disables TLS certificate validation; unset keeps legacy permissive behavior
-  # ca_cert_path: "/path/to/ca.crt"  # custom CA used to validate the broker when ssl is true
+  # With ssl: true the broker's certificate is validated against the system CA store.
+  # ca_cert_path: "/path/to/ca.crt"  # validate against this CA instead (self-signed brokers)
+  # insecure: true  # skip certificate validation entirely
   username:
   password:
   discovery_topic: homeassistant  # Home Assistant MQTT discovery topic prefix (default: homeassistant)

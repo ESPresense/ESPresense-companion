@@ -20,7 +20,8 @@ public static class MqttClientOptionsBuilderExtensions
             return mcob;
 
         var useTls = mqtt.Ssl == true;
-        X509Certificate2? ca = useTls && mqtt.Insecure != true ? LoadCaCertificate(mqtt.CaCertPath, logger) : null;
+        // ca_cert_path pins the broker's CA; otherwise the system trust store applies unless insecure is set.
+        X509Certificate2? ca = useTls ? LoadCaCertificate(mqtt.CaCertPath, logger) : null;
 
         mcob.WithTlsOptions(o =>
         {
@@ -28,22 +29,20 @@ public static class MqttClientOptionsBuilderExtensions
             if (!useTls)
                 return;
 
-            if (mqtt.Insecure == true)
-            {
-                logger?.LogWarning("MQTT mqtt.insecure is true: TLS certificate validation is disabled");
-                o.WithAllowUntrustedCertificates();
-                o.WithCertificateValidationHandler(_ => true);
-            }
-            else if (ca != null)
+            if (ca != null)
             {
                 o.WithCertificateValidationHandler(args => ValidateWithCa(args.Certificate, args.Chain, args.SslPolicyErrors, ca));
             }
-            else if (mqtt.Insecure == null)
+            else if (mqtt.Insecure)
             {
-                // Legacy behavior: ssl without explicit insecure setting accepted untrusted certificates.
+                logger?.LogWarning("MQTT mqtt.insecure is true: TLS certificate validation is disabled");
                 // MQTTnet 5.2.0.1603's default handler ignores AllowUntrustedCertificates, so accept explicitly.
                 o.WithAllowUntrustedCertificates();
                 o.WithCertificateValidationHandler(_ => true);
+            }
+            else
+            {
+                o.WithCertificateValidationHandler(args => ValidateWithSystemStore(args.SslPolicyErrors, mqtt.Host, logger));
             }
         });
         return mcob;
@@ -66,6 +65,16 @@ public static class MqttClientOptionsBuilderExtensions
             logger?.LogError(ex, "Unable to load MQTT CA certificate from {Path}", path);
             throw;
         }
+    }
+
+    internal static bool ValidateWithSystemStore(SslPolicyErrors errors, string? host, ILogger? logger)
+    {
+        if (errors == SslPolicyErrors.None)
+            return true;
+        logger?.LogError("MQTT broker {Host} presented a certificate that failed validation ({Errors}). " +
+                         "For a self-signed broker set mqtt.ca_cert_path to its CA certificate, or set mqtt.insecure: true to skip validation",
+            host, errors);
+        return false;
     }
 
     internal static bool ValidateWithCa(X509Certificate certificate, X509Chain? presentedChain, SslPolicyErrors errors, X509Certificate2 ca)
