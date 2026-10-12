@@ -166,7 +166,7 @@ public class MqttCoordinator : IMqttCoordinator
             {
                 if (!IsReadOnlyClient(config.ClientId))
                 {
-                    await mqttClient.PublishStringAsync("espresense/companion/status", "online").ConfigureAwait(false);
+                    await mqttClient.PublishStringAsync("espresense/companion/status", "online", retain: true).ConfigureAwait(false);
                 }
 
                 await mqttClient.SubscribeAsync("espresense/devices/+/+").ConfigureAwait(false);
