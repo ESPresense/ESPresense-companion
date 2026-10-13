@@ -72,6 +72,8 @@ public class MqttCoordinator : IMqttCoordinator
               !string.Equals(_lastConfig.Username, config.Username) ||
               !string.Equals(_lastConfig.Password, config.Password) ||
               _lastConfig.Ssl != config.Ssl ||
+              _lastConfig.Insecure != config.Insecure ||
+              !string.Equals(_lastConfig.CaCertPath, config.CaCertPath) ||
               !string.Equals(_lastConfig.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase));
     }
 

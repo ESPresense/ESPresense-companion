@@ -234,7 +234,7 @@ namespace ESPresense.Models
 
         [JsonProperty("insecure")]
         [YamlMember(Alias = "insecure")]
-        public bool? Insecure { get; set; }
+        public bool Insecure { get; set; }
 
         [JsonProperty("ca_cert_path")]
         [YamlMember(Alias = "ca_cert_path")]

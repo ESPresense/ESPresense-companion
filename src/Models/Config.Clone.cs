@@ -206,6 +206,8 @@ namespace ESPresense.Models
                 Host = Host,
                 Port = Port,
                 Ssl = Ssl,
+                Insecure = Insecure,
+                CaCertPath = CaCertPath,
                 Username = Username,
                 Password = Password,
                 ClientId = ClientId,

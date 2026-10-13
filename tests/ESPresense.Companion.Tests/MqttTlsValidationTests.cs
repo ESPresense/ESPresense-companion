@@ -65,19 +65,48 @@ public class MqttTlsValidationTests
     }
 
     [Test]
-    public void LegacySsl_AllowsUntrusted()
+    public void SslWithoutOptions_IsStrict()
     {
         var options = new MqttClientOptionsBuilder().WithConfig(new ConfigMqtt { Host = "localhost", Ssl = true }).Build();
-        Assert.That(options.ChannelOptions.TlsOptions.AllowUntrustedCertificates, Is.True);
+        Assert.That(options.ChannelOptions.TlsOptions.AllowUntrustedCertificates, Is.False);
         Assert.That(options.ChannelOptions.TlsOptions.CertificateValidationHandler, Is.Not.Null);
     }
 
     [Test]
-    public void ExplicitInsecureFalse_IsStrict()
+    public void Insecure_AllowsUntrusted()
     {
-        var options = new MqttClientOptionsBuilder().WithConfig(new ConfigMqtt { Host = "localhost", Ssl = true, Insecure = false }).Build();
-        Assert.That(options.ChannelOptions.TlsOptions.AllowUntrustedCertificates, Is.False);
-        Assert.That(options.ChannelOptions.TlsOptions.CertificateValidationHandler, Is.Null);
+        var options = new MqttClientOptionsBuilder().WithConfig(new ConfigMqtt { Host = "localhost", Ssl = true, Insecure = true }).Build();
+        Assert.That(options.ChannelOptions.TlsOptions.AllowUntrustedCertificates, Is.True);
+    }
+
+    [Test]
+    public void CaCertPath_WinsOverInsecure()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".crt");
+        File.WriteAllBytes(path, _ca.Export(X509ContentType.Cert));
+        try
+        {
+            var cfg = new ConfigMqtt { Host = "localhost", Ssl = true, Insecure = true, CaCertPath = path };
+            var options = new MqttClientOptionsBuilder().WithConfig(cfg).Build();
+            Assert.That(options.ChannelOptions.TlsOptions.AllowUntrustedCertificates, Is.False);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Test]
+    public void SystemStore_AcceptsValid() =>
+        Assert.That(MqttClientOptionsBuilderExtensions.ValidateWithSystemStore(SslPolicyErrors.None, "broker", null), Is.True);
+
+    [Test]
+    public void SystemStore_RejectsUntrusted() =>
+        Assert.That(MqttClientOptionsBuilderExtensions.ValidateWithSystemStore(SslPolicyErrors.RemoteCertificateChainErrors, "broker", null), Is.False);
+
+    [Test]
+    public void Clone_KeepsTlsOptions()
+    {
+        var clone = new ConfigMqtt { Ssl = true, Insecure = true, CaCertPath = "/ca.crt" }.Clone();
+        Assert.That(clone.Insecure, Is.True);
+        Assert.That(clone.CaCertPath, Is.EqualTo("/ca.crt"));
     }
 
     private static X509Certificate2 CreateCa(string subject)
