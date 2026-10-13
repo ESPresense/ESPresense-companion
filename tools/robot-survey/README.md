@@ -31,6 +31,27 @@ They hadn't: the beacon was lying still.
 - `build_fixture.py` drops captures from `BEACON_LOST_AT` on; they stay in `captures/`.
 - `BeaconMovesWithRobot` fails on any fixture whose fingerprints don't change with position.
 
+That evening the hat was refitted and the reached places resurveyed into `captures-resurvey/`
+(r* points, then s* for retries). `build_fixture.py` merges both dirs. The hat was knocked off again
+once by a rug on a fast run, and before that under the kitchen table; both table spots are left out.
+
+## Resurvey and spin
+
+```
+SURVEY_OUT=$PWD/captures-resurvey SURVEY_WPS=resurvey_waypoints.json SURVEY_PREFIX=r python3 run.py
+SURVEY_OUT=$PWD/captures-resurvey SURVEY_WPS=resurvey_retry.json SURVEY_PREFIX=s SURVEY_NUDGE=1 python3 run.py
+```
+
+- `SURVEY_DWELL` (default 30 s). The robot turns in place through it (`SURVEY_SPIN` seconds between
+  `vacuum_remote_control_move_step` calls, `SURVEY_ROT` units each; 64 is ~85 deg, bigger is erratic).
+  A turn call blocks ~10 s while the robot is still in its goto task, so the tour stops it first.
+  Coverage is still uneven: `headings` in tour.json records what each point actually got.
+- `vacuum_goto`'s "not inside the map" verdict moves between runs, even for places the robot
+  reached earlier the same day. `SURVEY_NUDGE=1` tries targets up to 0.9 m around a refused one.
+  An accepted target can still be unreachable (closed door?); the tour logs "never moved" and skips.
+- Repeatability: three spots measured morning and evening, 2 cm apart, differ by 7-10 dB rms per
+  node (up to 21 dB on one node). That is the noise floor of a single dwell.
+
 ## Running a survey
 
 ```
@@ -49,7 +70,8 @@ Things learned the hard way:
 - `vacuum_goto` is cruise, not cleaning. HA's generic vacuum state still reads `cleaning`; check
   `status` (`cruising_point`) and `cleaned_area`. The tour logs a rise in `cleaned_area` but does not abort.
 - Match the process name carefully when killing a tour. `pkill -f survey2/run.py` does not match
-  a process started as `python3 run.py`, and two tours driving one robot fight each other.
+  a process started as `python3 run.py`, and two tours driving one robot fight each other. `pkill -f`
+  from a shell whose own command line contains the pattern kills that shell too: kill by pid.
 - Unreachable waypoints are simply ignored by the robot; the tour detects "never moved" and skips.
 - Only `calibrate`'s **receive** direction matters: `espresense/devices/node:calibrate/<rx>` is
   "node rx heard the robot", which is the direction the locators consume.
@@ -60,7 +82,7 @@ Things learned the hard way:
 
 - `robot-survey-2026-10-12.json` -- 4 positions, 18 headings at one of them. Good for orientation
   sensitivity, poor spatial spread.
-- `robot-survey-2026-10-13.json` -- many positions, one heading each. The reverse.
+- `robot-survey-2026-10-13.json` -- 14 positions: p* one heading each, r*/s* spun through part of a turn.
 
 Heading alone moves inferred distance by up to 2.9x, so never read a single-heading point as the
 typical reading for that spot.

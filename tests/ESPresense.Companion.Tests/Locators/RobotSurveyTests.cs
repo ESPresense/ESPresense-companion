@@ -571,10 +571,23 @@ public class RobotSurveyTests
         var beaten = Solvers.Where(w => results[w].Median < nearest).ToList();
         TestContext.WriteLine($"\nSolvers beating the nearest-node baseline ({nearest:0.00} m): {(beaten.Count == 0 ? "none" : string.Join(", ", beaten))}");
 
-        // No regression baselines yet: the first set was recorded on data where the beacon had
-        // fallen off the robot (see BeaconMovesWithRobot). Pin them once a clean survey exists.
-        Assert.Pass("diagnostic - see output");
+        Assert.Multiple(() =>
+        {
+            foreach (var (which, bound) in MedianErrorBaselines)
+                Assert.That(results[which].Median, Is.LessThanOrEqualTo(bound), $"{which} median floor-frame error regressed");
+        });
     }
+
+    /// <summary>
+    /// Median horizontal error (m) per locator on the 14-point 2026-10-13 survey (morning p00-p04 plus
+    /// the evening resurvey), ~25% above what each achieved. Rebuilding the fixture with more points
+    /// will move these; re-pin from the test output.
+    /// </summary>
+    private static readonly Dictionary<string, double> MedianErrorBaselines = new()
+    {
+        ["nelder"] = 5.4, ["mle"] = 5.8, ["gaussnewton"] = 5.0, ["bfgs"] = 6.4,
+        ["multifloor"] = 9.6, ["nadaraya"] = 4.5, ["nearest"] = 6.2,
+    };
 
     /// <summary>Fewer positions than this and per-locator medians are noise.</summary>
     private const int MinAccuracyPoints = 10;

@@ -11,7 +11,8 @@ the fixture, nothing else from the config.
 import json, re, os, sys, statistics
 
 HERE=os.path.dirname(os.path.abspath(__file__))
-CAPDIR=os.environ.get('SURVEY_OUT') or os.path.join(HERE,'captures')
+# Every tour's captures go into one fixture. SURVEY_OUT may list several dirs, colon-separated.
+CAPDIRS=(os.environ.get('SURVEY_OUT') or ':'.join(os.path.join(HERE,d) for d in ('captures','captures-resurvey'))).split(':')
 FIXTURE=os.path.join(HERE,'../../tests/ESPresense.Companion.Tests/TestData/robot-survey-2026-10-13.json')
 CFG=os.environ.get('ESPRESENSE_CONFIG') or os.path.expanduser('~/.espresense/config.yaml')
 
@@ -59,7 +60,8 @@ TOPIC=re.compile(r'espresense/devices/node:calibrate/(\S+)')
 # p04. p04 itself is kept -- its fingerprint is 5 dB away from p03's 1.9 m off, so the beacon was still
 # riding. Later captures do not measure the robot's position and are left out; they stay in captures/
 # as a record (and as a static-beacon set). run.py now aborts a tour when this happens.
-BEACON_LOST_AT=1791907572   # unix time p10's capture started, first after the clean
+# The resurvey (captures-resurvey/, hat refitted) revisits the places the robot reached that day.
+BEACON_LOST_AT={'captures':1791907572}   # per dir: unix time p10's capture started, first after the clean
 def capture_start(path):
     with open(path, errors='replace') as f: return float(f.readline().split(' ',1)[0])
 
@@ -85,12 +87,12 @@ def summarise(path):
                   'sd':round(statistics.stdev(r),2) if len(r)>1 else 0.0}
     return out
 
-tour=json.load(open(f'{CAPDIR}/tour.json'))
 points=[]
-for t in tour:
+tours=[(d,t) for d in CAPDIRS if os.path.exists(f'{d}/tour.json') for t in json.load(open(f'{d}/tour.json'))]
+for capdir,t in tours:
     if t['status']!='ok': continue
-    cap=os.path.join(CAPDIR, os.path.basename(t['capture']))
-    if capture_start(cap)>=BEACON_LOST_AT:
+    cap=os.path.join(capdir, os.path.basename(t['capture']))
+    if capture_start(cap)>=BEACON_LOST_AT.get(os.path.basename(capdir.rstrip('/')),float('inf')):
         print(f"  skip {t['label']}: beacon was off the robot", file=sys.stderr); continue
     m=summarise(cap)
     if len(m)<4:
@@ -99,6 +101,7 @@ for t in tour:
     p={'label':t['label'],
        'robotX':round(pb[0]/1000,4),'robotY':round(pb[1]/1000,4),
        'headingDeg':pb[2],'driftMm':round(t['drift_mm'],1),'m':m}
+    if t.get('headings'): p['spinHeadingsDeg']=t['headings']   # turned in place through the dwell
     if to_floor:
         fx,fy=to_floor(pb[0]/1000,pb[1]/1000)
         p.update(floorX=round(fx,3),floorY=round(fy,3),floorRoom=room_at(fx,fy))
@@ -108,10 +111,10 @@ used=sorted({n for p in points for n in p['m']})
 fixture={'frame':'robotX/robotY: robot live LiDAR frame, metres. floorX/floorY: the same point in the '
                  'floorplan frame via tools/robot-survey/frames.json, a geometry-only fit of the robot map '
                  'to the room polygons (never RSSI). Node x/y/z are floorplan metres.',
-         'headings':'One heading per position. This survey trades heading coverage for spatial '
-                    'coverage; robot-survey-2026-10-12.json is the reverse (4 positions, 18 headings '
-                    'at one of them). Heading alone moves inferred distance by up to 2.9x, so do not '
-                    'read a single-heading point as the typical reading for that spot.',
+         'headings':'p* points (morning, 90 s) hold one heading. r*/s* points (evening resurvey, 30 s) '
+                    'turn in place through the dwell; spinHeadingsDeg samples the headings covered, '
+                    'often only part of a turn. Heading alone moves inferred distance by up to 2.9x, and '
+                    'the three spots measured both morning and evening differ by 7-10 dB rms per node.',
          'captured':'2026-10-13',
          'nodes':[nodes[n] for n in used],
          'rooms':rooms,

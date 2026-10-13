@@ -106,6 +106,15 @@
    ]
   },
   {
+   "id": "office",
+   "x": 6.8,
+   "y": 13.5,
+   "z": 3.6,
+   "floors": [
+    "second"
+   ]
+  },
+  {
    "id": "upstairs_hallway",
    "x": 10.4,
    "y": 6.4,
@@ -907,6 +916,696 @@
    "floorX": 7.399,
    "floorY": 1.3,
    "floorRoom": "kitchen"
+  },
+  {
+   "label": "r06_6368_2595",
+   "robotX": 6.346,
+   "robotY": 2.603,
+   "headingDeg": 350,
+   "driftMm": 2.2,
+   "m": {
+    "nook": {
+     "rssi": -91.61,
+     "dist": 11.348,
+     "n": 9,
+     "sd": 1.66
+    },
+    "master": {
+     "rssi": -85.81,
+     "dist": 10.582,
+     "n": 8,
+     "sd": 1.0
+    },
+    "foyer": {
+     "rssi": -90.07,
+     "dist": 10.726,
+     "n": 8,
+     "sd": 1.19
+    },
+    "family": {
+     "rssi": -94.3,
+     "dist": 13.779,
+     "n": 8,
+     "sd": 0.61
+    },
+    "upstairs_hallway": {
+     "rssi": -101.37,
+     "dist": 23.485,
+     "n": 8,
+     "sd": 1.99
+    },
+    "kitchen": {
+     "rssi": -68.63,
+     "dist": 2.293,
+     "n": 7,
+     "sd": 2.76
+    },
+    "back_stairs": {
+     "rssi": -84.89,
+     "dist": 6.852,
+     "n": 6,
+     "sd": 0.86
+    },
+    "bathroom": {
+     "rssi": -99.75,
+     "dist": 20.758,
+     "n": 5,
+     "sd": 1.68
+    },
+    "garage": {
+     "rssi": -90.3,
+     "dist": 16.026,
+     "n": 8,
+     "sd": 0.85
+    },
+    "laundry": {
+     "rssi": -75.43,
+     "dist": 3.434,
+     "n": 7,
+     "sd": 2.45
+    }
+   },
+   "floorX": 7.948,
+   "floorY": 3.095,
+   "floorRoom": "kitchen"
+  },
+  {
+   "label": "r07_7996_3499",
+   "robotX": 7.786,
+   "robotY": 3.283,
+   "headingDeg": 21,
+   "driftMm": 3.0,
+   "m": {
+    "garage": {
+     "rssi": -88.35,
+     "dist": 13.479,
+     "n": 8,
+     "sd": 0.69
+    },
+    "nook": {
+     "rssi": -92.34,
+     "dist": 11.928,
+     "n": 8,
+     "sd": 0.9
+    },
+    "upstairs_hallway": {
+     "rssi": -101.77,
+     "dist": 24.045,
+     "n": 8,
+     "sd": 1.08
+    },
+    "laundry": {
+     "rssi": -84.33,
+     "dist": 6.593,
+     "n": 6,
+     "sd": 1.41
+    },
+    "foyer": {
+     "rssi": -95.18,
+     "dist": 15.798,
+     "n": 9,
+     "sd": 0.81
+    },
+    "master": {
+     "rssi": -80.56,
+     "dist": 6.721,
+     "n": 7,
+     "sd": 1.77
+    },
+    "kitchen": {
+     "rssi": -80.66,
+     "dist": 6.157,
+     "n": 7,
+     "sd": 1.13
+    },
+    "back_stairs": {
+     "rssi": -92.03,
+     "dist": 11.735,
+     "n": 8,
+     "sd": 1.92
+    },
+    "family": {
+     "rssi": -96.94,
+     "dist": 16.781,
+     "n": 8,
+     "sd": 0.91
+    }
+   },
+   "floorX": 7.398,
+   "floorY": 1.601,
+   "floorRoom": "kitchen"
+  },
+  {
+   "label": "r08_4423_2883",
+   "robotX": 4.334,
+   "robotY": 2.835,
+   "headingDeg": 61,
+   "driftMm": 1.0,
+   "m": {
+    "foyer": {
+     "rssi": -79.75,
+     "dist": 4.926,
+     "n": 8,
+     "sd": 2.25
+    },
+    "kitchen": {
+     "rssi": -71.39,
+     "dist": 2.825,
+     "n": 6,
+     "sd": 0.65
+    },
+    "bathroom": {
+     "rssi": -97.59,
+     "dist": 17.795,
+     "n": 8,
+     "sd": 2.31
+    },
+    "family": {
+     "rssi": -93.21,
+     "dist": 12.739,
+     "n": 9,
+     "sd": 1.14
+    },
+    "basement": {
+     "rssi": -98.25,
+     "dist": 18.56,
+     "n": 7,
+     "sd": 1.54
+    },
+    "upstairs_hallway": {
+     "rssi": -100.46,
+     "dist": 21.79,
+     "n": 11,
+     "sd": 0.74
+    },
+    "master": {
+     "rssi": -82.16,
+     "dist": 7.726,
+     "n": 8,
+     "sd": 1.67
+    },
+    "nook": {
+     "rssi": -85.1,
+     "dist": 6.949,
+     "n": 7,
+     "sd": 0.29
+    },
+    "laundry": {
+     "rssi": -70.64,
+     "dist": 2.424,
+     "n": 7,
+     "sd": 2.94
+    },
+    "dining": {
+     "rssi": -100.02,
+     "dist": 21.084,
+     "n": 10,
+     "sd": 0.73
+    },
+    "back_stairs": {
+     "rssi": -80.06,
+     "dist": 4.784,
+     "n": 5,
+     "sd": 0.36
+    },
+    "garage": {
+     "rssi": -90.4,
+     "dist": 16.138,
+     "n": 9,
+     "sd": 0.21
+    }
+   },
+   "floorX": 9.546,
+   "floorY": 4.34,
+   "floorRoom": "kitchen"
+  },
+  {
+   "label": "r09_3906_5029",
+   "robotX": 3.89,
+   "robotY": 5.048,
+   "headingDeg": 112,
+   "driftMm": 3.2,
+   "m": {
+    "nook": {
+     "rssi": -82.71,
+     "dist": 6.004,
+     "n": 10,
+     "sd": 3.54
+    },
+    "master": {
+     "rssi": -83.32,
+     "dist": 8.48,
+     "n": 6,
+     "sd": 0.46
+    },
+    "family": {
+     "rssi": -92.89,
+     "dist": 12.4,
+     "n": 6,
+     "sd": 0.34
+    },
+    "upstairs_hallway": {
+     "rssi": -91.82,
+     "dist": 11.471,
+     "n": 9,
+     "sd": 0.89
+    },
+    "kitchen": {
+     "rssi": -75.05,
+     "dist": 3.867,
+     "n": 6,
+     "sd": 1.63
+    },
+    "foyer": {
+     "rssi": -91.28,
+     "dist": 11.746,
+     "n": 8,
+     "sd": 1.04
+    },
+    "bathroom": {
+     "rssi": -100.19,
+     "dist": 21.533,
+     "n": 6,
+     "sd": 2.08
+    },
+    "laundry": {
+     "rssi": -81.21,
+     "dist": 5.213,
+     "n": 6,
+     "sd": 0.7
+    },
+    "office": {
+     "rssi": -94.93,
+     "dist": 14.47,
+     "n": 7,
+     "sd": 1.17
+    },
+    "back_stairs": {
+     "rssi": -75.94,
+     "dist": 3.524,
+     "n": 5,
+     "sd": 0.86
+    },
+    "dining": {
+     "rssi": -98.09,
+     "dist": 18.249,
+     "n": 8,
+     "sd": 0.61
+    }
+   },
+   "floorX": 11.414,
+   "floorY": 3.073,
+   "floorRoom": "kitchen"
+  },
+  {
+   "label": "r10_24_4006",
+   "robotX": 0.006,
+   "robotY": 4.001,
+   "headingDeg": 28,
+   "driftMm": 2.0,
+   "m": {
+    "dining": {
+     "rssi": -91.86,
+     "dist": 11.592,
+     "n": 11,
+     "sd": 2.01
+    },
+    "back_stairs": {
+     "rssi": -96.13,
+     "dist": 15.777,
+     "n": 8,
+     "sd": 0.61
+    },
+    "bathroom": {
+     "rssi": -102.78,
+     "dist": 25.887,
+     "n": 3,
+     "sd": 1.07
+    },
+    "nook": {
+     "rssi": -86.8,
+     "dist": 7.91,
+     "n": 7,
+     "sd": 1.18
+    },
+    "laundry": {
+     "rssi": -86.96,
+     "dist": 8.046,
+     "n": 7,
+     "sd": 1.91
+    },
+    "family": {
+     "rssi": -97.62,
+     "dist": 17.966,
+     "n": 11,
+     "sd": 2.84
+    },
+    "foyer": {
+     "rssi": -90.86,
+     "dist": 11.489,
+     "n": 8,
+     "sd": 2.18
+    },
+    "kitchen": {
+     "rssi": -79.49,
+     "dist": 5.594,
+     "n": 8,
+     "sd": 1.44
+    },
+    "upstairs_hallway": {
+     "rssi": -85.02,
+     "dist": 6.94,
+     "n": 6,
+     "sd": 1.43
+    },
+    "master": {
+     "rssi": -92.74,
+     "dist": 19.45,
+     "n": 4,
+     "sd": 0.99
+    },
+    "basement": {
+     "rssi": -101.83,
+     "dist": 24.083,
+     "n": 3,
+     "sd": 0.29
+    }
+   },
+   "floorX": 13.45,
+   "floorY": 6.542,
+   "floorRoom": "dining"
+  },
+  {
+   "label": "r12_-3008_1491",
+   "robotX": -3.169,
+   "robotY": 1.3,
+   "headingDeg": 285,
+   "driftMm": 11.7,
+   "m": {
+    "foyer": {
+     "rssi": -82.73,
+     "dist": 6.117,
+     "n": 6,
+     "sd": 0.81
+    },
+    "family": {
+     "rssi": -105.37,
+     "dist": 31.33,
+     "n": 10,
+     "sd": 0.37
+    },
+    "basement": {
+     "rssi": -86.12,
+     "dist": 7.59,
+     "n": 6,
+     "sd": 2.34
+    },
+    "back_stairs": {
+     "rssi": -103.17,
+     "dist": 26.643,
+     "n": 6,
+     "sd": 0.88
+    },
+    "upstairs_hallway": {
+     "rssi": -95.33,
+     "dist": 14.856,
+     "n": 8,
+     "sd": 0.35
+    },
+    "nook": {
+     "rssi": -105.07,
+     "dist": 30.622,
+     "n": 5,
+     "sd": 0.15
+    },
+    "kitchen": {
+     "rssi": -89.74,
+     "dist": 13.161,
+     "n": 8,
+     "sd": 1.02
+    },
+    "dining": {
+     "rssi": -79.84,
+     "dist": 4.744,
+     "n": 7,
+     "sd": 1.97
+    },
+    "laundry": {
+     "rssi": -102.11,
+     "dist": 25.354,
+     "n": 5,
+     "sd": 3.72
+    },
+    "garage": {
+     "rssi": -94.37,
+     "dist": 22.927,
+     "n": 3,
+     "sd": 0.32
+    },
+    "office": {
+     "rssi": -97.07,
+     "dist": 17.047,
+     "n": 4,
+     "sd": 2.08
+    }
+   },
+   "floorX": 13.821,
+   "floorY": 10.694,
+   "floorRoom": "living"
+  },
+  {
+   "label": "r13_-2194_-1754",
+   "robotX": -2.182,
+   "robotY": -1.744,
+   "headingDeg": 220,
+   "driftMm": 1.4,
+   "m": {
+    "family": {
+     "rssi": -103.12,
+     "dist": 26.512,
+     "n": 12,
+     "sd": 0.33
+    },
+    "office": {
+     "rssi": -92.33,
+     "dist": 11.905,
+     "n": 8,
+     "sd": 0.73
+    },
+    "basement": {
+     "rssi": -82.49,
+     "dist": 5.745,
+     "n": 6,
+     "sd": 1.11
+    },
+    "dining": {
+     "rssi": -95.67,
+     "dist": 15.262,
+     "n": 8,
+     "sd": 0.74
+    },
+    "garage": {
+     "rssi": -94.6,
+     "dist": 23.411,
+     "n": 9,
+     "sd": 0.47
+    },
+    "back_stairs": {
+     "rssi": -100.96,
+     "dist": 22.591,
+     "n": 8,
+     "sd": 0.61
+    },
+    "foyer": {
+     "rssi": -78.63,
+     "dist": 4.472,
+     "n": 5,
+     "sd": 0.34
+    },
+    "nook": {
+     "rssi": -101.79,
+     "dist": 24.097,
+     "n": 12,
+     "sd": 1.23
+    },
+    "upstairs_hallway": {
+     "rssi": -87.55,
+     "dist": 8.336,
+     "n": 5,
+     "sd": 0.45
+    },
+    "master": {
+     "rssi": -93.11,
+     "dist": 20.05,
+     "n": 8,
+     "sd": 0.26
+    },
+    "kitchen": {
+     "rssi": -85.15,
+     "dist": 8.934,
+     "n": 7,
+     "sd": 0.5
+    },
+    "bathroom": {
+     "rssi": -100.18,
+     "dist": 21.31,
+     "n": 7,
+     "sd": 0.22
+    },
+    "laundry": {
+     "rssi": -91.23,
+     "dist": 10.959,
+     "n": 7,
+     "sd": 0.5
+    }
+   },
+   "floorX": 10.984,
+   "floorY": 12.173,
+   "floorRoom": "foyer"
+  },
+  {
+   "label": "s01_3007_1493",
+   "robotX": 2.931,
+   "robotY": 1.827,
+   "headingDeg": 39,
+   "driftMm": 1.4,
+   "m": {
+    "dining": {
+     "rssi": -101.31,
+     "dist": 23.191,
+     "n": 9,
+     "sd": 0.66
+    },
+    "garage": {
+     "rssi": -94.3,
+     "dist": 22.791,
+     "n": 8,
+     "sd": 0.26
+    },
+    "back_stairs": {
+     "rssi": -89.34,
+     "dist": 9.532,
+     "n": 6,
+     "sd": 0.53
+    },
+    "nook": {
+     "rssi": -89.39,
+     "dist": 9.566,
+     "n": 7,
+     "sd": 0.56
+    },
+    "family": {
+     "rssi": -97.79,
+     "dist": 17.843,
+     "n": 7,
+     "sd": 0.4
+    },
+    "foyer": {
+     "rssi": -81.73,
+     "dist": 5.74,
+     "n": 10,
+     "sd": 2.4
+    },
+    "master": {
+     "rssi": -88.98,
+     "dist": 13.949,
+     "n": 8,
+     "sd": 0.36
+    },
+    "upstairs_hallway": {
+     "rssi": -96.76,
+     "dist": 16.561,
+     "n": 11,
+     "sd": 0.91
+    },
+    "laundry": {
+     "rssi": -81.37,
+     "dist": 5.271,
+     "n": 7,
+     "sd": 0.73
+    },
+    "kitchen": {
+     "rssi": -69.76,
+     "dist": 2.485,
+     "n": 8,
+     "sd": 1.8
+    },
+    "bathroom": {
+     "rssi": -97.92,
+     "dist": 18.008,
+     "n": 6,
+     "sd": 0.26
+    }
+   },
+   "floorX": 9.84,
+   "floorY": 6.043,
+   "floorRoom": "kitchen"
+  },
+  {
+   "label": "s06_-2089_3891",
+   "robotX": -2.471,
+   "robotY": 3.873,
+   "headingDeg": 319,
+   "driftMm": 80.0,
+   "m": {
+    "family": {
+     "rssi": -100.47,
+     "dist": 21.813,
+     "n": 10,
+     "sd": 0.93
+    },
+    "basement": {
+     "rssi": -90.39,
+     "dist": 10.332,
+     "n": 6,
+     "sd": 1.23
+    },
+    "dining": {
+     "rssi": -74.84,
+     "dist": 3.255,
+     "n": 8,
+     "sd": 1.3
+    },
+    "nook": {
+     "rssi": -100.32,
+     "dist": 21.53,
+     "n": 7,
+     "sd": 0.35
+    },
+    "upstairs_hallway": {
+     "rssi": -82.06,
+     "dist": 5.599,
+     "n": 9,
+     "sd": 1.94
+    },
+    "kitchen": {
+     "rssi": -90.42,
+     "dist": 13.905,
+     "n": 10,
+     "sd": 0.62
+    },
+    "laundry": {
+     "rssi": -95.3,
+     "dist": 14.851,
+     "n": 8,
+     "sd": 0.94
+    },
+    "back_stairs": {
+     "rssi": -101.14,
+     "dist": 22.897,
+     "n": 10,
+     "sd": 0.73
+    },
+    "foyer": {
+     "rssi": -89.23,
+     "dist": 10.572,
+     "n": 5,
+     "sd": 4.6
+    }
+   },
+   "floorX": 15.127,
+   "floorY": 8.37,
+   "floorRoom": "living"
   }
  ],
  "floorBounds": {

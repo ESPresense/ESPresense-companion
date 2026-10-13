@@ -1,4 +1,4 @@
-import sys, time, json, subprocess, os, math
+import sys, time, json, subprocess, os, math, threading
 HERE=os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0,HERE)
 import ha
@@ -45,6 +45,12 @@ WPS+=[(-4450, 900), (-4650, 1100)]
 # vacuum accepts are still valid captures, since the tour records where the robot actually stopped.
 WPS+=[(6397, -2817), (10455, -885), (8501, -4541), (1158, 6532)]
 
+# A resurvey revisits places a tour already reached, from a JSON list of [x, y] live-frame mm.
+if os.environ.get('SURVEY_WPS'):
+    WPS=[tuple(p) for p in json.load(open(os.environ['SURVEY_WPS']))]
+PREFIX=os.environ.get('SURVEY_PREFIX','p')
+NUDGE=os.environ.get('SURVEY_NUDGE')=='1'
+
 def fingerprint(path):
     """Mean RSSI per receiving node for one capture."""
     per={}
@@ -56,7 +62,15 @@ def fingerprint(path):
     return {k:sum(v)/len(v) for k,v in per.items() if len(v)>=3}
 last_fp=None
 
-DWELL=90
+DWELL=int(os.environ.get('SURVEY_DWELL','30'))
+# Turn in place through the dwell so each point averages over headings: heading alone moves inferred
+# distance by up to 2.9x. One step is ~75 deg; one every 3 s makes ~2 turns in 30 s. SURVEY_SPIN=0 holds still.
+SPIN=float(os.environ.get('SURVEY_SPIN','2.5'))
+ROT=int(os.environ.get('SURVEY_ROT','64'))   # service units; 64 turns ~85 deg, bigger is erratic
+def turn():
+    try: ha.call("call_service",{"domain":"dreame_vacuum","service":"vacuum_remote_control_move_step",
+                 "entity_id":"vacuum.p10_pro_ultra","data":{"rotation":ROT,"velocity":0}})
+    except Exception as e: log(f"  turn error: {e}")
 # Resume: keep what an earlier run already captured and skip those waypoints.
 try: results=json.load(open(f"{OUT}/tour.json"))
 except FileNotFoundError: results=[]
@@ -67,7 +81,7 @@ start=time.time()
 AREA0=vac(["cleaned_area"])['attributes'].get('cleaned_area',0)
 
 for i,(tx,ty) in enumerate(WPS):
-    label=f"p{i:02d}_{tx}_{ty}"
+    label=f"{PREFIX}{i:02d}_{tx}_{ty}"
     if label in done: continue
     ensure_ready()
     p0=pos()
@@ -75,6 +89,15 @@ for i,(tx,ty) in enumerate(WPS):
     try:
         r=goto(tx,ty)
         if r: log(f"  goto -> {str(r)[:300]}")
+        # The map's idea of 'inside' shifts between runs. Try nearby targets before giving up.
+        if isinstance(r,str) and 'not inside the map' in r and NUDGE:
+            for rad in (300,600,900):
+                for k in range(8):
+                    nx=round(tx+rad*math.cos(k*math.pi/4)); ny=round(ty+rad*math.sin(k*math.pi/4))
+                    r=goto(nx,ny)
+                    if not (isinstance(r,str) and r.startswith("Error")): break
+                else: continue
+                log(f"  nudged to ({nx},{ny}) -> {str(r)[:100]}"); tx,ty=nx,ny; break
         if isinstance(r,str) and r.startswith("Error"):
             results.append({"label":label,"target":[tx,ty],"status":"rejected","reason":r[:200]}); continue
     except Exception as e:
@@ -108,17 +131,26 @@ for i,(tx,ty) in enumerate(WPS):
     log(f"  settled at {pa} arrived={arrived} status={v['attributes'].get('status')} batt={v['attributes'].get('battery_level')}")
     # capture
     cap=f"{OUT}/cap_{label}.txt"
+    headings=[]
+    # Still in its goto task, the robot makes each turn call block ~10 s; stopped, a call takes 0.5 s.
+    if SPIN:
+        ha.call("call_service",{"domain":"vacuum","service":"stop","entity_id":"vacuum.p10_pro_ultra"}); time.sleep(2)
     with open(cap,'w') as f:
-        subprocess.run(["mosquitto_sub","-h","mqtt.z13.org","-p","1883","-v","-W",str(DWELL),
+        sub=subprocess.Popen(["mosquitto_sub","-h","mqtt.z13.org","-p","1883","-v","-W",str(DWELL),
                         "-F","%U %t %p",
                         "-t","espresense/devices/node:calibrate/+",
                         "-t","espresense/devices/+/calibrate"],stdout=f,stderr=subprocess.DEVNULL)
+        while sub.poll() is None:
+            if SPIN: turn()
+            time.sleep(SPIN or 1)
+            p=pos()
+            if p: headings.append(p[2])
     pb=pos()
     drift=math.hypot(pb[0]-pa[0],pb[1]-pa[1]) if pa and pb else None
     n=sum(1 for _ in open(cap))
-    log(f"  captured {n} msgs, drift during dwell {drift:.0f}mm, end {pb}")
+    log(f"  captured {n} msgs, drift during dwell {drift:.0f}mm, end {pb}, headings {headings}")
     results.append({"label":label,"target":[tx,ty],"status":"ok","pos_before":pa,"pos_after":pb,
-                    "drift_mm":drift,"msgs":n,"capture":os.path.basename(cap)})
+                    "drift_mm":drift,"msgs":n,"headings":headings,"dwell_s":DWELL,"capture":os.path.basename(cap)})
     json.dump(results,open(f"{OUT}/tour.json","w"),indent=1)
     # Beacon check: if the robot moved 2 m+ since the last capture and every node still hears the
     # same RSSI, the calibrate hat has come off and is lying still. Stop rather than log junk.
