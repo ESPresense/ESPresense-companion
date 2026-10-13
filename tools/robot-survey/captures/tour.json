@@ -1,0 +1,44 @@
+[
+ {
+  "label": "p00_1190_698",
+  "target": [
+   1190,
+   698
+  ],
+  "status": "ok",
+  "pos_before": [
+   24,
+   4006,
+   304
+  ],
+  "pos_after": [
+   24,
+   4006,
+   304
+  ],
+  "drift_mm": 0.0,
+  "msgs": 935,
+  "capture": "/tmp/survey2/cap_p00_1190_698.txt"
+ },
+ {
+  "label": "p01_3000_1500",
+  "target": [
+   3000,
+   1500
+  ],
+  "status": "ok",
+  "pos_before": [
+   3007,
+   1493,
+   198
+  ],
+  "pos_after": [
+   3008,
+   1492,
+   167
+  ],
+  "drift_mm": 1.4142135623730951,
+  "msgs": 964,
+  "capture": "/tmp/survey2/cap_p01_3000_1500.txt"
+ }
+]

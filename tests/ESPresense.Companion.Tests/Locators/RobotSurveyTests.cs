@@ -27,6 +27,19 @@ public class RobotSurveyTests
 
     private static readonly string[] Locators = { "nelder", "mle", "gaussnewton" };
 
+    /// <summary>18 headings at one spot: good for orientation sensitivity, poor spatial spread.</summary>
+    private const string Headings = "robot-survey-2026-10-12.json";
+
+    /// <summary>One heading at many spots: good spatial spread, says nothing about orientation.</summary>
+    private const string Spread = "robot-survey-2026-10-13.json";
+
+    private static Survey Load(string file)
+    {
+        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", file);
+        return JsonSerializer.Deserialize<Survey>(File.ReadAllText(path),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+    }
+
     [SetUp]
     public void Setup()
     {
@@ -36,8 +49,7 @@ public class RobotSurveyTests
         _configLoader = new ConfigLoader(_configDir);
         _state = new State(_configLoader, new NodeTelemetryStore(mqtt.Object));
 
-        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "robot-survey-2026-10-12.json");
-        _survey = JsonSerializer.Deserialize<Survey>(File.ReadAllText(path), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        _survey = Load(Headings);
     }
 
     [TearDown]
@@ -140,9 +152,11 @@ public class RobotSurveyTests
     /// rotation and translation, though deliberately NOT to scale, so it also catches the
     /// systematic distance inflation seen in the calibration matrix.
     /// </summary>
-    [Test]
-    public void Rigidity_SolverMustReproduceKnownSeparations()
+    [TestCase(Headings)]
+    [TestCase(Spread)]
+    public void Rigidity_SolverMustReproduceKnownSeparations(string fixture)
     {
+        _survey = Load(fixture);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
 
@@ -163,6 +177,8 @@ public class RobotSurveyTests
         {
             var solved = positions.ToDictionary(p => p.Key, p => Solve(which, p.Dists, floor, nodes));
             var errs = new List<double>();
+            var truths = new List<double>();
+            var gots = new List<double>();
             for (int i = 0; i < positions.Count; i++)
                 for (int j = i + 1; j < positions.Count; j++)
                 {
@@ -171,11 +187,29 @@ public class RobotSurveyTests
                     var truth = Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2));
                     var got = Math.Sqrt(Math.Pow(pa.X - pb.X, 2) + Math.Pow(pa.Y - pb.Y, 2));
                     errs.Add(got - truth);
-                    TestContext.WriteLine($"{which,-13}{$"({a.X},{a.Y})-({b.X},{b.Y})",-26}{truth,9:0.00}{got,10:0.00}{got - truth,8:+0.00;-0.00}");
+                    truths.Add(truth);
+                    gots.Add(got);
+                    // Only list every pair when there are few; a spatial survey makes hundreds.
+                    if (positions.Count <= 6)
+                        TestContext.WriteLine($"{which,-13}{$"({a.X},{a.Y})-({b.X},{b.Y})",-26}{truth,9:0.00}{got,10:0.00}{got - truth,8:+0.00;-0.00}");
                     reported = true;
                 }
             if (errs.Count > 0)
-                TestContext.WriteLine($"{which,-13}{"MEAN SIGNED ERROR",-26}{"",9}{"",10}{errs.Average(),8:+0.00;-0.00}\n");
+                TestContext.WriteLine($"{which,-13}{"MEAN SIGNED ERROR",-26}{"",9}{"",10}{errs.Average(),8:+0.00;-0.00}");
+
+            // A mean hides the shape. Regressing solved separation on true separation splits the
+            // error into a multiplicative part (slope: distances scaled wrong) and an additive
+            // part (intercept: a floor the solver cannot resolve below). Those need different fixes.
+            if (truths.Count >= 6)
+            {
+                var mx = truths.Average();
+                var my = gots.Average();
+                var sxx = truths.Sum(t => (t - mx) * (t - mx));
+                var slope = sxx > 1e-9 ? truths.Zip(gots, (t, g) => (t - mx) * (g - my)).Sum() / sxx : double.NaN;
+                var intercept = my - slope * mx;
+                TestContext.WriteLine($"{which,-13}{$"FIT over {truths.Count} pairs",-26}{"",9}  slope {slope,5:0.00}  intercept {intercept,6:+0.00;-0.00} m\n");
+            }
+            else TestContext.WriteLine();
         }
 
         Assert.That(reported, Is.True, "no locator produced fixes at two or more positions");
@@ -187,9 +221,11 @@ public class RobotSurveyTests
     /// intersect, the problem is ill-conditioned, and tiny input changes move the answer metres.
     /// Sweeping a global scale separates "solver is fragile" from "input is inconsistent".
     /// </summary>
-    [Test]
-    public void ScaleSweep_SeparatesSolverFragilityFromDistanceInflation()
+    [TestCase(Headings)]
+    [TestCase(Spread)]
+    public void ScaleSweep_SeparatesSolverFragilityFromDistanceInflation(string fixture)
     {
+        _survey = Load(fixture);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
 
@@ -335,6 +371,72 @@ public class RobotSurveyTests
         Assert.That(worse, Is.LessThanOrEqualTo(excesses.Count / 5),
             $"GaussNewton lost to a quarter-metre grid on {worse} of {excesses.Count} points: " +
             "it is not minimising the objective it reports.");
+    }
+
+    /// <summary>
+    /// Blames the measurement, not the solver, and needs no coordinate transform at all.
+    ///
+    /// If the robot moves from p to q, the true distance to any fixed node cannot change by more
+    /// than the robot moved: |D(p) - D(q)| &lt;= |p - q|. That is the triangle inequality, it holds in
+    /// every frame, and the robot measures |p - q| to millimetres. So for each node the ratio
+    /// |d(p) - d(q)| / |p - q| must never exceed 1.
+    ///
+    /// When it does, that node's reported range moved further than physics allows. The worst ratio
+    /// it reaches is a lower bound on its range error -- per node, with no fitting and no
+    /// assumptions about geometry.
+    ///
+    /// It does NOT separate the causes: the beacon's heading also differs between positions, and
+    /// heading alone shifts inferred distance by up to 2.9x (see the 2026-10-12 survey). So read
+    /// this as "the measurement is impossible", not "the scale factor is X". Either way no solver
+    /// can recover from it, which is the point.
+    /// </summary>
+    [TestCase(Spread)]
+    public void RangeConsistency_NodeRangeCannotChangeFasterThanTheRobotMoved(string fixture)
+    {
+        _survey = Load(fixture);
+
+        var positions = _survey.Points
+            .GroupBy(p => (X: Math.Round(p.RobotX, 3), Y: Math.Round(p.RobotY, 3)))
+            .Select(g => (g.Key, Dists: g.SelectMany(p => p.M).GroupBy(kv => kv.Key)
+                                         .ToDictionary(k => k.Key, k => k.Average(v => v.Value.Dist))))
+            .ToList();
+
+        Assert.That(positions.Count, Is.GreaterThanOrEqualTo(4),
+            "this diagnostic needs several spatially separated positions");
+
+        TestContext.WriteLine($"{positions.Count} positions, pairs at least 1 m apart\n");
+        TestContext.WriteLine($"{"node",-20}{"pairs",7}{"median",9}{"p95",8}{"worst",8}{"over 1.0",10}");
+
+        var offenders = new List<string>();
+        foreach (var node in _survey.Nodes.Select(n => n.Id).OrderBy(x => x))
+        {
+            var ratios = new List<double>();
+            for (int i = 0; i < positions.Count; i++)
+                for (int j = i + 1; j < positions.Count; j++)
+                {
+                    if (!positions[i].Dists.TryGetValue(node, out var di)) continue;
+                    if (!positions[j].Dists.TryGetValue(node, out var dj)) continue;
+                    var a = positions[i].Key; var b = positions[j].Key;
+                    var moved = Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2));
+                    if (moved < 1.0) continue;   // small baselines turn measurement noise into huge ratios
+                    ratios.Add(Math.Abs(di - dj) / moved);
+                }
+
+            if (ratios.Count < 3) continue;
+            ratios.Sort();
+            var over = ratios.Count(r => r > 1.0);
+            var worst = ratios[^1];
+            TestContext.WriteLine($"{node,-20}{ratios.Count,7}{ratios[ratios.Count / 2],9:0.00}" +
+                                  $"{ratios[(int)(0.95 * (ratios.Count - 1))],8:0.00}{worst,8:0.00}" +
+                                  $"{(double)over / ratios.Count,10:0%}");
+            if (worst > 1.0) offenders.Add($"{node} x{worst:0.0}");
+        }
+
+        TestContext.WriteLine($"\nNodes reporting physically impossible range changes: " +
+                              (offenders.Count == 0 ? "none" : string.Join(", ", offenders)));
+        TestContext.WriteLine("'worst' is a lower bound on that node's range error (scale and heading combined).");
+
+        Assert.Pass("diagnostic - see output");
     }
 
     private sealed class Survey

@@ -1,0 +1,269 @@
+{
+ "frame": "Robot LiDAR frame, metres. NOT the floorplan frame: no transform has been established. Node x/y/z ARE floorplan metres. Only frame-free assertions are valid.",
+ "headings": "One heading per position. This survey trades heading coverage for spatial coverage; robot-survey-2026-10-12.json is the reverse (4 positions, 18 headings at one of them). Heading alone moves inferred distance by up to 2.9x, so do not read a single-heading point as the typical reading for that spot.",
+ "captured": "2026-10-13",
+ "nodes": [
+  {
+   "id": "back_stairs",
+   "x": 4.5,
+   "y": 7.5,
+   "z": 3.4,
+   "floors": [
+    "first",
+    "second"
+   ]
+  },
+  {
+   "id": "basement",
+   "x": 15.8,
+   "y": 11.5,
+   "z": -0.5,
+   "floors": [
+    "first"
+   ]
+  },
+  {
+   "id": "dining",
+   "x": 16.3,
+   "y": 2.6,
+   "z": 1.29,
+   "floors": [
+    "first",
+    "second"
+   ]
+  },
+  {
+   "id": "family",
+   "x": 0.25,
+   "y": 0.4,
+   "z": 0.4,
+   "floors": [
+    "first"
+   ]
+  },
+  {
+   "id": "foyer",
+   "x": 9.9,
+   "y": 8.3,
+   "z": 0.4,
+   "floors": [
+    "first",
+    "second"
+   ]
+  },
+  {
+   "id": "garage",
+   "x": 1.0,
+   "y": 17.3,
+   "z": 0.5,
+   "floors": [
+    "first"
+   ]
+  },
+  {
+   "id": "kitchen",
+   "x": 8.0,
+   "y": 6.5,
+   "z": 1.0,
+   "floors": [
+    "first"
+   ]
+  },
+  {
+   "id": "laundry",
+   "x": 4.3,
+   "y": 7.6,
+   "z": 2.0,
+   "floors": [
+    "first"
+   ]
+  },
+  {
+   "id": "master",
+   "x": 3.4,
+   "y": 10.4,
+   "z": 3.4,
+   "floors": [
+    "second"
+   ]
+  },
+  {
+   "id": "nook",
+   "x": 7.0,
+   "y": 0.55,
+   "z": 0.4,
+   "floors": [
+    "first"
+   ]
+  },
+  {
+   "id": "upstairs_hallway",
+   "x": 10.4,
+   "y": 6.4,
+   "z": 3.4,
+   "floors": [
+    "second"
+   ]
+  }
+ ],
+ "points": [
+  {
+   "label": "p00_1190_698",
+   "robotX": 0.024,
+   "robotY": 4.006,
+   "headingDeg": 304,
+   "driftMm": 0.0,
+   "m": {
+    "kitchen": {
+     "rssi": -89.8,
+     "dist": 11.37,
+     "n": 25,
+     "sd": 0.76
+    },
+    "dining": {
+     "rssi": -86.74,
+     "dist": 8.068,
+     "n": 27,
+     "sd": 3.13
+    },
+    "back_stairs": {
+     "rssi": -106.32,
+     "dist": 33.667,
+     "n": 21,
+     "sd": 0.87
+    },
+    "foyer": {
+     "rssi": -94.01,
+     "dist": 13.484,
+     "n": 22,
+     "sd": 0.58
+    },
+    "basement": {
+     "rssi": -81.31,
+     "dist": 5.299,
+     "n": 18,
+     "sd": 1.95
+    },
+    "family": {
+     "rssi": -98.99,
+     "dist": 19.519,
+     "n": 21,
+     "sd": 0.68
+    },
+    "laundry": {
+     "rssi": -93.94,
+     "dist": 13.446,
+     "n": 21,
+     "sd": 1.11
+    },
+    "nook": {
+     "rssi": -92.02,
+     "dist": 11.644,
+     "n": 25,
+     "sd": 0.95
+    },
+    "upstairs_hallway": {
+     "rssi": -94.23,
+     "dist": 13.701,
+     "n": 21,
+     "sd": 0.37
+    }
+   }
+  },
+  {
+   "label": "p01_3000_1500",
+   "robotX": 3.007,
+   "robotY": 1.493,
+   "headingDeg": 198,
+   "driftMm": 1.4,
+   "m": {
+    "back_stairs": {
+     "rssi": -95.38,
+     "dist": 14.94,
+     "n": 21,
+     "sd": 0.86
+    },
+    "garage": {
+     "rssi": -93.22,
+     "dist": 20.012,
+     "n": 16,
+     "sd": 0.43
+    },
+    "master": {
+     "rssi": -91.89,
+     "dist": 11.511,
+     "n": 20,
+     "sd": 0.28
+    },
+    "upstairs_hallway": {
+     "rssi": -88.84,
+     "dist": 9.19,
+     "n": 22,
+     "sd": 0.71
+    },
+    "family": {
+     "rssi": -93.89,
+     "dist": 13.35,
+     "n": 18,
+     "sd": 0.29
+    },
+    "kitchen": {
+     "rssi": -82.13,
+     "dist": 6.247,
+     "n": 21,
+     "sd": 1.74
+    },
+    "nook": {
+     "rssi": -84.06,
+     "dist": 6.439,
+     "n": 18,
+     "sd": 0.57
+    },
+    "dining": {
+     "rssi": -97.12,
+     "dist": 16.975,
+     "n": 26,
+     "sd": 0.32
+    },
+    "laundry": {
+     "rssi": -79.05,
+     "dist": 4.437,
+     "n": 17,
+     "sd": 0.1
+    },
+    "foyer": {
+     "rssi": -88.17,
+     "dist": 8.774,
+     "n": 21,
+     "sd": 1.37
+    }
+   }
+  }
+ ],
+ "floorBounds": {
+  "first": [
+   [
+    0,
+    0,
+    0
+   ],
+   [
+    17,
+    18,
+    3
+   ]
+  ],
+  "second": [
+   [
+    0,
+    0,
+    3
+   ],
+   [
+    17,
+    18,
+    5.5
+   ]
+  ]
+ }
+}
