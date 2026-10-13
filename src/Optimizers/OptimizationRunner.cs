@@ -138,11 +138,19 @@ internal class OptimizationRunner : BackgroundService
     /// outright: with only a handful of points a proposal can fit the very samples it was derived from
     /// (RMSE ~ 0) and "beat" the baseline without having been validated by anything, which would push an
     /// unverified calibration to a real node over MQTT during cold start or on sparse installs.
+    ///
+    /// For the same reason, when the history holds snapshots besides the one the optimizers fitted,
+    /// proposals are scored only on those others: a proposal that merely memorised its own snapshot's
+    /// radio noise scores well on itself however wrong it is, and on a cold start (default settings as
+    /// the baseline) the gate would otherwise wave it straight through.
     /// </summary>
     internal async Task RunCycleAsync(OptimizationSnapshot os, List<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
     {
+        var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
+        if (evalSet.Count == 0) evalSet = oss;
+
         var baselineResults = new OptimizationResults();
-        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(oss, _nsd);
+        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(evalSet, _nsd);
         if (baselineSamples < optimization.MinSamples)
         {
             Log.Debug("Optimization skipped: baseline evaluated on {0} measurements, need at least {1} (min_samples)", baselineSamples, optimization.MinSamples);
@@ -169,7 +177,7 @@ internal class OptimizationRunner : BackgroundService
         foreach (var optimizer in optimizers)
         {
             var results = optimizer.Optimize(os, currentSettings);
-            var (corr, rmse, samples) = results.Evaluate(oss, _nsd);
+            var (corr, rmse, samples) = results.Evaluate(evalSet, _nsd);
             if (samples < optimization.MinSamples)
             {
                 Log.Debug("Optimizer {0,-24} rejected: evaluated on {1} measurements, need at least {2} (min_samples)",
