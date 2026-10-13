@@ -1,0 +1,35 @@
+{
+ "source": "camera.p10_pro_ultra_map (live map) image of 2026-10-13 09:40; calibration as reported for it",
+ "calibration_points": [
+  {
+   "vacuum": {
+    "x": 0,
+    "y": 0
+   },
+   "map": {
+    "x": 426,
+    "y": 697
+   }
+  },
+  {
+   "vacuum": {
+    "x": 1000,
+    "y": 0
+   },
+   "map": {
+    "x": 506,
+    "y": 697
+   }
+  },
+  {
+   "vacuum": {
+    "x": 0,
+    "y": 1000
+   },
+   "map": {
+    "x": 426,
+    "y": 617
+   }
+  }
+ ]
+}

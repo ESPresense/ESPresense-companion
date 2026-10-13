@@ -1,0 +1,14 @@
+{
+ "liveToSaved": {
+  "rotDeg": 44.5,
+  "tx": -0.1,
+  "ty": 0.1,
+  "overlap": 0.9957
+ },
+ "savedToFloor": {
+  "rotDeg": 180,
+  "tx": 10.55,
+  "ty": 9.5,
+  "iouSum": 3.8312
+ }
+}
