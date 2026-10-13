@@ -1,22 +1,29 @@
 """Turn the tour captures into a test fixture. Robot frame, no transform applied."""
 import json, re, os, sys, math, statistics, glob
 
-CAPDIR='/tmp/survey2'
+HERE=os.path.dirname(os.path.abspath(__file__))
+CAPDIR=os.environ.get('SURVEY_OUT') or os.path.join(HERE,'captures')
+FIXTURE=os.path.join(HERE,'../../tests/ESPresense.Companion.Tests/TestData/robot-survey-2026-10-13.json')
 CFG=os.path.expanduser('~/.espresense/config.yaml')
 
 def slug(name): return re.sub(r'[^a-z0-9]+','_',name.lower()).strip('_')
 
 # --- node coordinates straight out of the live config -------------------------
 nodes={}
-blk=re.search(r'^nodes:\s*$(.*?)(?=^\S|\Z)', open(CFG).read(), re.M|re.S).group(1)
-for m in re.finditer(r'-\s+name:\s*(.+?)\n(.*?)(?=\n\s*-\s+name:|\Z)', blk, re.S):
-    name=m.group(1).strip(); body=m.group(2)
-    pt=re.search(r'point:\s*\[([^\]]+)\]', body)
-    fl=re.search(r'floors:\s*\[([^\]]+)\]', body)
-    if not pt: continue
-    x,y,z=[float(v) for v in pt.group(1).split(',')]
-    floors=[f.strip().strip('"\'') for f in fl.group(1).split(',')] if fl else []
-    nodes[slug(name)]={'id':slug(name),'x':x,'y':y,'z':z,'floors':floors}
+if not os.path.exists(CFG) and os.path.exists(FIXTURE):
+    # No live config on this machine: reuse the coordinates the last build took from it.
+    print(f"  {CFG} missing; node coordinates from {os.path.basename(FIXTURE)}", file=sys.stderr)
+    nodes={n['id']:n for n in json.load(open(FIXTURE))['nodes']}
+else:
+  blk=re.search(r'^nodes:\s*$(.*?)(?=^\S|\Z)', open(CFG).read(), re.M|re.S).group(1)
+  for m in re.finditer(r'-\s+name:\s*(.+?)\n(.*?)(?=\n\s*-\s+name:|\Z)', blk, re.S):
+      name=m.group(1).strip(); body=m.group(2)
+      pt=re.search(r'point:\s*\[([^\]]+)\]', body)
+      fl=re.search(r'floors:\s*\[([^\]]+)\]', body)
+      if not pt: continue
+      x,y,z=[float(v) for v in pt.group(1).split(',')]
+      floors=[f.strip().strip('"\'') for f in fl.group(1).split(',')] if fl else []
+      nodes[slug(name)]={'id':slug(name),'x':x,'y':y,'z':z,'floors':floors}
 
 # 'basement' is a placed node that lives in the Companion's own store, not config.yaml.
 nodes['basement']={'id':'basement','x':15.8,'y':11.5,'z':-0.5,'floors':['first']}
@@ -49,7 +56,7 @@ tour=json.load(open(f'{CAPDIR}/tour.json'))
 points=[]
 for t in tour:
     if t['status']!='ok': continue
-    m=summarise(t['capture'])
+    m=summarise(os.path.join(CAPDIR, os.path.basename(t['capture'])))
     if len(m)<4: 
         print(f"  skip {t['label']}: only {len(m)} placed nodes heard", file=sys.stderr); continue
     pb=t['pos_before']
@@ -68,7 +75,7 @@ fixture={'frame':'Robot LiDAR frame, metres. NOT the floorplan frame: no transfo
          'nodes':[nodes[n] for n in used],
          'points':points,
          'floorBounds':{'first':[[0,0,0],[17,18,3]],'second':[[0,0,3],[17,18,5.5]]}}
-json.dump(fixture, open(f'{CAPDIR}/robot-survey-2026-10-13.json','w'), indent=1)
+json.dump(fixture, open(FIXTURE,'w'), indent=1)
 print(f"{len(points)} points, {len(used)} placed nodes")
 for p in points:
     print(f"  {p['label']:<22} ({p['robotX']:>7.3f},{p['robotY']:>7.3f}) hdg {p['headingDeg']:>3}  "

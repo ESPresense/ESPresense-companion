@@ -61,5 +61,47 @@
   "drift_mm": 4.0,
   "msgs": 1213,
   "capture": "/tmp/survey2/cap_p02_4500_500.txt"
+ },
+ {
+  "label": "p03_6250_2560",
+  "target": [
+   6250,
+   2560
+  ],
+  "status": "ok",
+  "pos_before": [
+   6368,
+   2595,
+   68
+  ],
+  "pos_after": [
+   6367,
+   2596,
+   174
+  ],
+  "drift_mm": 1.4142135623730951,
+  "msgs": 1015,
+  "capture": "cap_p03_6250_2560.txt"
+ },
+ {
+  "label": "p04_8000_3500",
+  "target": [
+   8000,
+   3500
+  ],
+  "status": "ok",
+  "pos_before": [
+   7996,
+   3499,
+   82
+  ],
+  "pos_after": [
+   7996,
+   3499,
+   82
+  ],
+  "drift_mm": 0.0,
+  "msgs": 776,
+  "capture": "cap_p04_8000_3500.txt"
  }
 ]

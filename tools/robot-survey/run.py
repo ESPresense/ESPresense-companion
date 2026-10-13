@@ -1,28 +1,28 @@
 import sys, time, json, subprocess, os, math
-sys.path.insert(0,'/tmp')
+HERE=os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0,HERE)
 import ha
 
-OUT='/tmp/survey2'
+OUT=os.environ.get('SURVEY_OUT') or os.path.join(HERE,'captures')
 ha.init()
 
 def pos():
-    r=ha.call("ha_get_state",{"entity_id":"camera.p10_pro_ultra_map","attribute_keys":["vacuum_position"],"fields":["attributes"]})
-    p=r['data']['attributes'].get('vacuum_position')
+    r=ha.call("get_state",{"entity_id":"camera.p10_pro_ultra_map","fields":["vacuum_position"]})
+    p=r['attributes'].get('vacuum_position')
     return (p['x'],p['y'],p['a']) if p else None
 
 def vac(keys):
-    r=ha.call("ha_get_state",{"entity_id":"vacuum.p10_pro_ultra","attribute_keys":keys,"fields":["attributes","state"]})
-    return r['data']
+    return ha.call("get_state",{"entity_id":"vacuum.p10_pro_ultra","fields":keys})
 
 def goto(x,y):
-    return ha.call("ha_call_service",{"domain":"dreame_vacuum","service":"vacuum_goto",
-        "entity_id":"vacuum.p10_pro_ultra","data":{"x":x,"y":y},"wait":False})
+    return ha.call("call_service",{"domain":"dreame_vacuum","service":"vacuum_goto",
+        "entity_id":"vacuum.p10_pro_ultra","data":{"x":x,"y":y}})
 
 def ensure_ready():
     for _ in range(3):
         d=vac(["status"])
         if d['state'] not in ('paused','returning','error'): return True
-        ha.call("ha_call_service",{"domain":"vacuum","service":"stop","entity_id":"vacuum.p10_pro_ultra","wait":False})
+        ha.call("call_service",{"domain":"vacuum","service":"stop","entity_id":"vacuum.p10_pro_ultra"})
         time.sleep(8)
     return False
 
@@ -35,11 +35,15 @@ WPS=[(1190,698),(3000,1500),(4500,500),(6250,2560),(8000,3500),(9500,2000),
      (-3000,1500),(-1000,0),(554,-497),(2500,-1500),(5000,-1000),(3000,-3000)]
 
 DWELL=90
-results=[]
+# Resume: keep what an earlier run already captured and skip those waypoints.
+try: results=json.load(open(f"{OUT}/tour.json"))
+except FileNotFoundError: results=[]
+done={r['label'] for r in results if r['status']=='ok'}
 start=time.time()
 
 for i,(tx,ty) in enumerate(WPS):
     label=f"p{i:02d}_{tx}_{ty}"
+    if label in done: continue
     ensure_ready()
     p0=pos()
     log(f"\n=== {label} target=({tx},{ty}) from {p0} t={time.time()-start:.0f}s")
@@ -86,7 +90,7 @@ for i,(tx,ty) in enumerate(WPS):
     n=sum(1 for _ in open(cap))
     log(f"  captured {n} msgs, drift during dwell {drift:.0f}mm, end {pb}")
     results.append({"label":label,"target":[tx,ty],"status":"ok","pos_before":pa,"pos_after":pb,
-                    "drift_mm":drift,"msgs":n,"capture":cap})
+                    "drift_mm":drift,"msgs":n,"capture":os.path.basename(cap)})
     json.dump(results,open(f"{OUT}/tour.json","w"),indent=1)
 
 json.dump(results,open(f"{OUT}/tour.json","w"),indent=1)
