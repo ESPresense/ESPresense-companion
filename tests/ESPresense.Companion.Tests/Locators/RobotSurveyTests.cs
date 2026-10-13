@@ -239,6 +239,104 @@ public class RobotSurveyTests
         Assert.Pass("diagnostic sweep - see output");
     }
 
+    /// <summary>
+    /// GaussNewton states its own objective: minimise the sum of squared distance residuals
+    /// sum((|x - p_i| - d_i)^2) over the nodes it selected. This test holds it to exactly that.
+    ///
+    /// It is handed precisely four nodes, so there is no ambiguity about which subset it used,
+    /// and its answer is scored against a brute-force search of the same objective over the same
+    /// floor bounds. A solver that genuinely minimises cannot lose to a grid.
+    ///
+    /// Note why unit tests on synthetic data miss this: when the distances are mutually consistent
+    /// the residual is zero at the solution, and a wrong Jacobian still has a fixed point there.
+    /// The defect only shows on inconsistent measurements -- which is all that real radio produces.
+    /// </summary>
+    [Test]
+    public void Optimality_GaussNewtonMustMinimiseItsOwnObjective()
+    {
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+        var lo = floor.Bounds![0];
+        var hi = floor.Bounds![1];
+
+        double Objective(Point3D x, List<(Point3D P, double D)> obs)
+            => obs.Sum(o => Math.Pow(x.DistanceTo(o.P) - o.D, 2));
+
+        // Coarse lattice over the floor, then a shrinking pattern search from the best cell.
+        Point3D BruteForce(List<(Point3D P, double D)> obs)
+        {
+            var best = new Point3D(lo.X, lo.Y, lo.Z);
+            var bestF = double.MaxValue;
+            for (var x = lo.X; x <= hi.X; x += 0.25)
+            for (var y = lo.Y; y <= hi.Y; y += 0.25)
+            for (var z = lo.Z; z <= hi.Z; z += 0.25)
+            {
+                var p = new Point3D(x, y, z);
+                var f = Objective(p, obs);
+                if (f < bestF) { bestF = f; best = p; }
+            }
+            for (var step = 0.125; step > 1e-4; step /= 2)
+            {
+                var improved = true;
+                while (improved)
+                {
+                    improved = false;
+                    foreach (var d in new[]
+                             {
+                                 new Vector3D(step, 0, 0), new Vector3D(-step, 0, 0),
+                                 new Vector3D(0, step, 0), new Vector3D(0, -step, 0),
+                                 new Vector3D(0, 0, step), new Vector3D(0, 0, -step)
+                             })
+                    {
+                        var c = best + d;
+                        if (c.X < lo.X || c.X > hi.X || c.Y < lo.Y || c.Y > hi.Y || c.Z < lo.Z || c.Z > hi.Z) continue;
+                        var f = Objective(c, obs);
+                        if (f < bestF - 1e-12) { bestF = f; best = c; improved = true; }
+                    }
+                }
+            }
+            return best;
+        }
+
+        TestContext.WriteLine($"Floor bounds {lo} .. {hi}, 4 nearest nodes per point\n");
+        TestContext.WriteLine($"{"point",-22}{"solver f",11}{"best f",11}{"excess",10}{"gap (m)",10}");
+
+        var excesses = new List<double>();
+        var worse = 0;
+        foreach (var pt in _survey.Points)
+        {
+            var obs = pt.M
+                .Where(kv => nodes.ContainsKey(kv.Key))
+                .OrderBy(kv => kv.Value.Dist)
+                .Take(4)
+                .Select(kv => (P: nodes[kv.Key].Location, D: kv.Value.Dist))
+                .ToList();
+            if (obs.Count < 4) continue;
+
+            var dists = obs.Select((o, i) => (Id: pt.M.Where(kv => nodes.ContainsKey(kv.Key)).OrderBy(kv => kv.Value.Dist).ElementAt(i).Key, o.D))
+                           .ToDictionary(t => t.Id, t => t.D);
+            var solved = Solve("gaussnewton", dists, floor, nodes);
+            if (solved == null) continue;
+
+            var fSolver = Objective(solved.Value, obs);
+            var best = BruteForce(obs);
+            var fBest = Objective(best, obs);
+            var excess = fSolver - fBest;
+            excesses.Add(excess);
+            if (excess > 0.25) worse++;
+
+            TestContext.WriteLine($"{pt.Label,-22}{fSolver,11:0.000}{fBest,11:0.000}{excess,10:0.000}{solved.Value.DistanceTo(best),10:0.00}");
+        }
+
+        Assert.That(excesses, Is.Not.Empty, "no point produced a GaussNewton fix");
+        var median = excesses.OrderBy(x => x).ElementAt(excesses.Count / 2);
+        TestContext.WriteLine($"\n{worse} of {excesses.Count} points beaten by brute force; median excess {median:0.000}");
+
+        Assert.That(worse, Is.LessThanOrEqualTo(excesses.Count / 5),
+            $"GaussNewton lost to a quarter-metre grid on {worse} of {excesses.Count} points: " +
+            "it is not minimising the objective it reports.");
+    }
+
     private sealed class Survey
     {
         public List<SurveyNode> Nodes { get; set; } = new();
