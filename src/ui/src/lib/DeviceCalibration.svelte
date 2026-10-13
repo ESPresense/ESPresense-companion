@@ -412,8 +412,10 @@
 	let device = $derived($devices?.find((d: any) => d.id === deviceSettings.id));
 	// Initialize from device data when available
 	$effect.pre(() => {
-		if ($devices && deviceSettings?.id && !calibrationSpot) {
-			const device = $devices?.find((d: any) => d.id === deviceSettings.id);
+		// `$devices` starts as [] and fills in asynchronously; wait for it so a located device opens at its
+		// real position rather than the fallback below (which would then block the real one).
+		if ($devices?.length && deviceSettings?.id && !calibrationSpot) {
+			const device = $devices.find((d: any) => d.id === deviceSettings.id);
 			if (device) {
 				if (device.floor !== null) {
 					selectedFloorId = device.floor.id;
