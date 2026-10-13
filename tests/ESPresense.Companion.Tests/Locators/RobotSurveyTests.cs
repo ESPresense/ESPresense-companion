@@ -11,11 +11,14 @@ namespace ESPresense.Companion.Tests.Locators;
 /// Integration tests over a real survey captured by driving an ESPresense node around on a
 /// LiDAR robot vacuum (see TestData/robot-survey-2026-10-12.json).
 ///
-/// The robot reports its own position to a few millimetres, but in ITS OWN frame — we do not
-/// have a trustworthy rigid transform into the floorplan frame. So every assertion here is
-/// deliberately *frame-free*: it uses only quantities invariant to rotation and translation.
-/// That is a feature, not a limitation — it isolates solver behaviour from calibration error,
-/// from node-position error, and from the unknown transform.
+/// The robot reports its own position to a few millimetres, in ITS OWN frame. Most assertions
+/// here are deliberately *frame-free*: they use only quantities invariant to rotation and
+/// translation, which isolates solver behaviour from calibration error, node-position error and
+/// any transform error.
+///
+/// The spatial survey also carries floorX/floorY: each robot position mapped into the floorplan by
+/// a geometry-only fit of the robot's map to the room polygons (tools/robot-survey/frames.json).
+/// The Accuracy_ tests use it. They inherit any error in that fit, but never from RSSI.
 /// </summary>
 [TestFixture]
 public class RobotSurveyTests
@@ -24,8 +27,19 @@ public class RobotSurveyTests
     private ConfigLoader _configLoader = null!;
     private string _configDir = null!;
     private Survey _survey = null!;
+    private NodeTelemetryStore _nts = null!;
 
-    private static readonly string[] Locators = { "nelder", "mle", "gaussnewton" };
+    private static readonly string[] Locators = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor", "nadaraya", "nearest" };
+
+    /// <summary>Locators that actually solve for a position from ranges, as opposed to picking or blending node positions.</summary>
+    private static readonly string[] Solvers = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor" };
+
+    /// <summary>
+    /// First-floor nodes the survey caught breaking the triangle inequality worst (RangeConsistency):
+    /// they hear the robot through floors and walls. upstairs_hallway, bathroom and master were as bad
+    /// but are second-floor nodes, which the solvers here never see.
+    /// </summary>
+    private static readonly string[] ThroughStructureNodes = { "back_stairs", "garage", "basement" };
 
     /// <summary>18 headings at one spot: good for orientation sensitivity, poor spatial spread.</summary>
     private const string Headings = "robot-survey-2026-10-12.json";
@@ -47,7 +61,8 @@ public class RobotSurveyTests
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
         _configLoader = new ConfigLoader(_configDir);
-        _state = new State(_configLoader, new NodeTelemetryStore(mqtt.Object));
+        _nts = new NodeTelemetryStore(mqtt.Object);
+        _state = new State(_configLoader, _nts);
 
         _survey = Load(Headings);
     }
@@ -87,11 +102,16 @@ public class RobotSurveyTests
         return map;
     }
 
-    private static ILocate Make(string which, Device d, Floor f, State s) => which switch
+    private ILocate Make(string which, Device d, Floor f, State s) => which switch
     {
         "nelder" => new NelderMeadMultilateralizer(d, f, s),
         "mle" => new MLEMultilateralizer(d, f, s),
-        _ => new GaussNewtonMultilateralizer(d, f, s)
+        "gaussnewton" => new GaussNewtonMultilateralizer(d, f, s),
+        "bfgs" => new BfgsMultilateralizer(d, f, s),
+        "multifloor" => new MultiFloorMultilateralizer(d, s),
+        "nadaraya" => new NadarayaWatsonMultilateralizer(d, f, s, _nts),
+        "nearest" => new NearestNode(d, s),
+        _ => throw new ArgumentOutOfRangeException(nameof(which), which, null)
     };
 
     /// <summary>Runs one locator against one set of per-node distances; null if it produced no fix.</summary>
@@ -441,9 +461,155 @@ public class RobotSurveyTests
         Assert.Pass("diagnostic - see output");
     }
 
+    private static double Pct(List<double> sorted, double q) => sorted[(int)Math.Round(q * (sorted.Count - 1))];
+
+    private string? RoomAt(double x, double y)
+    {
+        foreach (var r in _survey.Rooms.Where(r => r.Floor == "first"))
+        {
+            var inside = false;
+            for (int i = 0, j = r.Points.Count - 1; i < r.Points.Count; j = i++)
+            {
+                double xi = r.Points[i][0], yi = r.Points[i][1], xj = r.Points[j][0], yj = r.Points[j][1];
+                if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+            }
+            if (inside) return r.Id;
+        }
+        return null;
+    }
+
+    private sealed record AccuracyResult(int Fixes, int Points, double Median, double P90, double Max, int RoomHits, int RoomTotal);
+
+    /// <summary>Absolute floorplan error for one locator over every survey point that has floor coordinates.</summary>
+    private AccuracyResult Accuracy(string which, Floor floor, Dictionary<string, Node> nodes, ICollection<string>? exclude = null)
+    {
+        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
+        var errs = new List<double>();
+        int hits = 0, total = 0;
+        foreach (var p in pts)
+        {
+            var dists = p.M.Where(kv => exclude == null || !exclude.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Dist);
+            if (Solve(which, dists, floor, nodes) is not { } fix) continue;
+            errs.Add(Math.Sqrt(Math.Pow(fix.X - p.FloorX!.Value, 2) + Math.Pow(fix.Y - p.FloorY!.Value, 2)));
+            if (p.FloorRoom == null) continue;
+            total++;
+            if (RoomAt(fix.X, fix.Y) == p.FloorRoom) hits++;
+        }
+        errs.Sort();
+        return errs.Count == 0
+            ? new AccuracyResult(0, pts.Count, double.NaN, double.NaN, double.NaN, 0, total)
+            : new AccuracyResult(errs.Count, pts.Count, Pct(errs, 0.5), Pct(errs, 0.9), errs[^1], hits, total);
+    }
+
+    /// <summary>
+    /// Absolute accuracy in the floorplan frame, per locator: horizontal error against the robot's
+    /// LiDAR position, and how often the fix lands in the room the robot was actually in.
+    ///
+    /// Ground truth comes from frames.json, fitted to the robot map's geometry and never to RSSI.
+    /// Its own error (decimetres) is well under the metre-scale errors measured here.
+    ///
+    /// The bounds are regression baselines, set a margin above what the locators achieved on this
+    /// survey: they catch a change that makes a locator worse, they are not an accuracy target.
+    /// </summary>
+    [Test]
+    public void Accuracy_FloorFrame_PerLocator()
+    {
+        _survey = Load(Spread);
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+        Assert.That(_survey.Points.Count(p => p.FloorX.HasValue), Is.GreaterThanOrEqualTo(10), "fixture lacks floor coordinates; rebuild it with tools/robot-survey/build_fixture.py");
+
+        TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}");
+        var results = new Dictionary<string, AccuracyResult>();
+        foreach (var which in Locators)
+        {
+            var r = results[which] = Accuracy(which, floor, nodes);
+            TestContext.WriteLine($"{which,-13}{$"{r.Fixes}/{r.Points}",8}{r.Median,10:0.00}{r.P90,8:0.00}{r.Max,8:0.00}{$"{r.RoomHits}/{r.RoomTotal}",11}");
+        }
+
+        // Every solver currently loses to just reporting the nearest node; that is the finding,
+        // printed rather than asserted so the baselines below stay green until a fix lands.
+        var nearest = results["nearest"].Median;
+        var beaten = Solvers.Where(w => results[w].Median < nearest).ToList();
+        TestContext.WriteLine($"\nSolvers beating the nearest-node baseline ({nearest:0.00} m): {(beaten.Count == 0 ? "none" : string.Join(", ", beaten))}");
+
+        Assert.Multiple(() =>
+        {
+            foreach (var (which, b) in Baselines)
+            {
+                var r = results[which];
+                Assert.That(r.Fixes, Is.GreaterThanOrEqualTo(b.MinFixes), $"{which} produced fewer fixes than its baseline");
+                Assert.That(r.Median, Is.LessThanOrEqualTo(b.MedianM + BaselineMarginM),
+                    $"{which} median floorplan error regressed: {r.Median:0.00} m vs baseline {b.MedianM:0.00} m");
+            }
+        });
+    }
+
+    /// <summary>Regression margin over the recorded median error. Well above the ~0.2 m the frame transform contributes.</summary>
+    private const double BaselineMarginM = 1.0;
+
+    /// <summary>
+    /// Recorded on robot-survey-2026-10-13.json (23 positions) when these tests were written. Lower a
+    /// locator's numbers when it improves, so the gain is locked in.
+    /// </summary>
+    private static readonly Dictionary<string, (int MinFixes, double MedianM)> Baselines = new()
+    {
+        ["nelder"] = (23, 6.28),
+        ["mle"] = (23, 5.38),
+        ["gaussnewton"] = (23, 6.18),
+        ["bfgs"] = (23, 6.49),
+        ["multifloor"] = (22, 9.63),
+        ["nadaraya"] = (23, 4.50),
+        ["nearest"] = (23, 4.82),
+    };
+
+    /// <summary>
+    /// Does dropping the nodes that RangeConsistency caught hearing through floors and walls fix the
+    /// solvers? Runs each solver on the spatial survey with every node, then without those, and
+    /// compares absolute error and the rigidity slope (solved vs true separation; 1.0 is perfect).
+    /// </summary>
+    [Test]
+    public void NodeExclusion_ThroughStructureNodesDragSolversToTheMiddle()
+    {
+        _survey = Load(Spread);
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+
+        double Slope(string which, ICollection<string>? exclude)
+        {
+            var fixes = _survey.Points
+                .Select(p => (P: p, Fix: Solve(which, p.M.Where(kv => exclude == null || !exclude.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Dist), floor, nodes)))
+                .Where(t => t.Fix != null).ToList();
+            var truths = new List<double>(); var gots = new List<double>();
+            for (int i = 0; i < fixes.Count; i++)
+                for (int j = i + 1; j < fixes.Count; j++)
+                {
+                    truths.Add(Math.Sqrt(Math.Pow(fixes[i].P.RobotX - fixes[j].P.RobotX, 2) + Math.Pow(fixes[i].P.RobotY - fixes[j].P.RobotY, 2)));
+                    gots.Add(Math.Sqrt(Math.Pow(fixes[i].Fix!.Value.X - fixes[j].Fix!.Value.X, 2) + Math.Pow(fixes[i].Fix!.Value.Y - fixes[j].Fix!.Value.Y, 2)));
+                }
+            if (truths.Count < 6) return double.NaN;
+            var mx = truths.Average(); var my = gots.Average();
+            var sxx = truths.Sum(t => (t - mx) * (t - mx));
+            return truths.Zip(gots, (t, g) => (t - mx) * (g - my)).Sum() / sxx;
+        }
+
+        TestContext.WriteLine($"excluding: {string.Join(", ", ThroughStructureNodes)}\n");
+        TestContext.WriteLine($"{"locator",-13}{"median all",12}{"median excl",13}{"slope all",11}{"slope excl",12}{"rooms all",11}{"rooms excl",12}");
+        foreach (var which in Solvers)
+        {
+            var all = Accuracy(which, floor, nodes);
+            var excl = Accuracy(which, floor, nodes, ThroughStructureNodes);
+            TestContext.WriteLine($"{which,-13}{all.Median,12:0.00}{excl.Median,13:0.00}{Slope(which, null),11:0.00}{Slope(which, ThroughStructureNodes),12:0.00}" +
+                                  $"{$"{all.RoomHits}/{all.RoomTotal}",11}{$"{excl.RoomHits}/{excl.RoomTotal}",12}");
+        }
+
+        Assert.Pass("diagnostic - see output");
+    }
+
     private sealed class Survey
     {
         public List<SurveyNode> Nodes { get; set; } = new();
+        public List<SurveyRoom> Rooms { get; set; } = new();
         public List<SurveyPoint> Points { get; set; } = new();
         public Dictionary<string, double[][]> FloorBounds { get; set; } = new();
     }
@@ -457,12 +623,22 @@ public class RobotSurveyTests
         public List<string> Floors { get; set; } = new();
     }
 
+    private sealed class SurveyRoom
+    {
+        public string Id { get; set; } = "";
+        public string Floor { get; set; } = "";
+        public List<double[]> Points { get; set; } = new();
+    }
+
     private sealed class SurveyPoint
     {
         public string Label { get; set; } = "";
         public double RobotX { get; set; }
         public double RobotY { get; set; }
         public double HeadingDeg { get; set; }
+        public double? FloorX { get; set; }
+        public double? FloorY { get; set; }
+        public string? FloorRoom { get; set; }
         public Dictionary<string, Meas> M { get; set; } = new();
     }
 

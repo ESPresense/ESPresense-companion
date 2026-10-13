@@ -4,16 +4,21 @@ Drives a Dreame P10 Pro Ultra with an ESPresense `calibrate` node strapped to it
 list of waypoints, and records every node's view of it. The robot's LiDAR gives ground truth to
 a few millimetres, which is what makes the resulting fixtures worth asserting against.
 
-## Why the fixtures are frame-free
+## Frames
 
-The robot reports position in **its own frame**. No rigid transform into the floorplan frame has
-been established, and it must NOT be fitted from RSSI -- that would launder the very errors we
-are trying to measure into the ground truth. So every assertion in `RobotSurveyTests` uses only
-rotation- and translation-invariant quantities.
+The robot reports position in **its own live frame**. Most assertions in `RobotSurveyTests` use only
+rotation- and translation-invariant quantities, so they cannot be skewed by a transform error.
 
-To unlock absolute-accuracy tests, the transform has to come from geometry: park the robot
-directly beneath two known nodes and have Darrell confirm. Two correspondences = 4 constraints
-for 3 degrees of freedom.
+The `Accuracy_` tests need floorplan coordinates. `frames.json` (fitted by `fit_frame.py`, helpers in
+`frames.py`) maps live -> saved map -> floorplan using geometry alone: the robot's map against the
+Companion room polygons, about 0.2 m 1-sigma. It must NOT be fitted from RSSI -- that would launder
+the very errors we are trying to measure into the ground truth. As a check that is not a fit, the
+strongest node at each point is usually one of the nearest under this transform, and measured vs true
+node distance correlates at 0.62; every rotated or mirrored alternative does worse.
+
+`build_fixture.py` writes `floorX`/`floorY`/`floorRoom` per point from it. Node positions and room
+polygons come from the Companion config (`ESPRESENSE_CONFIG`, e.g. the copy `fit_frame.py` caches
+from Home Assistant); only those are copied into the fixture.
 
 ## Running a survey
 

@@ -1,32 +1,55 @@
-"""Turn the tour captures into a test fixture. Robot frame, no transform applied."""
-import json, re, os, sys, math, statistics, glob
+"""Turn the tour captures into a test fixture.
+
+Positions are kept in the robot's live LiDAR frame (robotX/robotY). When frames.json exists, each
+point also gets floorX/floorY/floorRoom from the geometry-only transform fitted by fit_frame.py --
+never from RSSI, or the locator errors we measure would leak into the ground truth.
+
+Node positions and room polygons come from the Companion config. Set ESPRESENSE_CONFIG to point at
+it (fit_frame.py caches a copy fetched from Home Assistant); only those two things are copied into
+the fixture, nothing else from the config.
+"""
+import json, re, os, sys, statistics
 
 HERE=os.path.dirname(os.path.abspath(__file__))
 CAPDIR=os.environ.get('SURVEY_OUT') or os.path.join(HERE,'captures')
 FIXTURE=os.path.join(HERE,'../../tests/ESPresense.Companion.Tests/TestData/robot-survey-2026-10-13.json')
-CFG=os.path.expanduser('~/.espresense/config.yaml')
+CFG=os.environ.get('ESPRESENSE_CONFIG') or os.path.expanduser('~/.espresense/config.yaml')
 
 def slug(name): return re.sub(r'[^a-z0-9]+','_',name.lower()).strip('_')
 
-# --- node coordinates straight out of the live config -------------------------
-nodes={}
-if not os.path.exists(CFG) and os.path.exists(FIXTURE):
-    # No live config on this machine: reuse the coordinates the last build took from it.
-    print(f"  {CFG} missing; node coordinates from {os.path.basename(FIXTURE)}", file=sys.stderr)
-    nodes={n['id']:n for n in json.load(open(FIXTURE))['nodes']}
+# --- nodes and rooms from the Companion config ---------------------------------
+nodes={}; rooms=[]; bounds={'first':[[0,0,0],[17,18,3]],'second':[[0,0,3],[17,18,5.5]]}
+if os.path.exists(CFG):
+    import yaml
+    cfg=yaml.safe_load(open(CFG))
+    for n in cfg.get('nodes') or []:
+        if not n.get('point'): continue
+        x,y,z=[float(v) for v in n['point']]
+        nodes[slug(n['name'])]={'id':slug(n['name']),'x':x,'y':y,'z':z,'floors':list(n.get('floors') or [])}
+    for fl in cfg.get('floors') or []:
+        if fl.get('bounds'): bounds[fl['id']]=fl['bounds']
+        for r in fl.get('rooms') or []:
+            rooms.append({'id':slug(r['name']),'floor':fl['id'],'points':r['points']})
+elif os.path.exists(FIXTURE):
+    print(f"  {CFG} missing; nodes and rooms from {os.path.basename(FIXTURE)}", file=sys.stderr)
+    old=json.load(open(FIXTURE))
+    nodes={n['id']:n for n in old['nodes']}; rooms=old.get('rooms',[]); bounds=old.get('floorBounds',bounds)
 else:
-  blk=re.search(r'^nodes:\s*$(.*?)(?=^\S|\Z)', open(CFG).read(), re.M|re.S).group(1)
-  for m in re.finditer(r'-\s+name:\s*(.+?)\n(.*?)(?=\n\s*-\s+name:|\Z)', blk, re.S):
-      name=m.group(1).strip(); body=m.group(2)
-      pt=re.search(r'point:\s*\[([^\]]+)\]', body)
-      fl=re.search(r'floors:\s*\[([^\]]+)\]', body)
-      if not pt: continue
-      x,y,z=[float(v) for v in pt.group(1).split(',')]
-      floors=[f.strip().strip('"\'') for f in fl.group(1).split(',')] if fl else []
-      nodes[slug(name)]={'id':slug(name),'x':x,'y':y,'z':z,'floors':floors}
+    sys.exit(f"no config at {CFG}; set ESPRESENSE_CONFIG")
 
-# 'basement' is a placed node that lives in the Companion's own store, not config.yaml.
-nodes['basement']={'id':'basement','x':15.8,'y':11.5,'z':-0.5,'floors':['first']}
+# --- robot frame -> floorplan ---------------------------------------------------
+to_floor=None
+if os.path.exists(os.path.join(HERE,'frames.json')):
+    sys.path.insert(0,HERE)
+    import frames
+    to_floor=frames.load()['live_to_floor']
+
+def inside(x,y,poly):
+    c=False
+    for (x1,y1),(x2,y2) in zip(poly,poly[1:]+poly[:1]):
+        if (y1>y)!=(y2>y) and x<(x2-x1)*(y-y1)/(y2-y1)+x1: c=not c
+    return c
+room_at=lambda x,y:next((r['id'] for r in rooms if r['floor']=='first' and inside(x,y,r['points'])),None)
 
 TOPIC=re.compile(r'espresense/devices/node:calibrate/(\S+)')
 
@@ -57,26 +80,33 @@ points=[]
 for t in tour:
     if t['status']!='ok': continue
     m=summarise(os.path.join(CAPDIR, os.path.basename(t['capture'])))
-    if len(m)<4: 
+    if len(m)<4:
         print(f"  skip {t['label']}: only {len(m)} placed nodes heard", file=sys.stderr); continue
     pb=t['pos_before']
-    points.append({'label':t['label'],
-                   'robotX':round(pb[0]/1000,4),'robotY':round(pb[1]/1000,4),
-                   'headingDeg':pb[2],'driftMm':round(t['drift_mm'],1),'m':m})
+    p={'label':t['label'],
+       'robotX':round(pb[0]/1000,4),'robotY':round(pb[1]/1000,4),
+       'headingDeg':pb[2],'driftMm':round(t['drift_mm'],1),'m':m}
+    if to_floor:
+        fx,fy=to_floor(pb[0]/1000,pb[1]/1000)
+        p.update(floorX=round(fx,3),floorY=round(fy,3),floorRoom=room_at(fx,fy))
+    points.append(p)
 
 used=sorted({n for p in points for n in p['m']})
-fixture={'frame':'Robot LiDAR frame, metres. NOT the floorplan frame: no transform has been '
-                 'established. Node x/y/z ARE floorplan metres. Only frame-free assertions are valid.',
+fixture={'frame':'robotX/robotY: robot live LiDAR frame, metres. floorX/floorY: the same point in the '
+                 'floorplan frame via tools/robot-survey/frames.json, a geometry-only fit of the robot map '
+                 'to the room polygons (never RSSI). Node x/y/z are floorplan metres.',
          'headings':'One heading per position. This survey trades heading coverage for spatial '
                     'coverage; robot-survey-2026-10-12.json is the reverse (4 positions, 18 headings '
                     'at one of them). Heading alone moves inferred distance by up to 2.9x, so do not '
                     'read a single-heading point as the typical reading for that spot.',
          'captured':'2026-10-13',
          'nodes':[nodes[n] for n in used],
+         'rooms':rooms,
          'points':points,
-         'floorBounds':{'first':[[0,0,0],[17,18,3]],'second':[[0,0,3],[17,18,5.5]]}}
+         'floorBounds':bounds}
 json.dump(fixture, open(FIXTURE,'w'), indent=1)
-print(f"{len(points)} points, {len(used)} placed nodes")
+print(f"{len(points)} points, {len(used)} placed nodes, {len(rooms)} rooms, floor coords {'yes' if to_floor else 'no'}")
 for p in points:
+    fl=f"  floor ({p['floorX']:>6.2f},{p['floorY']:>6.2f}) {p['floorRoom'] or '-'}" if to_floor else ''
     print(f"  {p['label']:<22} ({p['robotX']:>7.3f},{p['robotY']:>7.3f}) hdg {p['headingDeg']:>3}  "
-          f"{len(p['m']):>2} nodes  drift {p['driftMm']:>5.1f}mm")
+          f"{len(p['m']):>2} nodes  drift {p['driftMm']:>5.1f}mm{fl}")

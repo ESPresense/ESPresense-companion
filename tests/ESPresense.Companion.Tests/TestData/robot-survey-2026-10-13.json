@@ -1,5 +1,5 @@
 {
- "frame": "Robot LiDAR frame, metres. NOT the floorplan frame: no transform has been established. Node x/y/z ARE floorplan metres. Only frame-free assertions are valid.",
+ "frame": "robotX/robotY: robot live LiDAR frame, metres. floorX/floorY: the same point in the floorplan frame via tools/robot-survey/frames.json, a geometry-only fit of the robot map to the room polygons (never RSSI). Node x/y/z are floorplan metres.",
  "headings": "One heading per position. This survey trades heading coverage for spatial coverage; robot-survey-2026-10-12.json is the reverse (4 positions, 18 headings at one of them). Heading alone moves inferred distance by up to 2.9x, so do not read a single-heading point as the typical reading for that spot.",
  "captured": "2026-10-13",
  "nodes": [
@@ -82,7 +82,7 @@
    "id": "laundry",
    "x": 4.3,
    "y": 7.6,
-   "z": 2.0,
+   "z": 1.0,
    "floors": [
     "first"
    ]
@@ -112,6 +112,426 @@
    "z": 3.4,
    "floors": [
     "second"
+   ]
+  }
+ ],
+ "rooms": [
+  {
+   "id": "powder",
+   "floor": "first",
+   "points": [
+    [
+     6.3,
+     10.2
+    ],
+    [
+     8.4,
+     10.2
+    ],
+    [
+     8.4,
+     9
+    ],
+    [
+     7.1,
+     7.6
+    ],
+    [
+     6.3,
+     7.6
+    ],
+    [
+     6.3,
+     10.2
+    ]
+   ]
+  },
+  {
+   "id": "den",
+   "floor": "first",
+   "points": [
+    [
+     6.3,
+     14
+    ],
+    [
+     9.9,
+     14
+    ],
+    [
+     9.9,
+     12.7
+    ],
+    [
+     9.8,
+     12.7
+    ],
+    [
+     9.8,
+     11.5
+    ],
+    [
+     8.4,
+     10.2
+    ],
+    [
+     6.3,
+     10.2
+    ]
+   ]
+  },
+  {
+   "id": "family",
+   "floor": "first",
+   "points": [
+    [
+     0.0,
+     0.7
+    ],
+    [
+     0.0,
+     5.4
+    ],
+    [
+     5.0,
+     5.4
+    ],
+    [
+     6,
+     4.5
+    ],
+    [
+     6,
+     0.75
+    ],
+    [
+     5.25,
+     0.0
+    ],
+    [
+     0.7,
+     0.0
+    ],
+    [
+     0.0,
+     0.7
+    ]
+   ]
+  },
+  {
+   "id": "kitchen",
+   "floor": "first",
+   "points": [
+    [
+     6,
+     0.8
+    ],
+    [
+     6,
+     4.5
+    ],
+    [
+     7.3,
+     6.3
+    ],
+    [
+     8.4,
+     7.4
+    ],
+    [
+     12.4,
+     7.4
+    ],
+    [
+     12.4,
+     1.75
+    ],
+    [
+     8.9,
+     1.75
+    ],
+    [
+     8.9,
+     0.5
+    ],
+    [
+     6.3,
+     0.5
+    ],
+    [
+     6.0,
+     0.7
+    ]
+   ]
+  },
+  {
+   "id": "garage",
+   "floor": "first",
+   "points": [
+    [
+     0,
+     17.375
+    ],
+    [
+     2.3,
+     17.375
+    ],
+    [
+     2.3,
+     17.7
+    ],
+    [
+     6.3,
+     17.7
+    ],
+    [
+     6.3,
+     7.6
+    ],
+    [
+     0,
+     7.6
+    ],
+    [
+     0,
+     17.375
+    ]
+   ]
+  },
+  {
+   "id": "living",
+   "floor": "first",
+   "points": [
+    [
+     16.45,
+     11.8
+    ],
+    [
+     16.45,
+     7.1
+    ],
+    [
+     12.4,
+     7.1
+    ],
+    [
+     12.4,
+     11.8
+    ],
+    [
+     16.45,
+     11.8
+    ]
+   ]
+  },
+  {
+   "id": "dining",
+   "floor": "first",
+   "points": [
+    [
+     16.45,
+     2.75
+    ],
+    [
+     16.45,
+     7.1
+    ],
+    [
+     12.4,
+     7.1
+    ],
+    [
+     12.4,
+     2.4
+    ],
+    [
+     16.45,
+     2.4
+    ]
+   ]
+  },
+  {
+   "id": "foyer",
+   "floor": "first",
+   "points": [
+    [
+     9.8,
+     12.7
+    ],
+    [
+     12.4,
+     12.7
+    ],
+    [
+     12.4,
+     8.5
+    ],
+    [
+     10.9,
+     7.4
+    ],
+    [
+     8.4,
+     7.4
+    ],
+    [
+     8.4,
+     8.6
+    ],
+    [
+     8.4,
+     10.2
+    ],
+    [
+     9.8,
+     11.5
+    ],
+    [
+     9.8,
+     12.5
+    ]
+   ]
+  },
+  {
+   "id": "laundry",
+   "floor": "first",
+   "points": [
+    [
+     0,
+     5.4
+    ],
+    [
+     0,
+     7.6
+    ],
+    [
+     3.5,
+     7.6
+    ],
+    [
+     3.5,
+     5.4
+    ],
+    [
+     0,
+     5.4
+    ]
+   ]
+  },
+  {
+   "id": "master",
+   "floor": "second",
+   "points": [
+    [
+     3.2,
+     7.6
+    ],
+    [
+     3.2,
+     12.3
+    ],
+    [
+     6.3,
+     12.3
+    ],
+    [
+     6.3,
+     10.2
+    ],
+    [
+     8.4,
+     10.2
+    ],
+    [
+     8.4,
+     9
+    ],
+    [
+     6.9,
+     7.6
+    ],
+    [
+     3.7,
+     7.6
+    ]
+   ]
+  },
+  {
+   "id": "office",
+   "floor": "second",
+   "points": [
+    [
+     6.3,
+     14
+    ],
+    [
+     9.9,
+     14
+    ],
+    [
+     9.9,
+     12.7
+    ],
+    [
+     9.8,
+     12.7
+    ],
+    [
+     9.8,
+     11.5
+    ],
+    [
+     8.4,
+     10.2
+    ],
+    [
+     6.3,
+     10.2
+    ]
+   ]
+  },
+  {
+   "id": "master_bathroom",
+   "floor": "second",
+   "points": [
+    [
+     0,
+     7.6
+    ],
+    [
+     0,
+     12.3
+    ],
+    [
+     3.2,
+     12.3
+    ],
+    [
+     3.2,
+     7.6
+    ]
+   ]
+  },
+  {
+   "id": "master_closet",
+   "floor": "second",
+   "points": [
+    [
+     1.3,
+     12.3
+    ],
+    [
+     5,
+     12.3
+    ],
+    [
+     5,
+     17.1
+    ],
+    [
+     1.3,
+     17.1
+    ]
    ]
   }
  ],
@@ -177,7 +597,10 @@
      "n": 21,
      "sd": 0.37
     }
-   }
+   },
+   "floorX": 13.441,
+   "floorY": 6.526,
+   "floorRoom": "dining"
   },
   {
    "label": "p01_3000_1500",
@@ -246,7 +669,10 @@
      "n": 21,
      "sd": 1.37
     }
-   }
+   },
+   "floorX": 9.552,
+   "floorY": 6.227,
+   "floorRoom": "kitchen"
   },
   {
    "label": "p02_4500_500",
@@ -321,7 +747,10 @@
      "n": 20,
      "sd": 0.46
     }
-   }
+   },
+   "floorX": 7.635,
+   "floorY": 5.811,
+   "floorRoom": "kitchen"
   },
   {
    "label": "p03_6250_2560",
@@ -402,7 +831,10 @@
      "n": 19,
      "sd": 0.53
     }
-   }
+   },
+   "floorX": 7.927,
+   "floorY": 3.086,
+   "floorRoom": "kitchen"
   },
   {
    "label": "p04_8000_3500",
@@ -471,7 +903,10 @@
      "n": 4,
      "sd": 0.85
     }
-   }
+   },
+   "floorX": 7.399,
+   "floorY": 1.3,
+   "floorRoom": "kitchen"
   },
   {
    "label": "p10_0_4000",
@@ -552,7 +987,10 @@
      "n": 17,
      "sd": 0.14
     }
-   }
+   },
+   "floorX": 13.463,
+   "floorY": 6.517,
+   "floorRoom": "dining"
   },
   {
    "label": "p12_-3000_1500",
@@ -627,7 +1065,10 @@
      "n": 21,
      "sd": 0.5
     }
-   }
+   },
+   "floorX": 13.841,
+   "floorY": 10.445,
+   "floorRoom": "living"
   },
   {
    "label": "p14_554_-497",
@@ -708,7 +1149,10 @@
      "n": 4,
      "sd": 2.83
     }
-   }
+   },
+   "floorX": 9.915,
+   "floorY": 9.372,
+   "floorRoom": "foyer"
   },
   {
    "label": "p16_5000_-1000",
@@ -789,7 +1233,10 @@
      "n": 4,
      "sd": 2.38
     }
-   }
+   },
+   "floorX": 6.386,
+   "floorY": 6.604,
+   "floorRoom": null
   },
   {
    "label": "p19_-2200_-1762",
@@ -864,7 +1311,10 @@
      "n": 18,
      "sd": 0.15
     }
-   }
+   },
+   "floorX": 10.985,
+   "floorY": 12.189,
+   "floorRoom": "foyer"
   },
   {
    "label": "p20_875_-862",
@@ -945,7 +1395,10 @@
      "n": 3,
      "sd": 1.0
     }
-   }
+   },
+   "floorX": 9.419,
+   "floorY": 9.379,
+   "floorRoom": "foyer"
   },
   {
    "label": "p21_469_524",
@@ -1020,7 +1473,10 @@
      "n": 22,
      "sd": 0.62
     }
-   }
+   },
+   "floorX": 10.378,
+   "floorY": 8.663,
+   "floorRoom": "foyer"
   },
   {
    "label": "p22_2825_-487",
@@ -1101,7 +1557,10 @@
      "n": 3,
      "sd": 3.46
     }
-   }
+   },
+   "floorX": 8.271,
+   "floorY": 7.762,
+   "floorRoom": null
   },
   {
    "label": "p24_4412_2875",
@@ -1176,7 +1635,10 @@
      "n": 18,
      "sd": 0.41
     }
-   }
+   },
+   "floorX": 9.516,
+   "floorY": 4.244,
+   "floorRoom": "kitchen"
   },
   {
    "label": "p25_3887_5037",
@@ -1251,7 +1713,10 @@
      "n": 18,
      "sd": 0.22
     }
-   }
+   },
+   "floorX": 11.389,
+   "floorY": 3.075,
+   "floorRoom": "kitchen"
   },
   {
    "label": "p30_7300_125",
@@ -1326,7 +1791,10 @@
      "n": 17,
      "sd": 0.26
     }
-   }
+   },
+   "floorX": 5.551,
+   "floorY": 4.188,
+   "floorRoom": "family"
   },
   {
    "label": "p31_9800_-675",
@@ -1401,7 +1869,10 @@
      "n": 23,
      "sd": 0.52
     }
-   }
+   },
+   "floorX": 3.127,
+   "floorY": 3.045,
+   "floorRoom": "family"
   },
   {
    "label": "p32_8962_-5137",
@@ -1476,7 +1947,10 @@
      "n": 21,
      "sd": 0.21
     }
-   }
+   },
+   "floorX": 0.667,
+   "floorY": 6.794,
+   "floorRoom": "laundry"
   },
   {
    "label": "p33_-2037_3925",
@@ -1551,7 +2025,10 @@
      "n": 22,
      "sd": 0.45
     }
-   }
+   },
+   "floorX": 14.867,
+   "floorY": 8.089,
+   "floorRoom": "living"
   },
   {
    "label": "p38_6397_-2817",
@@ -1626,7 +2103,10 @@
      "n": 24,
      "sd": 0.54
     }
-   }
+   },
+   "floorX": 4.142,
+   "floorY": 6.908,
+   "floorRoom": null
   },
   {
    "label": "p39_10455_-885",
@@ -1701,7 +2181,10 @@
      "n": 19,
      "sd": 0.39
     }
-   }
+   },
+   "floorX": 2.546,
+   "floorY": 2.732,
+   "floorRoom": "family"
   },
   {
    "label": "p40_8501_-4541",
@@ -1776,7 +2259,10 @@
      "n": 19,
      "sd": 0.34
     }
-   }
+   },
+   "floorX": 1.41,
+   "floorY": 6.681,
+   "floorRoom": "laundry"
   },
   {
    "label": "p41_1158_6532",
@@ -1851,7 +2337,10 @@
      "n": 17,
      "sd": 0.32
     }
-   }
+   },
+   "floorX": 0.724,
+   "floorY": 4.038,
+   "floorRoom": "family"
   }
  ],
  "floorBounds": {
