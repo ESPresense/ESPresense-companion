@@ -22,6 +22,11 @@ public class RxAdjRssiOptimizer : IOptimizer
         OptimizationResults or = new();
         var optimization = _state.Config?.Optimization;
 
+        // This optimizer fits only RxAdjRssi. It holds path-loss exponent fixed at the
+        // midpoint of the configured bounds purely as a modeling constant for that fit;
+        // it does NOT estimate absorption. Emitting this constant as a proposed Absorption
+        // would clobber every node's real per-node absorption with the same value (the
+        // "all nodes pinned to ~midpoint" degeneracy), so it is deliberately not proposed.
         var absorption = ((optimization?.AbsorptionMax - optimization?.AbsorptionMin) / 2d) + optimization?.AbsorptionMin ?? 3d;
 
         foreach (var g in os.ByRx())
@@ -63,7 +68,7 @@ public class RxAdjRssiOptimizer : IOptimizer
                 var rxAdjRssi = result.MinimizingPoint[0];
                 if (rxAdjRssi < optimization?.RxAdjRssiMin) rxAdjRssi = optimization.RxAdjRssiMin;
                 if (rxAdjRssi > optimization?.RxAdjRssiMax) rxAdjRssi = optimization.RxAdjRssiMax;
-                or.Nodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = rxAdjRssi, Absorption = absorption, Error = result.FunctionInfoAtMinimum.Value });
+                or.Nodes.Add(g.Key.Id, new ProposedValues { RxAdjRssi = rxAdjRssi, Error = result.FunctionInfoAtMinimum.Value });
             }
             catch (Exception ex)
             {
