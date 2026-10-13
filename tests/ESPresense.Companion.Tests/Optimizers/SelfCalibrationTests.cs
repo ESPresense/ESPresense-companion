@@ -1,0 +1,365 @@
+using System.Text.Json;
+using ESPresense.Models;
+using ESPresense.Optimizers;
+using ESPresense.Services;
+using MathNet.Spatial.Euclidean;
+using Moq;
+
+namespace ESPresense.Companion.Tests.Optimizers;
+
+/// <summary>
+/// Does continuous self-calibration actually work? Each test hands an optimizer measurements
+/// with known ground truth and scores the calibration it proposes by the only metric that
+/// matters: does applying it make ranging better?
+///
+/// The synthetic tests build a fake home where every receiver has a known gain error and a known
+/// absorption, generate the exact RSSI such a home would produce, and check the optimizer gets
+/// the calibration back out. That proves the machinery; it cannot prove field efficacy, because
+/// real radio breaks the log-distance model the optimizers assume.
+///
+/// Field efficacy is the robot-survey test at the bottom: calibrate on half the surveyed
+/// positions, then compare held-out range error against the distances the nodes themselves
+/// reported. It ignores itself until a clean resurvey provides enough spatial points — the
+/// 2026-10-13 tour lost its beacon at p04 (see cb43b41), leaving 5 usable positions.
+/// </summary>
+[FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
+public class SelfCalibrationTests
+{
+    private State _state = null!;
+    private ConfigLoader _configLoader = null!;
+    private string _configDir = null!;
+
+    private const double TxRef = -59;
+    private const double RobotZ = 0.30; // the survey beacon rode on top of the vacuum
+
+    /// <summary>A plausible single-floor spread; pairwise distances run ~1.5 m to ~20 m.</summary>
+    private static readonly (string Id, double X, double Y, double Z)[] Layout =
+    {
+        ("kitchen", 8.0, 6.5, 1.0),
+        ("family", 0.3, 0.4, 0.5),
+        ("nook", 7.0, 0.6, 0.4),
+        ("dining", 16.3, 2.6, 1.3),
+        ("foyer", 9.9, 8.3, 0.4),
+        ("laundry", 4.3, 7.6, 2.0),
+        ("garage", 1.0, 17.3, 0.5),
+        ("office", 14.0, 12.0, 1.0),
+        ("master", 3.4, 10.4, 2.5),
+        ("stairs", 5.5, 12.0, 2.2),
+    };
+
+    [SetUp]
+    public void Setup()
+    {
+        var mqtt = new Mock<IMqttCoordinator>();
+        _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(_configDir);
+        _configLoader = new ConfigLoader(_configDir);
+        _state = new State(_configLoader, new NodeTelemetryStore(mqtt.Object));
+
+        // ConfigLoader loads asynchronously; the optimizers need Config.Optimization.
+        for (var i = 0; i < 200 && _configLoader.Config == null; i++) Thread.Sleep(10);
+        Assert.That(_configLoader.Config, Is.Not.Null, "config did not load");
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        await _configLoader.StopAsync(CancellationToken.None);
+        _configLoader.Dispose();
+        try { Directory.Delete(_configDir, true); } catch { /* best effort */ }
+    }
+
+    private ConfigOptimization Opt => _configLoader.Config!.Optimization;
+    private double MidAbsorption => Opt.AbsorptionMin + (Opt.AbsorptionMax - Opt.AbsorptionMin) / 2;
+
+    private static Dictionary<string, OptNode> MakeNodes() =>
+        Layout.ToDictionary(l => l.Id, l => new OptNode { Id = l.Id, Name = l.Id, Location = new Point3D(l.X, l.Y, l.Z) });
+
+    private static double Gauss(Random rnd)
+    {
+        var u1 = 1.0 - rnd.NextDouble();
+        var u2 = rnd.NextDouble();
+        return Math.Sqrt(-2 * Math.Log(u1)) * Math.Cos(2 * Math.PI * u2);
+    }
+
+    /// <summary>
+    /// RSSI exactly as a home with these per-receiver gain errors and absorptions would produce it:
+    /// rssi = txRef + rxBias - 10*absorption*log10(d) + noise. A positive bias is a receiver that
+    /// hears hot, which is precisely what RxAdjRssi exists to absorb.
+    /// </summary>
+    private static OptimizationSnapshot Synth(Dictionary<string, OptNode> nodes,
+        Func<string, double> absorption, Func<string, double> rxBias,
+        double noiseSd = 0, int seed = 1, int repeats = 1)
+    {
+        var rnd = new Random(seed);
+        var os = new OptimizationSnapshot();
+        foreach (var rx in nodes.Values)
+            foreach (var tx in nodes.Values)
+            {
+                if (ReferenceEquals(rx, tx)) continue;
+                var d = rx.Location.DistanceTo(tx.Location);
+                if (d <= 1.2) continue; // log10(d) ~ 0 carries no slope information
+                for (var r = 0; r < repeats; r++)
+                    os.Measures.Add(new Measure
+                    {
+                        Rx = rx,
+                        Tx = tx,
+                        Rssi = TxRef + rxBias(rx.Id) - 10 * absorption(rx.Id) * Math.Log10(d) + noiseSd * Gauss(rnd),
+                        RssiRxAdj = 0,
+                        RefRssi = TxRef,
+                        Distance = d,
+                    });
+            }
+        return os;
+    }
+
+    /// <summary>Distance the system would infer for this measurement under the proposed calibration.</summary>
+    private double Predict(Measure m, OptimizationResults? results)
+    {
+        ProposedValues? rx = null, tx = null;
+        results?.Nodes.TryGetValue(m.Rx.Id, out rx);
+        results?.Nodes.TryGetValue(m.Tx.Id, out tx);
+        var absorption = rx?.Absorption ?? MidAbsorption;
+        var rxAdj = rx?.RxAdjRssi ?? 0;
+        var txRef = tx?.TxRefRssi ?? m.RefRssi;
+        return Math.Pow(10, (txRef + rxAdj - m.Rssi) / (10 * absorption));
+    }
+
+    private double MedianRangeError(OptimizationSnapshot os, OptimizationResults? results) =>
+        Median(os.Measures.Select(m => Math.Abs(Predict(m, results) - m.Rx.Location.DistanceTo(m.Tx.Location))));
+
+    private static double Median(IEnumerable<double> xs)
+    {
+        var v = xs.OrderBy(x => x).ToList();
+        Assert.That(v, Is.Not.Empty);
+        return v[v.Count / 2];
+    }
+
+    /// <summary>
+    /// Noise-free sanity: when the world matches the log-distance model exactly, isotonic
+    /// regression must hand back the exact per-receiver absorption and gain error it was shown.
+    /// An optimizer that cannot pass this is not calibrating, whatever else it does.
+    /// </summary>
+    [Test]
+    public void Isotonic_NoiseFree_RecoversAbsorptionAndRxBiasExactly()
+    {
+        var nodes = MakeNodes();
+        var bias = new Dictionary<string, double>
+        {
+            ["kitchen"] = 0, ["family"] = 6, ["nook"] = -4, ["dining"] = 12, ["foyer"] = 18,
+            ["laundry"] = 3, ["garage"] = 9, ["office"] = -2, ["master"] = 15, ["stairs"] = 1,
+        };
+        var os = Synth(nodes, _ => 3.0, id => bias[id]);
+
+        var results = new IsotonicRegressionOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+
+        Assert.That(results.Nodes.Keys, Is.EquivalentTo(nodes.Keys), "every receiver should get a proposal");
+        foreach (var (id, p) in results.Nodes)
+        {
+            Assert.That(p.Absorption, Is.EqualTo(3.0).Within(0.05), $"{id} absorption");
+            Assert.That(p.RxAdjRssi, Is.EqualTo(bias[id]).Within(0.5), $"{id} rxAdj");
+        }
+    }
+
+    /// <summary>
+    /// The real question: with 2 dB of radio noise on every reading, does applying the proposed
+    /// calibration make inferred distances better than the uncalibrated defaults? The injected
+    /// gain errors reach 18 dB, which uncalibrated turns into ~4x range error — calibration
+    /// has to claw most of that back even though no single reading is trustworthy.
+    /// </summary>
+    [Test]
+    public void Isotonic_NoisyRadio_CalibrationImprovesRanging()
+    {
+        var nodes = MakeNodes();
+        var bias = new Dictionary<string, double>
+        {
+            ["kitchen"] = 0, ["family"] = 6, ["nook"] = -4, ["dining"] = 12, ["foyer"] = 18,
+            ["laundry"] = 3, ["garage"] = 9, ["office"] = -2, ["master"] = 15, ["stairs"] = 1,
+        };
+        var os = Synth(nodes, _ => 3.0, id => bias[id], noiseSd: 2.0, seed: 42, repeats: 3);
+
+        var results = new IsotonicRegressionOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+
+        var before = MedianRangeError(os, null);
+        var after = MedianRangeError(os, results);
+        TestContext.WriteLine($"median range error: uncalibrated {before:0.00} m -> calibrated {after:0.00} m");
+        Assert.That(after, Is.LessThan(before / 2), "calibration should at least halve the median range error");
+
+        // The gain estimate is an intercept extrapolated to 1 m; receivers in far corners see a
+        // narrow band of distances, so 2 dB of noise legitimately moves it a few dB.
+        foreach (var (id, p) in results.Nodes)
+            Assert.That(p.RxAdjRssi, Is.EqualTo(bias[id]).Within(6.0), $"{id} rxAdj drifted from the injected gain error");
+    }
+
+    /// <summary>
+    /// A hopeless home — absorption well above the configured ceiling, one receiver 40 dB hot —
+    /// must produce clamped proposals, not runaway ones. The clamps are what make continuous
+    /// calibration safe to leave on: a bad week of data can only push settings to the fence.
+    /// </summary>
+    [Test]
+    public void Isotonic_ProposalsStayWithinConfiguredLimits()
+    {
+        var nodes = MakeNodes();
+        var os = Synth(nodes, _ => 6.0, id => id == "foyer" ? 40 : 0, noiseSd: 1.0, seed: 7);
+
+        var results = new IsotonicRegressionOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+
+        Assert.That(results.Nodes, Is.Not.Empty);
+        foreach (var (id, p) in results.Nodes)
+        {
+            Assert.That(p.Absorption, Is.InRange(Opt.AbsorptionMin, Opt.AbsorptionMax), $"{id} absorption");
+            Assert.That(p.RxAdjRssi, Is.InRange(Opt.RxAdjRssiMin, Opt.RxAdjRssiMax), $"{id} rxAdj");
+        }
+        Assert.That(results.Nodes["foyer"].RxAdjRssi, Is.EqualTo(Opt.RxAdjRssiMax).Within(1e-6),
+            "a 40 dB hot receiver should pin its proposal to the configured maximum");
+    }
+
+    /// <summary>
+    /// RxAdjRssiOptimizer assumes the mid-limits absorption and a -59 reference, and fits only the
+    /// per-receiver gain. Generate a world matching those assumptions and it must find each bias.
+    /// </summary>
+    [Test]
+    public void RxAdj_RecoversPerReceiverBias()
+    {
+        var nodes = MakeNodes();
+        var bias = new Dictionary<string, double>
+        {
+            ["kitchen"] = 0, ["family"] = 5, ["nook"] = -3, ["dining"] = 10, ["foyer"] = 16,
+            ["laundry"] = 2, ["garage"] = 8, ["office"] = -1, ["master"] = 13, ["stairs"] = 4,
+        };
+        var mid = MidAbsorption;
+        var os = Synth(nodes, _ => mid, id => bias[id], noiseSd: 1.0, seed: 11, repeats: 3);
+
+        var results = new RxAdjRssiOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+
+        Assert.That(results.Nodes.Keys, Is.EquivalentTo(nodes.Keys));
+        foreach (var (id, p) in results.Nodes)
+            Assert.That(p.RxAdjRssi, Is.EqualTo(bias[id]).Within(2.0), $"{id} rxAdj");
+    }
+
+    /// <summary>
+    /// per_node_absorption is what config.example.yaml ships, so it is what most users' continuous
+    /// calibration actually runs. It fits rxAdj+absorption per receiver and txRef per transmitter
+    /// jointly, which leaves a gauge freedom (txRef up, rxAdj down); so instead of checking the
+    /// parameters, check the thing users feel — the calibrated system must range better.
+    /// </summary>
+    [Test]
+    public void PerNodeAbsorptionRxTx_JointFit_ImprovesRanging()
+    {
+        var nodes = MakeNodes();
+        var bias = new Dictionary<string, double>
+        {
+            ["kitchen"] = 0, ["family"] = 5, ["nook"] = -3, ["dining"] = 10, ["foyer"] = 16,
+            ["laundry"] = 2, ["garage"] = 8, ["office"] = -1, ["master"] = 13, ["stairs"] = 4,
+        };
+        var os = Synth(nodes, _ => 3.0, id => bias[id], noiseSd: 1.0, seed: 23);
+
+        var results = new PerNodeAbsorptionRxTx(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+
+        var before = MedianRangeError(os, null);
+        var after = MedianRangeError(os, results);
+        TestContext.WriteLine($"median range error: uncalibrated {before:0.00} m -> calibrated {after:0.00} m");
+        Assert.That(results.Nodes, Is.Not.Empty, "joint fit proposed nothing");
+        Assert.That(after, Is.LessThan(before / 2), "calibration should at least halve the median range error");
+    }
+
+    /// <summary>
+    /// Field efficacy on real radio: calibrate each receiver on half the robot-surveyed positions,
+    /// then on the held-out half compare calibrated ranges against the distances the nodes
+    /// themselves reported. If continuous self-calibration works, it must beat the firmware's
+    /// uncalibrated estimate on positions it has never seen. The robot plays a surveyed
+    /// transmitter: its LiDAR position (floorX/floorY, geometry-fitted frame, ~0.2 m) is the kind
+    /// of truth node-to-node calibration enjoys from user-entered node coordinates.
+    /// </summary>
+    [Test]
+    public void RobotSurvey_HeldOut_CalibrationBeatsReportedDistances()
+    {
+        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "robot-survey-2026-10-13.json");
+        var survey = JsonSerializer.Deserialize<Survey>(File.ReadAllText(path),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+
+        var points = survey.Points.Where(p => p.FloorX != null && p.FloorY != null).OrderBy(p => p.Label).ToList();
+        if (points.Count < 12)
+            Assert.Ignore($"needs 12+ surveyed positions for a train/holdout split, fixture has {points.Count} " +
+                          "-- the 2026-10-13 tour lost its beacon at p04; resurvey with tools/robot-survey/run.py");
+
+        var rxNodes = survey.Nodes.ToDictionary(n => n.Id,
+            n => new OptNode { Id = n.Id, Name = n.Id, Location = new Point3D(n.X, n.Y, n.Z) });
+
+        var train = points.Where((_, i) => i % 2 == 0).ToList();
+        var test = points.Where((_, i) => i % 2 == 1).ToList();
+
+        var os = new OptimizationSnapshot();
+        foreach (var p in train)
+            foreach (var (id, meas) in p.M)
+            {
+                if (!rxNodes.TryGetValue(id, out var rx)) continue;
+                os.Measures.Add(new Measure
+                {
+                    Rx = rx,
+                    Tx = new OptNode { Id = $"robot-{p.Label}", Name = "robot", Location = new Point3D(p.FloorX!.Value, p.FloorY!.Value, RobotZ) },
+                    Rssi = meas.Rssi,
+                    RefRssi = TxRef, // the calibrate beacon's rssi@1m
+                    DistVar = meas.Sd * meas.Sd,
+                    Distance = meas.Dist,
+                });
+            }
+
+        var results = new IsotonicRegressionOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+        Assert.That(results.Nodes.Count, Is.GreaterThanOrEqualTo(rxNodes.Count / 2),
+            "calibration should produce proposals for at least half the receivers");
+
+        TestContext.WriteLine($"{"node",-20}{"n",3}{"reported med err",18}{"calibrated med err",20}");
+        var reported = new List<double>();
+        var calibrated = new List<double>();
+        foreach (var (id, p) in results.Nodes.OrderBy(kv => kv.Key))
+        {
+            var rep = new List<double>();
+            var cal = new List<double>();
+            foreach (var pt in test)
+            {
+                if (!pt.M.TryGetValue(id, out var meas)) continue;
+                var truth = rxNodes[id].Location.DistanceTo(new Point3D(pt.FloorX!.Value, pt.FloorY!.Value, RobotZ));
+                rep.Add(Math.Abs(meas.Dist - truth));
+                cal.Add(Math.Abs(Math.Pow(10, (TxRef + (p.RxAdjRssi ?? 0) - meas.Rssi) / (10 * (p.Absorption ?? MidAbsorption))) - truth));
+            }
+            if (rep.Count < 3) continue;
+            TestContext.WriteLine($"{id,-20}{rep.Count,3}{Median(rep),18:0.00}{Median(cal),20:0.00}");
+            reported.AddRange(rep);
+            calibrated.AddRange(cal);
+        }
+
+        TestContext.WriteLine($"\nheld-out median |range error|: reported {Median(reported):0.00} m, calibrated {Median(calibrated):0.00} m");
+        Assert.That(Median(calibrated), Is.LessThanOrEqualTo(Median(reported)),
+            "self-calibration made held-out ranging worse than the nodes' own reported distances");
+    }
+
+    private sealed class Survey
+    {
+        public List<SurveyNode> Nodes { get; set; } = new();
+        public List<SurveyPoint> Points { get; set; } = new();
+    }
+
+    private sealed class SurveyNode
+    {
+        public string Id { get; set; } = "";
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Z { get; set; }
+    }
+
+    private sealed class SurveyPoint
+    {
+        public string Label { get; set; } = "";
+        public double? FloorX { get; set; }
+        public double? FloorY { get; set; }
+        public Dictionary<string, Meas> M { get; set; } = new();
+    }
+
+    private sealed class Meas
+    {
+        public double Rssi { get; set; }
+        public double Dist { get; set; }
+        public double Sd { get; set; }
+    }
+}
