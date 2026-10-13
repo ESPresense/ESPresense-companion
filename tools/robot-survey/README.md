@@ -4,6 +4,20 @@ Drives a Dreame P10 Pro Ultra with an ESPresense `calibrate` node strapped to it
 list of waypoints, and records every node's view of it. The robot's LiDAR gives ground truth to
 a few millimetres, which is what makes the resulting fixtures worth asserting against.
 
+## Raw captures live on their own branch
+
+The raw MQTT captures (`captures/`, `captures-resurvey/`, ~5 MB) are on the
+`data/robot-survey-raw-captures` branch, not here; the tests only need the fixtures they produce.
+To rebuild a fixture, check them out into this directory first:
+
+```
+git fetch origin data/robot-survey-raw-captures
+git checkout origin/data/robot-survey-raw-captures -- tools/robot-survey/captures tools/robot-survey/captures-resurvey
+git restore --staged tools/robot-survey/captures tools/robot-survey/captures-resurvey
+```
+
+New tours write there too; `.gitignore` keeps them out of commits.
+
 ## Frames
 
 The robot reports position in **its own live frame**. Most assertions in `RobotSurveyTests` use only
