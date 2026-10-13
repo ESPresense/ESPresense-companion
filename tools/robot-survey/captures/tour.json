@@ -784,5 +784,89 @@
   ],
   "status": "rejected",
   "reason": "Error calling service: Coordinate (-4650, 1100) is not inside the map"
+ },
+ {
+  "label": "p38_6397_-2817",
+  "target": [
+   6397,
+   -2817
+  ],
+  "status": "ok",
+  "pos_before": [
+   6389,
+   -2784,
+   326
+  ],
+  "pos_after": [
+   6389,
+   -2784,
+   326
+  ],
+  "drift_mm": 0.0,
+  "msgs": 950,
+  "capture": "cap_p38_6397_-2817.txt"
+ },
+ {
+  "label": "p39_10455_-885",
+  "target": [
+   10455,
+   -885
+  ],
+  "status": "ok",
+  "pos_before": [
+   10454,
+   -924,
+   35
+  ],
+  "pos_after": [
+   10454,
+   -924,
+   35
+  ],
+  "drift_mm": 0.0,
+  "msgs": 953,
+  "capture": "cap_p39_10455_-885.txt"
+ },
+ {
+  "label": "p40_8501_-4541",
+  "target": [
+   8501,
+   -4541
+  ],
+  "status": "ok",
+  "pos_before": [
+   8496,
+   -4537,
+   310
+  ],
+  "pos_after": [
+   8496,
+   -4537,
+   310
+  ],
+  "drift_mm": 0.0,
+  "msgs": 924,
+  "capture": "cap_p40_8501_-4541.txt"
+ },
+ {
+  "label": "p41_1158_6532",
+  "target": [
+   1158,
+   6532
+  ],
+  "status": "ok",
+  "pos_before": [
+   10838,
+   -3133,
+   124
+  ],
+  "pos_after": [
+   10838,
+   -3133,
+   124
+  ],
+  "drift_mm": 0.0,
+  "msgs": 900,
+  "capture": "cap_p41_1158_6532.txt"
  }
 ]
