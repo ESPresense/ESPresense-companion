@@ -1,0 +1,872 @@
+[
+ {
+  "label": "p00_1190_698",
+  "target": [
+   1190,
+   698
+  ],
+  "status": "ok",
+  "pos_before": [
+   24,
+   4006,
+   304
+  ],
+  "pos_after": [
+   24,
+   4006,
+   304
+  ],
+  "drift_mm": 0.0,
+  "msgs": 935,
+  "capture": "/tmp/survey2/cap_p00_1190_698.txt"
+ },
+ {
+  "label": "p01_3000_1500",
+  "target": [
+   3000,
+   1500
+  ],
+  "status": "ok",
+  "pos_before": [
+   3007,
+   1493,
+   198
+  ],
+  "pos_after": [
+   3008,
+   1492,
+   167
+  ],
+  "drift_mm": 1.4142135623730951,
+  "msgs": 964,
+  "capture": "/tmp/survey2/cap_p01_3000_1500.txt"
+ },
+ {
+  "label": "p02_4500_500",
+  "target": [
+   4500,
+   500
+  ],
+  "status": "ok",
+  "pos_before": [
+   4666,
+   446,
+   301
+  ],
+  "pos_after": [
+   4666,
+   450,
+   226
+  ],
+  "drift_mm": 4.0,
+  "msgs": 1213,
+  "capture": "/tmp/survey2/cap_p02_4500_500.txt"
+ },
+ {
+  "label": "p03_6250_2560",
+  "target": [
+   6250,
+   2560
+  ],
+  "status": "ok",
+  "pos_before": [
+   6368,
+   2595,
+   68
+  ],
+  "pos_after": [
+   6367,
+   2596,
+   174
+  ],
+  "drift_mm": 1.4142135623730951,
+  "msgs": 1015,
+  "capture": "cap_p03_6250_2560.txt"
+ },
+ {
+  "label": "p04_8000_3500",
+  "target": [
+   8000,
+   3500
+  ],
+  "status": "ok",
+  "pos_before": [
+   7996,
+   3499,
+   82
+  ],
+  "pos_after": [
+   7996,
+   3499,
+   82
+  ],
+  "drift_mm": 0.0,
+  "msgs": 776,
+  "capture": "cap_p04_8000_3500.txt"
+ },
+ {
+  "label": "p05_9500_2000",
+  "target": [
+   9500,
+   2000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (9500, 2000) is not inside the map"
+ },
+ {
+  "label": "p06_6000_4500",
+  "target": [
+   6000,
+   4500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (6000, 4500) is not inside the map"
+ },
+ {
+  "label": "p07_4000_4000",
+  "target": [
+   4000,
+   4000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (4000, 4000) is not inside the map"
+ },
+ {
+  "label": "p08_1792_5008",
+  "target": [
+   1792,
+   5008
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (1792, 5008) is not inside the map"
+ },
+ {
+  "label": "p09_2000_7000",
+  "target": [
+   2000,
+   7000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2000, 7000) is not inside the map"
+ },
+ {
+  "label": "p10_0_4000",
+  "target": [
+   0,
+   4000
+  ],
+  "status": "ok",
+  "pos_before": [
+   15,
+   4028,
+   291
+  ],
+  "pos_after": [
+   9,
+   4025,
+   324
+  ],
+  "drift_mm": 6.708203932499369,
+  "msgs": 926,
+  "capture": "cap_p10_0_4000.txt"
+ },
+ {
+  "label": "p11_-1500_2500",
+  "target": [
+   -1500,
+   2500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-1500, 2500) is not inside the map"
+ },
+ {
+  "label": "p12_-3000_1500",
+  "target": [
+   -3000,
+   1500
+  ],
+  "status": "ok",
+  "pos_before": [
+   -3008,
+   1491,
+   224
+  ],
+  "pos_after": [
+   -3008,
+   1491,
+   224
+  ],
+  "drift_mm": 0.0,
+  "msgs": 933,
+  "capture": "cap_p12_-3000_1500.txt"
+ },
+ {
+  "label": "p13_-1000_0",
+  "target": [
+   -1000,
+   0
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-1000, 0) is not inside the map"
+ },
+ {
+  "label": "p14_554_-497",
+  "target": [
+   554,
+   -497
+  ],
+  "status": "ok",
+  "pos_before": [
+   544,
+   -495,
+   347
+  ],
+  "pos_after": [
+   544,
+   -495,
+   347
+  ],
+  "drift_mm": 0.0,
+  "msgs": 951,
+  "capture": "cap_p14_554_-497.txt"
+ },
+ {
+  "label": "p15_2500_-1500",
+  "target": [
+   2500,
+   -1500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2500, -1500) is not inside the map"
+ },
+ {
+  "label": "p16_5000_-1000",
+  "target": [
+   5000,
+   -1000
+  ],
+  "status": "ok",
+  "pos_before": [
+   5001,
+   -994,
+   208
+  ],
+  "pos_after": [
+   5002,
+   -995,
+   342
+  ],
+  "drift_mm": 1.4142135623730951,
+  "msgs": 940,
+  "capture": "cap_p16_5000_-1000.txt"
+ },
+ {
+  "label": "p17_3000_-3000",
+  "target": [
+   3000,
+   -3000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (3000, -3000) is not inside the map"
+ },
+ {
+  "label": "p05_9500_2000",
+  "target": [
+   9500,
+   2000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (9500, 2000) is not inside the map"
+ },
+ {
+  "label": "p06_6000_4500",
+  "target": [
+   6000,
+   4500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (6000, 4500) is not inside the map"
+ },
+ {
+  "label": "p07_4000_4000",
+  "target": [
+   4000,
+   4000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (4000, 4000) is not inside the map"
+ },
+ {
+  "label": "p08_1792_5008",
+  "target": [
+   1792,
+   5008
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (1792, 5008) is not inside the map"
+ },
+ {
+  "label": "p09_2000_7000",
+  "target": [
+   2000,
+   7000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2000, 7000) is not inside the map"
+ },
+ {
+  "label": "p11_-1500_2500",
+  "target": [
+   -1500,
+   2500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-1500, 2500) is not inside the map"
+ },
+ {
+  "label": "p13_-1000_0",
+  "target": [
+   -1000,
+   0
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-1000, 0) is not inside the map"
+ },
+ {
+  "label": "p15_2500_-1500",
+  "target": [
+   2500,
+   -1500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2500, -1500) is not inside the map"
+ },
+ {
+  "label": "p17_3000_-3000",
+  "target": [
+   3000,
+   -3000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (3000, -3000) is not inside the map"
+ },
+ {
+  "label": "p18_-3180_-420",
+  "target": [
+   -3180,
+   -420
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-3180, -420) is not inside the map"
+ },
+ {
+  "label": "p19_-2200_-1762",
+  "target": [
+   -2200,
+   -1762
+  ],
+  "status": "ok",
+  "pos_before": [
+   -2194,
+   -1754,
+   205
+  ],
+  "pos_after": [
+   -2194,
+   -1754,
+   205
+  ],
+  "drift_mm": 0.0,
+  "msgs": 933,
+  "capture": "cap_p19_-2200_-1762.txt"
+ },
+ {
+  "label": "p20_875_-862",
+  "target": [
+   875,
+   -862
+  ],
+  "status": "ok",
+  "pos_before": [
+   893,
+   -848,
+   7
+  ],
+  "pos_after": [
+   893,
+   -848,
+   7
+  ],
+  "drift_mm": 0.0,
+  "msgs": 927,
+  "capture": "cap_p20_875_-862.txt"
+ },
+ {
+  "label": "p21_469_524",
+  "target": [
+   469,
+   524
+  ],
+  "status": "ok",
+  "pos_before": [
+   711,
+   335,
+   65
+  ],
+  "pos_after": [
+   711,
+   335,
+   65
+  ],
+  "drift_mm": 0.0,
+  "msgs": 902,
+  "capture": "cap_p21_469_524.txt"
+ },
+ {
+  "label": "p22_2825_-487",
+  "target": [
+   2825,
+   -487
+  ],
+  "status": "ok",
+  "pos_before": [
+   2845,
+   -499,
+   354
+  ],
+  "pos_after": [
+   2845,
+   -499,
+   354
+  ],
+  "drift_mm": 0.0,
+  "msgs": 914,
+  "capture": "cap_p22_2825_-487.txt"
+ },
+ {
+  "label": "p23_3150_3000",
+  "target": [
+   3150,
+   3000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (3150, 3000) is not inside the map"
+ },
+ {
+  "label": "p24_4412_2875",
+  "target": [
+   4412,
+   2875
+  ],
+  "status": "ok",
+  "pos_before": [
+   4423,
+   2883,
+   114
+  ],
+  "pos_after": [
+   4423,
+   2883,
+   114
+  ],
+  "drift_mm": 0.0,
+  "msgs": 924,
+  "capture": "cap_p24_4412_2875.txt"
+ },
+ {
+  "label": "p25_3887_5037",
+  "target": [
+   3887,
+   5037
+  ],
+  "status": "ok",
+  "pos_before": [
+   3906,
+   5029,
+   122
+  ],
+  "pos_after": [
+   3906,
+   5029,
+   122
+  ],
+  "drift_mm": 0.0,
+  "msgs": 903,
+  "capture": "cap_p25_3887_5037.txt"
+ },
+ {
+  "label": "p26_2290_6340",
+  "target": [
+   2290,
+   6340
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2290, 6340) is not inside the map"
+ },
+ {
+  "label": "p27_3200_8344",
+  "target": [
+   3200,
+   8344
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (3200, 8344) is not inside the map"
+ },
+ {
+  "label": "p28_7681_7319",
+  "target": [
+   7681,
+   7319
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (7681, 7319) is not inside the map"
+ },
+ {
+  "label": "p29_9694_8750",
+  "target": [
+   9694,
+   8750
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (9694, 8750) is not inside the map"
+ },
+ {
+  "label": "p30_7300_125",
+  "target": [
+   7300,
+   125
+  ],
+  "status": "ok",
+  "pos_before": [
+   7290,
+   144,
+   316
+  ],
+  "pos_after": [
+   7290,
+   144,
+   316
+  ],
+  "drift_mm": 0.0,
+  "msgs": 903,
+  "capture": "cap_p30_7300_125.txt"
+ },
+ {
+  "label": "p05_9500_2000",
+  "target": [
+   9500,
+   2000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (9500, 2000) is not inside the map"
+ },
+ {
+  "label": "p06_6000_4500",
+  "target": [
+   6000,
+   4500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (6000, 4500) is not inside the map"
+ },
+ {
+  "label": "p07_4000_4000",
+  "target": [
+   4000,
+   4000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (4000, 4000) is not inside the map"
+ },
+ {
+  "label": "p08_1792_5008",
+  "target": [
+   1792,
+   5008
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (1792, 5008) is not inside the map"
+ },
+ {
+  "label": "p09_2000_7000",
+  "target": [
+   2000,
+   7000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2000, 7000) is not inside the map"
+ },
+ {
+  "label": "p11_-1500_2500",
+  "target": [
+   -1500,
+   2500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-1500, 2500) is not inside the map"
+ },
+ {
+  "label": "p13_-1000_0",
+  "target": [
+   -1000,
+   0
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-1000, 0) is not inside the map"
+ },
+ {
+  "label": "p15_2500_-1500",
+  "target": [
+   2500,
+   -1500
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2500, -1500) is not inside the map"
+ },
+ {
+  "label": "p17_3000_-3000",
+  "target": [
+   3000,
+   -3000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (3000, -3000) is not inside the map"
+ },
+ {
+  "label": "p18_-3180_-420",
+  "target": [
+   -3180,
+   -420
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-3180, -420) is not inside the map"
+ },
+ {
+  "label": "p23_3150_3000",
+  "target": [
+   3150,
+   3000
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (3150, 3000) is not inside the map"
+ },
+ {
+  "label": "p26_2290_6340",
+  "target": [
+   2290,
+   6340
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (2290, 6340) is not inside the map"
+ },
+ {
+  "label": "p27_3200_8344",
+  "target": [
+   3200,
+   8344
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (3200, 8344) is not inside the map"
+ },
+ {
+  "label": "p28_7681_7319",
+  "target": [
+   7681,
+   7319
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (7681, 7319) is not inside the map"
+ },
+ {
+  "label": "p29_9694_8750",
+  "target": [
+   9694,
+   8750
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (9694, 8750) is not inside the map"
+ },
+ {
+  "label": "p31_9800_-675",
+  "target": [
+   9800,
+   -675
+  ],
+  "status": "ok",
+  "pos_before": [
+   9820,
+   -740,
+   127
+  ],
+  "pos_after": [
+   9832,
+   -743,
+   1
+  ],
+  "drift_mm": 12.36931687685298,
+  "msgs": 892,
+  "capture": "cap_p31_9800_-675.txt"
+ },
+ {
+  "label": "p32_8962_-5137",
+  "target": [
+   8962,
+   -5137
+  ],
+  "status": "ok",
+  "pos_before": [
+   8947,
+   -5138,
+   326
+  ],
+  "pos_after": [
+   8947,
+   -5138,
+   326
+  ],
+  "drift_mm": 0.0,
+  "msgs": 923,
+  "capture": "cap_p32_8962_-5137.txt"
+ },
+ {
+  "label": "p33_-2037_3925",
+  "target": [
+   -2037,
+   3925
+  ],
+  "status": "ok",
+  "pos_before": [
+   -2089,
+   3891,
+   113
+  ],
+  "pos_after": [
+   -2089,
+   3891,
+   113
+  ],
+  "drift_mm": 0.0,
+  "msgs": 941,
+  "capture": "cap_p33_-2037_3925.txt"
+ },
+ {
+  "label": "p34_-4280_5150",
+  "target": [
+   -4280,
+   5150
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-4280, 5150) is not inside the map"
+ },
+ {
+  "label": "p35_-5569_6224",
+  "target": [
+   -5569,
+   6224
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-5569, 6224) is not inside the map"
+ },
+ {
+  "label": "p36_-4450_900",
+  "target": [
+   -4450,
+   900
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-4450, 900) is not inside the map"
+ },
+ {
+  "label": "p37_-4650_1100",
+  "target": [
+   -4650,
+   1100
+  ],
+  "status": "rejected",
+  "reason": "Error calling service: Coordinate (-4650, 1100) is not inside the map"
+ },
+ {
+  "label": "p38_6397_-2817",
+  "target": [
+   6397,
+   -2817
+  ],
+  "status": "ok",
+  "pos_before": [
+   6389,
+   -2784,
+   326
+  ],
+  "pos_after": [
+   6389,
+   -2784,
+   326
+  ],
+  "drift_mm": 0.0,
+  "msgs": 950,
+  "capture": "cap_p38_6397_-2817.txt"
+ },
+ {
+  "label": "p39_10455_-885",
+  "target": [
+   10455,
+   -885
+  ],
+  "status": "ok",
+  "pos_before": [
+   10454,
+   -924,
+   35
+  ],
+  "pos_after": [
+   10454,
+   -924,
+   35
+  ],
+  "drift_mm": 0.0,
+  "msgs": 953,
+  "capture": "cap_p39_10455_-885.txt"
+ },
+ {
+  "label": "p40_8501_-4541",
+  "target": [
+   8501,
+   -4541
+  ],
+  "status": "ok",
+  "pos_before": [
+   8496,
+   -4537,
+   310
+  ],
+  "pos_after": [
+   8496,
+   -4537,
+   310
+  ],
+  "drift_mm": 0.0,
+  "msgs": 924,
+  "capture": "cap_p40_8501_-4541.txt"
+ },
+ {
+  "label": "p41_1158_6532",
+  "target": [
+   1158,
+   6532
+  ],
+  "status": "ok",
+  "pos_before": [
+   10838,
+   -3133,
+   124
+  ],
+  "pos_after": [
+   10838,
+   -3133,
+   124
+  ],
+  "drift_mm": 0.0,
+  "msgs": 900,
+  "capture": "cap_p41_1158_6532.txt"
+ }
+]
