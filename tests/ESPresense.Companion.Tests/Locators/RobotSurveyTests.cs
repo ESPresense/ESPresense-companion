@@ -461,6 +461,46 @@ public class RobotSurveyTests
         Assert.Pass("diagnostic - see output");
     }
 
+    /// <summary>
+    /// Guards every other test here: the beacon must actually have been riding on the robot.
+    ///
+    /// The 2026-10-13 tour lost the calibrate hat partway through. The robot kept touring, every
+    /// node's RSSI stayed within ~1 dB for 19 positions up to 15 m apart, and the solvers' "collapse"
+    /// that followed was the beacon lying still. A real survey must show the per-node RSSI
+    /// fingerprint changing more between positions that are further apart.
+    /// </summary>
+    [TestCase(Spread)]
+    public void BeaconMovesWithRobot(string fixture)
+    {
+        _survey = Load(fixture);
+        var pts = _survey.Points;
+        var fp = new List<double>(); var sep = new List<double>();
+        for (int i = 0; i < pts.Count; i++)
+            for (int j = i + 1; j < pts.Count; j++)
+            {
+                var common = pts[i].M.Keys.Intersect(pts[j].M.Keys).ToList();
+                if (common.Count < 4) continue;
+                fp.Add(Math.Sqrt(common.Average(k => Math.Pow(pts[i].M[k].Rssi - pts[j].M[k].Rssi, 2))));
+                sep.Add(Math.Sqrt(Math.Pow(pts[i].RobotX - pts[j].RobotX, 2) + Math.Pow(pts[i].RobotY - pts[j].RobotY, 2)));
+            }
+        if (fp.Count < 3) Assert.Ignore("fewer than three comparable pairs of positions");
+
+        double mf = fp.Average(), ms = sep.Average();
+        var corr = fp.Zip(sep, (f, d) => (f - mf) * (d - ms)).Sum()
+                   / Math.Sqrt(fp.Sum(f => (f - mf) * (f - mf)) * sep.Sum(d => (d - ms) * (d - ms)));
+        var farPairs = fp.Zip(sep).Where(t => t.Second >= 3).Select(t => t.First).OrderBy(x => x).ToList();
+        TestContext.WriteLine($"{fp.Count} pairs; fingerprint-vs-separation correlation {corr:+0.00;-0.00}; " +
+                              $"median RSSI difference for pairs 3 m+ apart {(farPairs.Count > 0 ? farPairs[farPairs.Count / 2] : double.NaN):0.0} dB");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(corr, Is.GreaterThan(0.3), "RSSI fingerprints do not change with position: was the beacon on the robot?");
+            if (farPairs.Count > 0)
+                Assert.That(farPairs[farPairs.Count / 2], Is.GreaterThan(2.5),
+                    "positions 3 m+ apart look identical in RSSI: the beacon was probably lying still");
+        });
+    }
+
     private static double Pct(List<double> sorted, double q) => sorted[(int)Math.Round(q * (sorted.Count - 1))];
 
     private string? RoomAt(double x, double y)
@@ -517,7 +557,7 @@ public class RobotSurveyTests
         _survey = Load(Spread);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
-        Assert.That(_survey.Points.Count(p => p.FloorX.HasValue), Is.GreaterThanOrEqualTo(10), "fixture lacks floor coordinates; rebuild it with tools/robot-survey/build_fixture.py");
+        RequireSpatialPoints(MinAccuracyPoints);
 
         TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}");
         var results = new Dictionary<string, AccuracyResult>();
@@ -527,41 +567,25 @@ public class RobotSurveyTests
             TestContext.WriteLine($"{which,-13}{$"{r.Fixes}/{r.Points}",8}{r.Median,10:0.00}{r.P90,8:0.00}{r.Max,8:0.00}{$"{r.RoomHits}/{r.RoomTotal}",11}");
         }
 
-        // Every solver currently loses to just reporting the nearest node; that is the finding,
-        // printed rather than asserted so the baselines below stay green until a fix lands.
         var nearest = results["nearest"].Median;
         var beaten = Solvers.Where(w => results[w].Median < nearest).ToList();
         TestContext.WriteLine($"\nSolvers beating the nearest-node baseline ({nearest:0.00} m): {(beaten.Count == 0 ? "none" : string.Join(", ", beaten))}");
 
-        Assert.Multiple(() =>
-        {
-            foreach (var (which, b) in Baselines)
-            {
-                var r = results[which];
-                Assert.That(r.Fixes, Is.GreaterThanOrEqualTo(b.MinFixes), $"{which} produced fewer fixes than its baseline");
-                Assert.That(r.Median, Is.LessThanOrEqualTo(b.MedianM + BaselineMarginM),
-                    $"{which} median floorplan error regressed: {r.Median:0.00} m vs baseline {b.MedianM:0.00} m");
-            }
-        });
+        // No regression baselines yet: the first set was recorded on data where the beacon had
+        // fallen off the robot (see BeaconMovesWithRobot). Pin them once a clean survey exists.
+        Assert.Pass("diagnostic - see output");
     }
 
-    /// <summary>Regression margin over the recorded median error. Well above the ~0.2 m the frame transform contributes.</summary>
-    private const double BaselineMarginM = 1.0;
+    /// <summary>Fewer positions than this and per-locator medians are noise.</summary>
+    private const int MinAccuracyPoints = 10;
 
-    /// <summary>
-    /// Recorded on robot-survey-2026-10-13.json (23 positions) when these tests were written. Lower a
-    /// locator's numbers when it improves, so the gain is locked in.
-    /// </summary>
-    private static readonly Dictionary<string, (int MinFixes, double MedianM)> Baselines = new()
+    private void RequireSpatialPoints(int min)
     {
-        ["nelder"] = (23, 6.28),
-        ["mle"] = (23, 5.38),
-        ["gaussnewton"] = (23, 6.18),
-        ["bfgs"] = (23, 6.49),
-        ["multifloor"] = (22, 9.63),
-        ["nadaraya"] = (23, 4.50),
-        ["nearest"] = (23, 4.82),
-    };
+        var n = _survey.Points.Count(p => p.FloorX.HasValue);
+        if (n < min)
+            Assert.Ignore($"needs {min}+ surveyed positions with floor coordinates, fixture has {n} " +
+                          "-- run tools/robot-survey/run.py with the beacon attached, then build_fixture.py");
+    }
 
     /// <summary>
     /// Does dropping the nodes that RangeConsistency caught hearing through floors and walls fix the
@@ -572,6 +596,7 @@ public class RobotSurveyTests
     public void NodeExclusion_ThroughStructureNodesDragSolversToTheMiddle()
     {
         _survey = Load(Spread);
+        RequireSpatialPoints(MinAccuracyPoints);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
 

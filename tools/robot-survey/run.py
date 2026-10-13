@@ -45,6 +45,17 @@ WPS+=[(-4450, 900), (-4650, 1100)]
 # vacuum accepts are still valid captures, since the tour records where the robot actually stopped.
 WPS+=[(6397, -2817), (10455, -885), (8501, -4541), (1158, 6532)]
 
+def fingerprint(path):
+    """Mean RSSI per receiving node for one capture."""
+    per={}
+    for line in open(path, errors='replace'):
+        parts=line.split(' ',2)
+        if len(parts)<3 or not parts[1].startswith('espresense/devices/node:calibrate/'): continue
+        try: per.setdefault(parts[1].rsplit('/',1)[1],[]).append(float(json.loads(parts[2])['rssi']))
+        except Exception: pass
+    return {k:sum(v)/len(v) for k,v in per.items() if len(v)>=3}
+last_fp=None
+
 DWELL=90
 # Resume: keep what an earlier run already captured and skip those waypoints.
 try: results=json.load(open(f"{OUT}/tour.json"))
@@ -109,6 +120,17 @@ for i,(tx,ty) in enumerate(WPS):
     results.append({"label":label,"target":[tx,ty],"status":"ok","pos_before":pa,"pos_after":pb,
                     "drift_mm":drift,"msgs":n,"capture":os.path.basename(cap)})
     json.dump(results,open(f"{OUT}/tour.json","w"),indent=1)
+    # Beacon check: if the robot moved 2 m+ since the last capture and every node still hears the
+    # same RSSI, the calibrate hat has come off and is lying still. Stop rather than log junk.
+    fp=fingerprint(cap)
+    if last_fp and pa and math.hypot(pa[0]-last_fp[0][0],pa[1]-last_fp[0][1])>=2000:
+        common=set(fp)&set(last_fp[1])
+        if len(common)>=4:
+            rms=math.sqrt(sum((fp[k]-last_fp[1][k])**2 for k in common)/len(common))
+            log(f"  fingerprint change {rms:.1f} dB over {math.hypot(pa[0]-last_fp[0][0],pa[1]-last_fp[0][1])/1000:.1f} m")
+            if rms<2.0:
+                log("!!! RSSI fingerprint unchanged after moving 2 m+: the beacon is off the robot -- ABORT"); break
+    last_fp=(pa,fp)
 
 json.dump(results,open(f"{OUT}/tour.json","w"),indent=1)
 log(f"\nDONE {len([r for r in results if r['status']=='ok'])} points in {(time.time()-start)/60:.1f} min")

@@ -20,6 +20,17 @@ node distance correlates at 0.62; every rotated or mirrored alternative does wor
 polygons come from the Companion config (`ESPRESENSE_CONFIG`, e.g. the copy `fit_frame.py` caches
 from Home Assistant); only those are copied into the fixture.
 
+## The beacon can fall off
+
+The `calibrate` node is a hat taped on top of the robot. On 2026-10-13 it came off, almost certainly
+during a manual clean at p04, and the robot toured 18 more positions without it. Every node's RSSI then
+stayed within ~1 dB while the robot moved up to 15 m, and the locators looked as if they had collapsed.
+They hadn't: the beacon was lying still.
+
+- `run.py` now aborts if the robot moved 2 m+ and the RSSI fingerprint changed by less than 2 dB.
+- `build_fixture.py` drops captures from `BEACON_LOST_AT` on; they stay in `captures/`.
+- `BeaconMovesWithRobot` fails on any fixture whose fingerprints don't change with position.
+
 ## Running a survey
 
 ```

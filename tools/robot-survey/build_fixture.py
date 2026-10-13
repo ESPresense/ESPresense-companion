@@ -53,6 +53,16 @@ room_at=lambda x,y:next((r['id'] for r in rooms if r['floor']=='first' and insid
 
 TOPIC=re.compile(r'espresense/devices/node:calibrate/(\S+)')
 
+# The calibrate hat came off the robot during the 2026-10-13 survey, almost certainly in the manual
+# clean that started at p04 (robot pushing under Kitchen furniture). From p10 on, every node's mean RSSI
+# stays within ~1 dB at every point while the robot moved up to 15 m: the beacon was lying still near
+# p04. p04 itself is kept -- its fingerprint is 5 dB away from p03's 1.9 m off, so the beacon was still
+# riding. Later captures do not measure the robot's position and are left out; they stay in captures/
+# as a record (and as a static-beacon set). run.py now aborts a tour when this happens.
+BEACON_LOST_AT=1791907572   # unix time p10's capture started, first after the clean
+def capture_start(path):
+    with open(path, errors='replace') as f: return float(f.readline().split(' ',1)[0])
+
 def summarise(path):
     per={}
     for line in open(path, errors='replace'):
@@ -79,7 +89,10 @@ tour=json.load(open(f'{CAPDIR}/tour.json'))
 points=[]
 for t in tour:
     if t['status']!='ok': continue
-    m=summarise(os.path.join(CAPDIR, os.path.basename(t['capture'])))
+    cap=os.path.join(CAPDIR, os.path.basename(t['capture']))
+    if capture_start(cap)>=BEACON_LOST_AT:
+        print(f"  skip {t['label']}: beacon was off the robot", file=sys.stderr); continue
+    m=summarise(cap)
     if len(m)<4:
         print(f"  skip {t['label']}: only {len(m)} placed nodes heard", file=sys.stderr); continue
     pb=t['pos_before']
