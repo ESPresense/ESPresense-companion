@@ -277,6 +277,13 @@ public static class ReplayCli
                 m => calib.TryGetValue(m.Node, out var c) ? RecomputeAbs(m, c.absorption, c.refRssi) : m.Distance);
 
             if (baseErr.Count == 0) { stdout.WriteLine($"{name,-44} {0,6}  (no fixes)"); continue; }
+            // A fitted calibration can starve the locator of fixes while the baseline still has them.
+            // That is a result worth seeing, not a crash in Median().
+            if (calErr.Count == 0)
+            {
+                stdout.WriteLine($"{name,-44} {baseErr.Count,6} {Median(baseErr),9:0.000}   (fitted calibration produced no fixes)");
+                continue;
+            }
             double b = Median(baseErr), f = Median(calErr);
             stdout.WriteLine($"{name,-44} {baseErr.Count,6} {b,9:0.000} {f,9:0.000} {f - b,8:+0.000;-0.000}");
         }
