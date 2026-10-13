@@ -38,6 +38,9 @@ WPS=[(1190,698),(3000,1500),(4500,500),(6250,2560),(8000,3500),(9500,2000),
 # hand-picked list above is off the map.
 WPS+=[(-3180, -420), (-2200, -1762), (875, -862), (469, 524), (2825, -487), (3150, 3000), (4412, 2875), (3887, 5037), (2290, 6340), (3200, 8344), (7681, 7319), (9694, 8750), (7300, 125), (9800, -675), (8962, -5137), (-2037, 3925), (-4280, 5150), (-5569, 6224)]
 
+# Living, replacing the off-map centre (-3180,-420); second is the fallback if the first is off-map too.
+WPS+=[(-4450, 900), (-4650, 1100)]
+
 DWELL=90
 # Resume: keep what an earlier run already captured and skip those waypoints.
 try: results=json.load(open(f"{OUT}/tour.json"))

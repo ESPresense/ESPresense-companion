@@ -8,7 +8,13 @@ def _post(payload, notify=False):
     for attempt in range(6):
         try: return _post1(payload, notify)
         except urllib.error.HTTPError as e:
-            if e.code < 500 or attempt == 5: raise
+            # 404 on a live session id means the server dropped the session (MCP spec): start a new one.
+            # An HA restart also 404s the endpoint until the integration is back, so keep retrying.
+            if e.code == 404 and payload.get('method') != 'initialize' and attempt < 5:
+                _sess['v']=None
+                try: init()
+                except Exception: pass
+            elif e.code < 500 or attempt == 5: raise
         except urllib.error.URLError:
             if attempt == 5: raise
         time.sleep(5*(attempt+1))
