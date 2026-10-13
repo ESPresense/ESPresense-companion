@@ -31,7 +31,7 @@ Things learned the hard way:
 - The robot refuses `vacuum_goto` while it is in a paused "returning" state. Call `vacuum.stop`
   first -- `ensure_ready()` does this.
 - `vacuum_goto` is cruise, not cleaning. HA's generic vacuum state still reads `cleaning`; check
-  `status` (`cruising_point`) and `cleaned_area` (stays 0). The tour aborts if `cleaned_area` rises.
+  `status` (`cruising_point`) and `cleaned_area`. The tour logs a rise in `cleaned_area` but does not abort.
 - Match the process name carefully when killing a tour. `pkill -f survey2/run.py` does not match
   a process started as `python3 run.py`, and two tours driving one robot fight each other.
 - Unreachable waypoints are simply ignored by the robot; the tour detects "never moved" and skips.

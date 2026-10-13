@@ -33,6 +33,10 @@ def log(*a):
 WPS=[(1190,698),(3000,1500),(4500,500),(6250,2560),(8000,3500),(9500,2000),
      (6000,4500),(4000,4000),(1792,5008),(2000,7000),(0,4000),(-1500,2500),
      (-3000,1500),(-1000,0),(554,-497),(2500,-1500),(5000,-1000),(3000,-3000)]
+# In-map waypoints: anchor_waypoints.json (nearest open floor to placed nodes + room centres, from
+# plan_anchors.py) plus farthest-point samples of the map image >=1.2 m from those. Most of the
+# hand-picked list above is off the map.
+WPS+=[(-3180, -420), (-2200, -1762), (875, -862), (469, 524), (2825, -487), (3150, 3000), (4412, 2875), (3887, 5037), (2290, 6340), (3200, 8344), (7681, 7319), (9694, 8750), (7300, 125), (9800, -675), (8962, -5137), (-2037, 3925), (-4280, 5150), (-5569, 6224)]
 
 DWELL=90
 # Resume: keep what an earlier run already captured and skip those waypoints.
@@ -40,6 +44,8 @@ try: results=json.load(open(f"{OUT}/tour.json"))
 except FileNotFoundError: results=[]
 done={r['label'] for r in results if r['status']=='ok'}
 start=time.time()
+# Logged, not enforced: cleaning during the tour is allowed.
+AREA0=vac(["cleaned_area"])['attributes'].get('cleaned_area',0)
 
 for i,(tx,ty) in enumerate(WPS):
     label=f"p{i:02d}_{tx}_{ty}"
@@ -48,7 +54,10 @@ for i,(tx,ty) in enumerate(WPS):
     p0=pos()
     log(f"\n=== {label} target=({tx},{ty}) from {p0} t={time.time()-start:.0f}s")
     try:
-        goto(tx,ty)
+        r=goto(tx,ty)
+        if r: log(f"  goto -> {str(r)[:300]}")
+        if isinstance(r,str) and r.startswith("Error"):
+            results.append({"label":label,"target":[tx,ty],"status":"rejected","reason":r[:200]}); continue
     except Exception as e:
         log(f"  goto error: {e}"); continue
     # wait for arrival
@@ -71,8 +80,8 @@ for i,(tx,ty) in enumerate(WPS):
         else:
             still=0
     v=vac(["cleaned_area","status","battery_level"])
-    if v['attributes'].get('cleaned_area',0)>0:
-        log("!!! cleaned_area > 0 -- ABORT"); break
+    if v['attributes'].get('cleaned_area',0)>AREA0:
+        log(f"  note: cleaned_area {v['attributes'].get('cleaned_area')} (was {AREA0} at start)")
     pa=pos()
     if p0 and pa and math.hypot(pa[0]-p0[0],pa[1]-p0[1])<100 and math.hypot(pa[0]-tx,pa[1]-ty)>400:
         log(f"  REJECTED (never moved). skipping."); 
