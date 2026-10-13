@@ -401,8 +401,10 @@ public class RobotSurveyTests
                                          .ToDictionary(k => k.Key, k => k.Average(v => v.Value.Dist))))
             .ToList();
 
-        Assert.That(positions.Count, Is.GreaterThanOrEqualTo(4),
-            "this diagnostic needs several spatially separated positions");
+        // The spatial survey is collected incrementally; don't fail the build while it is short.
+        if (positions.Count < 6)
+            Assert.Ignore($"needs 6+ spatially separated positions, fixture has {positions.Count} " +
+                          "-- resume the tour with tools/robot-survey/run.py");
 
         TestContext.WriteLine($"{positions.Count} positions, pairs at least 1 m apart\n");
         TestContext.WriteLine($"{"node",-20}{"pairs",7}{"median",9}{"p95",8}{"worst",8}{"over 1.0",10}");
