@@ -40,12 +40,17 @@ WPS+=[(-3180, -420), (-2200, -1762), (875, -862), (469, 524), (2825, -487), (315
 
 # Living, replacing the off-map centre (-3180,-420); second is the fallback if the first is off-map too.
 WPS+=[(-4450, 900), (-4650, 1100)]
+# Live-frame picks from the corrected transform (anchor_waypoints.json, 2nd revision): Laundry anchor,
+# Family, Dining and Laundry centres. Earlier anchor picks were in the saved-map frame; any that the
+# vacuum accepts are still valid captures, since the tour records where the robot actually stopped.
+WPS+=[(6397, -2817), (10455, -885), (8501, -4541), (1158, 6532)]
 
 DWELL=90
 # Resume: keep what an earlier run already captured and skip those waypoints.
 try: results=json.load(open(f"{OUT}/tour.json"))
 except FileNotFoundError: results=[]
-done={r['label'] for r in results if r['status']=='ok'}
+# Also skip waypoints the vacuum already called off-map; that verdict does not change between runs.
+done={r['label'] for r in results if r['status']=='ok' or 'not inside the map' in r.get('reason','')}
 start=time.time()
 # Logged, not enforced: cleaning during the tour is allowed.
 AREA0=vac(["cleaned_area"])['attributes'].get('cleaned_area',0)
