@@ -40,5 +40,26 @@
   "drift_mm": 1.4142135623730951,
   "msgs": 964,
   "capture": "/tmp/survey2/cap_p01_3000_1500.txt"
+ },
+ {
+  "label": "p02_4500_500",
+  "target": [
+   4500,
+   500
+  ],
+  "status": "ok",
+  "pos_before": [
+   4666,
+   446,
+   301
+  ],
+  "pos_after": [
+   4666,
+   450,
+   226
+  ],
+  "drift_mm": 4.0,
+  "msgs": 1213,
+  "capture": "/tmp/survey2/cap_p02_4500_500.txt"
  }
 ]
