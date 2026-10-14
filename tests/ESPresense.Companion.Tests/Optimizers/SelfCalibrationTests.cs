@@ -19,8 +19,7 @@ namespace ESPresense.Companion.Tests.Optimizers;
 ///
 /// Field efficacy is the robot-survey test at the bottom: calibrate on half the surveyed
 /// positions, then compare held-out range error against the distances the nodes themselves
-/// reported. Survey data describes a real home, so it is not in the repo; the test runs when
-/// ESPRESENSE_SURVEY_DIR points at it (see RobotSurveyTests) and is skipped otherwise.
+/// reported. It uses the anonymised survey bundled under TestData/robot-survey (see RobotSurveyTests).
 /// </summary>
 [FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
 public class SelfCalibrationTests

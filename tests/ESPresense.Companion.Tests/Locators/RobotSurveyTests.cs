@@ -11,9 +11,9 @@ namespace ESPresense.Companion.Tests.Locators;
 /// Integration tests over a real survey captured by driving an ESPresense node around on a
 /// LiDAR robot vacuum.
 ///
-/// Survey data describes someone's home (node positions, room outlines), so it is not in the repo.
-/// Point ESPRESENSE_SURVEY_DIR at a directory holding the fixtures below to run these; without it
-/// they are skipped. The GaussNewton optimality check also runs on synthetic data, which needs none.
+/// The fixtures live in TestData/robot-survey with node, room and device ids anonymised (n01..,
+/// r01.., u01..); geometry and readings are as captured. Point ESPRESENSE_SURVEY_DIR at another
+/// directory holding the same files to run against a different survey.
 ///
 /// The robot reports its own position to a few millimetres, in ITS OWN frame. Most assertions
 /// here are deliberately *frame-free*: they use only quantities invariant to rotation and
@@ -50,10 +50,11 @@ public class RobotSurveyTests
     internal static string LoadFixtureText(string file)
     {
         var dir = Environment.GetEnvironmentVariable("ESPRESENSE_SURVEY_DIR");
-        var path = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, file);
-        if (path == null || !File.Exists(path))
-            Assert.Ignore($"robot survey data not available: set ESPRESENSE_SURVEY_DIR to a directory containing {file}");
-        return File.ReadAllText(path!);
+        if (string.IsNullOrEmpty(dir)) dir = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "robot-survey");
+        var path = Path.Combine(dir, file);
+        if (!File.Exists(path))
+            Assert.Ignore($"robot survey data not available: {path} not found");
+        return File.ReadAllText(path);
     }
 
     private static Survey Load(string file) =>
