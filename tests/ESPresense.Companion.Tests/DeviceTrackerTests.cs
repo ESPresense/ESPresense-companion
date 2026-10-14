@@ -14,7 +14,7 @@ public class DeviceTrackerTests
     [SetUp]
     public async Task Setup()
     {
-        await using var example = Assembly.GetExecutingAssembly().GetManifestResourceStream("ESPresense.Companion.Tests.TestData.stationary,7,14.75,1.25.jsonp") ?? throw new Exception("Could not find embedded stationary,7,14.75,1.25.jsonp");
+        await using var example = Assembly.GetExecutingAssembly().GetManifestResourceStream("ESPresense.Companion.Tests.TestData.stationary.jsonp") ?? throw new Exception("Could not find embedded stationary.jsonp");
         using var sr = new StreamReader(example);
         while (true)
         {
