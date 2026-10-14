@@ -58,9 +58,11 @@ public class SelfCalibrationTests
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
 
-        // ConfigLoader loads asynchronously; the optimizers need Config.Optimization.
-        for (var i = 0; i < 200 && _configLoader.Config == null; i++) Thread.Sleep(10);
-        Assert.That(_configLoader.Config, Is.Not.Null, "config did not load");
+        // ConfigLoader loads asynchronously and State takes its copy on the ConfigChanged event. The
+        // optimizers read State.Config, so wait for that, not just the loader, or the first test can
+        // start between the two and fail with "Optimization config not found".
+        for (var i = 0; i < 200 && _state.Config?.Optimization == null; i++) Thread.Sleep(10);
+        Assert.That(_state.Config?.Optimization, Is.Not.Null, "config did not load");
     }
 
     [TearDown]
@@ -512,7 +514,11 @@ public class SelfCalibrationTests
             return errs.Count == 0 ? double.NaN : Median(errs);
         }
 
-        var locators = new[] { "gaussnewton", "nelder", "mle", "nadaraya", "nearest" };
+        // Only the locators that solve a position from the ranges are scored. nadaraya blends node
+        // positions by a kernel on distance and nearest just picks the shortest range, so a calibration
+        // that rescales every range moves them little or not at all; both stay in the table for reference.
+        var solvers = new[] { "gaussnewton", "nelder", "mle" };
+        var locators = solvers.Concat(new[] { "nadaraya", "nearest" }).ToArray();
         TestContext.WriteLine($"mode {mode}: held-out median XY position error (m) by locator");
         TestContext.WriteLine($"{"locator",-12} {"cold",8} {"calibrated",11} {"defaults",9}");
         var ratios = new List<double>();
@@ -522,13 +528,13 @@ public class SelfCalibrationTests
             var k = MedianXyError(which, (id, m) => Ranged(m, nss.Get(id)));
             var r = MedianXyError(which, (_, m) => m.Dist);
             TestContext.WriteLine($"{which,-12} {c,8:0.00} {k,11:0.00} {r,9:0.00}");
-            // nearest-node picks a node position, so calibration cannot move it: printed, not scored.
-            if (which != "nearest" && double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
+            if (solvers.Contains(which) && double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
         }
 
-        Assert.That(ratios, Is.Not.Empty, "no locator produced fixes");
-        Assert.That(Median(ratios), Is.LessThan(0.8),
-            $"the applied calibration ({mode}) should cut held-out position error well below cold-start defaults across locators; median ratio {Median(ratios):0.00}");
+        Assert.That(ratios, Has.Count.EqualTo(solvers.Length), "a solving locator produced no fixes");
+        Assert.That(ratios.Average(), Is.LessThan(0.8),
+            $"the applied calibration ({mode}) should cut the solving locators' held-out position error by at least 20% on average; " +
+            $"ratios {string.Join(", ", ratios.Select(x => x.ToString("0.00")))}");
     }
 
     private sealed class Survey
