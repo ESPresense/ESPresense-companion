@@ -10,8 +10,10 @@ namespace ESPresense.Locators;
 /// positions (a fingerprint map), instead of turning RSSI into distances and trilaterating.
 ///
 /// Ranging assumes a log-distance model that walls, furniture and antenna patterns break; a
-/// fingerprint records what the radio actually does at each spot. On a robot survey this beat every
-/// ranging locator (see RobotSurveyTests).
+/// fingerprint records what the radio actually does at each spot. On a robot survey with spots
+/// 0.75 m apart this located held-out spots to ~1 m median, against ~2 m for the best ranging
+/// locator (see RobotSurveyTests). It needs the survey to cover where devices go, and a reading
+/// averaged over tens of seconds: ~30 s matched the full survey dwell, 10 s cost ~0.25 m.
 ///
 /// Matching is offset-free: the mean dB difference between the device's readings and a fingerprint
 /// is removed before comparing, so a phone that transmits hotter or colder than the survey beacon
