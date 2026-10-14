@@ -273,9 +273,9 @@ public class SelfCalibrationTests
     /// coordinates.
     ///
     /// On the survey this was developed against, the two modes split sharply. legacy (the code default) works:
-    /// its accepted calibration cut held-out median range error from 4.31 m (firmware defaults) to
-    /// 2.24 m. per_node_absorption (the config.example.yaml default) makes it worse, 4.31 m to
-    /// 5.10 m. That is a KNOWN DEFECT, pinned here at its current degradation
+    /// its accepted calibration cut held-out median range error from 4.15 m (firmware defaults) to
+    /// 1.38 m. per_node_absorption (the config.example.yaml default) gains nothing (4.15 m before and
+    /// after) and has made it worse on earlier data. That is a KNOWN DEFECT, pinned here
     /// so it cannot silently worsen: its quartic penalty against under-estimated distances pushes
     /// rxAdj positive (inflationary), and the gate scores proposals in RSSI space — where Pearson
     /// correlation is blind to that constant shift — so it accepts calibration that is worse in the

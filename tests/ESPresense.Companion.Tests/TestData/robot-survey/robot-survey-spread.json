@@ -937,9 +937,9 @@
     74,
     155
    ],
-   "floorX": 7.948,
-   "floorY": 3.095,
-   "floorRoom": "r06"
+   "floorX": 4.204,
+   "floorY": 6.897,
+   "floorRoom": null
   },
   {
    "label": "r07_7996_3499",
@@ -998,9 +998,9 @@
     100,
     185
    ],
-   "floorX": 7.398,
-   "floorY": 1.601,
-   "floorRoom": "r06"
+   "floorX": 2.764,
+   "floorY": 6.217,
+   "floorRoom": "r07"
   },
   {
    "label": "r08_4423_2883",
@@ -1074,9 +1074,9 @@
     61,
     230
    ],
-   "floorX": 9.546,
-   "floorY": 4.34,
-   "floorRoom": "r06"
+   "floorX": 6.216,
+   "floorY": 6.665,
+   "floorRoom": null
   },
   {
    "label": "r09_3906_5029",
@@ -1145,8 +1145,8 @@
     263,
     263
    ],
-   "floorX": 11.414,
-   "floorY": 3.073,
+   "floorX": 6.66,
+   "floorY": 4.452,
    "floorRoom": "r06"
   },
   {
@@ -1219,9 +1219,9 @@
     275,
     84
    ],
-   "floorX": 13.45,
-   "floorY": 6.542,
-   "floorRoom": "r02"
+   "floorX": 10.544,
+   "floorY": 5.499,
+   "floorRoom": "r06"
   },
   {
    "label": "r12_-3008_1491",
@@ -1289,8 +1289,8 @@
    "spinHeadingsDeg": [
     354
    ],
-   "floorX": 13.821,
-   "floorY": 10.694,
+   "floorX": 13.719,
+   "floorY": 8.2,
    "floorRoom": "r08"
   },
   {
@@ -1370,9 +1370,9 @@
     214,
     293
    ],
-   "floorX": 10.984,
-   "floorY": 12.173,
-   "floorRoom": "r04"
+   "floorX": 12.732,
+   "floorY": 11.244,
+   "floorRoom": "r08"
   },
   {
    "label": "s01_3007_1493",
@@ -1442,9 +1442,9 @@
     4,
     145
    ],
-   "floorX": 9.84,
-   "floorY": 6.043,
-   "floorRoom": "r06"
+   "floorX": 7.619,
+   "floorY": 7.673,
+   "floorRoom": null
   },
   {
    "label": "s06_-2089_3891",
@@ -1502,9 +1502,9 @@
    "spinHeadingsDeg": [
     114
    ],
-   "floorX": 15.127,
-   "floorY": 8.37,
-   "floorRoom": "r08"
+   "floorX": 13.021,
+   "floorY": 5.627,
+   "floorRoom": "r02"
   },
   {
    "label": "q00_24_4006",
@@ -1585,9 +1585,9 @@
     312,
     341
    ],
-   "floorX": 7.961,
-   "floorY": 3.105,
-   "floorRoom": "r06"
+   "floorX": 4.22,
+   "floorY": 6.895,
+   "floorRoom": null
   },
   {
    "label": "q01_6368_2595",
@@ -1668,9 +1668,9 @@
     317,
     350
    ],
-   "floorX": 7.954,
-   "floorY": 3.093,
-   "floorRoom": "r06"
+   "floorX": 4.206,
+   "floorY": 6.891,
+   "floorRoom": null
   },
   {
    "label": "q02_-3008_1491",
@@ -1748,8 +1748,8 @@
     64,
     92
    ],
-   "floorX": 13.789,
-   "floorY": 10.756,
+   "floorX": 13.739,
+   "floorY": 8.267,
    "floorRoom": "r08"
   },
   {
@@ -1821,9 +1821,9 @@
     258,
     258
    ],
-   "floorX": 13.445,
-   "floorY": 6.556,
-   "floorRoom": "r02"
+   "floorX": 10.55,
+   "floorY": 5.512,
+   "floorRoom": "r06"
   },
   {
    "label": "q04_6368_2595",
@@ -1900,9 +1900,9 @@
     136,
     136
    ],
-   "floorX": 7.952,
-   "floorY": 3.091,
-   "floorRoom": "r06"
+   "floorX": 4.204,
+   "floorY": 6.891,
+   "floorRoom": null
   },
   {
    "label": "q05_-3008_1491",
@@ -1978,8 +1978,8 @@
     136,
     177
    ],
-   "floorX": 13.835,
-   "floorY": 10.73,
+   "floorX": 13.754,
+   "floorY": 8.216,
    "floorRoom": "r08"
   },
   {
@@ -2050,9 +2050,9 @@
     251,
     64
    ],
-   "floorX": 13.443,
-   "floorY": 6.562,
-   "floorRoom": "r02"
+   "floorX": 10.553,
+   "floorY": 5.518,
+   "floorRoom": "r06"
   },
   {
    "label": "q07_6368_2595",
@@ -2132,9 +2132,9 @@
     106,
     227
    ],
-   "floorX": 7.934,
-   "floorY": 3.081,
-   "floorRoom": "r06"
+   "floorX": 4.184,
+   "floorY": 6.897,
+   "floorRoom": null
   },
   {
    "label": "q08_-3008_1491",
@@ -2197,8 +2197,8 @@
     238,
     2
    ],
-   "floorX": 13.9,
-   "floorY": 10.667,
+   "floorX": 13.756,
+   "floorY": 8.126,
    "floorRoom": "r08"
   },
   {
@@ -2268,9 +2268,9 @@
     132,
     307
    ],
-   "floorX": 13.447,
-   "floorY": 6.564,
-   "floorRoom": "r02"
+   "floorX": 10.557,
+   "floorY": 5.517,
+   "floorRoom": "r06"
   },
   {
    "label": "q10_6368_2595",
@@ -2351,9 +2351,9 @@
     195,
     336
    ],
-   "floorX": 7.951,
-   "floorY": 3.093,
-   "floorRoom": "r06"
+   "floorX": 4.204,
+   "floorY": 6.893,
+   "floorRoom": null
   },
   {
    "label": "q11_-3008_1491",
@@ -2433,8 +2433,8 @@
     21,
     147
    ],
-   "floorX": 13.828,
-   "floorY": 10.723,
+   "floorX": 13.744,
+   "floorY": 8.216,
    "floorRoom": "r08"
   },
   {
@@ -2507,9 +2507,9 @@
     1,
     101
    ],
-   "floorX": 13.449,
-   "floorY": 6.554,
-   "floorRoom": "r02"
+   "floorX": 10.552,
+   "floorY": 5.508,
+   "floorRoom": "r06"
   },
   {
    "label": "q13_6368_2595",
@@ -2590,9 +2590,9 @@
     250,
     290
    ],
-   "floorX": 7.951,
-   "floorY": 3.094,
-   "floorRoom": "r06"
+   "floorX": 4.205,
+   "floorY": 6.894,
+   "floorRoom": null
   },
   {
    "label": "q14_-3008_1491",
@@ -2662,8 +2662,8 @@
     20,
     176
    ],
-   "floorX": 13.845,
-   "floorY": 10.727,
+   "floorX": 13.759,
+   "floorY": 8.207,
    "floorRoom": "r08"
   }
  ],
@@ -2700,14 +2700,14 @@
    "n02"
   ],
   "medianErrorM": {
-   "nelder": 5.5,
-   "mle": 5.8,
-   "gaussnewton": 6.1,
-   "bfgs": 5.7,
-   "multifloor": 8.1,
-   "nadaraya": 5.5,
-   "nearest": 7.2
+   "nelder": 3.0,
+   "mle": 2.8,
+   "gaussnewton": 3.4,
+   "bfgs": 3.2,
+   "multifloor": 4.9,
+   "nadaraya": 2.4,
+   "nearest": 4.8
   },
-  "note": "throughStructureNodes: first-floor nodes worst at the triangle-inequality check. medianErrorM: ~25% above each locator's median on the raw-rssi fixture of 2026-10-14 (29 points), distances at firmware defaults."
+  "note": "throughStructureNodes: first-floor nodes worst at the triangle-inequality check. medianErrorM: ~25% above each locator's median on the raw-rssi fixture of 2026-10-14 (29 points, per-capture frame), distances at firmware defaults."
  }
 }
