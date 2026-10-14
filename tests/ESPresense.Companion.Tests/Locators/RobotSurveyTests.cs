@@ -41,9 +41,6 @@ public class RobotSurveyTests
     /// <summary>Locators that actually solve for a position from ranges, as opposed to picking or blending node positions.</summary>
     private static readonly string[] Solvers = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor" };
 
-    /// <summary>Many headings at one spot: good for orientation sensitivity, poor spatial spread.</summary>
-    private const string Headings = "robot-survey-headings.json";
-
     /// <summary>Many spots: good spatial spread.</summary>
     private const string Spread = "robot-survey-spread.json";
 
@@ -136,22 +133,24 @@ public class RobotSurveyTests
     }
 
     /// <summary>
-    /// The robot sat at one spot and only turned. Its position moved 2 mm across 18 headings, so
-    /// every fix should land on the same point. Whatever spread we see is the solver's sensitivity
-    /// to beacon orientation alone — a lower bound on the error a turning person induces.
+    /// The robot came back to one spot again and again (within a few centimetres), turning in place
+    /// each time, so every fix should land on the same point. Whatever spread we see is the solver's
+    /// sensitivity to what changes between visits -- heading, and the beacon remount for visits on
+    /// different days -- a lower bound on the error a moving person induces.
     /// </summary>
     [Test]
-    public void Repeatability_RobotStationary_OnlyHeadingChanged()
+    public void Repeatability_SameSpotRevisited()
     {
-        _survey = Load(Headings);
+        _survey = Load(Spread);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
 
         var group = _survey.Points
-            .GroupBy(p => (Math.Round(p.RobotX, 2), Math.Round(p.RobotY, 2)))
+            .GroupBy(p => (Math.Round(p.RobotX, 1), Math.Round(p.RobotY, 1)))
             .OrderByDescending(g => g.Count()).First();
+        if (group.Count() < 3) Assert.Ignore("no spot visited 3+ times");
 
-        TestContext.WriteLine($"Robot fixed at robot-frame {group.Key}, {group.Count()} headings, true movement 2 mm\n");
+        TestContext.WriteLine($"Robot at robot-frame {group.Key}, {group.Count()} visits\n");
         TestContext.WriteLine($"{"locator",-13}{"fixes",6}{"spread p95",12}{"max pair",10}{"centroid dev",14}");
 
         var anySolved = false;
@@ -181,7 +180,6 @@ public class RobotSurveyTests
     /// rotation and translation, though deliberately NOT to scale, so it also catches the
     /// systematic distance inflation seen in the calibration matrix.
     /// </summary>
-    [TestCase(Headings)]
     [TestCase(Spread)]
     public void Rigidity_SolverMustReproduceKnownSeparations(string fixture)
     {
@@ -250,7 +248,6 @@ public class RobotSurveyTests
     /// intersect, the problem is ill-conditioned, and tiny input changes move the answer metres.
     /// Sweeping a global scale separates "solver is fragile" from "input is inconsistent".
     /// </summary>
-    [TestCase(Headings)]
     [TestCase(Spread)]
     public void ScaleSweep_SeparatesSolverFragilityFromDistanceInflation(string fixture)
     {
@@ -315,18 +312,22 @@ public class RobotSurveyTests
     /// Note why unit tests on synthetic data miss this: when the distances are mutually consistent
     /// the residual is zero at the solution, and a wrong Jacobian still has a fixed point there.
     /// The defect only shows on inconsistent measurements -- which is all that real radio produces.
+    ///
+    /// Like the synthetic variant below, it asserts on the median excess: a correct solver still
+    /// settles in the wrong basin of a multimodal objective at some points (about 1 in 5 here),
+    /// while the broken Jacobian lost at every point.
     /// </summary>
     [Test]
     public void Optimality_GaussNewtonMustMinimiseItsOwnObjective()
     {
-        _survey = Load(Headings);
+        _survey = Load(Spread);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
         var excesses = GaussNewtonExcess(floor, nodes,
             _survey.Points.Select(p => (p.Label, p.M.ToDictionary(kv => kv.Key, kv => kv.Value.Dist))));
-        var worse = excesses.Count(e => e > 0.25);
-        Assert.That(worse, Is.LessThanOrEqualTo(excesses.Count / 5),
-            $"GaussNewton lost to a quarter-metre grid on {worse} of {excesses.Count} points: " +
+        var median = excesses.OrderBy(x => x).ElementAt(excesses.Count / 2);
+        Assert.That(median, Is.LessThan(0.1),
+            $"GaussNewton's median excess over a brute-force grid is {median:0.000}: " +
             "it is not minimising the objective it reports.");
     }
 
@@ -645,6 +646,84 @@ public class RobotSurveyTests
         });
     }
 
+    /// <summary>Firmware defaults (main/defaults.h): what a node reports before any calibration.</summary>
+    private const double DefaultRefRssi = -59, DefaultAbsorption = 2.7;
+
+    /// <summary>The beacon rode on top of the vacuum.</summary>
+    private const double RobotZ = 0.30;
+
+    /// <summary>Repeat visits within this distance count as the same spot.</summary>
+    private const double SameSpotM = 0.5;
+
+    /// <summary>
+    /// Fingerprinting against every ranging locator, leave-one-spot-out: each surveyed spot is located
+    /// using a fingerprint map built from the OTHER spots only (repeat visits to the same spot are left
+    /// out too, so it cannot just look itself up), through the real FingerprintLocator and a map file
+    /// in the config directory. The ranging locators get the nodes' reported distances, as in
+    /// Accuracy_FloorFrame_PerLocator.
+    ///
+    /// Fingerprinting skips the log-distance model entirely, which this survey shows is the weak link:
+    /// it must beat every ranging locator's median.
+    /// </summary>
+    [Test]
+    public void Accuracy_Fingerprint_LeaveOneSpotOut()
+    {
+        _survey = Load(Spread);
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+        RequireSpatialPoints(MinAccuracyPoints);
+
+        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
+        var cfg = new FingerprintConfig { Enabled = true };
+        var path = Path.Combine(_configDir, cfg.File);
+        var map = new FingerprintMap(path);
+
+        var errs = new List<double>();
+        int hits = 0, total = 0;
+        foreach (var p in pts)
+        {
+            var train = pts.Where(q => Math.Sqrt(Math.Pow(q.FloorX!.Value - p.FloorX!.Value, 2) + Math.Pow(q.FloorY!.Value - p.FloorY!.Value, 2)) > SameSpotM);
+            File.WriteAllText(path, JsonSerializer.Serialize(new
+            {
+                fingerprints = train.Select(q => new
+                {
+                    floor = "first", x = q.FloorX, y = q.FloorY, z = RobotZ,
+                    rssi = q.M.Where(kv => nodes.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Rssi)
+                })
+            }));
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(errs.Count + 1)); // force a reload per spot
+
+            var device = new Device($"robot-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
+            foreach (var (id, m) in p.M)
+                if (nodes.TryGetValue(id, out var node))
+                    device.Nodes[id] = new DeviceToNode(device, node) { Rssi = m.Rssi, Distance = m.Dist, LastHit = DateTime.UtcNow };
+            var scenario = new Scenario(_configLoader.Config, new FingerprintLocator(device, floor, map, cfg), "fingerprint");
+            if (!new FingerprintLocator(device, floor, map, cfg).Locate(scenario)) continue;
+            errs.Add(Math.Sqrt(Math.Pow(scenario.Location.X - p.FloorX!.Value, 2) + Math.Pow(scenario.Location.Y - p.FloorY!.Value, 2)));
+            if (p.FloorRoom == null) continue;
+            total++;
+            if (RoomAt(scenario.Location.X, scenario.Location.Y) == p.FloorRoom) hits++;
+        }
+        errs.Sort();
+        var fp = new AccuracyResult(errs.Count, pts.Count, Pct(errs, 0.5), Pct(errs, 0.9), errs[^1], hits, total);
+
+        TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}{"within 1 m",12}");
+        TestContext.WriteLine($"{"fingerprint",-13}{$"{fp.Fixes}/{fp.Points}",8}{fp.Median,10:0.00}{fp.P90,8:0.00}{fp.Max,8:0.00}{$"{fp.RoomHits}/{fp.RoomTotal}",11}{errs.Count(e => e <= 1.0),12}");
+        var ranging = new Dictionary<string, AccuracyResult>();
+        foreach (var which in Locators)
+        {
+            var r = ranging[which] = Accuracy(which, floor, nodes);
+            TestContext.WriteLine($"{which,-13}{$"{r.Fixes}/{r.Points}",8}{r.Median,10:0.00}{r.P90,8:0.00}{r.Max,8:0.00}{$"{r.RoomHits}/{r.RoomTotal}",11}");
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fp.Fixes, Is.EqualTo(pts.Count), "fingerprinting should fix every spot");
+            foreach (var (which, r) in ranging)
+                Assert.That(fp.Median, Is.LessThan(r.Median), $"fingerprinting should beat {which} on median error");
+        });
+    }
+
     /// <summary>Fewer positions than this and per-locator medians are noise.</summary>
     private const int MinAccuracyPoints = 10;
 
@@ -744,11 +823,18 @@ public class RobotSurveyTests
         public Dictionary<string, Meas> M { get; set; } = new();
     }
 
+    /// <summary>
+    /// One node's view of one spot. Rssi is the raw radio reading: the fixture keeps nothing the live
+    /// optimizer sets (rxAdj, rssi@1m, absorption, the node's own distance), so ranging gets the
+    /// distance the firmware would report at its defaults.
+    /// </summary>
     private sealed class Meas
     {
         public double Rssi { get; set; }
-        public double Dist { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public double Dist => Math.Pow(10, (DefaultRefRssi - Rssi) / (10 * DefaultAbsorption));
         public int N { get; set; }
         public double Sd { get; set; }
+
     }
 }

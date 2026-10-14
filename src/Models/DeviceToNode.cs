@@ -11,6 +11,8 @@ public class DeviceToNode(Device device, Node node)
     public double Rssi { get; set; }
     public double? RssiVar { get; set; }
     public double RefRssi { get; set; }
+    /// <summary>The node's rxAdj when it sent this reading; the firmware publishes rssi = raw - rxAdj.</summary>
+    public double? RssiRxAdj { get; set; }
 
     public DateTime? LastHit { get; set; }
     public int Hits { get; set; }
@@ -24,6 +26,7 @@ public class DeviceToNode(Device device, Node node)
         Rssi = payload.Rssi;
         RssiVar = payload.RssiVar;
         RefRssi = payload.RefRssi;
+        RssiRxAdj = payload.RssiRxAdj;
         NewName(payload.Name);
         var moved = Math.Abs(LastDistance - payload.Distance) > 0.25;
         if (moved) LastDistance = payload.Distance;

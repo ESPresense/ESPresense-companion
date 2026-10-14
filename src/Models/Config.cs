@@ -76,6 +76,30 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
+
+        [YamlMember(Alias = "fingerprint")]
+        public FingerprintConfig Fingerprint { get; set; } = new();
+    }
+
+    public partial class FingerprintConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
+
+        /// <summary>Fingerprint survey file, relative to the config directory.</summary>
+        [YamlMember(Alias = "file")]
+        public string File { get; set; } = "fingerprints.json";
+
+        /// <summary>How many closest fingerprints to average.</summary>
+        [YamlMember(Alias = "k")]
+        public int K { get; set; } = 3;
+
+        /// <summary>Fewest nodes a reading and a fingerprint must share to be compared.</summary>
+        [YamlMember(Alias = "min_common")]
+        public int MinCommon { get; set; } = 3;
     }
 
     public partial class NadarayaWatsonConfig

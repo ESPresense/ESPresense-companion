@@ -25,9 +25,21 @@ public class State
     // ponytail: device ids/names are matched case-insensitively everywhere else (all the dictionaries are OrdinalIgnoreCase), globs must agree
     private static readonly GlobOptions GlobOpts = new() { Evaluation = { CaseInsensitive = true } };
 
+    private readonly string _configDir;
+    private FingerprintMap? _fingerprints;
+
+    /// <summary>The fingerprint survey named by locators.fingerprint.file, re-created if the name changes.</summary>
+    private FingerprintMap Fingerprints(FingerprintConfig fc)
+    {
+        var path = Path.Combine(_configDir, fc.File);
+        if (_fingerprints?.Path != path) _fingerprints = new FingerprintMap(path);
+        return _fingerprints;
+    }
+
     public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
         _nts = nts;
+        _configDir = cl.ConfigDirectory;
         void LoadConfig(Config c)
         {
             Config = c;
@@ -209,9 +221,17 @@ public class State
         var multiFloor = Config?.Locators?.MultiFloor;
         var nadarayaWatson = Config?.Locators?.NadarayaWatson;
         var nearestNode = Config?.Locators?.NearestNode;
+        var fingerprint = Config?.Locators?.Fingerprint;
 
-        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (multiFloor?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
+        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (multiFloor?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false) || (fingerprint?.Enabled ?? false))
         {
+            if (fingerprint?.Enabled ?? false)
+            {
+                var map = Fingerprints(fingerprint);
+                foreach (var floor in GetFloorsByIds(fingerprint.Floors))
+                    yield return new Scenario(Config, new FingerprintLocator(device, floor, map, fingerprint), floor.Name);
+            }
+
             if (nelderMead?.Enabled ?? false)
                 foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
                     yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);

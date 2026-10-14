@@ -273,9 +273,9 @@ public class SelfCalibrationTests
     /// coordinates.
     ///
     /// On the survey this was developed against, the two modes split sharply. legacy (the code default) works:
-    /// its accepted calibration cut held-out median range error from 8.62 m (cold-start defaults)
-    /// to 2.26 m, beating even the nodes' own tuned firmware estimates (4.94 m). per_node_absorption
-    /// (the config.example.yaml default) is a KNOWN DEFECT, pinned here at its current degradation
+    /// its accepted calibration cut held-out median range error from 4.31 m (firmware defaults) to
+    /// 2.24 m. per_node_absorption (the config.example.yaml default) makes it worse, 4.31 m to
+    /// 5.10 m. That is a KNOWN DEFECT, pinned here at its current degradation
     /// so it cannot silently worsen: its quartic penalty against under-estimated distances pushes
     /// rxAdj positive (inflationary), and the gate scores proposals in RSSI space — where Pearson
     /// correlation is blind to that constant shift — so it accepts calibration that is worse in the
@@ -317,7 +317,7 @@ public class SelfCalibrationTests
                         RssiRxAdj = 0, // null would hide rxAdj proposals from the gate's evaluation
                         RefRssi = TxRef, // the calibrate beacon's rssi@1m
                         DistVar = meas.Sd * meas.Sd,
-                        Distance = meas.Dist,
+                        Distance = Math.Pow(10, (TxRef - meas.Rssi) / (10 * 2.7)), // firmware defaults
                     });
                 }
             return snap;
@@ -360,11 +360,6 @@ public class SelfCalibrationTests
             return Median(errs);
         }
 
-        var reported = Median(test.SelectMany(pt => pt.M
-            .Where(kv => rxNodes.ContainsKey(kv.Key))
-            .Select(kv => Math.Abs(kv.Value.Dist -
-                rxNodes[kv.Key].Location.DistanceTo(new Point3D(pt.FloorX!.Value, pt.FloorY!.Value, RobotZ))))));
-
         var before = HeldOutMedian();
         await runner.RunCycleAsync(fitOs, new List<OptimizationSnapshot> { evalOs, fitOs }, Opt, optimizers);
         var after = HeldOutMedian();
@@ -377,8 +372,7 @@ public class SelfCalibrationTests
             var c = nss.Get(id).Calibration;
             TestContext.WriteLine($"  {id,-20} absorption {c.Absorption:0.00}  rxAdj {c.RxAdjRssi}");
         }
-        TestContext.WriteLine($"\nheld-out median |range error|: before cycle {before:0.00} m, after {after:0.00} m " +
-                              $"(nodes' own reported distances: {reported:0.00} m)");
+        TestContext.WriteLine($"\nheld-out median |range error|: before cycle {before:0.00} m, after {after:0.00} m");
 
         Assert.That(after, Is.LessThanOrEqualTo(before * maxDegradation),
             $"a calibration cycle ({mode}) degraded held-out ranging: {before:0.00} m -> {after:0.00} m. " +
@@ -407,10 +401,10 @@ public class SelfCalibrationTests
         public Dictionary<string, Meas> M { get; set; } = new();
     }
 
+    /// <summary>Raw radio reading only; the fixture keeps nothing the live optimizer sets.</summary>
     private sealed class Meas
     {
         public double Rssi { get; set; }
-        public double Dist { get; set; }
         public double Sd { get; set; }
     }
 }

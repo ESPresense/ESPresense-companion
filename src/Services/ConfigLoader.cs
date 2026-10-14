@@ -14,9 +14,11 @@ public class ConfigLoader : BackgroundService
     private DateTime _lastModified;
     private readonly string _configPath;
     public Config? Config { get; private set; }
+    public string ConfigDirectory { get; }
 
     public ConfigLoader(string configDir)
     {
+        ConfigDirectory = configDir;
         _configPath = Path.Combine(configDir, "config.yaml");
         _deserializer = new DeserializerBuilder()
             .IgnoreUnmatchedProperties()
