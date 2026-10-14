@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ESPresense.Companion.Tests.Locators;
 using ESPresense.Models;
 using ESPresense.Optimizers;
 using ESPresense.Services;
@@ -26,6 +27,7 @@ public class SelfCalibrationTests
 {
     private State _state = null!;
     private ConfigLoader _configLoader = null!;
+    private NodeTelemetryStore _nts = null!;
     private string _configDir = null!;
 
     private const double TxRef = -59;
@@ -53,7 +55,8 @@ public class SelfCalibrationTests
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
         _configLoader = new ConfigLoader(_configDir);
-        _state = new State(_configLoader, new NodeTelemetryStore(mqtt.Object));
+        _nts = new NodeTelemetryStore(mqtt.Object);
+        _state = new State(_configLoader, _nts);
 
         // ConfigLoader loads asynchronously; the optimizers need Config.Optimization.
         for (var i = 0; i < 200 && _configLoader.Config == null; i++) Thread.Sleep(10);
@@ -262,70 +265,53 @@ public class SelfCalibrationTests
         Assert.That(after, Is.LessThan(before / 2), "calibration should at least halve the median range error");
     }
 
-    /// <summary>
-    /// Field safety on real radio, through the pipeline as shipped: a full optimization cycle —
-    /// optimizers plus the acceptance gate in <see cref="OptimizationRunner.RunCycleAsync"/> —
-    /// runs on half the robot-surveyed positions, and whatever calibration it chose to apply is
-    /// scored on the held-out half. The invariant is non-degradation: leaving continuous
-    /// calibration on must not make ranging worse than the settings it started from. The robot
-    /// plays a surveyed transmitter: its LiDAR position (floorX/floorY, geometry-fitted frame,
-    /// ~0.2 m) is the kind of truth node-to-node calibration enjoys from user-entered node
-    /// coordinates.
-    ///
-    /// On the survey this was developed against, the two modes split sharply. legacy (the code default) works:
-    /// its accepted calibration cut held-out median range error from 4.30 m (firmware defaults) to
-    /// 1.34 m. per_node_absorption (the config.example.yaml default) gains nothing (4.30 m before and
-    /// after) and has made it worse on earlier data. That is a KNOWN DEFECT, pinned here
-    /// so it cannot silently worsen: its quartic penalty against under-estimated distances pushes
-    /// rxAdj positive (inflationary), and the gate scores proposals in RSSI space — where Pearson
-    /// correlation is blind to that constant shift — so it accepts calibration that is worse in the
-    /// metres the locators actually consume.
-    /// </summary>
-    [TestCase("legacy", 1.10)]
-    [TestCase("per_node_absorption", 1.30)]
-    public async Task RobotSurvey_HeldOut_CalibrationCycleDoesNotDegradeRanging(string mode, double maxDegradation)
+    // ---- robot survey: real radio, through the pipeline as shipped -------------------------------
+
+    private Survey LoadSpread()
     {
         var survey = JsonSerializer.Deserialize<Survey>(
-            ESPresense.Companion.Tests.Locators.RobotSurveyTests.LoadFixtureText("robot-survey-spread.json"),
+            RobotSurveyTests.LoadFixtureText("robot-survey-spread.json"),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        survey.Points = survey.Points.Where(p => p.FloorX != null && p.FloorY != null).OrderBy(p => p.Label).ToList();
+        if (survey.Points.Count < 12)
+            Assert.Ignore($"needs 12+ surveyed positions for a train/holdout split, fixture has {survey.Points.Count}");
+        return survey;
+    }
 
-        var points = survey.Points.Where(p => p.FloorX != null && p.FloorY != null).OrderBy(p => p.Label).ToList();
-        if (points.Count < 12)
-            Assert.Ignore($"needs 12+ surveyed positions for a train/holdout split, fixture has {points.Count}");
+    private static Dictionary<string, OptNode> RxNodes(Survey survey) => survey.Nodes.ToDictionary(n => n.Id,
+        n => new OptNode { Id = n.Id, Name = n.Id, Location = new Point3D(n.X, n.Y, n.Z) });
 
-        var rxNodes = survey.Nodes.ToDictionary(n => n.Id,
-            n => new OptNode { Id = n.Id, Name = n.Id, Location = new Point3D(n.X, n.Y, n.Z) });
+    /// <summary>The robot's LiDAR position (floorX/floorY, geometry-fitted frame, ~0.2 m) with the beacon on top.</summary>
+    private static Point3D Truth(SurveyPoint p) => new(p.FloorX!.Value, p.FloorY!.Value, RobotZ);
 
-        // Dwells happen at different times, so different positions land in different snapshots:
-        // the optimizers fit the latest (fitOs) while the gate also holds earlier history (evalOs).
-        var train = points.Where((_, i) => i % 2 == 0).ToList();
-        var test = points.Where((_, i) => i % 2 == 1).ToList();
-
-        // One physical beacon, one tx identity — exactly one txRef for the joint fit to assign.
-        OptimizationSnapshot Snapshot(IEnumerable<SurveyPoint> pts)
-        {
-            var snap = new OptimizationSnapshot();
-            foreach (var p in pts)
-                foreach (var (id, meas) in p.M)
+    /// <summary>
+    /// One physical beacon, one tx identity — exactly one txRef for the joint fit to assign. The
+    /// robot plays a surveyed transmitter: its position is the kind of truth node-to-node
+    /// calibration enjoys from user-entered node coordinates.
+    /// </summary>
+    private static OptimizationSnapshot Snapshot(IEnumerable<SurveyPoint> pts, Dictionary<string, OptNode> rxNodes, Func<Meas, double>? rssi = null)
+    {
+        var snap = new OptimizationSnapshot();
+        foreach (var p in pts)
+            foreach (var (id, meas) in p.M)
+            {
+                if (!rxNodes.TryGetValue(id, out var rx)) continue;
+                snap.Measures.Add(new Measure
                 {
-                    if (!rxNodes.TryGetValue(id, out var rx)) continue;
-                    snap.Measures.Add(new Measure
-                    {
-                        Rx = rx,
-                        Tx = new OptNode { Id = "robot", Name = "robot", Location = new Point3D(p.FloorX!.Value, p.FloorY!.Value, RobotZ) },
-                        Rssi = meas.Rssi,
-                        RssiRxAdj = 0, // null would hide rxAdj proposals from the gate's evaluation
-                        RefRssi = TxRef, // the calibrate beacon's rssi@1m
-                        DistVar = meas.Sd * meas.Sd,
-                        Distance = Math.Pow(10, (TxRef - meas.Rssi) / (10 * 2.7)), // firmware defaults
-                    });
-                }
-            return snap;
-        }
+                    Rx = rx,
+                    Tx = new OptNode { Id = "robot", Name = "robot", Location = Truth(p) },
+                    Rssi = rssi?.Invoke(meas) ?? meas.Rssi,
+                    RssiRxAdj = meas.RxAdj ?? 0, // the rxAdj baked into Rssi; null would hide rxAdj proposals from the gate
+                    RefRssi = TxRef, // the calibrate beacon's rssi@1m
+                    DistVar = meas.Sd * meas.Sd,
+                    Distance = meas.Dist,
+                });
+            }
+        return snap;
+    }
 
-        var fitOs = Snapshot(train.Where((_, i) => i % 2 == 0));
-        var evalOs = Snapshot(train.Where((_, i) => i % 2 == 1));
-
+    private (OptimizationRunner Runner, NodeSettingsStore Nss) MakeRunner()
+    {
         var mqtt = new Mock<IMqttCoordinator>();
         mqtt.Setup(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
             .Returns(Task.CompletedTask);
@@ -333,56 +319,223 @@ public class SelfCalibrationTests
         var runner = new OptimizationRunner(_state, nss,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<OptimizationRunner>.Instance,
             _configLoader, Mock.Of<ILeaseService>());
+        return (runner, nss);
+    }
 
-        IList<IOptimizer> optimizers = mode == "per_node_absorption"
-            ? new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state) }
-            : new List<IOptimizer>
-            {
-                new RxAdjRssiOptimizer(_state),
-                new AbsorptionAvgOptimizer(_state),
-                new AbsorptionErrOptimizer(_state),
-                new IsotonicRegressionOptimizer(_state),
-            };
-
-        // Held-out range error under whatever settings the store currently holds; same distance
-        // model OptimizationResults.Evaluate uses, with the beacon's txRef fixed at its rssi@1m.
-        double HeldOutMedian()
+    private IList<IOptimizer> MakeOptimizers(string mode) => mode == "per_node_absorption"
+        ? new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state) }
+        : new List<IOptimizer>
         {
-            var errs = new List<double>();
-            foreach (var pt in test)
-                foreach (var (id, meas) in pt.M)
-                {
-                    if (!rxNodes.TryGetValue(id, out var rx)) continue;
-                    var s = nss.Get(id).Calibration;
-                    var pred = Math.Pow(10, (TxRef + (s.RxAdjRssi ?? 0) - meas.Rssi) / (10 * (s.Absorption ?? 2.7)));
-                    errs.Add(Math.Abs(pred - rx.Location.DistanceTo(new Point3D(pt.FloorX!.Value, pt.FloorY!.Value, RobotZ))));
-                }
-            return Median(errs);
-        }
+            new RxAdjRssiOptimizer(_state),
+            new AbsorptionAvgOptimizer(_state),
+            new AbsorptionErrOptimizer(_state),
+            new IsotonicRegressionOptimizer(_state),
+        };
 
-        var before = HeldOutMedian();
-        await runner.RunCycleAsync(fitOs, new List<OptimizationSnapshot> { evalOs, fitOs }, Opt, optimizers);
-        var after = HeldOutMedian();
+    /// <summary>
+    /// Distance the system would infer under these settings; same model OptimizationResults.Evaluate
+    /// uses, with the beacon's txRef fixed at its rssi@1m, exactly as a device is ranged. The node
+    /// would publish raw - rxAdj under the new settings, and raw is Rssi + the rxAdj at capture.
+    /// </summary>
+    private static double Ranged(Meas meas, NodeSettings s) =>
+        Math.Pow(10, (TxRef + (s.Calibration.RxAdjRssi ?? 0) - (meas.RxAdj ?? 0) - meas.Rssi) / (10 * (s.Calibration.Absorption ?? 2.7)));
+
+    private static double HeldOutMedian(IEnumerable<SurveyPoint> test, Dictionary<string, OptNode> rxNodes, NodeSettingsStore nss) =>
+        Median(test.SelectMany(pt => pt.M
+            .Where(kv => rxNodes.ContainsKey(kv.Key))
+            .Select(kv => Math.Abs(Ranged(kv.Value, nss.Get(kv.Key)) - rxNodes[kv.Key].Location.DistanceTo(Truth(pt))))));
+
+    private static string Describe(NodeSettingsStore nss, string id)
+    {
+        var c = nss.Get(id).Calibration;
+        return c.Absorption == null && c.RxAdjRssi == null ? "-" : $"{c.Absorption:0.00}/{c.RxAdjRssi,3}";
+    }
+
+    /// <summary>
+    /// Field efficacy on real radio: a full optimization cycle — optimizers plus the acceptance gate
+    /// in <see cref="OptimizationRunner.RunCycleAsync"/> — runs on half the robot-surveyed
+    /// positions, and whatever calibration it chose to apply is scored on the held-out half.
+    ///
+    /// On the survey this was developed against, both modes cut held-out median range error from
+    /// 8.62 m (cold-start defaults) to ~2.3 m, well under the nodes' own tuned firmware estimates
+    /// (4.94 m); the bar here is half, leaving room for other homes. per_node_absorption (the
+    /// config.example.yaml default) used to make it WORSE (10.65 m): its quartic penalty against
+    /// under-estimated distances pushed rxAdj positive, and the joint fit hid that behind a
+    /// matching txRef shift the gate's RSSI-space score cannot see. It now fits in dB with txRef
+    /// anchored, and the gate also scores with txRef held (see OptimizationResults.Evaluate).
+    /// </summary>
+    [TestCase("legacy", 0.5)]
+    [TestCase("per_node_absorption", 0.5)]
+    public async Task RobotSurvey_HeldOut_CalibrationCycleImprovesRanging(string mode, double maxRatio)
+    {
+        var survey = LoadSpread();
+        var rxNodes = RxNodes(survey);
+
+        // Dwells happen at different times, so different positions land in different snapshots:
+        // the optimizers fit the latest (fitOs) while the gate also holds earlier history (evalOs).
+        var train = survey.Points.Where((_, i) => i % 2 == 0).ToList();
+        var test = survey.Points.Where((_, i) => i % 2 == 1).ToList();
+        var fitOs = Snapshot(train.Where((_, i) => i % 2 == 0), rxNodes);
+        var evalOs = Snapshot(train.Where((_, i) => i % 2 == 1), rxNodes);
+
+        var (runner, nss) = MakeRunner();
+
+        var reported = Median(test.SelectMany(pt => pt.M
+            .Where(kv => rxNodes.ContainsKey(kv.Key))
+            .Select(kv => Math.Abs(kv.Value.Dist - rxNodes[kv.Key].Location.DistanceTo(Truth(pt))))));
+
+        var before = HeldOutMedian(test, rxNodes, nss);
+        await runner.RunCycleAsync(fitOs, new List<OptimizationSnapshot> { evalOs, fitOs }, Opt, MakeOptimizers(mode));
+        var after = HeldOutMedian(test, rxNodes, nss);
 
         var applied = rxNodes.Keys.Where(id => nss.Get(id).Calibration.Absorption != null
                                             || nss.Get(id).Calibration.RxAdjRssi != null).ToList();
-        TestContext.WriteLine($"mode {mode}: cycle applied calibration to {applied.Count} receivers ({string.Join(", ", applied)})");
-        foreach (var id in applied)
-        {
-            var c = nss.Get(id).Calibration;
-            TestContext.WriteLine($"  {id,-20} absorption {c.Absorption:0.00}  rxAdj {c.RxAdjRssi}");
-        }
-        TestContext.WriteLine($"\nheld-out median |range error|: before cycle {before:0.00} m, after {after:0.00} m");
+        TestContext.WriteLine($"mode {mode}: cycle applied calibration to {applied.Count} receivers (absorption/rxAdj)");
+        foreach (var id in applied) TestContext.WriteLine($"  {id,-6} {Describe(nss, id)}");
+        TestContext.WriteLine($"\nheld-out median |range error|: before cycle {before:0.00} m, after {after:0.00} m " +
+                              $"(at firmware defaults: {reported:0.00} m)");
 
-        Assert.That(after, Is.LessThanOrEqualTo(before * maxDegradation),
-            $"a calibration cycle ({mode}) degraded held-out ranging: {before:0.00} m -> {after:0.00} m. " +
-            "The acceptance gate accepted calibration that does not hold up on data the cycle never saw.");
+        Assert.That(applied, Is.Not.Empty, $"a calibration cycle ({mode}) applied nothing on cold-start defaults");
+        Assert.That(after, Is.LessThanOrEqualTo(before * maxRatio),
+            $"a calibration cycle ({mode}) should cut held-out range error to at most {maxRatio:0%} of cold-start defaults: " +
+            $"{before:0.00} m -> {after:0.00} m. Either the optimizer fits noise or the gate accepted calibration " +
+            "that does not hold up on data the cycle never saw.");
+    }
+
+    /// <summary>
+    /// Continuous calibration runs every interval on a home that has not changed, so successive
+    /// cycles see the same radio plus noise. Proposals must settle, not wander: the live Companion
+    /// was seen rewriting a node's rxAdj by 3–7 dB an hour on a stationary house, which is the gate
+    /// accepting noise as improvement over and over. Each cycle here gets a fresh noisy snapshot
+    /// (per-measurement sd from the survey) and the short history production keeps; after the
+    /// first applied calibration the settings must stay put and held-out ranging must not slide.
+    /// </summary>
+    [TestCase("legacy")]
+    [TestCase("per_node_absorption")]
+    public async Task RobotSurvey_SuccessiveCycles_SettingsConvergeRatherThanWander(string mode)
+    {
+        var survey = LoadSpread();
+        var rxNodes = RxNodes(survey);
+        var train = survey.Points.Where((_, i) => i % 2 == 0).ToList();
+        var test = survey.Points.Where((_, i) => i % 2 == 1).ToList();
+
+        var rnd = new Random(3);
+        OptimizationSnapshot Noisy() => Snapshot(train, rxNodes, m => m.Rssi + Math.Max(1.0, m.Sd) * Gauss(rnd));
+
+        var (runner, nss) = MakeRunner();
+        var optimizers = MakeOptimizers(mode);
+
+        // ExecuteAsync primes three snapshots before the first cycle and keeps a few minutes of history.
+        const int cycles = 8, window = 4;
+        var history = new List<OptimizationSnapshot> { Noisy(), Noisy(), Noisy() };
+        var trajectory = new List<(int Cycle, Dictionary<string, (int? RxAdj, double? Absorption)> Settings, double HeldOut)>();
+        for (var k = 0; k < cycles; k++)
+        {
+            var os = Noisy();
+            history.Add(os);
+            if (history.Count > window) history.RemoveAt(0);
+            await runner.RunCycleAsync(os, history.ToList(), Opt, optimizers);
+            trajectory.Add((k,
+                rxNodes.Keys.ToDictionary(id => id, id => (nss.Get(id).Calibration.RxAdjRssi, nss.Get(id).Calibration.Absorption)),
+                HeldOutMedian(test, rxNodes, nss)));
+        }
+
+        var ids = rxNodes.Keys.OrderBy(x => x).ToList();
+        TestContext.WriteLine($"mode {mode}: settings (absorption/rxAdj) after each cycle, held-out median range error");
+        TestContext.WriteLine($"{"cycle",5} {"m",6}  " + string.Join(" ", ids.Select(id => $"{id,9}")));
+        foreach (var t in trajectory)
+            TestContext.WriteLine($"{t.Cycle,5} {t.HeldOut,6:0.00}  " + string.Join(" ", ids.Select(id =>
+                t.Settings[id] is { RxAdj: null, Absorption: null } ? $"{"-",9}" : $"{t.Settings[id].Absorption,5:0.00}/{t.Settings[id].RxAdj,3}")));
+
+        Assert.That(trajectory.Any(t => t.Settings.Values.Any(s => s.RxAdj != null || s.Absorption != null)), "no cycle applied any calibration");
+
+        // The first couple of cycles may still refine while the history fills; after that the settings
+        // must hold. 3 dB / 0.3 are a step of the kind the live Companion was seen taking every hour.
+        const int settleBy = 2;
+        var settled = trajectory[settleBy];
+        var wander = new List<string>();
+        foreach (var t in trajectory.Skip(settleBy + 1))
+            foreach (var id in ids)
+            {
+                var (rx0, ab0) = settled.Settings[id];
+                var (rx1, ab1) = t.Settings[id];
+                if (Math.Abs((rx1 ?? 0) - (rx0 ?? 0)) > 3) wander.Add($"cycle {t.Cycle} {id} rxAdj {rx0} -> {rx1}");
+                if (Math.Abs((ab1 ?? 0) - (ab0 ?? 0)) > 0.3) wander.Add($"cycle {t.Cycle} {id} absorption {ab0:0.00} -> {ab1:0.00}");
+            }
+        Assert.That(wander, Is.Empty, $"settings kept moving after cycle {settleBy} ({mode}):\n  " + string.Join("\n  ", wander));
+
+        // And where it settles has to be good: the same bar as the single clean cycle, now under noise.
+        var cold = HeldOutMedian(test, rxNodes, MakeRunner().Nss);
+        Assert.That(trajectory[^1].HeldOut, Is.LessThanOrEqualTo(cold * 0.5),
+            $"after {cycles} noisy cycles ({mode}) held-out range error is {trajectory[^1].HeldOut:0.00} m against {cold:0.00} m cold-start; " +
+            "the gate let noise-fitted calibration through and then protected it");
+    }
+
+    /// <summary>
+    /// The loop closed: does the calibration a cycle applies make the *position* better, not just
+    /// the ranges? Each held-out point is ranged three ways — cold-start defaults, the applied
+    /// calibration, and the distances the nodes themselves reported — and each set goes through
+    /// the locators. First-floor nodes only, as in RobotSurveyTests; error is XY distance from the
+    /// robot's LiDAR position.
+    /// </summary>
+    [TestCase("legacy")]
+    [TestCase("per_node_absorption")]
+    public async Task RobotSurvey_HeldOut_CalibrationImprovesPosition(string mode)
+    {
+        var survey = LoadSpread();
+        var rxNodes = RxNodes(survey);
+        var train = survey.Points.Where((_, i) => i % 2 == 0).ToList();
+        var test = survey.Points.Where((_, i) => i % 2 == 1).ToList();
+
+        var (runner, nss) = MakeRunner();
+        await runner.RunCycleAsync(Snapshot(train.Where((_, i) => i % 2 == 0), rxNodes),
+            new List<OptimizationSnapshot> { Snapshot(train.Where((_, i) => i % 2 == 1), rxNodes), Snapshot(train.Where((_, i) => i % 2 == 0), rxNodes) },
+            Opt, MakeOptimizers(mode));
+        var cold = MakeRunner().Nss;
+
+        var harness = new SurveyLocatorHarness(_state, _configLoader, _nts, survey.FloorBounds["first"],
+            survey.Nodes.Where(n => n.Floors.Contains("first")).Select(n => (n.Id, n.X, n.Y, n.Z)));
+
+        Dictionary<string, double> Dists(SurveyPoint pt, Func<string, Meas, double> f) =>
+            pt.M.Where(kv => harness.Nodes.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => f(kv.Key, kv.Value));
+
+        double MedianXyError(string which, Func<string, Meas, double> f)
+        {
+            var errs = new List<double>();
+            foreach (var pt in test)
+            {
+                var fix = harness.Solve(which, Dists(pt, f));
+                if (fix == null) continue;
+                var t = Truth(pt);
+                errs.Add(Math.Sqrt(Math.Pow(fix.Value.X - t.X, 2) + Math.Pow(fix.Value.Y - t.Y, 2)));
+            }
+            return errs.Count == 0 ? double.NaN : Median(errs);
+        }
+
+        var locators = new[] { "gaussnewton", "nelder", "mle", "nadaraya", "nearest" };
+        TestContext.WriteLine($"mode {mode}: held-out median XY position error (m) by locator");
+        TestContext.WriteLine($"{"locator",-12} {"cold",8} {"calibrated",11} {"defaults",9}");
+        var ratios = new List<double>();
+        foreach (var which in locators)
+        {
+            var c = MedianXyError(which, (_, m) => Ranged(m, cold.Get("none")));
+            var k = MedianXyError(which, (id, m) => Ranged(m, nss.Get(id)));
+            var r = MedianXyError(which, (_, m) => m.Dist);
+            TestContext.WriteLine($"{which,-12} {c,8:0.00} {k,11:0.00} {r,9:0.00}");
+            // nearest-node picks a node position, so calibration cannot move it: printed, not scored.
+            if (which != "nearest" && double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
+        }
+
+        Assert.That(ratios, Is.Not.Empty, "no locator produced fixes");
+        Assert.That(Median(ratios), Is.LessThan(0.8),
+            $"the applied calibration ({mode}) should cut held-out position error well below cold-start defaults across locators; median ratio {Median(ratios):0.00}");
     }
 
     private sealed class Survey
     {
         public List<SurveyNode> Nodes { get; set; } = new();
         public List<SurveyPoint> Points { get; set; } = new();
+        public Dictionary<string, double[][]> FloorBounds { get; set; } = new();
     }
 
     private sealed class SurveyNode
@@ -391,6 +544,7 @@ public class SelfCalibrationTests
         public double X { get; set; }
         public double Y { get; set; }
         public double Z { get; set; }
+        public List<string> Floors { get; set; } = new();
     }
 
     private sealed class SurveyPoint
@@ -401,10 +555,17 @@ public class SelfCalibrationTests
         public Dictionary<string, Meas> M { get; set; } = new();
     }
 
-    /// <summary>Raw radio reading only; the fixture keeps nothing the live optimizer sets.</summary>
+    /// <summary>
+    /// The fixture keeps the raw radio reading only (published rssi + rxAdj): nothing the live
+    /// optimizer sets is recorded, so RxAdj is absent (0) and Dist is what a node at firmware defaults
+    /// (rssi@1m -59, absorption 2.7) would report.
+    /// </summary>
     private sealed class Meas
     {
         public double Rssi { get; set; }
         public double Sd { get; set; }
+        public double? RxAdj { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public double Dist => Math.Pow(10, (TxRef - Rssi) / (10 * 2.7));
     }
 }
