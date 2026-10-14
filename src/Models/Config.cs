@@ -93,7 +93,18 @@ namespace ESPresense.Models
         [YamlMember(Alias = "file")]
         public string File { get; set; } = "fingerprints.json";
 
-        /// <summary>How many closest fingerprints to average.</summary>
+        /// <summary>
+        /// "continuous" (default) matches against the survey smoothed over position, so devices between
+        /// surveyed spots are located between them; "knn" averages the k closest fingerprints.
+        /// </summary>
+        [YamlMember(Alias = "mode")]
+        public string Mode { get; set; } = "continuous";
+
+        /// <summary>Smoothing radius (m) of the continuous surface; about the survey spacing.</summary>
+        [YamlMember(Alias = "bandwidth")]
+        public double Bandwidth { get; set; } = 0.6;
+
+        /// <summary>How many closest fingerprints to average (knn mode).</summary>
         [YamlMember(Alias = "k")]
         public int K { get; set; } = 3;
 

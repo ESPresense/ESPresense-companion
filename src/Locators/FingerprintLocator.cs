@@ -44,7 +44,9 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
         try
         {
             var reading = heard.ToDictionary(n => n.Node.Id, n => n.Rssi + (n.RssiRxAdj ?? 0), StringComparer.OrdinalIgnoreCase);
-            var match = Match(reading, map.ForFloor(floor.Id), config.K, config.MinCommon, config.MissingRssi);
+            var match = config.Mode == "knn"
+                ? Match(reading, map.ForFloor(floor.Id), config.K, config.MinCommon, config.MissingRssi)
+                : map.Surface(floor.Id, config.Bandwidth, config.MissingRssi ?? -100).Match(reading, config.MinCommon);
             if (match == null)
             {
                 scenario.Confidence = 0;
@@ -92,14 +94,19 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
             var common = 0;
             foreach (var (node, rssi) in reading)
                 if (f.Rssi.TryGetValue(node, out var fr)) { deltas.Add(rssi - fr); common++; }
-                else if (missingRssi is { } m) deltas.Add(rssi - m);
             if (common < minCommon) continue;
+            // The device's offset from the survey beacon is estimated on shared nodes only: a
+            // stand-in missing value carries no offset, and would bias it.
+            var mean = deltas.Average();
             if (missingRssi is { } miss)
+            {
+                foreach (var (node, rssi) in reading)
+                    if (!f.Rssi.ContainsKey(node)) deltas.Add(rssi - miss);
                 foreach (var (node, fr) in f.Rssi)
                     if (!reading.ContainsKey(node)) deltas.Add(miss - fr);
-            // Removing the mean costs a degree of freedom: divide by n - 1, or fingerprints sharing
+            }
+            // Removing the offset costs a degree of freedom: divide by n - 1, or fingerprints sharing
             // few nodes would score systematically closer than ones sharing many.
-            var mean = deltas.Average();
             var d = Math.Sqrt(deltas.Sum(x => (x - mean) * (x - mean)) / Math.Max(1, deltas.Count - 1));
             scored.Add((f, d, common));
         }

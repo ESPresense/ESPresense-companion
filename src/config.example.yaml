@@ -115,6 +115,8 @@ locators:
     enabled: false
     floors: ["first", "second"]
     file: fingerprints.json
+    mode: continuous     # or knn: average the k closest fingerprints
+    bandwidth: 0.6       # continuous: smoothing radius in metres, about the survey spacing
     k: 3
     min_common: 3
     missing_rssi: -100   # assumed for a node heard on one side only; omit to compare shared nodes only

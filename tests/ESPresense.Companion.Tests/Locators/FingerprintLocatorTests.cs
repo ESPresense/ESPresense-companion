@@ -68,6 +68,21 @@ public class FingerprintLocatorTests
     }
 
     [Test]
+    public void ContinuousSurfaceLandsBetweenSpotsForAnInBetweenReading()
+    {
+        // A line of spots 1 m apart where node a fades and node b grows along x.
+        var line = Enumerable.Range(0, 7).Select(i => F(i, 0, ("a", -50 - 5 * i), ("b", -80 + 5 * i), ("c", -70))).ToList();
+        var surface = new FingerprintSurface(line, bandwidth: 0.6, missingRssi: -100);
+
+        var onSpot = surface.Match(new Dictionary<string, double> { ["a"] = -60, ["b"] = -70, ["c"] = -70 }, minCommon: 3)!;
+        Assert.That(onSpot.Location.X, Is.EqualTo(2).Within(0.3));
+
+        // Halfway between x=2 and x=3, and 8 dB hotter overall: still lands between them.
+        var between = surface.Match(new Dictionary<string, double> { ["a"] = -54.5, ["b"] = -59.5, ["c"] = -62 }, minCommon: 3)!;
+        Assert.That(between.Location.X, Is.EqualTo(2.5).Within(0.3));
+    }
+
+    [Test]
     public void MapFileIsReadCaseInsensitivelyAndReloadedWhenChanged()
     {
         var path = Path.Combine(Path.GetTempPath(), $"fp-{Guid.NewGuid()}.json");

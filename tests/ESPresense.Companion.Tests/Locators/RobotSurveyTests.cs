@@ -707,11 +707,12 @@ public class RobotSurveyTests
 
         var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
         var cfg = new FingerprintConfig { Enabled = true };
+        var knnCfg = new FingerprintConfig { Enabled = true, Mode = "knn" };
         var path = Path.Combine(_configDir, cfg.File);
         var map = new FingerprintMap(path);
 
         var reloads = 0;
-        var fp = Score(pts, p =>
+        AccuracyResult Run(FingerprintConfig cfg) => Score(pts, p =>
         {
             var train = pts.Where(q => Math.Sqrt(Math.Pow(q.FloorX!.Value - p.FloorX!.Value, 2) + Math.Pow(q.FloorY!.Value - p.FloorY!.Value, 2)) > SameSpotM);
             File.WriteAllText(path, JsonSerializer.Serialize(new
@@ -732,10 +733,13 @@ public class RobotSurveyTests
             var scenario = new Scenario(_configLoader.Config, locator, "fingerprint");
             return locator.Locate(scenario) ? scenario.Location : null;
         });
+        var fp = Run(cfg);
+        var knn = Run(knnCfg);
 
         TestContext.WriteLine($"{Spots(pts).Count} spots, {pts.Count} visits; errors are per spot (median over its visits)\n");
         TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}");
         TestContext.WriteLine($"{"fingerprint",-13}{$"{fp.Fixes}/{fp.Points}",8}{fp.Median,10:0.00}{fp.P90,8:0.00}{fp.Max,8:0.00}{$"{fp.RoomHits}/{fp.RoomTotal}",11}");
+        TestContext.WriteLine($"{"  (knn)",-13}{$"{knn.Fixes}/{knn.Points}",8}{knn.Median,10:0.00}{knn.P90,8:0.00}{knn.Max,8:0.00}{$"{knn.RoomHits}/{knn.RoomTotal}",11}");
         var ranging = new Dictionary<string, AccuracyResult>();
         foreach (var which in Locators)
         {

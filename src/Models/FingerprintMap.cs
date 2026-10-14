@@ -62,4 +62,21 @@ public class FingerprintMap(string path)
 
     public IEnumerable<Fingerprint> ForFloor(string? floorId) =>
         All.Where(f => f.Floor == null || string.Equals(f.Floor, floorId, StringComparison.OrdinalIgnoreCase));
+
+    private IReadOnlyList<Fingerprint>? _surfaceSource;
+    private readonly Dictionary<(string?, double, double), Locators.FingerprintSurface> _surfaces = new();
+
+    /// <summary>The continuous surface for one floor, rebuilt when the file reloads or the settings change.</summary>
+    public Locators.FingerprintSurface Surface(string? floorId, double bandwidth, double missingRssi)
+    {
+        var all = All;
+        lock (_lock)
+        {
+            if (!ReferenceEquals(all, _surfaceSource)) { _surfaces.Clear(); _surfaceSource = all; }
+            var key = (floorId?.ToLowerInvariant(), bandwidth, missingRssi);
+            if (!_surfaces.TryGetValue(key, out var s))
+                _surfaces[key] = s = new Locators.FingerprintSurface(ForFloor(floorId).ToList(), bandwidth, missingRssi);
+            return s;
+        }
+    }
 }
