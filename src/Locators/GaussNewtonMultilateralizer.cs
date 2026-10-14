@@ -159,18 +159,38 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
             return Vector3.Distance(x, dnLocation) - dnDistance;
         }
 
+        private double Cost(Vector3 x)
+        {
+            double sum = 0;
+            for (var i = 0; i < _transmitters.Length; ++i)
+            {
+                var e = Error(x, _transmitters[i], _ranges[i]);
+                sum += e * e;
+            }
+            return sum;
+        }
+
         public Vector3 FindPosition(Vector3 initialGuess)
         {
             var guess = initialGuess;
-            var lambda = 1e-3; // Regularization parameter
+            var lambda = 1e-3; // Levenberg damping; raised when a step fails, lowered when it helps
+            var cost = Cost(guess);
 
             for (var iter = 0; iter < 100; ++iter)
             {
                 // Construct the Jacobian matrix
+                // The residual below is (|x - p| - d), so its gradient is the unit vector from the
+                // transmitter towards the guess. Using 2*(x - p) instead -- the gradient of the
+                // SQUARED-distance residual -- silently weights each node by its own range, which
+                // drags the fix towards whichever node reads farthest.
                 var jacobian = DenseMatrix.OfArray(new double[_transmitters.Length, 3]);
                 for (var i = 0; i < _transmitters.Length; ++i)
+                {
+                    var delta = guess - _transmitters[i];
+                    var norm = delta.Length();
                     for (var j = 0; j < 3; ++j)
-                        jacobian[i, j] = 2 * (guess - _transmitters[i])[j];
+                        jacobian[i, j] = norm > 1e-6 ? delta[j] / norm : 0.0;
+                }
 
                 // Construct the residual vector
                 var residuals = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.Dense(_transmitters.Length);
@@ -178,16 +198,37 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
 
                 // Construct the normal equations with regularization
                 var normalMatrix = jacobian.TransposeThisAndMultiply(jacobian);
-                normalMatrix += DenseMatrix.CreateIdentity(3) * lambda;
-                var step = normalMatrix.Inverse() * jacobian.Transpose() * residuals;
+                var gradient = jacobian.Transpose() * residuals;
 
-                // Update the guess
-                guess -= new Vector3((float)step[0], (float)step[1], (float)step[2]);
+                // Ranges that cannot all be satisfied at once -- which is every real radio fix --
+                // make an undamped step overshoot and oscillate off the floor bounds. Only take a
+                // step that actually lowers the cost; otherwise damp harder and try again.
+                var accepted = false;
+                for (var attempt = 0; attempt < 12; ++attempt)
+                {
+                    var damped = normalMatrix + DenseMatrix.CreateIdentity(3) * lambda;
+                    var step = damped.Inverse() * gradient;
 
-                guess = Vector3.Max(_lowerBounds, Vector3.Min(_upperBounds, guess));
+                    var candidate = guess - new Vector3((float)step[0], (float)step[1], (float)step[2]);
+                    candidate = Vector3.Max(_lowerBounds, Vector3.Min(_upperBounds, candidate));
 
-                // If the step size is small enough, stop iterating
-                if (step.L2Norm() < 1e-5) break;
+                    var candidateCost = Cost(candidate);
+                    if (candidateCost <= cost)
+                    {
+                        var converged = (candidate - guess).Length() < 1e-5;
+                        guess = candidate;
+                        cost = candidateCost;
+                        lambda = Math.Max(lambda / 3, 1e-9);
+                        accepted = true;
+                        if (converged) return guess;
+                        break;
+                    }
+
+                    lambda *= 8;
+                }
+
+                // Damping can no longer buy an improvement: this is the minimum we can reach.
+                if (!accepted) break;
             }
 
             return guess;
