@@ -16,7 +16,14 @@ public class OptimizationResults
 {
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
-    public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss)
+    /// <summary>
+    /// Scores this proposal against <paramref name="oss"/>. With <paramref name="deviceFrame"/> the
+    /// proposed txRef values are ignored in favour of the transmitters' current ones: that is how a
+    /// device is ranged (with its own rssi@1m, which no optimizer touches), so it is the frame in
+    /// which rxAdj has to be right in absolute terms. Node-to-node data cannot tell "every
+    /// transmitter k dB hot" from "every receiver k dB hot"; scoring in both frames can.
+    /// </summary>
+    public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss, bool deviceFrame = false)
     {
         List<double> predictedValues = new();
         List<double> measuredValues = new();
@@ -42,7 +49,7 @@ public class OptimizationResults
                     continue;
 
                 double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
-                double txRefRssi = txPv?.TxRefRssi ?? tx.Calibration.TxRefRssi ?? -59;
+                double txRefRssi = (deviceFrame ? null : txPv?.TxRefRssi) ?? tx.Calibration.TxRefRssi ?? -59;
                 double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
 
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);

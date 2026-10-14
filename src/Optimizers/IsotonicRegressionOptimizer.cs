@@ -15,6 +15,9 @@ public class IsotonicRegressionOptimizer : IOptimizer
 
     public string Name => "Isotonic Regression";
 
+    /// <summary>Prior sd of the fitted slope in dB per decade: absorption 0.5 either side of the mid-limit.</summary>
+    private const double SlopePriorSd = 5.0;
+
     public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
     {
         OptimizationResults results = new();
@@ -59,6 +62,24 @@ public class IsotonicRegressionOptimizer : IOptimizer
         var (slope, intercept) = fit.Value;
         if (double.IsNaN(slope) || double.IsNaN(intercept))
             return null;
+
+        // The slope is only as trustworthy as the spread of distances behind it. A receiver that
+        // hears a transmitter at 8 m and 12 m cannot tell absorption 2.5 from 3.5 once radio noise
+        // is on the readings, yet the straight fit will happily report one at the fence and an
+        // intercept extrapolated to 1 m to match. Shrink the slope toward the mid-limit absorption
+        // by noise^2 / prior^2 against the leverage sum(w (x - x̄)^2): exact data shrinks by nothing,
+        // noisy narrow-band data shrinks toward the prior. The intercept is re-derived through the
+        // weighted centroid, which the shrunk line still passes through.
+        var noiseRmse = CalculateWeightedRmse(ordered, -slope / 10.0, intercept);
+        var wSum = weights.Sum();
+        var xBar = logDistances.Zip(weights, (x, w) => x * w).Sum() / wSum;
+        var yBar = smoothedTargets.Zip(weights, (y, w) => y * w).Sum() / wSum;
+        var leverage = logDistances.Zip(weights, (x, w) => w * (x - xBar) * (x - xBar)).Sum();
+        var midAbsorption = (optimization.AbsorptionMin + optimization.AbsorptionMax) / 2.0;
+        var prior = double.IsFinite(noiseRmse) ? noiseRmse * noiseRmse / (SlopePriorSd * SlopePriorSd) : 0;
+        var keep = leverage / (leverage + prior);
+        slope = keep * slope + (1 - keep) * (-10.0 * midAbsorption);
+        intercept = yBar - slope * xBar;
 
         var absorption = Math.Clamp(-slope / 10.0, optimization.AbsorptionMin, optimization.AbsorptionMax);
         var rxAdj = Math.Clamp(intercept, optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
