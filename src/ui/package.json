@@ -46,7 +46,7 @@
 		"jsdom": "^30.1.2",
 		"layercake": "^10.0.3",
 		"ol": "^10.10.0",
-		"prettier": "^3.9.6",
+		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.0.1",
 		"s-ago": "^2.2.0",
 		"svelte": "^5.57.1",
