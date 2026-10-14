@@ -76,8 +76,9 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
     /// <summary>
     /// Weighted mean position of the <paramref name="k"/> fingerprints closest to
     /// <paramref name="reading"/> (node id → raw rssi). Distance between a reading and a fingerprint is
-    /// the rms of their per-node dB differences after removing the mean difference, over the nodes
-    /// both contain; fingerprints sharing fewer than <paramref name="minCommon"/> nodes are skipped.
+    /// the sample standard deviation of their per-node dB differences (the mean difference removed),
+    /// over the nodes both contain; fingerprints sharing fewer than <paramref name="minCommon"/>
+    /// nodes are skipped.
     /// </summary>
     public static MatchResult? Match(IReadOnlyDictionary<string, double> reading, IEnumerable<Fingerprint> fingerprints, int k, int minCommon)
     {
@@ -89,8 +90,10 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
                 if (f.Rssi.TryGetValue(node, out var fr))
                     deltas.Add(rssi - fr);
             if (deltas.Count < minCommon) continue;
+            // Removing the mean costs a degree of freedom: divide by n - 1, or fingerprints sharing
+            // few nodes would score systematically closer than ones sharing many.
             var mean = deltas.Average();
-            var d = Math.Sqrt(deltas.Average(x => (x - mean) * (x - mean)));
+            var d = Math.Sqrt(deltas.Sum(x => (x - mean) * (x - mean)) / Math.Max(1, deltas.Count - 1));
             scored.Add((f, d, deltas.Count));
         }
         if (scored.Count == 0) return null;

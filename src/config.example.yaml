@@ -109,7 +109,8 @@ locators:
 
   # Matches a device's raw RSSI per node against a survey of known spots instead of ranging.
   # Needs a fingerprint file beside this config: {"fingerprints": [{"floor": "first", "x": 1.0,
-  # "y": 2.0, "z": 0.3, "rssi": {"node_a": -71.2, "node_b": -80.5}}]}, rssi = published rssi + rxAdj.
+  # "y": 2.0, "z": 1.0, "rssi": {"node_a": -71.2, "node_b": -80.5}}]}, rssi = published rssi + rxAdj.
+  # Survey at the height devices are carried (about 1 m): node geometry changes with height.
   fingerprint:
     enabled: false
     floors: ["first", "second"]
@@ -161,9 +162,8 @@ floors:
         points:
           - [0.0, 0.7]
           - [0.0, 5.4]
-          - [5.5, 5.4]
-          - [5.5, 3.7]
-          - [6, 3.7]
+          - [5.0, 5.4]
+          - [6, 4.5]
           - [6, 0.75]
           - [5.25, 0.0]
           - [0.7, 0.0]
@@ -171,9 +171,8 @@ floors:
       - name: Kitchen
         points:
           - [6, 0.8]
-          - [6, 3.7]
-          - [5.5, 3.7]
-          - [5.5, 7.4]
+          - [6, 4.5]
+          - [7.3, 6.3]
           - [8.4, 7.4]
           - [12.4, 7.4]
           - [12.4, 1.75]
@@ -222,13 +221,6 @@ floors:
           - [3.5, 7.6]
           - [3.5, 5.4]
           - [0, 5.4]
-      - name: Back Hall
-        points:
-          - [3.5, 5.4]
-          - [3.5, 7.6]
-          - [5.5, 7.6]
-          - [5.5, 5.4]
-          - [3.5, 5.4]
   - id: second
     name: Second Floor
     bounds: [[0, 0, 3], [17, 18, 5.5]]
@@ -286,7 +278,7 @@ nodes:
     point: [6.8, 13.5, 3.6]
     floors: ["second"]
   - name: Family
-    point: [0.4, 0.4, 0.4]
+    point: [0.25, 0.4, 0.4]
     floors: ["first"]
   - name: Kitchen
     point: [8, 6.5, 1]
