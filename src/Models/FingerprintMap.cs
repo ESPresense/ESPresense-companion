@@ -63,6 +63,10 @@ public class FingerprintMap(string path)
     public IEnumerable<Fingerprint> ForFloor(string? floorId) =>
         All.Where(f => f.Floor == null || string.Equals(f.Floor, floorId, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Every node id the floor's fingerprints recorded.</summary>
+    public HashSet<string> NodesForFloor(string? floorId) =>
+        ForFloor(floorId).SelectMany(f => f.Rssi.Keys).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     private IReadOnlyList<Fingerprint>? _surfaceSource;
     private readonly Dictionary<(string?, double, double), Locators.FingerprintSurface> _surfaces = new();
 

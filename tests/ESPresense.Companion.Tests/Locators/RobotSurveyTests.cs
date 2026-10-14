@@ -703,6 +703,14 @@ public class RobotSurveyTests
         _survey = Load(Spread);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
+        // Fingerprinting needs no node coordinates, so it also gets the other floors' nodes.
+        var allNodes = new Dictionary<string, Node>(nodes);
+        foreach (var n in _survey.Nodes.Where(n => !n.Floors.Contains("first")))
+        {
+            var node = new Node(n.Id, NodeSourceType.Config);
+            node.Update(_configLoader.Config!, new ConfigNode { Name = n.Id, Point = new[] { n.X, n.Y, n.Z } }, Array.Empty<Floor>());
+            allNodes[n.Id] = node;
+        }
         RequireSpatialPoints(MinAccuracyPoints);
 
         var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
@@ -720,14 +728,14 @@ public class RobotSurveyTests
                 fingerprints = train.Select(q => new
                 {
                     floor = "first", x = q.FloorX, y = q.FloorY, z = RobotZ,
-                    rssi = q.M.Where(kv => nodes.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Rssi)
+                    rssi = q.M.Where(kv => allNodes.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Rssi)
                 })
             }));
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(++reloads)); // force a reload per visit
 
             var device = new Device($"robot-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
             foreach (var (id, m) in p.M)
-                if (nodes.TryGetValue(id, out var node))
+                if (allNodes.TryGetValue(id, out var node))
                     device.Nodes[id] = new DeviceToNode(device, node) { Rssi = m.Rssi, Distance = m.Dist, LastHit = DateTime.UtcNow };
             var locator = new FingerprintLocator(device, floor, map, cfg);
             var scenario = new Scenario(_configLoader.Config, locator, "fingerprint");

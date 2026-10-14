@@ -111,6 +111,7 @@ locators:
   # Needs a fingerprint file beside this config: {"fingerprints": [{"floor": "first", "x": 1.0,
   # "y": 2.0, "z": 1.0, "rssi": {"node_a": -71.2, "node_b": -80.5}}]}, rssi = published rssi + rxAdj.
   # Survey at the height devices are carried (about 1 m): node geometry changes with height.
+  # Every node the survey heard is used, including nodes on other floors or not placed on the map.
   fingerprint:
     enabled: false
     floors: ["first", "second"]

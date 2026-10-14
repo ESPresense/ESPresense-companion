@@ -24,8 +24,12 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
 {
     public bool Locate(Scenario scenario)
     {
+        // Fingerprints need no node coordinates, so every node the survey recorded is a feature, even
+        // one on another floor or never placed on the map; the floor only picks which fingerprints to
+        // match. Nodes the map has never seen carry no information and are left out.
+        var known = map.NodesForFloor(floor.Id);
         var heard = device.Nodes.Values
-            .Where(n => n.Current && (n.Node?.Floors?.Contains(floor) ?? false))
+            .Where(n => n.Current && n.Node != null && known.Contains(n.Node.Id))
             .ToArray();
 
         if (heard.Length < config.MinCommon)
