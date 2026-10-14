@@ -6,19 +6,41 @@ Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%`
 
 | Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
 |---|---:|---:|---:|---:|---:|---:|
-| `diagonal_walk` | 61 | 0.60 | 1.33 | 0.70 | 1.56 | 6.6% |
-| `living_to_bedroom` | 121 | 0.60 | 1.61 | 0.69 | 2.03 | 22.3% |
+| `diagonal_walk` | 61 | 0.95 | 1.71 | 0.94 | 2.01 | 23.0% |
+| `living_to_bedroom` | 121 | 0.72 | 1.76 | 0.83 | 2.19 | 32.2% |
 
 Single-station-outage (drop each, solve on remaining stations):
 
 - track `diagonal_walk`
-  - drop `node-bedroom-ne`: median 0.84m, p95 2.06m, n=61
-  - drop `node-bedroom-se`: median 0.80m, p95 1.69m, n=61
-  - drop `node-living-nw`: median 0.61m, p95 1.44m, n=61
-  - drop `node-living-sw`: median 0.85m, p95 2.17m, n=61
+  - drop `node-bedroom-ne`: median 0.91m, p95 1.90m, n=61
+  - drop `node-bedroom-se`: median 1.11m, p95 2.29m, n=61
+  - drop `node-living-nw`: median 1.02m, p95 1.98m, n=61
+  - drop `node-living-sw`: median 0.91m, p95 1.78m, n=61
 - track `living_to_bedroom`
-  - drop `node-bedroom-ne`: median 0.70m, p95 2.01m, n=121
-  - drop `node-bedroom-se`: median 0.71m, p95 2.04m, n=121
-  - drop `node-living-nw`: median 0.69m, p95 1.83m, n=121
-  - drop `node-living-sw`: median 0.69m, p95 1.86m, n=121
+  - drop `node-bedroom-ne`: median 0.80m, p95 2.46m, n=121
+  - drop `node-bedroom-se`: median 0.87m, p95 2.32m, n=121
+  - drop `node-living-nw`: median 0.79m, p95 2.15m, n=121
+  - drop `node-living-sw`: median 0.80m, p95 2.02m, n=121
+
+### Scenario: `plug_height_4node_6x4m` &middot; locator `NelderMead`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.71 | 1.16 | 0.66 | 1.26 | 6.6% |
+| `living_to_bedroom` | 121 | 0.61 | 1.34 | 0.71 | 2.60 | 20.7% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 0.84m, p95 2.42m, n=61
+  - drop `node-bedroom-se`: median 0.75m, p95 1.53m, n=61
+  - drop `node-living-nw`: median 0.70m, p95 1.47m, n=61
+  - drop `node-living-sw`: median 0.74m, p95 1.77m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 0.83m, p95 2.09m, n=121
+  - drop `node-bedroom-se`: median 0.81m, p95 2.12m, n=121
+  - drop `node-living-nw`: median 0.68m, p95 1.77m, n=121
+  - drop `node-living-sw`: median 0.68m, p95 1.90m, n=121
 
