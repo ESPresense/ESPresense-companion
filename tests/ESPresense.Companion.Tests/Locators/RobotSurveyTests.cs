@@ -585,25 +585,57 @@ public class RobotSurveyTests
 
     private sealed record AccuracyResult(int Fixes, int Points, double Median, double P90, double Max, int RoomHits, int RoomTotal);
 
-    /// <summary>Absolute floorplan error for one locator over every survey point that has floor coordinates.</summary>
-    private AccuracyResult Accuracy(string which, Floor floor, Dictionary<string, Node> nodes, ICollection<string>? exclude = null)
+    /// <summary>
+    /// Groups points into spots: visits within <see cref="SameSpotM"/> of a spot's first visit. A spot
+    /// revisited many times (the repeatability runs) would otherwise outvote the rest of the survey.
+    /// </summary>
+    private static List<List<SurveyPoint>> Spots(IEnumerable<SurveyPoint> pts)
     {
-        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
-        var errs = new List<double>();
-        int hits = 0, total = 0;
+        var spots = new List<List<SurveyPoint>>();
         foreach (var p in pts)
         {
-            var dists = p.M.Where(kv => exclude == null || !exclude.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Dist);
-            if (Solve(which, dists, floor, nodes) is not { } fix) continue;
-            errs.Add(Math.Sqrt(Math.Pow(fix.X - p.FloorX!.Value, 2) + Math.Pow(fix.Y - p.FloorY!.Value, 2)));
-            if (p.FloorRoom == null) continue;
+            var s = spots.FirstOrDefault(s => Math.Sqrt(Math.Pow(s[0].FloorX!.Value - p.FloorX!.Value, 2) + Math.Pow(s[0].FloorY!.Value - p.FloorY!.Value, 2)) <= SameSpotM);
+            if (s == null) spots.Add(new List<SurveyPoint> { p }); else s.Add(p);
+        }
+        return spots;
+    }
+
+    /// <summary>
+    /// Scores one fix per visit, then each spot once: its error is the median over its visits, and it
+    /// counts as the right room when most of its visits land in it.
+    /// </summary>
+    private AccuracyResult Score(List<SurveyPoint> pts, Func<SurveyPoint, Point3D?> locate)
+    {
+        var errs = new List<double>();
+        int fixes = 0, hits = 0, total = 0;
+        foreach (var spot in Spots(pts))
+        {
+            var e = new List<double>(); int h = 0;
+            foreach (var p in spot)
+            {
+                if (locate(p) is not { } fix) continue;
+                fixes++;
+                e.Add(Math.Sqrt(Math.Pow(fix.X - p.FloorX!.Value, 2) + Math.Pow(fix.Y - p.FloorY!.Value, 2)));
+                if (RoomAt(fix.X, fix.Y) == p.FloorRoom) h++;
+            }
+            if (e.Count == 0) continue;
+            e.Sort();
+            errs.Add(e[e.Count / 2]);
+            if (spot[0].FloorRoom == null) continue;
             total++;
-            if (RoomAt(fix.X, fix.Y) == p.FloorRoom) hits++;
+            if (2 * h > e.Count) hits++;
         }
         errs.Sort();
         return errs.Count == 0
             ? new AccuracyResult(0, pts.Count, double.NaN, double.NaN, double.NaN, 0, total)
-            : new AccuracyResult(errs.Count, pts.Count, Pct(errs, 0.5), Pct(errs, 0.9), errs[^1], hits, total);
+            : new AccuracyResult(fixes, pts.Count, Pct(errs, 0.5), Pct(errs, 0.9), errs[^1], hits, total);
+    }
+
+    /// <summary>Absolute floorplan error for one locator over every survey point that has floor coordinates, scored per spot.</summary>
+    private AccuracyResult Accuracy(string which, Floor floor, Dictionary<string, Node> nodes, ICollection<string>? exclude = null)
+    {
+        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
+        return Score(pts, p => Solve(which, p.M.Where(kv => exclude == null || !exclude.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Dist), floor, nodes));
     }
 
     /// <summary>
@@ -678,9 +710,8 @@ public class RobotSurveyTests
         var path = Path.Combine(_configDir, cfg.File);
         var map = new FingerprintMap(path);
 
-        var errs = new List<double>();
-        int hits = 0, total = 0;
-        foreach (var p in pts)
+        var reloads = 0;
+        var fp = Score(pts, p =>
         {
             var train = pts.Where(q => Math.Sqrt(Math.Pow(q.FloorX!.Value - p.FloorX!.Value, 2) + Math.Pow(q.FloorY!.Value - p.FloorY!.Value, 2)) > SameSpotM);
             File.WriteAllText(path, JsonSerializer.Serialize(new
@@ -691,24 +722,20 @@ public class RobotSurveyTests
                     rssi = q.M.Where(kv => nodes.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Rssi)
                 })
             }));
-            File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(errs.Count + 1)); // force a reload per spot
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(++reloads)); // force a reload per visit
 
             var device = new Device($"robot-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
             foreach (var (id, m) in p.M)
                 if (nodes.TryGetValue(id, out var node))
                     device.Nodes[id] = new DeviceToNode(device, node) { Rssi = m.Rssi, Distance = m.Dist, LastHit = DateTime.UtcNow };
-            var scenario = new Scenario(_configLoader.Config, new FingerprintLocator(device, floor, map, cfg), "fingerprint");
-            if (!new FingerprintLocator(device, floor, map, cfg).Locate(scenario)) continue;
-            errs.Add(Math.Sqrt(Math.Pow(scenario.Location.X - p.FloorX!.Value, 2) + Math.Pow(scenario.Location.Y - p.FloorY!.Value, 2)));
-            if (p.FloorRoom == null) continue;
-            total++;
-            if (RoomAt(scenario.Location.X, scenario.Location.Y) == p.FloorRoom) hits++;
-        }
-        errs.Sort();
-        var fp = new AccuracyResult(errs.Count, pts.Count, Pct(errs, 0.5), Pct(errs, 0.9), errs[^1], hits, total);
+            var locator = new FingerprintLocator(device, floor, map, cfg);
+            var scenario = new Scenario(_configLoader.Config, locator, "fingerprint");
+            return locator.Locate(scenario) ? scenario.Location : null;
+        });
 
-        TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}{"within 1 m",12}");
-        TestContext.WriteLine($"{"fingerprint",-13}{$"{fp.Fixes}/{fp.Points}",8}{fp.Median,10:0.00}{fp.P90,8:0.00}{fp.Max,8:0.00}{$"{fp.RoomHits}/{fp.RoomTotal}",11}{errs.Count(e => e <= 1.0),12}");
+        TestContext.WriteLine($"{Spots(pts).Count} spots, {pts.Count} visits; errors are per spot (median over its visits)\n");
+        TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}");
+        TestContext.WriteLine($"{"fingerprint",-13}{$"{fp.Fixes}/{fp.Points}",8}{fp.Median,10:0.00}{fp.P90,8:0.00}{fp.Max,8:0.00}{$"{fp.RoomHits}/{fp.RoomTotal}",11}");
         var ranging = new Dictionary<string, AccuracyResult>();
         foreach (var which in Locators)
         {

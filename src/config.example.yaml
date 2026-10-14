@@ -117,6 +117,7 @@ locators:
     file: fingerprints.json
     k: 3
     min_common: 3
+    missing_rssi: -100   # assumed for a node heard on one side only; omit to compare shared nodes only
 
 filtering:
   # Kalman Filter Parameters

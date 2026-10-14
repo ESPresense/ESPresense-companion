@@ -100,6 +100,13 @@ namespace ESPresense.Models
         /// <summary>Fewest nodes a reading and a fingerprint must share to be compared.</summary>
         [YamlMember(Alias = "min_common")]
         public int MinCommon { get; set; } = 3;
+
+        /// <summary>
+        /// RSSI assumed for a node heard on only one side of a comparison (roughly the hearing limit);
+        /// null compares shared nodes only. On the robot survey -100 cut the worst errors sharply.
+        /// </summary>
+        [YamlMember(Alias = "missing_rssi")]
+        public double? MissingRssi { get; set; } = -100;
     }
 
     public partial class NadarayaWatsonConfig

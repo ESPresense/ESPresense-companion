@@ -42,7 +42,7 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
         try
         {
             var reading = heard.ToDictionary(n => n.Node.Id, n => n.Rssi + (n.RssiRxAdj ?? 0), StringComparer.OrdinalIgnoreCase);
-            var match = Match(reading, map.ForFloor(floor.Id), config.K, config.MinCommon);
+            var match = Match(reading, map.ForFloor(floor.Id), config.K, config.MinCommon, config.MissingRssi);
             if (match == null)
             {
                 scenario.Confidence = 0;
@@ -76,25 +76,30 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
     /// <summary>
     /// Weighted mean position of the <paramref name="k"/> fingerprints closest to
     /// <paramref name="reading"/> (node id → raw rssi). Distance between a reading and a fingerprint is
-    /// the sample standard deviation of their per-node dB differences (the mean difference removed),
-    /// over the nodes both contain; fingerprints sharing fewer than <paramref name="minCommon"/>
-    /// nodes are skipped.
+    /// the sample standard deviation of their per-node dB differences (the mean difference removed).
+    /// A node heard on one side only means "far from that node": with <paramref name="missingRssi"/> set
+    /// it stands in for the silent side, otherwise only shared nodes are compared. Fingerprints sharing
+    /// fewer than <paramref name="minCommon"/> nodes are skipped.
     /// </summary>
-    public static MatchResult? Match(IReadOnlyDictionary<string, double> reading, IEnumerable<Fingerprint> fingerprints, int k, int minCommon)
+    public static MatchResult? Match(IReadOnlyDictionary<string, double> reading, IEnumerable<Fingerprint> fingerprints, int k, int minCommon, double? missingRssi = null)
     {
         var scored = new List<(Fingerprint F, double D, int Common)>();
         foreach (var f in fingerprints)
         {
             var deltas = new List<double>();
+            var common = 0;
             foreach (var (node, rssi) in reading)
-                if (f.Rssi.TryGetValue(node, out var fr))
-                    deltas.Add(rssi - fr);
-            if (deltas.Count < minCommon) continue;
+                if (f.Rssi.TryGetValue(node, out var fr)) { deltas.Add(rssi - fr); common++; }
+                else if (missingRssi is { } m) deltas.Add(rssi - m);
+            if (common < minCommon) continue;
+            if (missingRssi is { } miss)
+                foreach (var (node, fr) in f.Rssi)
+                    if (!reading.ContainsKey(node)) deltas.Add(miss - fr);
             // Removing the mean costs a degree of freedom: divide by n - 1, or fingerprints sharing
             // few nodes would score systematically closer than ones sharing many.
             var mean = deltas.Average();
             var d = Math.Sqrt(deltas.Sum(x => (x - mean) * (x - mean)) / Math.Max(1, deltas.Count - 1));
-            scored.Add((f, d, deltas.Count));
+            scored.Add((f, d, common));
         }
         if (scored.Count == 0) return null;
 

@@ -53,6 +53,21 @@ public class FingerprintLocatorTests
     }
 
     [Test]
+    public void SilentNodeCountsAgainstASpotWhereItWasLoud()
+    {
+        // Both spots match a, b, c exactly; only the second was right next to node e, which the device
+        // does not hear. Shared nodes alone cannot tell them apart; a missing-node rssi can.
+        var spots = new[]
+        {
+            F(0, 0, ("a", -60), ("b", -70), ("c", -80)),
+            F(9, 9, ("a", -60), ("b", -70), ("c", -80), ("e", -45)),
+        };
+        var reading = new Dictionary<string, double> { ["a"] = -60, ["b"] = -70, ["c"] = -80 };
+        var withFloor = FingerprintLocator.Match(reading, spots.Reverse(), k: 1, minCommon: 3, missingRssi: -100)!;
+        Assert.That((withFloor.Location.X, withFloor.Location.Y), Is.EqualTo((0.0, 0.0)));
+    }
+
+    [Test]
     public void MapFileIsReadCaseInsensitivelyAndReloadedWhenChanged()
     {
         var path = Path.Combine(Path.GetTempPath(), $"fp-{Guid.NewGuid()}.json");
