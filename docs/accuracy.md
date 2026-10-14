@@ -33,10 +33,16 @@ dotnet run --no-build -c Release --project tests/ESPresense.Companion.Simulation
 Default seed is `20260530`. The harness is single-process, in-repo, no
 extra runtime dependencies on top of the existing .NET 8 SDK.
 
-## Scenario: tier-1 ESP32, 6m × 4m two-room residential
+## Scenarios: tier-1 ESP32, 6m × 4m two-room residential
 
-Four ESP32 nodes, ceiling-corner-mounted at 2.4m, in a 6m × 4m floor
-divided into a 4m living room and a 2m bedroom. Two ground-truth tracks:
+Four ESP32 nodes in the corners of a 6m × 4m floor divided into a 4m
+living room and a 2m bedroom, with the tracked device carried at 1.0m.
+Two mountings:
+
+- `baseline_4node_6x4m`: nodes ceiling-mounted at 2.4m
+- `plug_height_4node_6x4m`: nodes plugged into wall outlets at 0.3m
+
+Two ground-truth tracks:
 
 - `diagonal_walk`: corner-to-corner, 61 samples
 - `living_to_bedroom`: a transit straight through the room boundary at
@@ -62,47 +68,74 @@ Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%`
 
 | Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
 |---|---:|---:|---:|---:|---:|---:|
-| `diagonal_walk` | 61 | 0.60 | 1.33 | 0.70 | 1.56 | 6.6% |
-| `living_to_bedroom` | 121 | 0.60 | 1.61 | 0.69 | 2.03 | 22.3% |
+| `diagonal_walk` | 61 | 0.95 | 1.71 | 0.94 | 2.01 | 23.0% |
+| `living_to_bedroom` | 121 | 0.72 | 1.76 | 0.83 | 2.19 | 32.2% |
 
 Single-station-outage (drop each, solve on remaining stations):
 
 - track `diagonal_walk`
-  - drop `node-bedroom-ne`: median 0.84m, p95 2.06m, n=61
-  - drop `node-bedroom-se`: median 0.80m, p95 1.69m, n=61
-  - drop `node-living-nw`: median 0.61m, p95 1.44m, n=61
-  - drop `node-living-sw`: median 0.85m, p95 2.17m, n=61
+  - drop `node-bedroom-ne`: median 0.91m, p95 1.90m, n=61
+  - drop `node-bedroom-se`: median 1.11m, p95 2.29m, n=61
+  - drop `node-living-nw`: median 1.02m, p95 1.98m, n=61
+  - drop `node-living-sw`: median 0.91m, p95 1.78m, n=61
 - track `living_to_bedroom`
-  - drop `node-bedroom-ne`: median 0.70m, p95 2.01m, n=121
-  - drop `node-bedroom-se`: median 0.71m, p95 2.04m, n=121
-  - drop `node-living-nw`: median 0.69m, p95 1.83m, n=121
-  - drop `node-living-sw`: median 0.69m, p95 1.86m, n=121
+  - drop `node-bedroom-ne`: median 0.80m, p95 2.46m, n=121
+  - drop `node-bedroom-se`: median 0.87m, p95 2.32m, n=121
+  - drop `node-living-nw`: median 0.79m, p95 2.15m, n=121
+  - drop `node-living-sw`: median 0.80m, p95 2.02m, n=121
+
+### Scenario: `plug_height_4node_6x4m` &middot; locator `NelderMead`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.71 | 1.16 | 0.66 | 1.26 | 6.6% |
+| `living_to_bedroom` | 121 | 0.61 | 1.34 | 0.71 | 2.60 | 20.7% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 0.84m, p95 2.42m, n=61
+  - drop `node-bedroom-se`: median 0.75m, p95 1.53m, n=61
+  - drop `node-living-nw`: median 0.70m, p95 1.47m, n=61
+  - drop `node-living-sw`: median 0.74m, p95 1.77m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 0.83m, p95 2.09m, n=121
+  - drop `node-bedroom-se`: median 0.81m, p95 2.12m, n=121
+  - drop `node-living-nw`: median 0.68m, p95 1.77m, n=121
+  - drop `node-living-sw`: median 0.68m, p95 1.90m, n=121
 
 ### What the numbers mean
 
-- **Median ~0.60m** — most samples place the device within roughly two
-  feet of where it actually is, on a 6m × 4m floor.
-- **p95 ~1.3–1.6m** — the worst 5% of samples land a meter or two off.
-  On this floor that is enough to land in the wrong half of the bedroom
-  but usually not flip the whole room.
-- **Room mis-id 22.3% on `living_to_bedroom`** — the
-  `living_to_bedroom` track is *deliberately* a transit through the
-  boundary at x=4.0m, so a large fraction of samples sit within 10cm of
-  the wall. That number is by design, not catastrophic; a
-  stationary-in-room-center track for the same scenario would be far
-  lower. The `diagonal_walk` track which spends almost no time near a
-  boundary lands at 6.6%, which is the more honest indicator of normal
-  use.
-- **Outage sweep**: dropping any single station roughly doubles p95
-  error. Bedroom-side stations (which sit alone covering the smaller
-  room) hurt the most when removed.
+- **Mounting height matters.** With ceiling nodes the device sits 1.4m
+  below every node, so every range includes a 1.4m vertical leg the
+  solver has to separate from the horizontal distance: median 0.95m and
+  room mis-id 23% on `diagonal_walk`. Plug-height nodes sit 0.7m below
+  the device: median 0.71m, room mis-id 6.6%.
+- **Median ~0.6–1.0m** — most samples place the device within one metre
+  of where it actually is, on a 6m × 4m floor.
+- **Room mis-id on `living_to_bedroom`** — that track is *deliberately* a
+  transit through the boundary at x=4.0m, so a large fraction of samples
+  sit within 10cm of the wall. Its mis-id is high by design; the
+  `diagonal_walk` track, which spends almost no time near a boundary, is
+  the more honest indicator of normal use.
+- **Outage sweep**: dropping a single station raises p95 error in every
+  case, from a few percent up to roughly double.
 
-These numbers are materially better than the Python lower-bound
+Earlier revisions of this baseline put the device at the same 2.4m as the
+nodes (ranges were purely horizontal), which reported a 0.60m median and
+6.6% mis-id for ceiling mounting. That height is unrealistic for a carried
+device, and it hid the cost of the vertical offset.
+
+The Python lower bound
 [ESPresense#2318](https://github.com/ESPresense/ESPresense/pull/2318)
-published (median 0.78–0.82m, room mis-id 29.5–33.1%). That is expected:
-the real `NelderMead` locator brings weighting, scale correction, and
-Pearson confidence pruning that the stub did not. Now we measure what we
-ship.
+published median 0.78–0.82m and room mis-id 29.5–33.1% with purely
+horizontal ranges. The real `NelderMead` locator beat it comfortably under
+that same assumption (0.60m, see above), as expected: it brings weighting,
+scale correction, and Pearson confidence pruning that the stub did not.
+The ceiling-mounted figures above are not comparable to it, because they
+add the vertical offset the stub never modelled.
 
 ## What this baseline does NOT model (blind spots)
 
@@ -119,11 +152,10 @@ These are deliberate, documented v1 limitations.
    differences. Per-board calibration models will be added when we have
    on-hardware capture data to fit them against.
 
-3. **2D positioning, z fixed.** Ground-truth points are 2D (x, y); the
-   solver runs `ILocate` in 3D against a station-z plane at 2.4m, and
-   error is scored in 2D. Most residential layouts place all nodes
-   within ~1m of each other vertically, so the projection error is small
-   but non-zero.
+3. **2D scoring, fixed heights.** Ground-truth points are 2D (x, y) at a
+   fixed device height (`device_z`, 1.0m in both scenarios); the solver
+   runs `ILocate` in 3D against the stations' real heights, and error is
+   scored in 2D. Real devices move vertically (pocket, hand, bedside).
 
 4. **No Kalman / hysteresis between samples.** The harness re-uses one
    `ILocate` device across the track so its internal Kalman filter sees
