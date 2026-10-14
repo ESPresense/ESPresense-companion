@@ -46,7 +46,7 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
             var reading = heard.ToDictionary(n => n.Node.Id, n => n.Rssi + (n.RssiRxAdj ?? 0), StringComparer.OrdinalIgnoreCase);
             var match = config.Mode == "knn"
                 ? Match(reading, map.ForFloor(floor.Id), config.K, config.MinCommon, config.MissingRssi)
-                : map.Surface(floor.Id, config.Bandwidth, config.MissingRssi ?? -100).Match(reading, config.MinCommon);
+                : map.Surface(floor.Id, config.Bandwidth, config.MissingRssi ?? -100).Match(reading, config.MinCommon, config.Top);
             if (match == null)
             {
                 scenario.Confidence = 0;

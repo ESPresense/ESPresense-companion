@@ -100,9 +100,13 @@ namespace ESPresense.Models
         [YamlMember(Alias = "mode")]
         public string Mode { get; set; } = "continuous";
 
-        /// <summary>Smoothing radius (m) of the continuous surface; about the survey spacing.</summary>
+        /// <summary>Smoothing radius (m) of the continuous surface; about 0.8x the survey spacing.</summary>
         [YamlMember(Alias = "bandwidth")]
         public double Bandwidth { get; set; } = 0.6;
+
+        /// <summary>How many best-matching surface points to average (continuous mode).</summary>
+        [YamlMember(Alias = "top")]
+        public int Top { get; set; } = 20;
 
         /// <summary>How many closest fingerprints to average (knn mode).</summary>
         [YamlMember(Alias = "k")]

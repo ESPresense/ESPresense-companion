@@ -70,7 +70,7 @@ public sealed class FingerprintSurface
     /// estimated over nodes the reading heard and the surface expects to be heard, is removed before
     /// taking the sample standard deviation over every node either side knows.
     /// </summary>
-    public FingerprintLocator.MatchResult? Match(IReadOnlyDictionary<string, double> reading, int minCommon, int best = 5)
+    public FingerprintLocator.MatchResult? Match(IReadOnlyDictionary<string, double> reading, int minCommon, int best = 20)
     {
         var known = _nodes.Select(n => reading.ContainsKey(n)).ToArray();
         var shared = known.Count(k => k);
