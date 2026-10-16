@@ -18,6 +18,8 @@ public class LeaseInfo
     public DateTime ExpiresAt { get; set; }
 }
 
+public sealed record LeaseStatus(string InstanceId, DateTime ExpiresAt, bool IsOwned);
+
 public class LeaseHandle : IAsyncDisposable
 {
     private readonly ILeaseService _leaseService;
@@ -54,6 +56,7 @@ public interface ILeaseService
     Task<LeaseHandle?> AcquireAsync(string leaseName, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
     Task ReleaseAsync(string leaseName);
     bool HasLease(string leaseName);
+    LeaseStatus? GetStatus(string leaseName);
     Task ReleaseAllAsync();
 }
 
@@ -270,6 +273,18 @@ public class LeaseService : ILeaseService, IDisposable
         => _leases.TryGetValue(leaseName, out var s) &&
            s.Owned.InstanceId == _instanceId &&
            s.Owned.ExpiresAt > DateTime.UtcNow;
+
+    public LeaseStatus? GetStatus(string leaseName)
+    {
+        if (!_leases.TryGetValue(leaseName, out var state)) return null;
+
+        var isOwned = state.Owned.InstanceId == _instanceId && state.Owned.ExpiresAt > DateTime.UtcNow;
+        var current = isOwned ? state.Owned : state.Observed;
+        return new LeaseStatus(
+            current.InstanceId,
+            current.ExpiresAt,
+            isOwned);
+    }
 
     public Task ReleaseAllAsync() => Task.WhenAll(_leases.Keys.Select(ReleaseAsync));
 

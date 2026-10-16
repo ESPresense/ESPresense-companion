@@ -169,14 +169,25 @@ namespace ESPresense.Models
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
         [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "legacy"; // Options: global_absorption, per_node_absorption, legacy
-        [YamlMember(Alias = "interval_secs")] public int IntervalSecs { get; set; } = 60;
-        [YamlMember(Alias = "keep_snapshot_mins")] public int KeepSnapshotMins { get; set; } = 5;
-        [YamlMember(Alias = "min_samples")] public int MinSamples { get; set; } = 5; // Minimum measurements an optimizer result must be evaluated on before it can be applied
+        [YamlMember(Alias = "sample_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? SampleIntervalSecs { get; set; }
+        [YamlMember(Alias = "training_window_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? TrainingWindowMins { get; set; }
+        [YamlMember(Alias = "optimization_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? OptimizationIntervalSecs { get; set; }
+        [YamlMember(Alias = "validation_fraction")] public double ValidationFraction { get; set; } = 0.2;
+
+        // Legacy timing keys. Keep these as deserialization fallbacks for existing installations.
+        [YamlMember(Alias = "interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? IntervalSecs { get; set; }
+        [YamlMember(Alias = "keep_snapshot_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? KeepSnapshotMins { get; set; }
+        [YamlMember(Alias = "min_samples")] public int MinSamples { get; set; } = 5; // Minimum holdout measurements a candidate must be evaluated on before it can be applied
         [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set; } = new();
         [YamlMember(Alias = "weights")] public Dictionary<string, double> Weights { get; set; } = new();
 
+        [YamlIgnore] public int EffectiveSampleIntervalSecs => Math.Max(1, SampleIntervalSecs ?? 30);
+        [YamlIgnore] public int EffectiveTrainingWindowMins => Math.Max(1, TrainingWindowMins ?? KeepSnapshotMins ?? 30);
+        [YamlIgnore] public int EffectiveOptimizationIntervalSecs => Math.Max(1, OptimizationIntervalSecs ?? IntervalSecs ?? 900);
+        [YamlIgnore] public double EffectiveValidationFraction => Math.Clamp(ValidationFraction, 0.1, 0.5);
+
         [YamlIgnore] public double AbsorptionMin => Limits.TryGetValue("absorption_min", out var val) ? val : 2;
-        [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 4;
+        [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 5;
         [YamlIgnore] public double TxRefRssiMin => Limits.TryGetValue("tx_ref_rssi_min", out var val) ? val : -70;
         [YamlIgnore] public double TxRefRssiMax => Limits.TryGetValue("tx_ref_rssi_max", out var val) ? val : -50;
         [YamlIgnore] public double RxAdjRssiMin => Limits.TryGetValue("rx_adj_rssi_min", out var val) ? val : -5;

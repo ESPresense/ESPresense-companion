@@ -2,6 +2,121 @@ import { expect, test } from '@playwright/test';
 import { mockApi } from './mock-api';
 
 test.describe('Calibration Matrix Anchored Devices', () => {
+	test('labels current and best-seen live distance metrics', async ({ page }) => {
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: {},
+					rmse: 1.2344,
+					r: 0.7654,
+					bestRMSE: 0.9874,
+					bestR: 0.8764,
+					optimizerState: {
+						optimizers: 'Test',
+						phase: 'Waiting',
+						message: 'Waiting',
+						snapshotCount: 3,
+						measurementCount: 30,
+						trainingSamples: 20,
+						validationSamples: 10
+					}
+				})
+			});
+		});
+
+		await page.goto('/calibration');
+		await expect(page.getByText('Current RMSE (m)', { exact: true })).toBeVisible();
+		await expect(page.getByText('Current R', { exact: true })).toBeVisible();
+		await expect(page.getByText('Best Seen RMSE (m)', { exact: true })).toBeVisible();
+		await expect(page.getByText('Best Seen R', { exact: true })).toBeVisible();
+		await expect(page.getByText('1.234', { exact: true })).toBeVisible();
+		await expect(page.getByText('0.765', { exact: true })).toBeVisible();
+		await expect(page.getByText('0.987', { exact: true })).toBeVisible();
+		await expect(page.getByText('0.876', { exact: true })).toBeVisible();
+	});
+
+	test('refreshes calibration without overlapping requests', async ({ page }) => {
+		let requestCount = 0;
+		let activeRequests = 0;
+		let maxActiveRequests = 0;
+
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', async (route) => {
+			requestCount++;
+			activeRequests++;
+			maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+			await new Promise((resolve) => setTimeout(resolve, 1250));
+
+			const phase = requestCount === 1 ? 'Collecting' : 'Waiting';
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: {},
+					optimizerState: {
+						optimizers: 'Test',
+						phase,
+						message: `${phase} samples`,
+						snapshotCount: requestCount,
+						measurementCount: requestCount,
+						trainingSamples: 0,
+						validationSamples: 0
+					}
+				})
+			});
+			activeRequests--;
+		});
+
+		await page.goto('/calibration');
+		await expect(page.getByText('Collecting', { exact: true })).toBeVisible();
+		await expect(page.getByText('Waiting', { exact: true })).toBeVisible({ timeout: 8000 });
+		expect(requestCount).toBeGreaterThanOrEqual(2);
+		expect(maxActiveRequests).toBe(1);
+	});
+
+	test('uses the page scroller instead of clipping the matrix', async ({ page }) => {
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', (route) => {
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: Object.fromEntries(
+						Array.from({ length: 30 }, (_, index) => [
+							`Transmitter ${index}`,
+							{
+								Receiver: {
+									distance: 5,
+									rssi: -70,
+									mapDistance: 4.5,
+									diff: 0.5,
+									percent: 0.1
+								}
+							}
+						])
+					)
+				})
+			});
+		});
+
+		await page.goto('/calibration');
+		const content = page.getByTestId('calibration-content');
+		await expect(content.locator('tbody tr')).toHaveCount(30);
+		expect(await content.evaluate((element) => getComputedStyle(element).overflowY)).toBe('visible');
+		expect(
+			await content.evaluate((element) => {
+				let ancestor = element.parentElement;
+				while (ancestor && !['auto', 'scroll'].includes(getComputedStyle(ancestor).overflowY)) {
+					ancestor = ancestor.parentElement;
+				}
+				return !!ancestor && ancestor.scrollHeight > ancestor.clientHeight;
+			})
+		).toBe(true);
+	});
+
 	test('excludes empty receiver columns for anchored devices', async ({ page }) => {
 		// Mock calibration data with anchored devices
 		const calibrationData = {
