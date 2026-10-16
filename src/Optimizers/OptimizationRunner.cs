@@ -76,47 +76,69 @@ internal class OptimizationRunner : BackgroundService
                 while (optimization is not { Enabled: true })
                 {
                     Log.Information("Optimization disabled");
-                    _state.OptimizerState.Optimizers = "Disabled";
+                    SetStatus("Disabled", "Auto optimization is disabled.", optimizers: string.Empty);
+                    _state.OptimizerState.NextRunAt = null;
+                    _state.OptimizerState.LeaseHolder = null;
+                    _state.OptimizerState.LeaseExpiresAt = null;
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                     optimization = _state.Config?.Optimization;
                 }
 
                 // Try to acquire the optimization lease (wait indefinitely)
-                _state.OptimizerState.Optimizers = "Acquiring lease...";
-                await using var lease = await _leaseService.AcquireAsync(
+                SetStatus("WaitingForLease", "Waiting for MQTT connection or optimization lease availability.", optimizers: "Acquiring lease...");
+                var leaseTask = _leaseService.AcquireAsync(
                     OptimizationLeaseName,
                     timeout: null, // Wait indefinitely
-                    cancellationToken: stoppingToken)
+                    cancellationToken: stoppingToken);
+
+                while (!leaseTask.IsCompleted)
+                {
+                    UpdateLeaseStatus();
+                    await Task.WhenAny(leaseTask, Task.Delay(TimeSpan.FromSeconds(1), stoppingToken));
+                }
+
+                await using var lease = await leaseTask
                     ?? throw new InvalidOperationException("Optimization lease acquisition returned null unexpectedly.");
 
                 Log.Information("Optimization enabled");
-                _state.OptimizerState.Optimizers = "Starting...";
-                await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
-
-                for (int i = 0; i < 3; i++)
-                {
-                    _state.TakeOptimizationSnapshot();
-                    await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
-                }
-
-                Log.Information("Optimization cycle started");
+                SetStatus("Collecting", "Collecting snapshots for the initial training and validation split.", optimizers: GetOptimizerNames());
+                _state.OptimizerState.LeaseHolder = "This instance";
+                _state.OptimizerState.LeaseExpiresAt = _leaseService.GetStatus(OptimizationLeaseName)?.ExpiresAt;
                 _previousBestCorr = double.NaN;
                 _previousBestRmse = double.NaN;
+                DateTime? lastOptimizationAt = null;
 
+                // Sampling and optimizing run on separate clocks: snapshots are taken every sample interval,
+                // while proposals are only evaluated once per optimization interval on the accumulated history.
                 while (lease.HasLease())
                 {
                     optimization = _state.Config?.Optimization;
                     if (optimization is not { Enabled: true }) break;
-                    var os = _state.TakeOptimizationSnapshot();
+                    _state.TakeOptimizationSnapshot();
+                    UpdateSampleCounts();
 
-                    IList<IOptimizer> currentOptimizers;
-                    lock (_optimizersLock)
-                        currentOptimizers = _optimizers.ToList();
-                    _state.OptimizerState.Optimizers = string.Join(", ", currentOptimizers.Select(o => o.Name));
+                    var now = DateTime.UtcNow;
+                    var optimizationDue = lastOptimizationAt == null ||
+                                          now - lastOptimizationAt.Value >= TimeSpan.FromSeconds(optimization.EffectiveOptimizationIntervalSecs);
+                    if (optimizationDue)
+                    {
+                        IList<IOptimizer> currentOptimizers;
+                        lock (_optimizersLock)
+                            currentOptimizers = _optimizers.ToList();
 
-                    await RunCycleAsync(os, _state.OptimizationSnaphots, optimization, currentOptimizers);
+                        if (await RunScheduledCycleAsync(optimization, currentOptimizers))
+                        {
+                            lastOptimizationAt = now;
+                            _state.OptimizerState.NextRunAt = now.AddSeconds(optimization.EffectiveOptimizationIntervalSecs);
+                            SetStatus("Waiting", _state.OptimizerState.LastOutcome ?? "Validation cycle completed.");
+                        }
+                    }
+                    else
+                    {
+                        SetStatus("Waiting", $"Collecting fresh samples; next validation at {_state.OptimizerState.NextRunAt:O}.");
+                    }
 
-                    await Task.Delay(TimeSpan.FromSeconds(optimization.IntervalSecs), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(optimization.EffectiveSampleIntervalSecs), stoppingToken);
                 }
             }
             catch (OperationCanceledException)
@@ -125,11 +147,96 @@ internal class OptimizationRunner : BackgroundService
             }
             catch (Exception ex)
             {
-                _state.OptimizerState.Optimizers = "Error: " + ex.Message;
+                SetStatus("Error", ex.Message, optimizers: "Error: " + ex.Message);
+                _state.OptimizerState.NextRunAt = null;
                 Log.Error(ex, "Error in OptimizationRunner");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
+    }
+
+    /// <summary>Share of the training window the history must span before the first proposal is evaluated.</summary>
+    internal const double MinimumHistoryFraction = 0.5;
+
+    /// <summary>
+    /// A few seconds of history is enough to split but not enough to trust: a proposal fitted to two snapshots and
+    /// checked on one would pass the held-out and every-snapshot checks almost vacuously, and would be pushed to
+    /// real nodes within minutes of start-up. Wait until the history covers half the training window.
+    /// </summary>
+    internal static bool HasSufficientHistory(IReadOnlyCollection<OptimizationSnapshot> snapshots, ConfigOptimization optimization)
+    {
+        if (snapshots.Count < OptimizationDataSplit.MinimumSnapshots) return false;
+        var span = snapshots.Max(s => s.Timestamp) - snapshots.Min(s => s.Timestamp);
+        return span >= TimeSpan.FromMinutes(optimization.EffectiveTrainingWindowMins * MinimumHistoryFraction);
+    }
+
+    /// <summary>
+    /// Splits the snapshot history by time: the older part is pooled into one training snapshot that the
+    /// optimizers fit, and the newest <see cref="ConfigOptimization.ValidationFraction"/> is held out so
+    /// <see cref="RunCycleAsync"/> only scores proposals on data they were not fitted to.
+    /// Returns false (and keeps collecting) when there is not yet enough history for a split.
+    /// </summary>
+    internal async Task<bool> RunScheduledCycleAsync(ConfigOptimization optimization, IList<IOptimizer> currentOptimizers)
+    {
+        var snapshots = _state.OptimizationSnaphots.ToArray();
+        if (!HasSufficientHistory(snapshots, optimization))
+        {
+            SetStatus("Collecting", $"Collected {snapshots.Length} snapshots; waiting until they span {MinimumHistoryFraction:P0} of the {optimization.EffectiveTrainingWindowMins}-minute training window before the first validation.");
+            return false;
+        }
+
+        if (!OptimizationDataSplit.TryCreate(snapshots, optimization.EffectiveValidationFraction, out var split) || split == null)
+        {
+            SetStatus("Collecting", $"Collected {snapshots.Length} of {OptimizationDataSplit.MinimumSnapshots} required snapshots.");
+            Log.Information("Optimization deferred: only {SnapshotCount} snapshots are available", snapshots.Length);
+            return false;
+        }
+
+        _state.OptimizerState.Optimizers = string.Join(", ", currentOptimizers.Select(o => o.Name));
+        _state.OptimizerState.TrainingSamples = split.Training.Measures.Count;
+        SetStatus("Optimizing", $"Training on {split.Training.Measures.Count} measurements and validating newer holdout data.");
+
+        await RunCycleAsync(split.Training, split.Validation.ToList(), optimization, currentOptimizers);
+        _state.OptimizerState.LastRunAt = DateTime.UtcNow;
+        return true;
+    }
+
+    private void SetStatus(string phase, string message, string? optimizers = null)
+    {
+        _state.OptimizerState.Phase = phase;
+        _state.OptimizerState.Message = message;
+        if (optimizers != null) _state.OptimizerState.Optimizers = optimizers;
+    }
+
+    private string GetOptimizerNames()
+    {
+        lock (_optimizersLock)
+            return string.Join(", ", _optimizers.Select(optimizer => optimizer.Name));
+    }
+
+    private void UpdateSampleCounts()
+    {
+        _state.OptimizerState.SnapshotCount = _state.OptimizationSnaphots.Count;
+        _state.OptimizerState.MeasurementCount = _state.OptimizationSnaphots.Sum(snapshot => snapshot.Measures.Count);
+        _state.OptimizerState.LeaseExpiresAt = _leaseService.GetStatus(OptimizationLeaseName)?.ExpiresAt;
+    }
+
+    private void UpdateLeaseStatus()
+    {
+        var status = _leaseService.GetStatus(OptimizationLeaseName);
+        if (status == null || status.InstanceId == "nobody" || status.ExpiresAt <= DateTime.UtcNow)
+        {
+            _state.OptimizerState.LeaseHolder = null;
+            _state.OptimizerState.LeaseExpiresAt = null;
+            _state.OptimizerState.Message = "Waiting for MQTT connection or lease confirmation.";
+            return;
+        }
+
+        _state.OptimizerState.LeaseHolder = status.IsOwned ? "This instance" : status.InstanceId;
+        _state.OptimizerState.LeaseExpiresAt = status.ExpiresAt;
+        _state.OptimizerState.Message = status.IsOwned
+            ? "Confirming this instance's optimization lease."
+            : $"Lease held by {status.InstanceId} until {status.ExpiresAt:O}.";
     }
 
     /// <summary>
@@ -165,11 +272,21 @@ internal class OptimizationRunner : BackgroundService
         var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
         if (evalSet.Count == 0) evalSet = oss;
 
+        // Freeze the incumbent settings once for the whole cycle. NodeSettingsStore.Get reads whatever the
+        // store holds at that moment, so scoring straight from it would let the same proposal score
+        // differently depending on whether an earlier cycle's MQTT writes had been echoed back yet.
+        var frozen = new Dictionary<string, NodeSettings>(StringComparer.Ordinal);
+        foreach (var id in os.GetNodeIds().Concat(evalSet.SelectMany(s => s.GetNodeIds())).Distinct())
+            frozen[id] = _nsd.Get(id);
+        NodeSettings Frozen(string id) => frozen.TryGetValue(id, out var settings) ? settings : _nsd.Get(id);
+
         var baselineResults = new OptimizationResults();
-        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(evalSet, _nsd);
+        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(evalSet, Frozen);
+        _state.OptimizerState.ValidationSamples = baselineSamples;
         if (baselineSamples < optimization.MinSamples)
         {
             Log.Debug("Optimization skipped: baseline evaluated on {0} measurements, need at least {1} (min_samples)", baselineSamples, optimization.MinSamples);
+            _state.OptimizerState.LastOutcome = $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).";
             return;
         }
 
@@ -188,7 +305,8 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.BestR = bestCorr;
         _state.OptimizerState.BestRMSE = bestRmse;
 
-        var currentSettings = os.GetNodeIds().ToDictionary(id => id, _nsd.Get);
+        // Optimizers get their own copies so nothing they do can touch the frozen incumbent.
+        var currentSettings = os.GetNodeIds().ToDictionary(id => id, id => Frozen(id).Clone());
 
         // Every optimizer is scored against the same incumbent and only the best passing proposal is
         // applied. Applying them greedily in sequence made the outcome depend on list order, and let an
@@ -197,8 +315,8 @@ internal class OptimizationRunner : BackgroundService
 
         foreach (var optimizer in optimizers)
         {
-            var results = optimizer.Optimize(os, currentSettings);
-            var (corr, rmse, samples) = results.Evaluate(evalSet, _nsd);
+            var results = optimizer.Optimize(os, currentSettings).QuantizeForApplication();
+            var (corr, rmse, samples) = results.Evaluate(evalSet, Frozen);
             if (samples < optimization.MinSamples)
             {
                 Log.Debug("Optimizer {0,-24} rejected: evaluated on {1} measurements, need at least {2} (min_samples)",
@@ -225,7 +343,7 @@ internal class OptimizationRunner : BackgroundService
             // bias for every device. See OptimizationResults.Evaluate.
             if (results.Nodes.Values.Any(r => r.TxRefRssi != null))
             {
-                var (dCorr, dRmse, _) = results.Evaluate(evalSet, _nsd, deviceFrame: true);
+                var (dCorr, dRmse, _) = results.Evaluate(evalSet, Frozen, deviceFrame: true);
                 var deviceComposite = (dCorr * correlationWeight) + ((1 - dRmse / (1 + dRmse)) * rmseWeight);
                 if (double.IsNaN(deviceComposite) || double.IsInfinity(deviceComposite) || deviceComposite <= bestScore)
                 {
@@ -245,8 +363,8 @@ internal class OptimizationRunner : BackgroundService
                 var losesOn = evalSet.Where(snap =>
                 {
                     var one = new List<OptimizationSnapshot> { snap };
-                    var (bc, br, bs) = baselineResults.Evaluate(one, _nsd);
-                    var (pc, pr, ps) = results.Evaluate(one, _nsd);
+                    var (bc, br, bs) = baselineResults.Evaluate(one, Frozen);
+                    var (pc, pr, ps) = results.Evaluate(one, Frozen);
                     if (bs < optimization.MinSamples || ps < optimization.MinSamples) return false;
                     var baseOne = (bc * correlationWeight) + ((1 - br / (1 + br)) * rmseWeight);
                     var propOne = (pc * correlationWeight) + ((1 - pr / (1 + pr)) * rmseWeight);
@@ -266,12 +384,17 @@ internal class OptimizationRunner : BackgroundService
                 best = (optimizer, results, composite, corr, rmse);
         }
 
-        if (best == null) return;
+        if (best == null)
+        {
+            _state.OptimizerState.LastOutcome = "No proposal beat the current calibration on the held-out data.";
+            return;
+        }
 
         var (chosen, chosenResults, chosenComposite, chosenCorr, chosenRmse) = best.Value;
         Log.Information("Applying {0} (Composite={1:0.000}, R={2:0.000}, RMSE={3:0.000})", chosen.Name, chosenComposite, chosenCorr, chosenRmse);
         _state.OptimizerState.BestR = chosenCorr;
         _state.OptimizerState.BestRMSE = chosenRmse;
+        _state.OptimizerState.LastOutcome = $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenCorr:0.000}, RMSE={chosenRmse:0.000}).";
 
         foreach (var (id, result) in chosenResults.Nodes)
         {

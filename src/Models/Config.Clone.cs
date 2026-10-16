@@ -149,10 +149,16 @@ namespace ESPresense.Models
             return new ConfigOptimization
             {
                 Enabled = Enabled,
+                Optimizer = Optimizer,
+                SampleIntervalSecs = SampleIntervalSecs,
+                TrainingWindowMins = TrainingWindowMins,
+                OptimizationIntervalSecs = OptimizationIntervalSecs,
+                ValidationFraction = ValidationFraction,
                 IntervalSecs = IntervalSecs,
                 KeepSnapshotMins = KeepSnapshotMins,
                 MinSamples = MinSamples,
-                Limits = new Dictionary<string, double>(Limits)
+                Limits = new Dictionary<string, double>(Limits),
+                Weights = new Dictionary<string, double>(Weights)
             };
         }
     }
