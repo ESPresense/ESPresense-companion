@@ -117,6 +117,42 @@ public class LeaseServiceTests
     }
 
     [Test]
+    public async Task GetStatus_ReportsCompetingLeaseHolder()
+    {
+        var service = CreateService();
+        var expiresAt = DateTime.UtcNow.AddMinutes(1);
+        await SimulateMqttMessage(
+            service,
+            "espresense/companion/lease/test-lease",
+            JsonSerializer.Serialize(new LeaseInfo
+            {
+                InstanceId = "other-instance",
+                ExpiresAt = expiresAt
+            }));
+
+        var status = service.GetStatus("test-lease");
+
+        Assert.That(status, Is.Not.Null);
+        Assert.That(status!.InstanceId, Is.EqualTo("other-instance"));
+        Assert.That(status.ExpiresAt, Is.EqualTo(expiresAt));
+        Assert.That(status.IsOwned, Is.False);
+    }
+
+    [Test]
+    public async Task GetStatus_ReportsLocallyOwnedLease()
+    {
+        var service = CreateService();
+        await SimulateNoLeaseHolder(service, "test-lease");
+        await using var lease = await service.AcquireAsync("test-lease", timeout: TimeSpan.FromMilliseconds(100));
+
+        var status = service.GetStatus("test-lease");
+
+        Assert.That(status, Is.Not.Null);
+        Assert.That(status!.IsOwned, Is.True);
+        Assert.That(status.ExpiresAt, Is.GreaterThan(DateTime.UtcNow));
+    }
+
+    [Test]
     public async Task AcquireAsync_ExpiredLease_TakesOverSuccessfully()
     {
         // Arrange

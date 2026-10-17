@@ -167,4 +167,97 @@ public class OptimizationRunnerTests
         _mqtt.Verify(x => x.EnqueueAsync(AbsorptionTopic, It.IsAny<string?>(), false), Times.Once);
         Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
     }
+
+    private sealed class UnroundedAbsorptionOptimizer : IOptimizer
+    {
+        public string Name => "Unrounded";
+
+        public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
+        {
+            var results = new OptimizationResults();
+            results.Nodes["rx"] = new ProposedValues { Absorption = 2.9996 };
+            return results;
+        }
+    }
+
+    private sealed class CountingNodeSettingsStore(IMqttCoordinator mqtt) : NodeSettingsStore(mqtt, Mock.Of<ILogger<NodeSettingsStore>>())
+    {
+        public Dictionary<string, int> Reads { get; } = new();
+
+        public override NodeSettings Get(string id)
+        {
+            Reads[id] = Reads.GetValueOrDefault(id) + 1;
+            return base.Get(id);
+        }
+    }
+
+    [Test]
+    public async Task RunCycle_ScoresAProposalAtTheValueThatWillBeApplied()
+    {
+        await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5 }, new UnroundedAbsorptionOptimizer());
+
+        Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
+    }
+
+    [Test]
+    public async Task RunCycle_ReadsEachNodesSettingsOnceBeforeScoring()
+    {
+        var store = new CountingNodeSettingsStore(_mqtt.Object);
+        var runner = new OptimizationRunner(_state, store, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>());
+        var snapshot = SnapshotWith(5);
+
+        await runner.RunCycleAsync(
+            snapshot,
+            new List<OptimizationSnapshot> { snapshot },
+            new ConfigOptimization { Enabled = true, MinSamples = 5 },
+            new List<IOptimizer> { new FixedAbsorptionOptimizer() });
+
+        // Scoring dozens of measurements must not re-read the live store each time: one frozen read at cycle
+        // start, then only the reads made while applying the winning proposal (rx is read to apply and again by Set).
+        Assert.That(store.Reads["rx"], Is.EqualTo(3));
+        Assert.That(store.Reads["tx0"], Is.EqualTo(1));
+    }
+
+    private static List<OptimizationSnapshot> TimedSnapshots(int count, TimeSpan spacing, int measurementCount = 5)
+    {
+        var start = DateTime.UtcNow - spacing * (count - 1);
+        return Enumerable.Range(0, count)
+            .Select(i => new OptimizationSnapshot { Timestamp = start + spacing * i, Measures = SnapshotWith(measurementCount).Measures })
+            .ToList();
+    }
+
+    [Test]
+    public void HasSufficientHistory_RequiresHalfTheTrainingWindow()
+    {
+        var optimization = new ConfigOptimization { TrainingWindowMins = 30 };
+
+        Assert.That(OptimizationRunner.HasSufficientHistory(TimedSnapshots(4, TimeSpan.FromSeconds(30)), optimization), Is.False, "90 seconds of history");
+        Assert.That(OptimizationRunner.HasSufficientHistory(TimedSnapshots(31, TimeSpan.FromSeconds(30)), optimization), Is.True, "15 minutes of history");
+        Assert.That(OptimizationRunner.HasSufficientHistory(TimedSnapshots(2, TimeSpan.FromMinutes(20)), optimization), Is.False, "too few snapshots to split");
+    }
+
+    [Test]
+    public async Task ScheduledCycle_WithTooLittleHistory_AppliesNothing()
+    {
+        _state.OptimizationSnaphots.AddRange(TimedSnapshots(4, TimeSpan.FromSeconds(30)));
+
+        var ran = await _runner.RunScheduledCycleAsync(new ConfigOptimization { Enabled = true, TrainingWindowMins = 30 }, new List<IOptimizer> { new FixedAbsorptionOptimizer() });
+
+        Assert.That(ran, Is.False);
+        _mqtt.Verify(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
+    public async Task ScheduledCycle_WithEnoughHistory_FitsOlderDataAndValidatesOnNewer()
+    {
+        _state.OptimizationSnaphots.AddRange(TimedSnapshots(31, TimeSpan.FromSeconds(30)));
+
+        var ran = await _runner.RunScheduledCycleAsync(new ConfigOptimization { Enabled = true, TrainingWindowMins = 30 }, new List<IOptimizer> { new FixedAbsorptionOptimizer() });
+
+        Assert.That(ran, Is.True);
+        Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
+        // 31 snapshots of 5 measurements, 20% (7 snapshots) held out
+        Assert.That(_state.OptimizerState.TrainingSamples, Is.EqualTo(24 * 5));
+        Assert.That(_state.OptimizerState.ValidationSamples, Is.EqualTo(7 * 5));
+    }
 }
