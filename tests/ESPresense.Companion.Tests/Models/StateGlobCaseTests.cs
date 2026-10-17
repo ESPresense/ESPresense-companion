@@ -27,7 +27,8 @@ public class StateGlobCaseTests
         _configLoader = new ConfigLoader(_configDir);
         _state = new State(_configLoader, new NodeTelemetryStore(new Mock<IMqttCoordinator>().Object));
 
-        for (var i = 0; i < 50 && _state.Config == null; i++) await Task.Delay(20);
+        // State subscribed to ConfigChanged above; the explicit load fires it synchronously.
+        await _configLoader.LoadAsync();
         Assert.That(_state.Config, Is.Not.Null, "config never loaded");
     }
 
