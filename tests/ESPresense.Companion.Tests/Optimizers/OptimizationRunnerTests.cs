@@ -92,13 +92,46 @@ public class OptimizationRunnerTests
         }
     }
 
-    private Task RunCycle(OptimizationSnapshot snapshot, ConfigOptimization optimization)
+    /// <summary>
+    /// Proposes the exact absorption plus a txRef/rxAdj shift that cancels node-to-node: every
+    /// transmitter 10 dB louder, the receiver 10 dB deafer. Fits the snapshot perfectly, and would
+    /// make every device (ranged with its own rssi@1m) read 10 dB too far.
+    /// </summary>
+    private sealed class GaugeShiftedOptimizer : IOptimizer
+    {
+        public string Name => "GaugeShifted";
+
+        public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
+        {
+            var results = new OptimizationResults();
+            results.Nodes["rx"] = new ProposedValues { Absorption = 3.0, RxAdjRssi = -10 };
+            foreach (var tx in os.Measures.Select(m => m.Tx.Id).Distinct())
+                results.Nodes[tx] = new ProposedValues { TxRefRssi = -49 };
+            return results;
+        }
+    }
+
+    private Task RunCycle(OptimizationSnapshot snapshot, ConfigOptimization optimization, IOptimizer? optimizer = null)
     {
         return _runner.RunCycleAsync(
             snapshot,
             new List<OptimizationSnapshot> { snapshot },
             optimization,
-            new List<IOptimizer> { new FixedAbsorptionOptimizer() });
+            new List<IOptimizer> { optimizer ?? new FixedAbsorptionOptimizer() });
+    }
+
+    [Test]
+    public async Task RunCycle_TxRefRxAdjShiftThatCancelsNodeToNode_IsRejected()
+    {
+        var snapshot = SnapshotWith(5);
+        foreach (var m in snapshot.Measures) m.RssiRxAdj = 0; // measurements carry their rxAdj, so a proposal can re-base them
+
+        await RunCycle(snapshot, new ConfigOptimization { Enabled = true, MinSamples = 5 }, new GaugeShiftedOptimizer());
+
+        _mqtt.Verify(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never,
+            "a proposal that only wins by shifting txRef against rxAdj must not be applied");
+        Assert.That(_nss.Get("rx").Calibration.RxAdjRssi, Is.Null);
+        Assert.That(_nss.Get("tx0").Calibration.TxRefRssi, Is.Null);
     }
 
     [Test]

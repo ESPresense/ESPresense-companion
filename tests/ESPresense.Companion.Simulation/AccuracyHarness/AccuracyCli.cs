@@ -45,7 +45,7 @@ public static class AccuracyCli
     {
         var opts = ParseOpts(args);
         var scenarios = opts.Scenarios.Count == 0
-            ? new List<string> { "baseline_4node_6x4m.json" }
+            ? new List<string> { "baseline_4node_6x4m.json", "plug_height_4node_6x4m.json" }
             : opts.Scenarios;
         var locators = opts.Locators.Count == 0
             ? new List<LocatorKind> { LocatorKind.NelderMead }
@@ -93,7 +93,7 @@ public static class AccuracyCli
         }
 
         var scenarios = opts.Scenarios.Count == 0
-            ? new List<string> { "baseline_4node_6x4m.json" }
+            ? new List<string> { "baseline_4node_6x4m.json", "plug_height_4node_6x4m.json" }
             : opts.Scenarios;
         var locators = opts.Locators.Count == 0
             ? new List<LocatorKind> { LocatorKind.NelderMead }

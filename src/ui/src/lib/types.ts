@@ -39,6 +39,7 @@ export interface Node {
 	cpu: CPU;
 	flavor: Flavor;
 	online: boolean;
+	updateError?: string | null;
 	id: string;
 	name: string;
 	location: { x: number; y: number; z: number };

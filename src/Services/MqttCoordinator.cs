@@ -76,6 +76,8 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
               !string.Equals(_lastConfig.Username, config.Username) ||
               !string.Equals(_lastConfig.Password, config.Password) ||
               _lastConfig.Ssl != config.Ssl ||
+              _lastConfig.Insecure != config.Insecure ||
+              !string.Equals(_lastConfig.CaCertPath, config.CaCertPath) ||
               !string.Equals(_lastConfig.ClientId, config.ClientId) ||
               _lastConfig.ReadOnly != config.ReadOnly ||
               !string.Equals(_lastConfig.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase));
@@ -192,7 +194,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
             {
                 if (readOnlyReason == ReadOnlyReason.None)
                 {
-                    await mqttClient.PublishStringAsync("espresense/companion/status", "online").ConfigureAwait(false);
+                    await mqttClient.PublishStringAsync("espresense/companion/status", "online", retain: true).ConfigureAwait(false);
                 }
 
                 await mqttClient.SubscribeAsync("espresense/devices/+/+").ConfigureAwait(false);
@@ -267,7 +269,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         };
 
         var optionsBuilder = new MqttClientOptionsBuilder()
-            .WithConfig(config)
+            .WithConfig(config, _logger)
             .WithClientId(config.ClientId)
             .WithCleanSession()
             .WithKeepAlivePeriod(TimeSpan.FromSeconds(30));
@@ -478,6 +480,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
     public event Func<NodeTelemetryRemovedEventArgs, Task>? NodeTelemetryRemovedAsync;
     public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
     public event Func<NodeStatusRemovedEventArgs, Task>? NodeStatusRemovedAsync;
+    public event Func<NodeUpdateErrorEventArgs, Task>? NodeUpdateErrorAsync;
     public event EventHandler? MqttMessageMalformed;
     public event EventHandler<PreviousDeviceDiscoveredEventArgs>? PreviousDeviceDiscovered;
     public event Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceivedAsync;
@@ -543,6 +546,9 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
                     break;
                 case ["espresense", "rooms", _, "status"]:
                     await ProcessStatusMessage(parts[2], payload);
+                    break;
+                case ["espresense", "rooms", _, "update_error"]:
+                    await ProcessUpdateErrorMessage(parts[2], payload);
                     break;
                 case ["espresense", "rooms", "*", _, "set"]:
                     await ProcessNodeSettingMessage(parts[2], parts[3], payload);
@@ -794,6 +800,21 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
                 "Telemetry",
                 ex);
         }
+    }
+
+    /// <summary>
+    /// Handles a node's retained <c>update_error</c> message; an empty payload means the error was cleared.
+    /// </summary>
+    private async Task ProcessUpdateErrorMessage(string nodeId, string? payload)
+    {
+        if (NodeUpdateErrorAsync == null)
+            return;
+
+        await InvokeAllAsync(NodeUpdateErrorAsync, new NodeUpdateErrorEventArgs
+        {
+            NodeId = nodeId,
+            Error = string.IsNullOrEmpty(payload) ? null : payload
+        }, nameof(NodeUpdateErrorAsync));
     }
 
     /// <summary>

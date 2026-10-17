@@ -241,3 +241,6 @@ test-results
 
 # Oh My ClaudeCode
 .omc/
+
+# local scratch kept beside the tests
+tests/ESPresense.Companion.Tests/*.pending
