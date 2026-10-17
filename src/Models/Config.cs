@@ -118,7 +118,7 @@ namespace ESPresense.Models
 
         /// <summary>
         /// RSSI assumed for a node heard on only one side of a comparison (roughly the hearing limit);
-        /// null compares shared nodes only. On the robot survey -100 cut the worst errors sharply.
+        /// null compares shared nodes only (knn mode only; continuous mode treats null as -100). On the robot survey -100 cut the worst errors sharply.
         /// </summary>
         [YamlMember(Alias = "missing_rssi")]
         public double? MissingRssi { get; set; } = -100;

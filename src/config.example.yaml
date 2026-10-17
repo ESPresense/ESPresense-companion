@@ -121,7 +121,8 @@ locators:
     top: 20              # continuous: how many best-matching surface points to average
     k: 3
     min_common: 3
-    missing_rssi: -100   # assumed for a node heard on one side only; omit to compare shared nodes only
+    missing_rssi: -100   # assumed for a node heard on one side only (continuous mode treats null as -100)
+                         # knn mode only: an explicit null compares shared nodes only
 
 filtering:
   # Kalman Filter Parameters
