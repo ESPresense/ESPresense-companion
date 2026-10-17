@@ -72,6 +72,8 @@ public class MqttCoordinator : IMqttCoordinator
               !string.Equals(_lastConfig.Username, config.Username) ||
               !string.Equals(_lastConfig.Password, config.Password) ||
               _lastConfig.Ssl != config.Ssl ||
+              _lastConfig.Insecure != config.Insecure ||
+              !string.Equals(_lastConfig.CaCertPath, config.CaCertPath) ||
               !string.Equals(_lastConfig.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -166,7 +168,7 @@ public class MqttCoordinator : IMqttCoordinator
             {
                 if (!IsReadOnlyClient(config.ClientId))
                 {
-                    await mqttClient.PublishStringAsync("espresense/companion/status", "online").ConfigureAwait(false);
+                    await mqttClient.PublishStringAsync("espresense/companion/status", "online", retain: true).ConfigureAwait(false);
                 }
 
                 await mqttClient.SubscribeAsync("espresense/devices/+/+").ConfigureAwait(false);
@@ -228,7 +230,7 @@ public class MqttCoordinator : IMqttCoordinator
         };
 
         var mqttClientOptions = new MqttClientOptionsBuilder()
-            .WithConfig(config)
+            .WithConfig(config, _logger)
             .WithClientId(config.ClientId)
             .WithWillTopic("espresense/companion/status")
             .WithWillRetain()

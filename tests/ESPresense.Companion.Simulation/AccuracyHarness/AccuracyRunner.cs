@@ -107,8 +107,8 @@ public static class AccuracyRunner
             var measured = scenario.Stations
                 .Select(st =>
                 {
-                    double dx = tx - st.X, dy = ty - st.Y;
-                    double trueD = Math.Sqrt(dx * dx + dy * dy);
+                    double dx = tx - st.X, dy = ty - st.Y, dz = (scenario.DeviceZ ?? st.Z) - st.Z;
+                    double trueD = Math.Sqrt(dx * dx + dy * dy + dz * dz);
                     double trueRssi = FirmwareDistanceModel.DistanceToRssi(st.CalRssi, trueD, st.Absorption);
                     double noisyRssi = noise.Sample(rng, trueRssi);
                     double measuredD = FirmwareDistanceModel.RssiToDistance(st.CalRssi, noisyRssi, st.Absorption);
@@ -210,8 +210,7 @@ public static class AccuracyRunner
         {
             Name = scenario.Name,
             // Companion uses [x,y,z] bounds; the harness scenarios are 2D so we
-            // inflate z to a fixed 3m ceiling consistent with the station
-            // mounting in the baseline scenario.
+            // give every floor a fixed 3m floor-to-ceiling height.
             Bounds = new[]
             {
                 new[] { scenario.Bounds.XMin, scenario.Bounds.YMin, 0.0 },

@@ -45,7 +45,7 @@
 <div>
 	{#if $nodes}
 		<VersionPicker bind:updateMethod={$updateMethod} bind:firmwareSource={$firmwareSource} bind:flavor={$flavor} bind:version={$version} bind:artifact={$artifact} />
-		<DataTable {columns} rows={$nodes} classNameTable="table  table-compact" onclickRow={(event) => select(event.row)} />
+		<DataTable {columns} rows={$nodes} classNameTable="table  table-compact" search searchPlaceholder="Filter by name or id…" onclickRow={(event) => select(event.row)} />
 	{/if}
 </div>
 
