@@ -229,6 +229,28 @@ public class RoomLearningTests
     }
 
     [Test]
+    public async Task DiscoveryIsSentOnceAndAgainOnlyWhenItChanges()
+    {
+        var topic = RoomLearningService.DiscoveryTopic(_mqtt.Object, _device.Id);
+        Hear();
+        await _service.UpdateAsync(_device);
+        for (var i = 0; i < 5; i++)
+        {
+            _clock.Time += TimeSpan.FromMinutes(2);
+            Hear();
+            await _service.UpdateAsync(_device);
+        }
+        Assert.That(_published.Count(p => p.Topic == topic), Is.EqualTo(1), "retained discovery is not re-sent on a timer");
+
+        var floor = _state.Config!.Floors[0];
+        floor.Rooms = floor.Rooms!.Append(new ConfigRoom { Id = "den", Name = "Den", Points = new[] { new[] { 0d, 5d }, new[] { 5d, 5d }, new[] { 0d, 10d } } }).ToArray();
+        _state.Floors["first"].Update(_state.Config, floor);
+        await _service.UpdateAsync(_device);
+        Assert.That(_published.Count(p => p.Topic == topic), Is.EqualTo(2), "a new room changes the options");
+        Assert.That(_published.Last(p => p.Topic == topic).Payload, Does.Contain("Den"));
+    }
+
+    [Test]
     public async Task TaughtRoomIsRecognisedAtDefaultFirmwareReportRate()
     {
         // A still device on default firmware reports to each node about every 4 s, out of step with

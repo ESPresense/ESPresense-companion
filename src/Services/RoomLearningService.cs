@@ -25,7 +25,7 @@ public sealed class RoomLearningService : IDisposable
     private readonly Dictionary<string, Queue<Report>> _recent = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Correction> _pending = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Correction> _last = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, (string Payload, DateTime Sent)> _discovery = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _discovery = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (string Value, DateTime Sent)> _published = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (Room Room, DateTime Until)> _holds = new(StringComparer.OrdinalIgnoreCase);
     private sealed record Report(DateTime At, string Node, double Rssi);
@@ -201,8 +201,9 @@ public sealed class RoomLearningService : IDisposable
             device = new { identifiers = new[] { $"espresense-{device.Id}" }, name = device.Name ?? device.Id },
             origin = new { name = "ESPresense Companion" }
         });
-        if (!_discovery.TryGetValue(device.Id, out var sent) || sent.Payload != payload || now - sent.Sent > TimeSpan.FromMinutes(1))
-            if (await _mqtt.TryEnqueueAsync(DiscoveryTopic(_mqtt, device.Id), payload, true)) _discovery[device.Id] = (payload, now);
+        // Discovery is retained, so like the device's other discovery it is sent only when it changes.
+        if (!_discovery.TryGetValue(device.Id, out var sent) || sent != payload)
+            if (await _mqtt.TryEnqueueAsync(DiscoveryTopic(_mqtt, device.Id), payload, true)) _discovery[device.Id] = payload;
         var value = (device.IsAnchored || device.Nodes.Values.Any(n => n.Current)) && rooms.Contains(device.Room!) ? device.Room!.Name! : "None";
         if (!_published.TryGetValue(device.Id, out var previous) || previous.Value != value || now - previous.Sent > TimeSpan.FromSeconds(10))
         {
