@@ -17,7 +17,7 @@ floor and ID are stored internally, so changing its display name keeps its examp
 An ambiguous duplicate room name is rejected rather than guessed.
 
 A correction labels the preceding 10 seconds of raw RSSI readings. At least three
-receivers must have reported within the last three seconds. Companion holds an
+receivers must have reported within those 10 seconds. Companion holds an
 accepted correction for 10 seconds, then resumes prediction. It learns only when
 it receives a command; publishing its own predicted state never trains the model.
 The dropdown is unknown when there is no current room prediction. Its attributes

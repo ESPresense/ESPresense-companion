@@ -228,6 +228,47 @@ public class RoomLearningTests
         Assert.That(_device.LearnedRoom, Is.Null);
     }
 
+    [Test]
+    public async Task TaughtRoomIsRecognisedAtDefaultFirmwareReportRate()
+    {
+        // A still device on default firmware reports to each node about every 4 s, out of step with
+        // each other. Whichever moment the room is taught and later checked, every node must count.
+        var pattern = new Dictionary<string, double> { ["a"] = -50, ["b"] = -70, ["c"] = -80 };
+        void Report(string node)
+        {
+            _mqtt.Raise(m => m.DeviceMessageReceivedAsync += null, new DeviceMessageEventArgs
+                { DeviceId = _device.Id, NodeId = node, Payload = new DeviceMessage { Rssi = pattern[node] - 5, RssiRxAdj = 5 } });
+        }
+        var elapsed = 0.0;
+        async Task Run(double seconds, Func<Task>? atEnd = null)
+        {
+            for (var end = elapsed + seconds; elapsed < end - 0.01; elapsed += 0.5)
+            {
+                foreach (var (node, phase) in new[] { ("a", 0.0), ("b", 1.5), ("c", 3.0) })
+                    if (elapsed >= phase && Math.Abs((elapsed - phase) % 4) < 0.01) Report(node);
+                _clock.Time += TimeSpan.FromSeconds(0.5);
+            }
+            if (atEnd != null) await atEnd();
+        }
+
+        await Run(10, async () =>
+        {
+            _service.QueueCorrection(Command, "Kitchen", false);
+            await _service.UpdateAsync(_device);
+        });
+        Assert.That(new RoomFingerprintStore(FilePath).ForDevice("phone").Single().Rssi.Keys, Is.EquivalentTo(new[] { "a", "b", "c" }));
+
+        // Past the correction hold, check at every half second of a report cycle.
+        await Run(12);
+        for (var i = 0; i < 8; i++)
+        {
+            await Run(0.5);
+            await _service.UpdateAsync(_device);
+            Assert.That(_device.LearnedRoom?.Source, Is.EqualTo("learned"), $"recognised {i * 0.5:0.0} s into the cycle");
+            Assert.That(_device.Room?.Id, Is.EqualTo("kitchen"));
+        }
+    }
+
     private sealed class FixedLocator(Room room) : ESPresense.Locators.ILocate
     {
         public bool Locate(Scenario scenario)
@@ -301,7 +342,8 @@ public class RoomLearningTests
         Hear();
         await _service.UpdateAsync(_device);
         Assert.That(File.Exists(FilePath), Is.False);
-        _clock.Time += TimeSpan.FromSeconds(4);
+        // Only one receiver heard in the last 10 s.
+        _clock.Time += TimeSpan.FromSeconds(11);
         _mqtt.Raise(m => m.DeviceMessageReceivedAsync += null, new DeviceMessageEventArgs
         {
             DeviceId = "phone", NodeId = "a", Payload = new DeviceMessage { Rssi = -50 }

@@ -79,12 +79,17 @@ public sealed class RoomLearningService : IDisposable
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Each node's mean raw rssi over the last 10 s. A still device on default firmware reports to a node
+    /// only every ~4 s (6 s at p90, robot survey), so a shorter freshness cut changes which nodes are in
+    /// the reading from one update to the next; with the presence penalty in Distance, a taught room was
+    /// then recognised at the same spot ~2% of the time instead of ~82%.
+    /// </summary>
     private Dictionary<string, double> Reading(string id)
     {
         if (!_recent.TryGetValue(id, out var reports)) return new(StringComparer.OrdinalIgnoreCase);
         return reports.Where(r => Now - r.At <= TimeSpan.FromSeconds(10))
             .GroupBy(r => r.Node, StringComparer.OrdinalIgnoreCase)
-            .Where(g => Now - g.Max(r => r.At) <= TimeSpan.FromSeconds(3))
             .ToDictionary(g => g.Key, g => g.Average(r => r.Rssi), StringComparer.OrdinalIgnoreCase);
     }
 
