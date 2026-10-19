@@ -334,3 +334,7 @@ devices:
 # Devices to NOT track
 exclude_devices:
   - id: "iBeacon:e5ca1ade-f007-ba11-0000-000000000000-*" # These are junk, we alias them to node:*
+
+# Opt in to Home Assistant room correction and per-device room learning.
+room_learning:
+  enabled: false

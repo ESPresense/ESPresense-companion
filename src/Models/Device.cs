@@ -51,10 +51,10 @@ public class Device
     public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
     [STJ.JsonConverter(typeof(RoomConverter))]
-    public Room? Room => Anchor?.Room ?? BestScenario?.Room;
+    public Room? Room => Anchor?.Room ?? ActiveLearnedRoom?.Room ?? BestScenario?.Room;
 
     [STJ.JsonConverter(typeof(FloorConverter))]
-    public Floor? Floor => Anchor?.Floor ?? BestScenario?.Floor;
+    public Floor? Floor => Anchor?.Floor ?? ActiveLearnedRoom?.Room.Floor ?? BestScenario?.Floor;
 
     public int? Confidence => IsAnchored ? 100 : BestScenario?.Confidence;
 
@@ -78,6 +78,10 @@ public class Device
 
     [STJ.JsonIgnore] public bool Check { get; set; }
     [STJ.JsonIgnore] public bool Track { get; set; }
+
+    [STJ.JsonIgnore] public LearnedRoomPrediction? LearnedRoom { get; set; }
+    [STJ.JsonIgnore] public LearnedRoomPrediction? ActiveLearnedRoom =>
+        !IsAnchored && LearnedRoom is { } learned && learned.ValidUntil > DateTime.UtcNow ? learned : null;
 
     [STJ.JsonIgnore] public Scenario? BestScenario { get; set; }
     [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
@@ -190,3 +194,5 @@ public class Device
         }
     }
 }
+
+public sealed record LearnedRoomPrediction(Room Room, DateTime ValidUntil, string Source);

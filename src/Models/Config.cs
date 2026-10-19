@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using TextExtensions;
 using YamlDotNet.Serialization;
 using ESPresense.Extensions;
@@ -32,6 +32,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "optimization")]
         public ConfigOptimization Optimization { get; set; } = new();
 
+        [YamlMember(Alias = "room_learning")]
+        public RoomLearningConfig RoomLearning { get; set; } = new();
+
         [YamlMember(Alias = "locators")]
         public ConfigLocators Locators { get; set; } = new();
 
@@ -55,6 +58,12 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "exclude_devices")]
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
+    }
+
+    public class RoomLearningConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
     }
 
     public partial class ConfigLocators

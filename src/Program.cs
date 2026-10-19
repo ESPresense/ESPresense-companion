@@ -72,6 +72,7 @@ builder.Services.AddSingleton<FirmwareCatalogService>();
 builder.Services.AddSingleton<DeviceService>();
 builder.Services.AddSingleton<DeviceCaptureService>();
 builder.Services.AddSingleton<FingerprintCollectionService>();
+builder.Services.AddSingleton<RoomLearningService>();
 builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
 
