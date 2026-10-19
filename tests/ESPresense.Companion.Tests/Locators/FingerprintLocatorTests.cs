@@ -1,5 +1,7 @@
 using ESPresense.Locators;
 using ESPresense.Models;
+using ESPresense.Services;
+using Moq;
 
 namespace ESPresense.Companion.Tests.Locators;
 
@@ -97,5 +99,146 @@ public class FingerprintLocatorTests
             Assert.That(map.All, Is.Empty);
         }
         finally { File.Delete(path); }
+    }
+
+    [TestFixture]
+    public class RoomPrediction
+    {
+        // A single floor with a room layout the default config does not define, so the only rooms in
+        // play are the ones this test adds. Two rooms 3 m tall with a 1 m gap between them at x = 5..6:
+        // the gap belongs to no polygon, which is where the old "room of the averaged coordinate"
+        // logic returned null.
+        private const string FloorId = "room-test-floor";
+
+        private static ConfigRoom Room(string name, double x0, double x1) => new()
+        {
+            Name = name,
+            Points = new[] { new[] { x0, 0.0 }, new[] { x1, 0.0 }, new[] { x1, 3.0 }, new[] { x0, 3.0 } }
+        };
+
+        private readonly List<FingerprintSurvey> _surveys = new();
+
+        [TearDown]
+        public async Task Cleanup()
+        {
+            foreach (var survey in _surveys)
+            {
+                await survey.Loader.ConfigAsync();
+                await survey.Loader.StopAsync(CancellationToken.None);
+                survey.Loader.Dispose();
+                Directory.Delete(survey.Dir, true);
+            }
+            _surveys.Clear();
+        }
+
+        private FingerprintSurvey Build(FingerprintConfig config)
+        {
+            var dir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(dir);
+            var loader = new ConfigLoader(dir);
+            var mqtt = new Mock<IMqttCoordinator>();
+            var state = new State(loader, new NodeTelemetryStore(mqtt.Object));
+
+            var floor = new Floor();
+            floor.Update(loader.Config!, new ConfigFloor
+            {
+                Id = FloorId, Name = "Room Test",
+                Bounds = new[] { new[] { 0.0, 0.0, 0.0 }, new[] { 9.0, 3.0, 3.0 } },
+                Rooms = new[] { Room("Left", 0, 5), Room("Right", 6, 9) }
+            });
+            state.Floors[floor.Id] = floor;
+
+            var nodes = new Dictionary<string, Node>();
+            foreach (var id in new[] { "a", "b", "c" })
+            {
+                var node = new Node(id, NodeSourceType.Config);
+                node.Update(loader.Config!, new ConfigNode { Name = id, Point = new[] { 1.0, 0.0, 2.0 } }, new[] { floor });
+                state.Nodes[id] = node;
+                nodes[id] = node;
+            }
+            var survey = new FingerprintSurvey(dir, loader, state, floor, nodes, config);
+            _surveys.Add(survey);
+            return survey;
+        }
+
+        private sealed record FingerprintSurvey(string Dir, ConfigLoader Loader, State State, Floor Floor,
+            Dictionary<string, Node> Nodes, FingerprintConfig Config);
+
+        private static Fingerprint Spot(double x, double y, params (string Node, double Rssi)[] r) =>
+            new() { Floor = FloorId, X = x, Y = y, Z = 0, Rssi = r.ToDictionary(a => a.Node, a => a.Rssi, StringComparer.OrdinalIgnoreCase) };
+
+        private static (Scenario Scenario, bool Located) Locate(FingerprintSurvey s, IReadOnlyList<Fingerprint> spots, params (string Node, double Rssi)[] reading)
+        {
+            var path = Path.Combine(s.Dir, s.Config.File);
+            File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(new
+            {
+                fingerprints = spots
+            }));
+
+            var device = new Device($"dev-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
+            foreach (var (node, rssi) in reading)
+                device.Nodes[node] = new DeviceToNode(device, s.Nodes[node]) { Rssi = rssi, LastHit = DateTime.UtcNow };
+
+            var locator = new FingerprintLocator(device, s.Floor, new FingerprintMap(path), s.Config);
+            var scenario = new Scenario(s.Loader.Config, locator, FloorId);
+            var located = locator.Locate(scenario);
+            return (scenario, located);
+        }
+
+        [Test]
+        public void FixOutsideEveryRoomKeepsTheFloor()
+        {
+            var s = Build(new FingerprintConfig { MinCommon = 3, Mode = "knn", K = 1 });
+            var spots = new[] { Spot(5.5, 1.5, ("a", -50), ("b", -70), ("c", -80)) };
+            var (scenario, located) = Locate(s, spots, ("a", -50), ("b", -70), ("c", -80));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(located, Is.True);
+                Assert.That(scenario.Room, Is.Null);
+                Assert.That(scenario.Floor, Is.SameAs(s.Floor));
+            });
+        }
+
+        [Test]
+        public void RoomComesFromMatchingSpotsEvenWhenTheFixLandsInAGapBetweenRooms()
+        {
+            // The two surveyed spots flank the gap: one inside the left room, one inside the right.
+            // Their weighted average lands near x = 5.5, in no room. The match is a clear tie broken
+            // by weight, so the room must come from the spots, not the coordinate.
+            var s = Build(new FingerprintConfig { MinCommon = 3, Mode = "knn", K = 2 });
+            var spots = new[]
+            {
+                Spot(4.5, 1.5, ("a", -50), ("b", -70), ("c", -80)),
+                Spot(6.5, 1.5, ("a", -70), ("b", -50), ("c", -80))
+            };
+            // Symmetric patterns: an even reading averages to exactly x = 5.5, in no room.
+            var (scenario, located) = Locate(s, spots, ("a", -60), ("b", -60), ("c", -80));
+
+            Assert.That(located, Is.True);
+            Assert.That(scenario.Location.X, Is.EqualTo(5.5).Within(0.01));
+            Assert.That(scenario.Room?.Name, Is.AnyOf("Left", "Right"), "a fingerprint fix must still report a room");
+        }
+
+        [Test]
+        public void RoomFollowsTheBetterMatchingSpot()
+        {
+            // The reading matches the spot in the right room far better, while the left spot is a
+            // valid-but-worse match. The average of the two still lands in the gap, so only the
+            // matched spots can say "Right".
+            var s = Build(new FingerprintConfig { MinCommon = 3, Mode = "knn", K = 2 });
+            var spots = new[]
+            {
+                Spot(4.5, 1.5, ("a", -50), ("b", -75), ("c", -80)),
+                Spot(6.5, 1.5, ("a", -70), ("b", -50), ("c", -80))
+            };
+            // Near the midpoint of the two patterns: the right spot still matches better, but the
+            // weight is balanced enough that the averaged coordinate stays in the gap.
+            var (scenario, located) = Locate(s, spots, ("a", -62), ("b", -58), ("c", -80));
+
+            Assert.That(located, Is.True);
+            Assert.That(scenario.Location.X, Is.GreaterThan(5).And.LessThan(6), "the fix sits in the gap");
+            Assert.That(scenario.Room?.Name, Is.EqualTo("Right"));
+        }
     }
 }

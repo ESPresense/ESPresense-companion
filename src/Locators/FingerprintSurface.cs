@@ -103,6 +103,7 @@ public sealed class FingerprintSurface
             top.Select((t, i) => _points[t.I].X * w[i]).Sum() / ws,
             top.Select((t, i) => _points[t.I].Y * w[i]).Sum() / ws,
             top.Select((t, i) => _points[t.I].Z * w[i]).Sum() / ws);
-        return new FingerprintLocator.MatchResult(loc, top[0].D, shared);
+        var samples = top.Select((t, i) => (_points[t.I], w[i])).ToArray();
+        return new FingerprintLocator.MatchResult(loc, top[0].D, shared, samples);
     }
 }

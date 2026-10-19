@@ -87,7 +87,11 @@ public class RobotSurveyTests
         {
             Id = "first",
             Name = "First",
-            Bounds = _survey.FloorBounds["first"]
+            Bounds = _survey.FloorBounds["first"],
+            Rooms = _survey.Rooms.Where(r => r.Floor == "first").Select(r => new ConfigRoom
+            {
+                Id = r.Id, Name = r.Id, Points = r.Points.Select(q => q.ToArray()).ToArray()
+            }).ToArray()
         });
         _state.Floors[floor.Id] = floor;
         return floor;
@@ -604,7 +608,7 @@ public class RobotSurveyTests
     /// Scores one fix per visit, then each spot once: its error is the median over its visits, and it
     /// counts as the right room when most of its visits land in it.
     /// </summary>
-    private AccuracyResult Score(List<SurveyPoint> pts, Func<SurveyPoint, Point3D?> locate)
+    private AccuracyResult Score(List<SurveyPoint> pts, Func<SurveyPoint, Point3D?> locate, Func<string?>? predictedRoom = null)
     {
         var errs = new List<double>();
         int fixes = 0, hits = 0, total = 0;
@@ -616,7 +620,7 @@ public class RobotSurveyTests
                 if (locate(p) is not { } fix) continue;
                 fixes++;
                 e.Add(Math.Sqrt(Math.Pow(fix.X - p.FloorX!.Value, 2) + Math.Pow(fix.Y - p.FloorY!.Value, 2)));
-                if (RoomAt(fix.X, fix.Y) == p.FloorRoom) h++;
+                if ((predictedRoom == null ? RoomAt(fix.X, fix.Y) : predictedRoom()) == p.FloorRoom) h++;
             }
             if (e.Count == 0) continue;
             e.Sort();
@@ -720,6 +724,8 @@ public class RobotSurveyTests
         var map = new FingerprintMap(path);
 
         var reloads = 0;
+        string? room = null;
+        int visitHits = 0, noRoom = 0;
         AccuracyResult Run(FingerprintConfig cfg) => Score(pts, p =>
         {
             var train = pts.Where(q => Math.Sqrt(Math.Pow(q.FloorX!.Value - p.FloorX!.Value, 2) + Math.Pow(q.FloorY!.Value - p.FloorY!.Value, 2)) > SameSpotM);
@@ -739,10 +745,22 @@ public class RobotSurveyTests
                     device.Nodes[id] = new DeviceToNode(device, node) { Rssi = m.Rssi, Distance = m.Dist, LastHit = DateTime.UtcNow };
             var locator = new FingerprintLocator(device, floor, map, cfg);
             var scenario = new Scenario(_configLoader.Config, locator, "fingerprint");
-            return locator.Locate(scenario) ? scenario.Location : null;
-        });
+            var located = locator.Locate(scenario);
+            room = scenario.Room?.Id;
+            if (p.FloorRoom != null)
+            {
+                if (room == p.FloorRoom) visitHits++;
+                if (room == null) noRoom++;
+            }
+            return located ? scenario.Location : null;
+        }, () => room);
         var fp = Run(cfg);
+        var continuousVisitHits = visitHits;
+        var continuousNoRoom = noRoom;
+        visitHits = noRoom = 0;
         var knn = Run(knnCfg);
+        var roomVisits = pts.Count(p => p.FloorRoom != null);
+        TestContext.WriteLine($"Continuous room visits: {continuousVisitHits}/{roomVisits}; no room: {continuousNoRoom}; knn: {visitHits}/{roomVisits}; no room: {noRoom}");
 
         TestContext.WriteLine($"{Spots(pts).Count} spots, {pts.Count} visits; errors are per spot (median over its visits)\n");
         TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}");
@@ -757,6 +775,7 @@ public class RobotSurveyTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(continuousVisitHits, Is.GreaterThanOrEqualTo(103), "continuous room vote must not regress");
             Assert.That(fp.Fixes, Is.EqualTo(pts.Count), "fingerprinting should fix every spot");
             foreach (var (which, r) in ranging)
                 Assert.That(fp.Median, Is.LessThan(r.Median), $"fingerprinting should beat {which} on median error");
