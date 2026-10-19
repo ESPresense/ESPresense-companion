@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Serilog;
 
@@ -7,6 +8,8 @@ namespace ESPresense.Models;
 /// <summary>One surveyed spot: where it is, and the raw rssi (rssi + rxAdj) each node heard there.</summary>
 public sealed class Fingerprint
 {
+    [JsonPropertyName("id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Guid? Id { get; init; }
+    [JsonPropertyName("device"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? DeviceId { get; init; }
     [JsonPropertyName("floor")] public string? Floor { get; init; }
     [JsonPropertyName("x")] public double X { get; init; }
     [JsonPropertyName("y")] public double Y { get; init; }
@@ -58,6 +61,53 @@ public class FingerprintMap(string path)
                 return _all;
             }
         }
+    }
+
+    /// <summary>Append without overwriting an unreadable survey; replace the file atomically.</summary>
+    public void Append(Fingerprint fingerprint)
+    {
+        lock (_lock)
+        {
+            var data = File.Exists(Path)
+                ? JsonNode.Parse(File.ReadAllText(Path)) as JsonObject
+                    ?? throw new InvalidDataException("Invalid fingerprint file.")
+                : new JsonObject { ["fingerprints"] = new JsonArray() };
+            if (data["fingerprints"] is not JsonArray entries) throw new InvalidDataException("Invalid fingerprint list.");
+            entries.Add(JsonSerializer.SerializeToNode(fingerprint));
+            WriteDocument(data);
+        }
+    }
+
+    /// <summary>Remove only the identified sample belonging to this device, preserving other survey data.</summary>
+    public bool Remove(Guid sampleId, string deviceId)
+    {
+        lock (_lock)
+        {
+            if (!File.Exists(Path)) return false;
+            var data = JsonNode.Parse(File.ReadAllText(Path)) as JsonObject
+                ?? throw new InvalidDataException("Invalid fingerprint file.");
+            if (data["fingerprints"] is not JsonArray entries) throw new InvalidDataException("Invalid fingerprint list.");
+            var matches = entries.OfType<JsonObject>().Where(entry =>
+                entry["id"] is JsonValue id && id.TryGetValue<string>(out var value) && Guid.TryParse(value, out var parsed) && parsed == sampleId &&
+                entry["device"] is JsonValue owner && owner.TryGetValue<string>(out var name) && string.Equals(name, deviceId, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length == 0) return false;
+            if (matches.Length > 1) throw new InvalidDataException("Duplicate fingerprint ID.");
+            entries.Remove(matches[0]);
+            WriteDocument(data);
+            return true;
+        }
+    }
+
+    private void WriteDocument(JsonObject data)
+    {
+        var temporary = Path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, JsonSerializer.Serialize(data));
+            File.Move(temporary, Path, overwrite: true);
+            _loadedAt = default;
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     public IEnumerable<Fingerprint> ForFloor(string? floorId) =>

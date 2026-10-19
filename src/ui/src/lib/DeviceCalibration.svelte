@@ -2,6 +2,7 @@
 	import { apiFetch, apiUrl } from '$lib/api';
 	import { devices, nodes, config, wsManager } from '$lib/stores';
 	import Map from '$lib/Map.svelte';
+	import FingerprintCollection from '$lib/FingerprintCollection.svelte';
 	import { getToastStore } from '$lib/toast/toastStore';
 	import type { DeviceSetting, NodeSetting, NodeSettingDetails } from '$lib/types';
 	import type { DeviceMessage } from '$lib/types';
@@ -122,8 +123,6 @@
 
 	// Calibration metrics and related reactive state
 	let rssiValues: { [key: string]: number | null } = $state({});
-	let includedNodes: { [key: string]: boolean } = $state({});
-	let calculatedRefRssi: number | null = $state(null);
 
 	// --- Helper functions ---
 
@@ -297,55 +296,6 @@
 		positionDebounce = setTimeout(() => sendCapturePosition(), 300);
 	}
 
-	// Update this function to use only parameters from device messages
-	function calculateFinalRssi() {
-		const refRssiEstimates: Array<{ refRssi: number; weight: number }> = [];
-
-		// Calculate using all device messages
-		Object.entries(deviceMessages).forEach(([nodeId, messages]) => {
-			// Skip if node isn't included or doesn't have enough messages
-			if (!includedNodes[nodeId] || messages.length < 5) return;
-
-			// Find the associated node in nodeDistances
-			const node = nodeDistances.find((n) => n.id === nodeId);
-			if (!node || node.distance < 0.1) return;
-
-			// Extract valid RSSI values
-			const validRssiValues = messages.map((msg) => msg.rssi).filter((rssi) => rssi !== null && rssi !== undefined) as number[];
-
-			if (validRssiValues.length < 5) return;
-
-			// Calculate average RSSI
-			const avgRssi = validRssiValues.reduce((sum, val) => sum + val, 0) / validRssiValues.length;
-
-			// Get the node's absorption value or use default of 2 if not available
-			const absorption = nodeSettings[nodeId]?.calibration?.absorption ?? 2;
-
-			// Use the node's absorption value (multiplied by 10 to match the scale)
-			// The formula is RSSI@1m = RSSI + 10*n*log10(distance) where n is the path loss exponent
-			const refRssi = avgRssi + 10 * absorption * Math.log10(node.distance);
-
-			// Weight by inverse distance (closer nodes get higher weight)
-			const weight = 1 / Math.max(1, node.distance);
-
-			refRssiEstimates.push({ refRssi, weight });
-		});
-
-		// If no valid estimates, return null
-		if (refRssiEstimates.length === 0) return null;
-
-		// Calculate weighted average
-		const totalWeight = refRssiEstimates.reduce((sum, est) => sum + est.weight, 0);
-		const rawValue = refRssiEstimates.reduce((sum, est) => sum + est.refRssi * est.weight, 0) / totalWeight;
-
-		return Math.round(rawValue);
-	}
-
-	function toggleNodeInclusion(nodeId: string) {
-		includedNodes[nodeId] = !includedNodes[nodeId];
-		includedNodes = { ...includedNodes }; // Trigger reactivity
-	}
-
 	// Get message statistics for display
 	function calculateMessageStats(deviceMessages: Record<string, DeviceMessage[]>) {
 		const stats: Record<string, { count: number; avgRssi: number | null; minRssi: number | null; maxRssi: number | null; stdDev: number | null }> = {};
@@ -376,31 +326,6 @@
 		return stats;
 	}
 
-	async function saveCalibration() {
-		if (!calculatedRefRssi) return;
-		try {
-			const response = await fetch(apiUrl(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
-			});
-			if (response.ok) {
-				currentRefRssi = calculatedRefRssi;
-				toastStore.trigger({
-					message: 'Calibration saved successfully!',
-					background: 'preset-filled-success-500'
-				});
-			} else if (response.status === 400) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Bad request. Please check your input.');
-			} else {
-				throw new Error('Error saving calibration. Please try again.');
-			}
-		} catch (e: unknown) {
-			const error = e as Error;
-			toastStore.trigger({ message: error.message, background: 'preset-filled-error-500' });
-		}
-	}
 	let isAnchored = $derived(deviceSettings?.x != null && deviceSettings?.y != null && deviceSettings?.z != null);
 	// Error handling adjusted for fetched settings
 	$effect(() => {
@@ -443,7 +368,6 @@
 	$effect.pre(() => {
 		if (selectedFloorId && calibrationSpot) {
 			rssiValues = {};
-			calculatedRefRssi = null;
 		}
 	});
 	// Update Z coordinate when height changes
@@ -457,11 +381,6 @@
 	$effect.pre(() => {
 		// Fetch settings for each node
 		nodeDistances.forEach((node) => {
-			// Set default inclusion
-			if (includedNodes[node.id] === undefined) {
-				includedNodes[node.id] = true;
-			}
-
 			// Fetch node settings if not already requested
 			if (!nodeSettingsRequested.has(node.id)) {
 				nodeSettingsRequested.add(node.id);
@@ -489,12 +408,6 @@
 			if (Object.keys(newRssiValues).length > 0) {
 				rssiValues = newRssiValues;
 			}
-		}
-	});
-	// Calculate final RSSI using all device messages when enough data is collected
-	$effect.pre(() => {
-		if (Object.values(deviceMessages).some((msgs) => msgs.length >= 5)) {
-			calculatedRefRssi = calculateFinalRssi();
 		}
 	});
 	let exportUrl = $derived(deviceSettings?.id ? apiUrl(`/api/device/${deviceSettings.id}/capture/export`) : '');
@@ -525,9 +438,9 @@
 					<ol class="list-decimal pl-6 mb-2">
 						<li>Select a floor from the dropdown</li>
 						<li>Place the marker where your device is physically located (drag to position)</li>
-						<li>Data is automatically collected as you keep the device stationary</li>
+						<li>Click Collect sample and keep the device stationary for 15 seconds</li>
 						<li>Compare Map Distance (actual) with Est. Distance (calculated from RSSI)</li>
-						<li>When stability is good, review and save the calculated value</li>
+						<li>The fingerprint is saved; optionally apply the suggested calibration</li>
 					</ol>
 					<p class="text-sm font-medium mt-2">The closer Map Distance matches Est. Distance for all nodes, the more accurate your positioning will be.</p>
 				</div>
@@ -580,6 +493,17 @@
 				</div>
 			</div>
 
+			<FingerprintCollection
+				deviceId={deviceSettings.id}
+				{currentRefRssi}
+				oncalibrated={(settings) => {
+					deviceSettings = settings;
+					currentRefRssi = settings['rssi@1m'];
+				}}
+				floorId={selectedFloorId}
+				position={calibrationSpot ? { x: calibrationSpot.x, y: calibrationSpot.y, z: (bounds?.[0]?.[2] ?? 0) + calibrationSpotHeight } : null}
+			/>
+
 			<div class="card p-4 preset-tonal">
 				<header class="font-semibold mb-2">Recording</header>
 				<p class="text-sm mb-3">Records this device's raw node measurements along with the marker position as ground truth. Keep the marker on the device's actual location — move it whenever the device moves.</p>
@@ -626,7 +550,6 @@
 									<th>Est. Distance (m)</th>
 									<th>RSSI (dBm)</th>
 									<th>Est. RSSI@1m</th>
-									<th>Include</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -653,9 +576,6 @@
 											{:else}
 												n/a
 											{/if}
-										</td>
-										<td>
-											<input type="checkbox" checked={includedNodes[node.id] || false} onchange={() => toggleNodeInclusion(node.id)} class="checkbox" />
 										</td>
 									</tr>
 								{/each}
@@ -696,7 +616,7 @@
 
 				<div class="col-span-1 space-y-4">
 					<div class="card p-4 preset-tonal">
-						<header class="font-semibold mb-2">Data Collection Status</header>
+						<header class="font-semibold mb-2">Live signal diagnostics</header>
 						<div class="mt-4">
 							<div class="flex justify-between mb-1">
 								<span>Total Messages:</span>
@@ -707,33 +627,6 @@
 							</div>
 						</div>
 						<p class="mt-4 text-sm">Keep the device stationary for best results.</p>
-					</div>
-					<div class="card p-4 preset-tonal">
-						<header class="font-semibold mb-4">Calibration Results</header>
-						<div class="grid grid-cols-1 gap-4 mb-4">
-							<div class="card p-4 preset-tonal">
-								<header class="font-semibold mb-2">Current Values</header>
-								<p class="text-xl font-bold">
-									RSSI@1m: {currentRefRssi != null ? Math.round(currentRefRssi) : 'n/a'} dBm
-								</p>
-							</div>
-							<div class="card p-4 preset-filled-primary-500">
-								<header class="font-semibold mb-2">New Values</header>
-								<p class="text-xl font-bold">
-									RSSI@1m: {calculatedRefRssi != null ? calculatedRefRssi : 'n/a'} dBm
-								</p>
-							</div>
-						</div>
-						{#if currentRefRssi != null && calculatedRefRssi != null}
-							<div class="card p-4 preset-tonal-warning border border-warning-500 mb-4">
-								<p>
-									This is a <span class="font-semibold">{Math.abs(calculatedRefRssi - Math.round(currentRefRssi))} dBm</span>
-									{calculatedRefRssi > currentRefRssi ? 'increase' : 'decrease'}.
-								</p>
-								<p>This change will affect how distances are calculated for this device.</p>
-							</div>
-						{/if}
-						<button class="btn btn-lg preset-filled-primary-500 w-full" onclick={saveCalibration} disabled={calculatedRefRssi == null || currentRefRssi === calculatedRefRssi}> Accept New Calibration </button>
 					</div>
 				</div>
 			</div>
