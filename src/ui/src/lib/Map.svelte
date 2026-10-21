@@ -24,14 +24,13 @@
 		deviceId?: string | null;
 		nodeId?: string | null;
 		exclusive?: boolean;
-		calibrate?: boolean;
 		/** For maps embedded in a scrolling page: plain scroll scrolls the page; pinch or Ctrl+scroll zooms. */
 		embedded?: boolean;
 		calibrationSpot?: { x: number; y: number } | null;
 		onselected?: ((item: Device | Node) => void) | undefined;
 	}
 
-	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), exclusive = false, calibrate = false, embedded = false, calibrationSpot = $bindable(null), onselected = undefined }: Props = $props();
+	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), exclusive = false, embedded = false, calibrationSpot = $bindable(null), onselected = undefined }: Props = $props();
 
 	function makeSquareBounds(bounds: number[][]): number[][] {
 		const maxDim = Math.max(bounds[1][0], bounds[1][1]);
@@ -211,7 +210,7 @@
 			<Rooms {transform} {floorId} />
 			<Nodes {transform} {floorId} {deviceId} {nodeId} onselected={selectedNode} onhovered={hoveredNode} />
 			<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
-			{#if calibrate && calibrationSpot}
+			{#if calibrationSpot}
 				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} />
 			{/if}
 		</Svg>
