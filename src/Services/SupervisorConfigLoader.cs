@@ -94,7 +94,9 @@ namespace ESPresense.Services
                     Port = int.TryParse(data.Port, out var i) ? i : null,
                     Username = data.Username,
                     Password = data.Password,
-                    Ssl = data.Ssl
+                    Ssl = data.Ssl,
+                    // Supervisor-provided brokers are always used for publishing.
+                    ReadOnly = false
                 };
 
                 // Cache the config.
