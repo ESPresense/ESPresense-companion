@@ -24,3 +24,22 @@ test('coordinate readout tracks the mouse and holds its value', async ({ page })
 	await page.waitForTimeout(1500);
 	await expect(readout).toHaveText(moved!);
 });
+
+// The readout is what Ctrl+C copies into config.yaml room points, so it must be exact:
+// the mock device marker sits at (30, 30) and hovering its centre has to read that.
+test('coordinate readout is accurate at a known point', async ({ page }) => {
+	await mockApi(page, { stubWebSocket: true });
+	await page.setViewportSize({ width: 1200, height: 800 });
+	await page.goto('/');
+
+	const svg = page
+		.locator('svg')
+		.filter({ has: page.locator('g') })
+		.first();
+	await svg.waitFor();
+	const marker = (await svg.locator('circle').first().boundingBox())!;
+	await page.mouse.move(marker.x + marker.width / 2, marker.y + marker.height / 2);
+
+	const readout = page.getByText(/^X: .*, Y: /);
+	await expect(readout).toHaveText(/^X: 30(\.[01])?, Y: 30(\.[01])?$|^X: 29\.9, Y: 29\.9$/);
+});
