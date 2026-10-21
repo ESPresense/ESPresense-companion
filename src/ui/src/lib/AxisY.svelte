@@ -3,20 +3,15 @@
   Generates an HTML y-axis.
  -->
 <script lang="ts">
-	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
-	import type { Readable } from 'svelte/store';
-	import type { LayerCakeContext } from '$lib/types';
+	import { getLayerCakeContext } from 'layercake';
+	import type { MapScales } from '$lib/types';
 
 	/** LayerCake scales are linear here, but ordinal (band) scales are detected at runtime. */
-	type AxisScale = LayerCakeContext['yScale'] extends Readable<infer S> ? S & { bandwidth?: () => number } : never;
+	type AxisScale = MapScales['y'] & { bandwidth?: () => number };
 	type Ticks = number | number[] | ((defaultTicks: number[]) => number[]) | undefined;
 
-	const context: Pick<LayerCakeContext, 'padding' | 'xScale'> & {
-		xRange: Readable<number[]>;
-		yScale: Readable<AxisScale>;
-	} = getContext('LayerCake');
-	const { padding, xRange, yScale } = context;
+	const chart = getLayerCakeContext<MapScales>();
 
 	interface Props {
 		/** The current d3-zoom transform; the y-scale is rescaled through it so the axis follows pan/zoom. */
@@ -42,7 +37,7 @@
 
 	let { transform = zoomIdentity, gridlines = false, tickMarks = true, formatTick = (d) => d, ticks = undefined, xTick = 0, yTick = 0, dxTick = 0, dyTick = -4, textAnchor = 'start' }: Props = $props();
 
-	let y = $derived(transform.rescaleY($yScale));
+	let y = $derived(transform.rescaleY<AxisScale>(chart.yScale));
 
 	let isBandwidth = $derived(typeof y.bandwidth === 'function');
 	/** Half the band width, to centre marks within the band on ordinal scales; 0 otherwise. */
@@ -50,9 +45,9 @@
 	let tickVals = $derived(Array.isArray(ticks) ? ticks : isBandwidth ? y.domain() : typeof ticks === 'function' ? ticks(y.ticks()) : y.ticks(ticks));
 </script>
 
-<g class="axis y-axis" transform="translate({-$padding.left}, 0)">
+<g class="axis y-axis" transform="translate({-chart.padding.left}, 0)">
 	{#each tickVals as tick (tick)}
-		<g class="tick tick-{tick}" transform="translate({$xRange[0] + (isBandwidth ? $padding.left : 0)}, {y(tick)})">
+		<g class="tick tick-{tick}" transform="translate({chart.xRange[0] + (isBandwidth ? chart.padding.left : 0)}, {y(tick)})">
 			{#if gridlines !== false}
 				<line class="gridline" x2="100%" y1={yTick + (isBandwidth ? halfBand : 0)} y2={yTick + (isBandwidth ? halfBand : 0)}></line>
 			{/if}

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
-	import { getContext } from 'svelte';
-	import type { LayerCakeContext } from '$lib/types';
+	import { getLayerCakeContext } from 'layercake';
+	import type { MapScales } from '$lib/types';
 
 	// Get the scales from the LayerCake context.
-	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
+	const chart = getLayerCakeContext<MapScales>();
 
 	interface Props {
 		// The current d3 zoom transform.
@@ -54,10 +54,10 @@
 		const coords = getClientCoords(event);
 
 		// Compute the marker's current screen position.
-		// The marker is rendered at: translate($xScale(position.x), $yScale(position.y))
+		// The marker is rendered at: translate(chart.xScale(position.x), chart.yScale(position.y))
 		// and then the outer <g> applies the zoom transform.
-		const markerScreenX = transform.k * $xScale(position.x) + transform.x;
-		const markerScreenY = transform.k * $yScale(position.y) + transform.y;
+		const markerScreenX = transform.k * chart.xScale(position.x) + transform.x;
+		const markerScreenY = transform.k * chart.yScale(position.y) + transform.y;
 
 		// Record the offset from the pointer to the marker center.
 		offset.x = coords.clientX - markerScreenX;
@@ -89,8 +89,8 @@
 		// Convert the screen coordinates back into data coordinates.
 		// First, remove the zoom transform: subtract translation and divide by scale.
 		// Then, invert the scales to get back to data space.
-		const newDataX = $xScale.invert((newMarkerScreenX - transform.x) / transform.k);
-		const newDataY = $yScale.invert((newMarkerScreenY - transform.y) / transform.k);
+		const newDataX = chart.xScale.invert((newMarkerScreenX - transform.x) / transform.k);
+		const newDataY = chart.yScale.invert((newMarkerScreenY - transform.y) / transform.k);
 
 		// Optionally, clamp to bounds.
 		const clampedX = Math.max(bounds[0][0], Math.min(bounds[1][0], newDataX));
@@ -127,10 +127,10 @@
 
 <!--
   The outer <g> applies the d3‑zoom transform.
-  The inner <g> positions the calibration spot using $xScale and $yScale.
+  The inner <g> positions the calibration spot using chart.xScale and chart.yScale.
 -->
 <g transform={transform.toString()}>
-	<g transform="translate({$xScale(position.x)}, {$yScale(position.y)})" style="cursor: move">
+	<g transform="translate({chart.xScale(position.x)}, {chart.yScale(position.y)})" style="cursor: move">
 		<!-- Outer ring -->
 		<circle r="10" fill="none" stroke="#4CAF50" stroke-width="2" opacity="0.8" />
 		<!-- Inner dot -->
