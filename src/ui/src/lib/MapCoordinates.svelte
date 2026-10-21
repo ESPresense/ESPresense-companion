@@ -35,12 +35,10 @@
 			// Convert screen coordinates to SVG coordinates
 			const svgPoint = point.matrixTransform(screenCTM.inverse());
 
-			// Adjust for padding from context
-			const adjustedX = svgPoint.x - (chart.padding?.left ?? 0);
-			const adjustedY = svgPoint.y - (chart.padding?.top ?? 0);
-
-			const transformedX = (adjustedX - transform.x) / transform.k;
-			const transformedY = (adjustedY - transform.y) / transform.k;
+			// layercake 11 insets the <svg> itself by the padding (rather than translating a <g> inside it),
+			// so svg coordinates are already layer coordinates; subtracting the padding again shifts the readout.
+			const transformedX = (svgPoint.x - transform.x) / transform.k;
+			const transformedY = (svgPoint.y - transform.y) / transform.k;
 
 			cursorX = chart.xScale.invert(transformedX);
 			cursorY = chart.yScale.invert(transformedY);
