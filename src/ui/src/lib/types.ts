@@ -1,19 +1,7 @@
-import type { ScaleOrdinal, ScaleLinear } from 'd3';
-import type { Writable } from 'svelte/store';
+import type { ScaleLinear } from 'd3';
 
-export interface LayerCakeContext {
-	xScale: Writable<ScaleLinear<number, number, never>>;
-	yScale: Writable<ScaleLinear<number, number, never>>;
-	width: Writable<number>;
-	height: Writable<number>;
-	padding: Writable<{
-		top: number;
-		right: number;
-		bottom: number;
-		left: number;
-	}>;
-	colors: ScaleOrdinal<string, string>;
-}
+/** The floor map's LayerCake scale types: `getLayerCakeContext<MapScales>()`. Read values off the context (`chart.xScale`), don't destructure. */
+export type MapScales = { x: ScaleLinear<number, number, never>; y: ScaleLinear<number, number, never> };
 
 export interface Room {
 	id: string;

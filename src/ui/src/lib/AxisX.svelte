@@ -3,20 +3,15 @@
   Generates an SVG x-axis. This component is also configured to detect if your x-scale is an ordinal scale. If so, it will place the markers in the middle of the bandwidth.
  -->
 <script lang="ts">
-	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
-	import type { Readable } from 'svelte/store';
-	import type { LayerCakeContext } from '$lib/types';
+	import { getLayerCakeContext } from 'layercake';
+	import type { MapScales } from '$lib/types';
 
 	/** LayerCake scales are linear here, but ordinal (band) scales are detected at runtime. */
-	type AxisScale = LayerCakeContext['xScale'] extends Readable<infer S> ? S & { bandwidth?: () => number } : never;
+	type AxisScale = MapScales['x'] & { bandwidth?: () => number };
 	type Ticks = number | number[] | ((defaultTicks: number[]) => number[]) | undefined;
 
-	const context: Pick<LayerCakeContext, 'width' | 'height' | 'padding' | 'yScale'> & {
-		yRange: Readable<number[]>;
-		xScale: Readable<AxisScale>;
-	} = getContext('LayerCake');
-	const { width, height, padding, yRange, xScale } = context;
+	const chart = getLayerCakeContext<MapScales>();
 
 	interface Props {
 		/** The current d3-zoom transform; the x-scale is rescaled through it so the axis follows pan/zoom. */
@@ -45,7 +40,7 @@
 
 	let { transform = zoomIdentity, gridlines = false, tickMarks = true, baseline = true, snapTicks = false, formatTick = (d) => d, ticks = undefined, xTick = 0, yTick = -16, dxTick = 4, dyTick = 16 }: Props = $props();
 
-	let x = $derived(transform.rescaleX($xScale));
+	let x = $derived(transform.rescaleX<AxisScale>(chart.xScale));
 
 	function textAnchor(i: number) {
 		return 'start';
@@ -57,11 +52,11 @@
 	let tickVals = $derived(Array.isArray(ticks) ? ticks : isBandwidth ? x.domain() : typeof ticks === 'function' ? ticks(x.ticks()) : x.ticks(ticks));
 </script>
 
-<g class="axis x-axis" class:snapTicks transform="translate(0, {$padding.bottom})">
+<g class="axis x-axis" class:snapTicks transform="translate(0, {chart.padding.bottom})">
 	{#each tickVals as tick, i (tick)}
-		<g class="tick tick-{i}" transform="translate({x(tick)},{Math.max(...$yRange)})">
+		<g class="tick tick-{i}" transform="translate({x(tick)},{Math.max(...chart.yRange)})">
 			{#if gridlines !== false}
-				<line class="gridline" y1={$height * -1} y2="0" x1="0" x2="0" />
+				<line class="gridline" y1={chart.height * -1} y2="0" x1="0" x2="0" />
 			{/if}
 			{#if tickMarks === true}
 				<line class="tick-mark" y1={0} y2={-6} x1={xTick || isBandwidth ? halfBand : 0} x2={xTick || isBandwidth ? halfBand : 0} />
@@ -70,7 +65,7 @@
 		</g>
 	{/each}
 	{#if baseline === true}
-		<line class="baseline" y1={$height + 0.5} y2={$height + 0.5} x1="0" x2={$width} />
+		<line class="baseline" y1={chart.height + 0.5} y2={chart.height + 0.5} x1="0" x2={chart.width} />
 	{/if}
 </g>
 
