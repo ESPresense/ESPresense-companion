@@ -41,11 +41,12 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var (lat, lon) = gps?.Report == true ? gps.Add(anchorLocation.X, anchorLocation.Y) : (null, null);
             var elevation = gps?.Report == true ? anchorLocation.Z + gps?.Elevation : null;
 
-            var stateChanged = device.ReportedState != "not_home";
+            var anchorState = device.Room?.Name ?? device.Floor?.Name ?? "not_home";
+            var stateChanged = device.ReportedState != anchorState;
             if (stateChanged)
             {
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", retain: true))
-                    device.ReportedState = "not_home";
+                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", anchorState, retain: true))
+                    device.ReportedState = anchorState;
             }
 
             var locationChanged = device.ReportedLocation != anchorLocation;

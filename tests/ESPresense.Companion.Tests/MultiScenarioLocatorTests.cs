@@ -107,4 +107,59 @@ public class MultiScenarioLocatorTests
 
         mqttMock.Verify();
     }
+
+    [Test]
+    public async Task AnchoredDeviceReportsAnchorRoomAsState()
+    {
+        var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg-anchor-room");
+        Directory.CreateDirectory(workDir);
+
+        var configLoader = new ConfigLoader(workDir);
+        var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
+
+        var mqttMock = new Mock<MqttCoordinator>(configLoader,
+            NullLogger<MqttCoordinator>.Instance,
+            new MqttNetLogger(),
+            supervisor);
+
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var tele = new TelemetryService(mqttMock.Object);
+        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
+        var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
+        var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
+        var leaseServiceMock = new Mock<ILeaseService>();
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+
+        var config = new Config();
+        var floor = new Floor();
+        floor.Update(config, new ConfigFloor
+        {
+            Id = "first",
+            Name = "First Floor",
+            Bounds = new[] { new double[] { 0, 0, 0 }, new double[] { 10, 10, 3 } }
+        });
+        var room = new Room();
+        room.Update(config, floor, new ConfigRoom
+        {
+            Id = "living",
+            Name = "Living Room",
+            Points = new[] { new double[] { 0, 0 }, new double[] { 5, 0 }, new double[] { 5, 5 }, new double[] { 0, 5 } }
+        });
+
+        var device = new Device("anchored", null, TimeSpan.FromSeconds(1)) { ReportedState = "not_home" };
+        device.SetAnchor(new DeviceAnchor(new Point3D(1, 1, 1), floor, room));
+
+        mqttMock.Setup(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}", "Living Room", true))
+            .ReturnsAsync(true)
+            .Verifiable(Times.Once);
+        mqttMock.Setup(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", It.IsAny<string>(), true))
+            .ReturnsAsync(true);
+
+        await locator.ProcessDevice(device);
+        await locator.ProcessDevice(device);
+
+        Assert.That(device.ReportedState, Is.EqualTo("Living Room"));
+        mqttMock.Verify(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}", It.IsAny<string>(), true), Times.Once);
+        mqttMock.Verify();
+    }
 }
