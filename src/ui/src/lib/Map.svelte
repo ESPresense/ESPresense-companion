@@ -25,11 +25,13 @@
 		nodeId?: string | null;
 		exclusive?: boolean;
 		calibrate?: boolean;
+		/** For maps embedded in a scrolling page: plain scroll scrolls the page; pinch or Ctrl+scroll zooms. */
+		cooperative?: boolean;
 		calibrationSpot?: { x: number; y: number } | null;
 		onselected?: ((item: Device | Node) => void) | undefined;
 	}
 
-	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), exclusive = false, calibrate = false, calibrationSpot = $bindable(null), onselected = undefined }: Props = $props();
+	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), exclusive = false, calibrate = false, cooperative = false, calibrationSpot = $bindable(null), onselected = undefined }: Props = $props();
 
 	function makeSquareBounds(bounds: number[][]): number[][] {
 		const maxDim = Math.max(bounds[1][0], bounds[1][1]);
@@ -47,6 +49,8 @@
 			// Like Google Maps: scroll and pinch both zoom at the cursor. Trackpad pinch arrives as a
 			// ctrlKey wheel event with small deltas, so it gets a larger multiplier (and handling it
 			// here stops the browser from zooming the whole page).
+			// A zero delta makes d3-zoom skip preventDefault, so the page scrolls normally.
+			if (cooperative && !event.ctrlKey) return 0;
 			const unit = event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002;
 			return -event.deltaY * unit * (event.ctrlKey ? 5 : 1);
 		})
