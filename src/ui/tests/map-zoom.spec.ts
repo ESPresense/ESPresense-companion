@@ -8,7 +8,7 @@ const mapSvg = (page: Page) =>
 		.first();
 
 // Dispatch a wheel event on the map's <svg> and report whether anything called preventDefault on it.
-async function wheel(page: Page, init: WheelEventInit): Promise<boolean> {
+async function wheel(page: Page, init: { deltaY: number; ctrlKey?: boolean }): Promise<boolean> {
 	return mapSvg(page).evaluate((svg, init) => {
 		const rect = svg.getBoundingClientRect();
 		const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2, ...init });
