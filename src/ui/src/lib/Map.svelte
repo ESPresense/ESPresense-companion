@@ -43,13 +43,16 @@
 	const handler = zoom<SVGElement, unknown>()
 		.scaleExtent([0.5, 40])
 		// Shift+drag is box zoom (handled below), so it must not also start a pan.
-		.filter((event) => !(event.shiftKey && event.type === 'mousedown') && (!event.ctrlKey || event.type === 'wheel') && !event.button)
+		.filter((event) => {
+			// Embedded: plain scroll belongs to the page, so d3-zoom must not see it at all (a zero delta
+			// still calls preventDefault while a pinch gesture is winding down).
+			if (event.type === 'wheel' && embedded && !event.ctrlKey) return false;
+			return !(event.shiftKey && event.type === 'mousedown') && (!event.ctrlKey || event.type === 'wheel') && !event.button;
+		})
 		.wheelDelta((event) => {
 			// Like Google Maps: scroll and pinch both zoom at the cursor. Trackpad pinch arrives as a
 			// ctrlKey wheel event with small deltas, so it gets a larger multiplier (and handling it
 			// here stops the browser from zooming the whole page).
-			// A zero delta makes d3-zoom skip preventDefault, so the page scrolls normally.
-			if (embedded && !event.ctrlKey) return 0;
 			const unit = event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002;
 			return -event.deltaY * unit * (event.ctrlKey ? 5 : 1);
 		})
