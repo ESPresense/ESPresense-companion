@@ -106,4 +106,60 @@ test.describe('Map zoom gestures', () => {
 		await page.keyboard.up('Shift');
 		expect(await snapshot(page)).toBe(before);
 	});
+
+	for (const [name, deltaY] of [
+		['minimum', 5000],
+		['maximum', -5000]
+	] as const) {
+		test(`pinch at the ${name} zoom limit still cannot zoom the browser page`, async ({ page }) => {
+			await mockApi(page, { stubWebSocket: true });
+			await page.setViewportSize({ width: 1200, height: 800 });
+			await page.goto('/');
+			await mapSvg(page).waitFor();
+
+			// Drive the scale to its limit, then let d3's wheel gesture idle out (150ms).
+			expect(await wheel(page, { deltaY, ctrlKey: true })).toBe(true);
+			const atLimit = await snapshot(page);
+			await page.waitForTimeout(400);
+
+			// A fresh gesture that can't change the scale must still be claimed from the browser.
+			expect(await wheel(page, { deltaY, ctrlKey: true })).toBe(true);
+			expect(await snapshot(page)).toBe(atLimit);
+		});
+	}
+
+	test('embedded map: pinch at the zoom limit is claimed, plain scroll still passes through', async ({ page }) => {
+		await openCalibration(page);
+
+		expect(await wheel(page, { deltaY: 5000, ctrlKey: true })).toBe(true);
+		await page.waitForTimeout(400);
+		expect(await wheel(page, { deltaY: 5000, ctrlKey: true })).toBe(true);
+		expect(await wheel(page, { deltaY: 100 })).toBe(false);
+	});
+
+	test('Shift+drag box zoom centres the selected region in the map viewport', async ({ page }) => {
+		await mockApi(page, { stubWebSocket: true });
+		await page.setViewportSize({ width: 1200, height: 800 });
+		await page.goto('/');
+		const svg = mapSvg(page);
+		await svg.waitFor();
+
+		// Box a region around the test device's marker.
+		const marker = (await svg.locator('circle').first().boundingBox())!;
+		const cx = marker.x + marker.width / 2;
+		const cy = marker.y + marker.height / 2;
+		await page.keyboard.down('Shift');
+		await page.mouse.move(cx - 60, cy - 40);
+		await page.mouse.down();
+		await page.mouse.move(cx + 60, cy + 40, { steps: 5 });
+		await page.mouse.up();
+		await page.keyboard.up('Shift');
+
+		// LayerCake sizes the <svg> to the padded area, so the <svg>'s centre is the layer viewport's centre.
+		// Pointer input is whole pixels (up to ~0.5px off, times the ~9x zoom), but a padding mistake is >100px.
+		const area = (await svg.boundingBox())!;
+		const after = (await svg.locator('circle').first().boundingBox())!;
+		expect(Math.abs(after.x + after.width / 2 - (area.x + area.width / 2))).toBeLessThan(6);
+		expect(Math.abs(after.y + after.height / 2 - (area.y + area.height / 2))).toBeLessThan(6);
+	});
 });

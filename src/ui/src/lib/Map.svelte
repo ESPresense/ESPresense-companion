@@ -139,7 +139,17 @@
 	let bounds = $derived(floor?.bounds);
 	let squareBounds = $derived(bounds ? makeSquareBounds(bounds) : undefined);
 	$effect(() => {
-		if (svg) select(svg).call(handler);
+		const el = svg;
+		if (!el) return;
+		select(el).call(handler);
+
+		// d3-zoom skips preventDefault when a new wheel gesture can't change the scale (at the zoom limits),
+		// which would let a pinch zoom the whole browser page instead.
+		const claimPinch = (event: WheelEvent) => {
+			if (event.ctrlKey) event.preventDefault();
+		};
+		el.addEventListener('wheel', claimPinch, { passive: false });
+		return () => el.removeEventListener('wheel', claimPinch);
 	});
 
 	// Shift+drag draws a box and zooms to it, like Google Maps.
@@ -182,6 +192,7 @@
 			const bh = Math.abs(y - y0);
 			if (bw < 5 || bh < 5) return; // a shift-click, not a drag
 
+			// LayerCake sizes the <svg> to the padded area, so pointer coordinates are already layer coordinates.
 			const { width, height } = el.getBoundingClientRect();
 			const k = Math.min(40, Math.max(0.5, transform.k * Math.min(width / bw, height / bh)));
 			const [cx, cy] = transform.invert([(x + x0) / 2, (y + y0) / 2]);
