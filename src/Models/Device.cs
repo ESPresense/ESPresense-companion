@@ -84,7 +84,17 @@ public class Device
         !IsAnchored && LearnedRoom is { } learned && learned.ValidUntil > DateTime.UtcNow ? learned : null;
 
     [STJ.JsonIgnore] public Scenario? BestScenario { get; set; }
-    [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
+    [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; private set; } = new List<Scenario>();
+
+    /// <summary>The <see cref="State.LocatorsVersion"/> the scenarios were built from; -1 if not built from config.</summary>
+    [STJ.JsonIgnore] public int LocatorsVersion { get; private set; } = -1;
+
+    /// <summary>Swaps in a new list rather than editing the old one, so a reader mid-enumeration is unaffected.</summary>
+    public void ReplaceScenarios(IEnumerable<Scenario> scenarios, int locatorsVersion)
+    {
+        Scenarios = scenarios.ToList();
+        LocatorsVersion = locatorsVersion;
+    }
 
     [STJ.JsonConverter(typeof(Point3DConverter))]
     public Point3D? Location => Anchor?.Location ?? (BestScenario == null ? null : _kalmanLocation.Location);

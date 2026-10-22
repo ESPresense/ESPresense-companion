@@ -78,7 +78,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             {
                 var d = new Device(id, arg.AutoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = arg.AutoDiscover.Message.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
                 d.KalmanFilter.Settings = state.KalmanSettings;
-                foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
+                state.BuildScenarios(d);
                 Log.Information("[+] Track: {Device} (disc)", d);
                 return d;
             });
@@ -117,7 +117,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                     {
                         var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
                         d.KalmanFilter.Settings = state.KalmanSettings;
-                        foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
+                        state.BuildScenarios(d);
                         return d;
                     });
                     tele.UpdateDevicesCount(state.Devices.Count);

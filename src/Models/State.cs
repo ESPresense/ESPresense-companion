@@ -26,6 +26,10 @@ public class State
     private static readonly GlobOptions GlobOpts = new() { Evaluation = { CaseInsensitive = true } };
 
     private readonly string _configDir;
+    private string? _locatorsJson;
+
+    /// <summary>Goes up whenever the locators config changes; see <see cref="RefreshScenarios"/>.</summary>
+    public int LocatorsVersion { get; private set; }
     private FingerprintMap? _fingerprints;
 
     /// <summary>The fingerprint survey named by locators.fingerprint.file, re-created if the name changes.</summary>
@@ -84,6 +88,13 @@ public class State
                 {
                     device.KalmanFilter.Settings = KalmanSettings;
                 }
+            }
+
+            var locatorsJson = System.Text.Json.JsonSerializer.Serialize(c?.Locators);
+            if (locatorsJson != _locatorsJson)
+            {
+                _locatorsJson = locatorsJson;
+                LocatorsVersion++;
             }
 
             foreach (var device in Devices.Values) device.Check = true;
@@ -199,6 +210,23 @@ public class State
             foreach (var floorId in floorIds)
                 if (Floors.TryGetValue(floorId, out var floor))
                     yield return floor;
+    }
+
+    /// <summary>Builds a new device's scenarios from the locators config.</summary>
+    public void BuildScenarios(Device device) => device.ReplaceScenarios(GetScenarios(device), LocatorsVersion);
+
+    /// <summary>
+    /// Rebuilds the scenarios of a device built by <see cref="BuildScenarios"/> if the locators config
+    /// changed since. Without this, enabling or retuning a locator in config.yaml only took effect for
+    /// devices first seen after a restart.
+    /// </summary>
+    public bool RefreshScenarios(Device device)
+    {
+        var version = LocatorsVersion;
+        if (device.LocatorsVersion < 0 || device.LocatorsVersion == version) return false;
+        Log.Debug("Locators config changed, rebuilding scenarios for {Device}", device);
+        device.ReplaceScenarios(GetScenarios(device), version);
+        return true;
     }
 
     public IEnumerable<Scenario> GetScenarios(Device device)

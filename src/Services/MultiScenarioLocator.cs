@@ -33,6 +33,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
     internal async Task ProcessDevice(Device device)
     {
+        state?.RefreshScenarios(device);
         if (device.IsAnchored && device.Anchor is { } anchor)
         {
             if (roomLearning != null) await roomLearning.UpdateAsync(device);
