@@ -37,6 +37,20 @@ namespace ESPresense.Services
         /// Compares the new settings with the current stored settings and, for each changed property,
         /// sends an update via the MQTT coordinator along with the previous value.
         /// </remarks>
+        /// <summary>
+        /// Resets a node's calibration (absorption, rx_adj_rssi, tx_ref_rssi) to the node's own defaults by
+        /// sending each an empty payload. A literal 0 is a value, not a reset: on ESP32-S3 the
+        /// rx_adj_rssi default is +20.
+        /// </summary>
+        public async Task ResetCalibration(string id)
+        {
+            var retain = id == "*";
+            var old = Get(id).Calibration;
+            await mqtt.UpdateSetting(id, "absorption", "", retain, old.Absorption?.ToString());
+            await mqtt.UpdateSetting(id, "rx_adj_rssi", "", retain, old.RxAdjRssi?.ToString());
+            await mqtt.UpdateSetting(id, "tx_ref_rssi", "", retain, old.TxRefRssi?.ToString());
+        }
+
         public async Task Set(string id, NodeSettings ds)
         {
             var retain = id == "*";

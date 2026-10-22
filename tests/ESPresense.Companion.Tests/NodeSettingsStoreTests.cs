@@ -231,4 +231,43 @@ public class NodeSettingsStoreTests
     /// <summary>The settings a <see cref="NodeSettings"/> section can carry (every nullable property)</summary>
     private static IEnumerable<PropertyInfo> NullableSettings(Type sectionType) =>
         sectionType.GetProperties().Where(p => p.CanWrite && (Nullable.GetUnderlyingType(p.PropertyType) is not null || p.PropertyType == typeof(string)));
+
+    [Test]
+    public async Task Set_RxAdjRssiZero_SendsLiteralZero()
+    {
+        // An empty payload resets the node to its default, which is +20 on ESP32-S3, so 0 must stay "0".
+        Receive("node-1", "rx_adj_rssi", "5");
+
+        var settings = _store.Get("node-1");
+        settings.Calibration.RxAdjRssi = 0;
+        await _store.Set("node-1", settings);
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_adj_rssi/set", "0", false), Times.Once);
+    }
+
+    [Test]
+    public async Task Set_TxRefRssiZero_SendsLiteralZero()
+    {
+        Receive("node-1", "tx_ref_rssi", "-59");
+
+        var settings = _store.Get("node-1");
+        settings.Calibration.TxRefRssi = 0;
+        await _store.Set("node-1", settings);
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/tx_ref_rssi/set", "0", false), Times.Once);
+    }
+
+    [Test]
+    public async Task ResetCalibration_SendsEmptyPayloads()
+    {
+        Receive("node-1", "rx_adj_rssi", "20");
+        Receive("node-1", "tx_ref_rssi", "-61");
+        Receive("node-1", "absorption", "3.1");
+
+        await _store.ResetCalibration("node-1");
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_adj_rssi/set", "", false), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/tx_ref_rssi/set", "", false), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/absorption/set", "", false), Times.Once);
+    }
 }
