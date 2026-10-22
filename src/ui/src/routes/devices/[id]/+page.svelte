@@ -85,7 +85,7 @@
 		</div>
 		<div class="grid flex-1 min-h-[300px]">
 			{#if teaching}
-				<Map deviceId={data.settings?.id} floorId={teachingFloor} exclusive={true} calibrate={true} bind:calibrationSpot={spot} />
+				<Map deviceId={data.settings?.id} floorId={teachingFloor} exclusive={true} embedded={true} bind:calibrationSpot={spot} />
 			{:else}
 				<Map deviceId={data.settings?.id} floorId={device?.floor?.id} exclusive={true} />
 			{/if}
