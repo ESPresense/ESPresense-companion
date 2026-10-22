@@ -36,8 +36,10 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
         var heard = device.Nodes.Values
             .Where(n => n.Current && n.Node != null && known.Contains(n.Node.Id))
             .ToArray();
+        // With the offset removed, one shared node always matches perfectly, so every spot would tie.
+        var minCommon = Math.Max(2, config.MinCommon);
 
-        if (heard.Length < config.MinCommon)
+        if (heard.Length < minCommon)
         {
             scenario.Confidence = 0;
             scenario.Room = null;
@@ -46,7 +48,6 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
         }
 
         scenario.Minimum = heard.Min(n => (double?)n.Distance);
-        scenario.LastHit = heard.Max(n => n.LastHit);
         scenario.Fixes = heard.Length;
         scenario.Floor = floor;
 
@@ -55,14 +56,16 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
         {
             var reading = heard.ToDictionary(n => n.Node.Id, n => n.Rssi + (n.RssiRxAdj ?? 0), StringComparer.OrdinalIgnoreCase);
             match = config.Mode == "knn"
-                ? Match(reading, map.ForFloor(floor.Id), config.K, config.MinCommon, config.MissingRssi)
-                : map.Surface(floor.Id, config.Bandwidth, config.MissingRssi ?? -100).Match(reading, config.MinCommon, config.Top);
+                ? Match(reading, map.ForFloor(floor.Id), config.K, minCommon, config.MissingRssi)
+                : map.Surface(floor.Id, config.Bandwidth, config.MissingRssi ?? -100).Match(reading, minCommon, config.Top);
             if (match == null)
             {
                 scenario.Confidence = 0;
                 return false;
             }
 
+            // UpdateLocation stamps LastHit, so only a match makes the scenario current: a reading the
+            // map cannot place must not keep a stale room in the running.
             scenario.UpdateLocation(match.Location);
             scenario.Error = match.Residual;
             scenario.PearsonCorrelation = null;

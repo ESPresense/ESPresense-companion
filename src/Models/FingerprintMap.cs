@@ -11,10 +11,10 @@ public sealed class Fingerprint
     [JsonPropertyName("id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Guid? Id { get; init; }
     [JsonPropertyName("device"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? DeviceId { get; init; }
     [JsonPropertyName("floor")] public string? Floor { get; init; }
-    [JsonPropertyName("x")] public double X { get; init; }
-    [JsonPropertyName("y")] public double Y { get; init; }
+    [JsonPropertyName("x"), JsonRequired] public double X { get; init; }
+    [JsonPropertyName("y"), JsonRequired] public double Y { get; init; }
     [JsonPropertyName("z")] public double Z { get; init; }
-    [JsonPropertyName("rssi")] public Dictionary<string, double> Rssi { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    [JsonPropertyName("rssi"), JsonRequired] public Dictionary<string, double> Rssi { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>
@@ -46,16 +46,22 @@ public class FingerprintMap(string path)
                 if (fi.LastWriteTimeUtc == _loadedAt) return _all;
                 try
                 {
-                    var parsed = JsonSerializer.Deserialize<FileShape>(File.ReadAllText(Path));
-                    _all = parsed?.Fingerprints ?? new List<Fingerprint>();
-                    // System.Text.Json builds the dictionary itself; make node ids case-insensitive.
-                    foreach (var f in _all)
-                        f.Rssi = new Dictionary<string, double>(f.Rssi, StringComparer.OrdinalIgnoreCase);
+                    var parsed = JsonSerializer.Deserialize<FileShape>(File.ReadAllText(Path))?.Fingerprints
+                        ?? throw new InvalidDataException("no \"fingerprints\" list");
+                    // Check every entry before replacing the loaded survey: a hand-edited file with one bad
+                    // entry keeps the last good survey instead of breaking every device's locator.
+                    for (var i = 0; i < parsed.Count; i++)
+                    {
+                        if (parsed[i]?.Rssi == null) throw new InvalidDataException($"fingerprint {i} has no rssi");
+                        // System.Text.Json builds the dictionary itself; make node ids case-insensitive.
+                        parsed[i].Rssi = new Dictionary<string, double>(parsed[i].Rssi, StringComparer.OrdinalIgnoreCase);
+                    }
+                    _all = parsed;
                     Log.Information("Loaded {Count} fingerprints from {Path}", _all.Count, Path);
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("Error reading fingerprints from {Path}: {Message}", Path, ex.Message);
+                    Log.Error("Error reading fingerprints from {Path}, keeping the last good survey: {Message}", Path, ex.Message);
                 }
                 _loadedAt = fi.LastWriteTimeUtc;
                 return _all;

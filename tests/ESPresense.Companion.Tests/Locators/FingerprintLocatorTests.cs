@@ -101,6 +101,34 @@ public class FingerprintLocatorTests
         finally { File.Delete(path); }
     }
 
+    [Test]
+    public void BadEntryKeepsTheLastGoodSurvey()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"fp-{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(path, """{"fingerprints":[{"floor":"first","x":1,"y":2,"rssi":{"a":-60}}]}""");
+            var map = new FingerprintMap(path);
+            Assert.That(map.All, Has.Count.EqualTo(1));
+
+            var minute = 0;
+            foreach (var bad in new[]
+                     {
+                         """{"fingerprints":[{"floor":"first","x":5,"y":5,"rssi":{"a":-60}},{"floor":"first","x":1,"y":2,"rssi":null}]}""",
+                         """{"fingerprints":[{"floor":"first","x":5,"y":5,"rssi":{"a":-60}},{"floor":"first","y":2,"rssi":{"a":-60}}]}""",
+                         """{"fingerprints":[{"floor":"first","x":5,"y":5}]}""",
+                         """{"fingerprints":null}""",
+                     })
+            {
+                File.WriteAllText(path, bad);
+                File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(++minute));
+                Assert.That(map.All.Single().X, Is.EqualTo(1), bad);
+                Assert.That(map.NodesForFloor("first"), Is.EquivalentTo(new[] { "a" }), "locating keeps working");
+            }
+        }
+        finally { File.Delete(path); }
+    }
+
     [TestFixture]
     public class RoomPrediction
     {
@@ -167,7 +195,11 @@ public class FingerprintLocatorTests
         private static Fingerprint Spot(double x, double y, params (string Node, double Rssi)[] r) =>
             new() { Floor = FloorId, X = x, Y = y, Z = 0, Rssi = r.ToDictionary(a => a.Node, a => a.Rssi, StringComparer.OrdinalIgnoreCase) };
 
-        private static (Scenario Scenario, bool Located) Locate(FingerprintSurvey s, IReadOnlyList<Fingerprint> spots, params (string Node, double Rssi)[] reading)
+        private static (Scenario Scenario, bool Located) Locate(FingerprintSurvey s, IReadOnlyList<Fingerprint> spots, params (string Node, double Rssi)[] reading) =>
+            Locate(s, spots, reading.Select(r => (r.Node, r.Rssi, (double?)null)).ToArray());
+
+        /// <summary>Like a live device: <c>Rssi</c> is what the node published, <c>RxAdj</c> the node's rxAdj then.</summary>
+        private static (Scenario Scenario, bool Located) Locate(FingerprintSurvey s, IReadOnlyList<Fingerprint> spots, (string Node, double Rssi, double? RxAdj)[] reading)
         {
             var path = Path.Combine(s.Dir, s.Config.File);
             File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(new
@@ -176,13 +208,50 @@ public class FingerprintLocatorTests
             }));
 
             var device = new Device($"dev-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
-            foreach (var (node, rssi) in reading)
-                device.Nodes[node] = new DeviceToNode(device, s.Nodes[node]) { Rssi = rssi, LastHit = DateTime.UtcNow };
+            foreach (var (node, rssi, rxAdj) in reading)
+                device.Nodes[node] = new DeviceToNode(device, s.Nodes[node]) { Rssi = rssi, RssiRxAdj = rxAdj, LastHit = DateTime.UtcNow };
 
             var locator = new FingerprintLocator(device, s.Floor, new FingerprintMap(path), s.Config);
             var scenario = new Scenario(s.Loader.Config, locator, FloorId);
             var located = locator.Locate(scenario);
             return (scenario, located);
+        }
+
+        [Test]
+        public void LiveReadingIsMatchedRawWithRxAdjAddedBack()
+        {
+            // The survey stores raw rssi. Node a has rxAdj 10, so it publishes 10 dB under raw: matched as
+            // published (or with rxAdj subtracted) the reading looks like the right-hand spot.
+            var s = Build(new FingerprintConfig { MinCommon = 3, Mode = "knn", K = 1 });
+            var spots = new[]
+            {
+                Spot(1, 1.5, ("a", -55), ("b", -70), ("c", -80)),
+                Spot(8, 1.5, ("a", -65), ("b", -70), ("c", -80))
+            };
+            var (scenario, located) = Locate(s, spots, new (string, double, double?)[] { ("a", -65, 10), ("b", -70, 0), ("c", -80, null) });
+            Assert.That(located, Is.True);
+            Assert.That(scenario.Location.X, Is.EqualTo(1).Within(0.01));
+        }
+
+        [Test]
+        public void NoMatchLeavesTheScenarioNotCurrent()
+        {
+            // Every node is in the survey, but no single spot shares three of them with the reading.
+            var s = Build(new FingerprintConfig { MinCommon = 3, Mode = "knn", K = 1 });
+            var spots = new[] { Spot(1, 1.5, ("a", -55), ("b", -70)), Spot(8, 1.5, ("b", -70), ("c", -60)) };
+            var (scenario, located) = Locate(s, spots, ("a", -55), ("b", -70), ("c", -60));
+            Assert.That(located, Is.False);
+            Assert.That(scenario.Current, Is.False, "a reading the map cannot place must not compete with a stale room");
+        }
+
+        [Test]
+        public void MinCommonBelowTwoIsTreatedAsTwo()
+        {
+            // With the offset removed, a single shared node is a perfect match for every spot.
+            var s = Build(new FingerprintConfig { MinCommon = 1, Mode = "knn", K = 1 });
+            var spots = new[] { Spot(1, 1.5, ("a", -55), ("b", -70)), Spot(8, 1.5, ("a", -75), ("b", -50)) };
+            var (_, located) = Locate(s, spots, ("a", -60));
+            Assert.That(located, Is.False);
         }
 
         [Test]

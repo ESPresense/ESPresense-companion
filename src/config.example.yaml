@@ -109,7 +109,8 @@ locators:
 
   # Matches a device's raw RSSI per node against a survey of known spots instead of ranging.
   # Needs a fingerprint file beside this config: {"fingerprints": [{"floor": "first", "x": 1.0,
-  # "y": 2.0, "z": 1.0, "rssi": {"node_a": -71.2, "node_b": -80.5}}]}, rssi = published rssi + rxAdj.
+  # "y": 2.0, "z": 1.0, "rssi": {"node_a": -71.2, "node_b": -80.5, "node_c": -88.0}}]},
+  # rssi = published rssi + rxAdj.
   # To collect samples: choose "I'm here" on a device map (or open its Calibrate page),
   # place the marker at its actual position, and Collect sample. Keep still for 15 seconds.
   # The same sample offers an optional device calibration update.
