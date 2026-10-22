@@ -22,7 +22,8 @@ namespace ESPresense.Locators;
 ///
 /// The room is predicted from the matched spots themselves (a weighted vote of the rooms containing
 /// them), so a fix can report a room even when the averaged coordinate lands in a doorway, near
-/// a wall or in a gap between room polygons. When no room matches, the floor is reported.
+/// a wall or in a gap between room polygons. When no matched spot is in a room, the room is null and
+/// the device reports its floor rather than snapping the coordinate into a wrong room.
 /// </summary>
 public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, FingerprintConfig config) : ILocate
 {
@@ -88,8 +89,9 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
 
     /// <summary>
     /// The room the match points to: the weighted vote of the rooms containing the best-matching
-    /// spots. When none of the matched spots sits inside a room polygon the located coordinate is
-    /// used as a last resort. If neither matches a room, the floor is reported.
+    /// spots. When no matched spot sits inside a room polygon the room is left null and the device
+    /// reports its floor (see MultiScenarioLocator), rather than snapping the averaged coordinate
+    /// into an arbitrary room.
     /// </summary>
     private static Room? RoomFromMatch(MatchResult match, Floor floor)
     {
@@ -100,9 +102,7 @@ public class FingerprintLocator(Device device, Floor floor, FingerprintMap map, 
                 r.Polygon?.EnclosesPoint(position.ToPoint2D()) ?? false);
             if (room != null) votes[room] = votes.GetValueOrDefault(room) + weight;
         }
-        if (votes.Count > 0) return votes.OrderByDescending(v => v.Value).First().Key;
-        return floor.Rooms.Values.FirstOrDefault(r =>
-            r.Polygon?.EnclosesPoint(match.Location.ToPoint2D()) ?? false);
+        return votes.Count > 0 ? votes.OrderByDescending(v => v.Value).First().Key : null;
     }
 
     public sealed record MatchResult(Point3D Location, double Residual, int Common,
