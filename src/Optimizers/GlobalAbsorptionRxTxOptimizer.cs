@@ -304,27 +304,36 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
             double globalAbsorptionValue = result.MinimizingPoint[globalAbsorptionIndex];
             globalAbsorptionValue = Math.Max(optimization.AbsorptionMin, Math.Min(globalAbsorptionValue, optimization.AbsorptionMax));
 
+            double FittedRxAdj(string rxId) => Math.Clamp(result.MinimizingPoint[rxIndexMap[rxId]], optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
+            double FittedTxRef(string txId) => Math.Clamp(result.MinimizingPoint[txIndexMap[txId]], optimization.TxRefRssiMin, optimization.TxRefRssiMax);
+
+            // Each node's own RSSI residuals at the fitted values, in plain dB (without the asymmetric
+            // penalty or cap), rather than the global objective, which is the same for every node.
+            var rms = new NodeResidualRms();
+            foreach (var node in allRxNodes)
+            {
+                if (node.Rx?.Location == null || node.Tx?.Location == null) continue;
+                double mapDistance = node.Rx.Location.DistanceTo(node.Tx.Location);
+                if (mapDistance <= 0) mapDistance = 0.1;
+                double predictedRssi = FittedTxRef(node.Tx.Id) - 10 * globalAbsorptionValue * Math.Log10(mapDistance);
+                rms.Add(node, predictedRssi - node.GetAdjustedRssi(FittedRxAdj(node.Rx.Id)), nodeWeights[node]);
+            }
+
             // Process Rx node results
             foreach (var rxId in uniqueRxIds)
             {
-                double rxAdjRssi = result.MinimizingPoint[rxIndexMap[rxId]];
-                rxAdjRssi = Math.Max(optimization.RxAdjRssiMin, Math.Min(rxAdjRssi, optimization.RxAdjRssiMax));
-
                 var n = or.Nodes.GetOrAdd(rxId);
-                n.RxAdjRssi = rxAdjRssi;
+                n.RxAdjRssi = FittedRxAdj(rxId);
                 n.Absorption = globalAbsorptionValue;
-                n.Error = result.FunctionInfoAtMinimum.Value;
+                n.Error = rms.Get(rxId);
             }
 
             // Process Tx node results
             foreach (var txId in uniqueTxIds)
             {
-                double txRefRssi = result.MinimizingPoint[txIndexMap[txId]];
-                txRefRssi = Math.Max(optimization.TxRefRssiMin, Math.Min(txRefRssi, optimization.TxRefRssiMax));
-
                 var n = or.Nodes.GetOrAdd(txId);
-                n.TxRefRssi = txRefRssi;
-                n.Error = result.FunctionInfoAtMinimum.Value;
+                n.TxRefRssi = FittedTxRef(txId);
+                n.Error = rms.Get(txId);
             }
 
             // Log the optimization results

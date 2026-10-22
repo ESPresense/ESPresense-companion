@@ -230,15 +230,20 @@ public class MqttCoordinator : IMqttCoordinator
             return Task.CompletedTask;
         };
 
-        var mqttClientOptions = new MqttClientOptionsBuilder()
+        var optionsBuilder = new MqttClientOptionsBuilder()
             .WithConfig(config, _logger)
             .WithClientId(config.ClientId)
-            .WithWillTopic("espresense/companion/status")
-            .WithWillRetain()
-            .WithWillPayload("offline")
             .WithCleanSession()
-            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-            .Build();
+            .WithKeepAlivePeriod(TimeSpan.FromSeconds(30));
+
+        // A read-only client must not leave a retained "offline" behind if it drops uncleanly.
+        if (!IsReadOnlyClient(config.ClientId))
+            optionsBuilder
+                .WithWillTopic("espresense/companion/status")
+                .WithWillRetain()
+                .WithWillPayload("offline");
+
+        var mqttClientOptions = optionsBuilder.Build();
 
         _logger.LogInformation("Connecting to MQTT at {Host}{Port} as {User}",
             config.Host,

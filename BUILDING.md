@@ -10,4 +10,15 @@ While developing you use vite as your webserver and it proxies /api and /ws to t
 
 On deployment it's the opposite, the dotnet server runs and serves up precompiled html and js files.
 
+## Running read-only against a live broker
+
+To debug against your real MQTT broker without a dev instance changing anything, set a `client_id` containing `read` (any case) in the dev config's `mqtt` section:
+
+```yaml
+mqtt:
+  client_id: espresense-companion-readonly
+```
+
+A read-only client still subscribes to everything, but publishes nothing: no `espresense/companion/status`, no last will, no discovery, no node settings. Each publish it skips is logged as `ReadOnly, would have sent to <topic>: <payload>`. Use a different client ID from your production Companion, or the broker disconnects one of them.
+
 Join us on discord for development talk: [https://discord.gg/jbqmn7V6n6]
