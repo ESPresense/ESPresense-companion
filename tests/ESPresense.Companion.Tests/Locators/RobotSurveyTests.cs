@@ -62,12 +62,15 @@ public class RobotSurveyTests
     private string[] ThroughStructureNodes => _survey.Expect?.ThroughStructureNodes?.ToArray() ?? Array.Empty<string>();
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         var mqtt = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
         _configLoader = new ConfigLoader(_configDir);
+        // The example config loads in the background and has a floor "first" too. Finish loading before
+        // State exists, or a late load merges the example's rooms into the survey's floor mid-test.
+        await _configLoader.ConfigAsync();
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
     }

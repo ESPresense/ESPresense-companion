@@ -29,13 +29,15 @@ public class FingerprintCollectionTests
     public async Task CollectionAveragesRawRssiAndAcceptsAliasesOnly()
     {
         var mqtt = new Mock<IMqttCoordinator>();
-        var service = new FingerprintCollectionService(mqtt.Object, new ConfigLoader(Path.GetTempPath())) { Duration = TimeSpan.FromMilliseconds(200) };
+        var window = new TaskCompletionSource();
+        var service = new FingerprintCollectionService(mqtt.Object, new ConfigLoader(Path.GetTempPath())) { Window = _ => window.Task };
         var collection = service.CollectAsync(new[] { "alias", "original" }, CancellationToken.None);
         foreach (var (device, rssi, adjustment) in new[] { ("ORIGINAL", -70.0, 5.0), ("alias", -60.0, 3.0), ("other", -10.0, 0.0) })
             mqtt.Raise(m => m.DeviceMessageReceivedAsync += null, new DeviceMessageEventArgs
             {
                 DeviceId = device, NodeId = "node", Payload = new DeviceMessage { Rssi = rssi, RssiRxAdj = adjustment }
             });
+        window.SetResult();
         var result = await collection;
         Assert.That(result["NODE"].RawRssi, Is.EqualTo(-61));
         Assert.That(result["NODE"].Rssi, Is.EqualTo(-65));
@@ -47,7 +49,7 @@ public class FingerprintCollectionTests
     public void CancellationStopsCollection()
     {
         var mqtt = new Mock<IMqttCoordinator>();
-        var service = new FingerprintCollectionService(mqtt.Object, new ConfigLoader(Path.GetTempPath())) { Duration = TimeSpan.FromMilliseconds(200) };
+        var service = new FingerprintCollectionService(mqtt.Object, new ConfigLoader(Path.GetTempPath())) { Duration = Timeout.InfiniteTimeSpan };
         using var cancellation = new CancellationTokenSource();
         var collection = service.CollectAsync(new[] { "device" }, cancellation.Token);
         cancellation.Cancel();

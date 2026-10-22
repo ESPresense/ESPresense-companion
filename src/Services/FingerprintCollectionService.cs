@@ -10,6 +10,9 @@ public class FingerprintCollectionService(IMqttCoordinator mqtt, ConfigLoader co
 
     public TimeSpan Duration { get; init; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>Lets a test close the sample window itself instead of racing a short <see cref="Duration"/>.</summary>
+    internal Func<CancellationToken, Task>? Window { get; init; }
+
     // Default firmware yields roughly 2.3–2.7 reports/node per 10 s in the robot survey.
     // A 15 s window reaches three reports for 86% of known-dwell links; five is too strict.
     public const int MinimumCalibrationReports = 3;
@@ -35,7 +38,7 @@ public class FingerprintCollectionService(IMqttCoordinator mqtt, ConfigLoader co
         mqtt.DeviceMessageReceivedAsync += OnMessage;
         try
         {
-            await Task.Delay(Duration, cancellationToken);
+            await (Window?.Invoke(cancellationToken) ?? Task.Delay(Duration, cancellationToken));
             lock (gate)
                 return readings.ToDictionary(p => p.Key, p => new FingerprintReading(p.Value.RawSum / p.Value.Count, p.Value.RssiSum / p.Value.Count, p.Value.Count), StringComparer.OrdinalIgnoreCase);
         }
