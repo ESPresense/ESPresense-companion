@@ -47,7 +47,10 @@ namespace ESPresense.Services
             var retain = id == "*";
             var old = Get(id).Calibration;
             await mqtt.UpdateSetting(id, "absorption", "", retain, old.Absorption?.ToString());
-            await mqtt.UpdateSetting(id, "rx_adj_rssi", "", retain, old.RxAdjRssi?.ToString());
+            if (old.UsesRxOffset)
+                await mqtt.UpdateSetting(id, "rx_offset_rssi", "", retain, (-old.RxAdjRssi)?.ToString());
+            else
+                await mqtt.UpdateSetting(id, "rx_adj_rssi", "", retain, old.RxAdjRssi?.ToString());
             await mqtt.UpdateSetting(id, "tx_ref_rssi", "", retain, old.TxRefRssi?.ToString());
         }
 
@@ -104,7 +107,13 @@ namespace ESPresense.Services
                 await mqtt.UpdateSetting(id, "absorption", ds.Calibration.Absorption, retain, old.Calibration.Absorption);
 
             if (ds.Calibration.RxAdjRssi != null && ds.Calibration.RxAdjRssi != old.Calibration.RxAdjRssi)
-                await mqtt.UpdateSetting(id, "rx_adj_rssi", ds.Calibration.RxAdjRssi, retain, old.Calibration.RxAdjRssi);
+            {
+                // v5 nodes take the added rx_offset_rssi; older ones the subtracted rx_adj_rssi.
+                if (old.Calibration.UsesRxOffset)
+                    await mqtt.UpdateSetting(id, "rx_offset_rssi", -ds.Calibration.RxAdjRssi, retain, -old.Calibration.RxAdjRssi);
+                else
+                    await mqtt.UpdateSetting(id, "rx_adj_rssi", ds.Calibration.RxAdjRssi, retain, old.Calibration.RxAdjRssi);
+            }
 
             if (ds.Calibration.TxRefRssi != null && ds.Calibration.TxRefRssi != old.Calibration.TxRefRssi)
                 await mqtt.UpdateSetting(id, "tx_ref_rssi", ds.Calibration.TxRefRssi, retain, old.Calibration.TxRefRssi);
@@ -147,11 +156,10 @@ namespace ESPresense.Services
             merged.Filtering.SkipDistance = incoming.Filtering.SkipDistance ?? merged.Filtering.SkipDistance;
             merged.Filtering.SkipMs = incoming.Filtering.SkipMs ?? merged.Filtering.SkipMs;
 
-            // MqttCoordinatorExtensions.UpdateSetting publishes 0 as "" for absorption, rx_adj_rssi and
-            // tx_ref_rssi, which the echo parses back as null; mirror that so the cache matches the echo.
-            merged.Calibration.Absorption = incoming.Calibration.Absorption is 0.0 ? null : incoming.Calibration.Absorption ?? merged.Calibration.Absorption;
-            merged.Calibration.RxAdjRssi = incoming.Calibration.RxAdjRssi is 0 ? null : incoming.Calibration.RxAdjRssi ?? merged.Calibration.RxAdjRssi;
-            merged.Calibration.TxRefRssi = incoming.Calibration.TxRefRssi is 0 ? null : incoming.Calibration.TxRefRssi ?? merged.Calibration.TxRefRssi;
+            // 0 is published as "0" (ESPresense-companion#1765) and echoes back as 0, so it is cached as is.
+            merged.Calibration.Absorption = incoming.Calibration.Absorption ?? merged.Calibration.Absorption;
+            merged.Calibration.RxAdjRssi = incoming.Calibration.RxAdjRssi ?? merged.Calibration.RxAdjRssi;
+            merged.Calibration.TxRefRssi = incoming.Calibration.TxRefRssi ?? merged.Calibration.TxRefRssi;
             merged.Calibration.RxRefRssi = incoming.Calibration.RxRefRssi ?? merged.Calibration.RxRefRssi;
 
             return merged;
@@ -236,7 +244,13 @@ namespace ESPresense.Services
                                 ns.Calibration.Absorption = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
                                 break;
                             case "rx_adj_rssi":
+                                // A v5 node clears this retained topic (an empty message); its value is rx_offset_rssi.
+                                if (ns.Calibration.UsesRxOffset) return Task.CompletedTask;
                                 ns.Calibration.RxAdjRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
+                                break;
+                            case "rx_offset_rssi":
+                                ns.Calibration.UsesRxOffset = true;
+                                ns.Calibration.RxAdjRssi = -ParsingUtils.ParseIntOrDefault(arg.Payload);
                                 break;
                             case "tx_ref_rssi":
                                 ns.Calibration.TxRefRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
