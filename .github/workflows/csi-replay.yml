@@ -1,0 +1,49 @@
+name: CSI replay fixture
+
+# Deterministic off-hardware replay of binary WiFi-CSI captures (QA-1 / ESPA-173).
+# This is the *bytes + replay-determinism* gate for the CSI⊕BLE coexistence work:
+#   - the ECF1 reference container codec + §B->ECF1 adapter,
+#   - the deterministic replay engine and its locked digests,
+#   - the synthetic fixture corpus.
+# It is Python-only by design (Python owns the bytes; C# owns the metrics/golden),
+# and is scoped so it only runs when the CSI fixture assets change. The *accuracy*
+# gate for positioning/occupancy is a separate workflow (accuracy-harness.yml).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tests/ESPresense.Companion.Simulation/AccuracyHarness/Csi/**"
+      - ".github/workflows/csi-replay.yml"
+  pull_request:
+    paths:
+      - "tests/ESPresense.Companion.Simulation/AccuracyHarness/Csi/**"
+      - ".github/workflows/csi-replay.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: CSI replay determinism guard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/ESPresense.Companion.Simulation/AccuracyHarness/Csi
+    steps:
+      - uses: actions/checkout@v6
+
+      # stdlib-only suite -> a bare interpreter is enough; pin the minor for
+      # reproducibility (the digests are pure-Python and version-stable, but an
+      # unpinned interpreter makes any future drift impossible to attribute).
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Replay determinism + golden + corpus-reproducibility + adapter suite
+        # Warnings-as-errors so a future sloppy edit (unclosed handle, deprecation)
+        # fails the gate instead of rotting silently.
+        run: python -W error -m unittest -v test_csi_replay
+
+      - name: Adapter self-test (§B -> ECF1, standalone)
+        run: python ecf1_adapter.py

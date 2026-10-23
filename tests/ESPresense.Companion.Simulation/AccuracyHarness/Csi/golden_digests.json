@@ -1,0 +1,413 @@
+{
+  "_note": "SYNTHETIC corpus. Guards ECF1 replay determinism + byte stability, NOT positioning/occupancy accuracy. Re-cut the accuracy golden in the C# AccuracyHarness from a REAL captured corpus (prototype FW-1 milestone-1).",
+  "files": {
+    "esp32-s3_000hz_occupied-still.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 0,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 199,
+      "capture_rate_hz": 0,
+      "digest": "9013ea2c001dc8230703f023ce7fee9c61f7b49a23ca59fb4e8e2f109173427e",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 0,
+      "scene": "occupied-still",
+      "sha256": "152ad0720df983b993b319baad04732e8d4268228d501b64168ff0f71c69331d",
+      "virtual_duration_us": 0
+    },
+    "esp32-s3_000hz_vacant.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 0,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 199,
+      "capture_rate_hz": 0,
+      "digest": "08e5da6ce7aa672bfcc87d17a5b3a80a0971f0f36d60df08002a98767ed52e5a",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 0,
+      "scene": "vacant",
+      "sha256": "82dd9c72fc0b4c6550a4bcc24c2cab13c29a4630a2a60405df378fec392bb2f0",
+      "virtual_duration_us": 0
+    },
+    "esp32-s3_010hz_occupied-still.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 10,
+      "digest": "451da6a5bd784d8366b5313b9ad377ee9ab2035f5eb0a55e86356b535e9fc086",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 10,
+      "scene": "occupied-still",
+      "sha256": "112521d03a6711abaabdc687158346ee14cccf7f718a4d6b6a0da42f8e0a7fee",
+      "virtual_duration_us": 1200000
+    },
+    "esp32-s3_010hz_vacant.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 10,
+      "digest": "1e9aae2df88a5576826585f65684cf101c44fbe857632463e3f0151551f2dbd5",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 10,
+      "scene": "vacant",
+      "sha256": "0439ab24e070ad62eec38aca4f7ee30fc6a2d376cec8743e3739b95671fe3eab",
+      "virtual_duration_us": 1200000
+    },
+    "esp32-s3_020hz_occupied-still.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 20,
+      "digest": "2dcd7770d4e351d95f5bbe91ef6e69b4816a63822d957addf5e6bf0f21f73918",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 20,
+      "scene": "occupied-still",
+      "sha256": "37b7dfad76f350ca7478fc1e3be1fb835decf344573346f797fc1a84ae5d0244",
+      "virtual_duration_us": 600000
+    },
+    "esp32-s3_020hz_vacant.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 20,
+      "digest": "165911a5b84fbba608859bc84a2aa15eb0fc8fa5fb2af0a8e2cb3baaee355bde",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 20,
+      "scene": "vacant",
+      "sha256": "cee2e246f688ec04275f51f0667f026341ee5ee31bb6c8900821d033f9655040",
+      "virtual_duration_us": 600000
+    },
+    "esp32-s3_030hz_occupied-still.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 30,
+      "digest": "e53442f35b5646cb9fdadac14adb2fc712a4e88279af30e5234b1933152b519f",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 30,
+      "scene": "occupied-still",
+      "sha256": "33cd77e12c9dda42cd7ec8a4f6e1c914ca923b457067e72c6636b8684633b2fa",
+      "virtual_duration_us": 399996
+    },
+    "esp32-s3_030hz_vacant.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 30,
+      "digest": "183b5a3499e64a6ff4e32fc862d6b47ddef27e962b8c89cc7fb9155f99e06427",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 30,
+      "scene": "vacant",
+      "sha256": "4219ba55b90e8b91c04824c4b518ed534a832e5b458901fd2f3b0c34a24bd614",
+      "virtual_duration_us": 399996
+    },
+    "esp32-s3_050hz_occupied-still.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 50,
+      "digest": "331332cfefc3a277671e0d4d4073309d69b92e7db631a447415949979a40fae6",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 50,
+      "scene": "occupied-still",
+      "sha256": "a115bcf4d735f9de994fd04651813000dd11d78e771c8b0e5f754f233bc4e7b6",
+      "virtual_duration_us": 240000
+    },
+    "esp32-s3_050hz_vacant.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 50,
+      "digest": "9c185d7f27e822023b1356d683aa5d8c2d43fe735685e4bce625e9aa0d1f9705",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 50,
+      "scene": "vacant",
+      "sha256": "a13709c16f4252c825e37d24c5c92c6ee6c9d2faeb7380d47cba93c43e2a3abe",
+      "virtual_duration_us": 240000
+    },
+    "esp32-s3_100hz_occupied-still.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 100,
+      "digest": "8c5317601d9a92698264a7a8b8712705788839326209d0cb71efd3255e9da2eb",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 100,
+      "scene": "occupied-still",
+      "sha256": "93841ffa3ab742962f2734a6960ffab5247f93059483466c2621213802814429",
+      "virtual_duration_us": 120000
+    },
+    "esp32-s3_100hz_vacant.ecf1": {
+      "board": "esp32-s3",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 100,
+      "digest": "8a91960520e1a226c46dbc652582cc62fd0a7feb7ecd11e3d2d78317696433b6",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 100,
+      "scene": "vacant",
+      "sha256": "602a5218e105bfcd9a3dc025b5c9d5c6eef8c2288a5838f9eca2879f3458aca5",
+      "virtual_duration_us": 120000
+    },
+    "esp32_000hz_occupied-still.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 0,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 199,
+      "capture_rate_hz": 0,
+      "digest": "b91dcdd799346ab7df3aaff88a0f4ec931b1b3aee9b39fdc9ea562aee496c882",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 0,
+      "scene": "occupied-still",
+      "sha256": "d152b27d0d46720d0b1b7b66df9fd3492e903c6886b018c5a7b6eadc6a32f95e",
+      "virtual_duration_us": 0
+    },
+    "esp32_000hz_vacant.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 0,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 199,
+      "capture_rate_hz": 0,
+      "digest": "a88b2a03dfb940541b9e2d7de1011b3dac6b606768d31bf5924c0eafeebada3c",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 0,
+      "scene": "vacant",
+      "sha256": "bc40c43d1aa01240722218295e2202ebb342d1f4ce3dba2b3c227a0c975ff729",
+      "virtual_duration_us": 0
+    },
+    "esp32_010hz_occupied-still.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 10,
+      "digest": "5d23794b011efe6470dbdbb49d934008bcaf3d46263d3a131d2cfcfecb5e2622",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 10,
+      "scene": "occupied-still",
+      "sha256": "8ae4c6c3ddb493b5089a734cbe0cb79942255284b36258dbbc750792575b1fce",
+      "virtual_duration_us": 1200000
+    },
+    "esp32_010hz_vacant.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 10,
+      "digest": "83f89318c33495b61e22906283b3d31c19f18387e88f8891c7f993ff0e5a649f",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 10,
+      "scene": "vacant",
+      "sha256": "e758897436ba1b3800c0060946f46a4dbb436ea40d6dfb344f9eea617e1c9e96",
+      "virtual_duration_us": 1200000
+    },
+    "esp32_020hz_occupied-still.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 20,
+      "digest": "e3f12271f5b07132933781a0889a402086d1a5734ae5b324d773e5c1c12b58ba",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 20,
+      "scene": "occupied-still",
+      "sha256": "c740264047950080cad156bf02416d53fab51d35b6b1f4807303f892e4d11301",
+      "virtual_duration_us": 600000
+    },
+    "esp32_020hz_vacant.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 20,
+      "digest": "645f82dd3b9b92baad464f3be3a52385681fd0b9eb4eca743f8746edcdf59d0c",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 20,
+      "scene": "vacant",
+      "sha256": "f1c66e34bd93d0b387ac05d6e1be56e640ea1ebf1979384bcf3d6307c53d44b4",
+      "virtual_duration_us": 600000
+    },
+    "esp32_030hz_occupied-still.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 30,
+      "digest": "43261660eb439b7f7c84eb6c432f3d598aed85fe5883611475876e36d1c3d518",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 30,
+      "scene": "occupied-still",
+      "sha256": "d165d51a84db99b4466193027bb00c7ed25c53e5c6f11d7ce8774fff36e4caa1",
+      "virtual_duration_us": 399996
+    },
+    "esp32_030hz_vacant.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 30,
+      "digest": "9077b07e4f1c16e0f1d76f27d9950d702bed9bd1bc01f76ecdcd7b2f0d14346c",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 30,
+      "scene": "vacant",
+      "sha256": "2a694ca0b31370a33de2834ca1e625e6f4b4158349f03465b664d536fac1824a",
+      "virtual_duration_us": 399996
+    },
+    "esp32_050hz_occupied-still.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 50,
+      "digest": "5835ae50c5a72d11d79822f9142c95f5f531b34ce7061c1169407d961664d0c6",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 50,
+      "scene": "occupied-still",
+      "sha256": "440a01fa652309c59700da5972d641f29e706d24310ed547f02f323ee9b998f3",
+      "virtual_duration_us": 240000
+    },
+    "esp32_050hz_vacant.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 50,
+      "digest": "ce0591ecb0134cca82706d9ee2820a9a4841b0944d522348aeb33f2ad1b18d3f",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 50,
+      "scene": "vacant",
+      "sha256": "c18374456bd719689a938a85276d57703106deff02945038ef3b2da3bb7f7f08",
+      "virtual_duration_us": 240000
+    },
+    "esp32_100hz_occupied-still.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 100,
+      "digest": "e06372804d884ad17d1d226107e2115f46558593c1ba09be7eab823d9d04bce1",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 100,
+      "scene": "occupied-still",
+      "sha256": "8b576d568346afccf81e4044b3acd18fdb677dce4b7ab453169fa8d99d2f3756",
+      "virtual_duration_us": 120000
+    },
+    "esp32_100hz_vacant.ecf1": {
+      "board": "esp32",
+      "by_type": {
+        "ble": 6,
+        "csi": 12,
+        "marker": 0,
+        "stat": 1
+      },
+      "bytes": 1867,
+      "capture_rate_hz": 100,
+      "digest": "d931f023c4637f197e4fa6689d3f36fef6585d38f4c25475f3df08747d67c4ba",
+      "n_subcarriers": 64,
+      "replay_rate_hz": 100,
+      "scene": "vacant",
+      "sha256": "c099e0db933b36aaba8e5d89d70eb8acabcfd718cb2b7ca8f78ec191cc8cc73d",
+      "virtual_duration_us": 120000
+    }
+  }
+}
