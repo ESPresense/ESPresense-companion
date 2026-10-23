@@ -47,10 +47,12 @@ namespace ESPresense.Services
             var retain = id == "*";
             var old = Get(id).Calibration;
             await mqtt.UpdateSetting(id, "absorption", "", retain, old.Absorption?.ToString());
-            if (old.UsesRxOffset)
-                await mqtt.UpdateSetting(id, "rx_offset_rssi", "", retain, (-old.RxAdjRssi)?.ToString());
-            else
+            // "*" reaches a fleet that can mix firmware, and its own cache entry says nothing about any
+            // node's convention, so it resets both topics; a single node gets the one it uses.
+            if (id == "*" || !old.UsesRxOffset)
                 await mqtt.UpdateSetting(id, "rx_adj_rssi", "", retain, old.RxAdjRssi?.ToString());
+            if (id == "*" || old.UsesRxOffset)
+                await mqtt.UpdateSetting(id, "rx_offset_rssi", "", retain, (-old.RxAdjRssi)?.ToString());
             await mqtt.UpdateSetting(id, "tx_ref_rssi", "", retain, old.TxRefRssi?.ToString());
         }
 
@@ -108,11 +110,12 @@ namespace ESPresense.Services
 
             if (ds.Calibration.RxAdjRssi != null && ds.Calibration.RxAdjRssi != old.Calibration.RxAdjRssi)
             {
-                // v5 nodes take the added rx_offset_rssi; older ones the subtracted rx_adj_rssi.
-                if (old.Calibration.UsesRxOffset)
-                    await mqtt.UpdateSetting(id, "rx_offset_rssi", -ds.Calibration.RxAdjRssi, retain, -old.Calibration.RxAdjRssi);
-                else
+                // v5 nodes take the added rx_offset_rssi; older ones the subtracted rx_adj_rssi. "*" can
+                // reach both, so it sends both (old firmware ignores the topic it doesn't know).
+                if (id == "*" || !old.Calibration.UsesRxOffset)
                     await mqtt.UpdateSetting(id, "rx_adj_rssi", ds.Calibration.RxAdjRssi, retain, old.Calibration.RxAdjRssi);
+                if (id == "*" || old.Calibration.UsesRxOffset)
+                    await mqtt.UpdateSetting(id, "rx_offset_rssi", -ds.Calibration.RxAdjRssi, retain, -old.Calibration.RxAdjRssi);
             }
 
             if (ds.Calibration.TxRefRssi != null && ds.Calibration.TxRefRssi != old.Calibration.TxRefRssi)
@@ -244,8 +247,11 @@ namespace ESPresense.Services
                                 ns.Calibration.Absorption = ParsingUtils.ParseDoubleOrDefault(arg.Payload);
                                 break;
                             case "rx_adj_rssi":
-                                // A v5 node clears this retained topic (an empty message); its value is rx_offset_rssi.
-                                if (ns.Calibration.UsesRxOffset) return Task.CompletedTask;
+                                // A v5 node clears this retained topic with an empty message; its value is
+                                // rx_offset_rssi. A non-empty value means the node runs older firmware again
+                                // (e.g. a downgrade), so it is back on rx_adj_rssi.
+                                if (string.IsNullOrEmpty(arg.Payload) && ns.Calibration.UsesRxOffset) return Task.CompletedTask;
+                                if (!string.IsNullOrEmpty(arg.Payload)) ns.Calibration.UsesRxOffset = false;
                                 ns.Calibration.RxAdjRssi = ParsingUtils.ParseIntOrDefault(arg.Payload);
                                 break;
                             case "rx_offset_rssi":
