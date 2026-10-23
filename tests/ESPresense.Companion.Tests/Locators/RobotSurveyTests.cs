@@ -153,11 +153,12 @@ public class RobotSurveyTests
         var nodes = FirstFloorNodes(floor);
 
         var group = _survey.Points
-            .GroupBy(p => (Math.Round(p.RobotX, 1), Math.Round(p.RobotY, 1)))
+            .Where(p => p.FloorX.HasValue && p.FloorY.HasValue)
+            .GroupBy(p => (Math.Round(p.FloorX!.Value, 1), Math.Round(p.FloorY!.Value, 1)))
             .OrderByDescending(g => g.Count()).First();
         if (group.Count() < 3) Assert.Ignore("no spot visited 3+ times");
 
-        TestContext.WriteLine($"Robot at robot-frame {group.Key}, {group.Count()} visits\n");
+        TestContext.WriteLine($"Robot at floor-frame {group.Key}, {group.Count()} visits\n");
         TestContext.WriteLine($"{"locator",-13}{"fixes",6}{"spread p95",12}{"max pair",10}{"centroid dev",14}");
 
         var anySolved = false;
