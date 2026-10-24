@@ -54,7 +54,8 @@ namespace ESPresense.Services
         /// </summary>
         /// <remarks>
         /// Converts the provided nullable integer to its string representation before updating the setting.
-        /// For the "rx_adj_rssi" and "tx_ref_rssi" settings, a value of zero is treated as an empty string.
+        /// Zero is sent as "0": it is a valid value, and an empty payload would instead reset the node to
+        /// its default (+20 for rx_adj_rssi on ESP32-S3). Use NodeSettingsStore.ResetCalibration to reset.
         /// </remarks>
         /// <param name="id">The identifier for the setting.</param>
         /// <param name="setting">The name of the setting to update.</param>
@@ -67,12 +68,6 @@ namespace ESPresense.Services
             // Convert to string for comparison and mqtt
             string? strValue = value?.ToString();
             string? strOldValue = oldValue?.ToString();
-
-            // Special handling for 0 values in certain fields
-            if ((setting == "rx_adj_rssi" || setting == "tx_ref_rssi") && value == 0)
-            {
-                strValue = "";
-            }
 
             await mqtt.UpdateSetting(id, setting, strValue, retain, strOldValue);
         }
@@ -95,12 +90,6 @@ namespace ESPresense.Services
             // Convert to string with proper formatting for comparison and mqtt
             string? strValue = value.HasValue ? $"{value:0.00}" : null;
             string? strOldValue = oldValue.HasValue ? $"{oldValue:0.00}" : null;
-
-            // Special handling for 0 values in absorption
-            if (setting == "absorption" && value == 0)
-            {
-                strValue = "";
-            }
 
             await mqtt.UpdateSetting(id, setting, strValue, retain, strOldValue);
         }

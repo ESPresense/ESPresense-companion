@@ -92,7 +92,13 @@ public class FilteringSettings
 public class CalibrationSettings
 {
     public int? RxRefRssi { get; set; }
+    /// <summary>Receiver adjustment in the subtracted convention: rssi = raw - RxAdjRssi.</summary>
     public int? RxAdjRssi { get; set; }
+    /// <summary>
+    /// The node reported rx_offset_rssi (v5 firmware, added: rssi = raw + offset). RxAdjRssi then holds
+    /// -rx_offset_rssi, and writes and resets go to rx_offset_rssi.
+    /// </summary>
+    public bool UsesRxOffset { get; set; }
     public double? Absorption { get; set; }
     public int? TxRefRssi { get; set; }
     public CalibrationSettings Clone() => (CalibrationSettings)MemberwiseClone();
