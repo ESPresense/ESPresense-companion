@@ -195,7 +195,7 @@ public class NodeSettingsStoreTests
             var sectionValue = section.GetValue(settings)!;
             foreach (var setting in NullableSettings(section.PropertyType))
             {
-                // Non-zero values: Merge mirrors UpdateSetting publishing 0 as "", which echoes back as null
+                // Any non-null value; Merge caches each as is.
                 object value = setting.PropertyType == typeof(string) ? "value-" + setting.Name
                     : setting.PropertyType == typeof(int?) ? 11
                     : setting.PropertyType == typeof(double?) ? 1.25
@@ -269,5 +269,133 @@ public class NodeSettingsStoreTests
         _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_adj_rssi/set", "", false), Times.Once);
         _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/tx_ref_rssi/set", "", false), Times.Once);
         _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/absorption/set", "", false), Times.Once);
+    }
+
+    [Test]
+    public async Task Set_ThenGet_CachesZeroCalibrationAsZero()
+    {
+        // 0 is published as "0" and echoes back as 0, so the cache keeps 0 rather than null.
+        Receive("node-1", "rx_adj_rssi", "5");
+        var settings = _store.Get("node-1");
+        settings.Calibration.RxAdjRssi = 0;
+        await _store.Set("node-1", settings);
+
+        Assert.That(_store.Get("node-1").Calibration.RxAdjRssi, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void Inbound_RxOffsetRssi_IsStoredInTheSubtractedConvention()
+    {
+        // v5 nodes publish rx_offset_rssi (added); RxAdjRssi keeps the subtracted convention.
+        Receive("node-1", "rx_offset_rssi", "1");
+
+        var calibration = _store.Get("node-1").Calibration;
+        Assert.That(calibration.UsesRxOffset, Is.True);
+        Assert.That(calibration.RxAdjRssi, Is.EqualTo(-1));
+    }
+
+    [Test]
+    public void Inbound_ClearedRxAdjRssi_DoesNotWipeAV5NodesOffset()
+    {
+        // A v5 node clears its retained rx_adj_rssi with an empty message after publishing rx_offset_rssi.
+        Receive("node-1", "rx_offset_rssi", "1");
+        Receive("node-1", "rx_adj_rssi", "");
+
+        Assert.That(_store.Get("node-1").Calibration.RxAdjRssi, Is.EqualTo(-1));
+    }
+
+    [Test]
+    public async Task Set_RxAdjRssi_OnAV5Node_WritesRxOffsetRssiNegated()
+    {
+        Receive("node-1", "rx_offset_rssi", "1");
+        var settings = _store.Get("node-1");
+        settings.Calibration.RxAdjRssi = 3;  // subtracted 3 = added -3
+        await _store.Set("node-1", settings);
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_offset_rssi/set", "-3", false), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_adj_rssi/set", It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
+    public async Task ResetCalibration_OnAV5Node_ResetsRxOffsetRssi()
+    {
+        Receive("node-1", "rx_offset_rssi", "-20");
+
+        await _store.ResetCalibration("node-1");
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_offset_rssi/set", "", false), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_adj_rssi/set", It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
+    public async Task Set_RxAdjRssi_OnTheWildcard_WritesBothConventions()
+    {
+        // "*" reaches a fleet that can mix firmware: older nodes read rx_adj_rssi, v5 nodes rx_offset_rssi.
+        var settings = _store.Get("*");
+        settings.Calibration.RxAdjRssi = 3;
+        await _store.Set("*", settings);
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/*/rx_adj_rssi/set", "3", true), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/*/rx_offset_rssi/set", "-3", true), Times.Once);
+    }
+
+    [Test]
+    public async Task Set_RxAdjRssiZero_OnTheWildcard_WritesZeroToBoth()
+    {
+        Receive("*", "rx_adj_rssi", "5");
+        var settings = _store.Get("*");
+        settings.Calibration.RxAdjRssi = 0;
+        await _store.Set("*", settings);
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/*/rx_adj_rssi/set", "0", true), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/*/rx_offset_rssi/set", "0", true), Times.Once);
+    }
+
+    [Test]
+    public async Task ResetCalibration_OnTheWildcard_ResetsBothConventions()
+    {
+        Receive("*", "rx_adj_rssi", "5");
+
+        await _store.ResetCalibration("*");
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/*/rx_adj_rssi/set", "", true), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/*/rx_offset_rssi/set", "", true), Times.Once);
+    }
+
+    [Test]
+    public async Task Set_RxAdjRssi_InAMixedFleet_RoutesEachNodeToItsOwnConvention()
+    {
+        Receive("old-node", "rx_adj_rssi", "2");
+        Receive("v5-node", "rx_offset_rssi", "-2");
+
+        var oldSettings = _store.Get("old-node");
+        oldSettings.Calibration.RxAdjRssi = 4;
+        await _store.Set("old-node", oldSettings);
+        var v5Settings = _store.Get("v5-node");
+        v5Settings.Calibration.RxAdjRssi = 4;
+        await _store.Set("v5-node", v5Settings);
+
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/old-node/rx_adj_rssi/set", "4", false), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/old-node/rx_offset_rssi/set", It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/v5-node/rx_offset_rssi/set", "-4", false), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/v5-node/rx_adj_rssi/set", It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
+    public async Task Inbound_RxAdjRssiValue_AfterRxOffset_MeansTheNodeWasDowngraded()
+    {
+        // A node downgraded from v5 publishes rx_adj_rssi again: it's back on the older convention.
+        Receive("node-1", "rx_offset_rssi", "1");
+        Receive("node-1", "rx_adj_rssi", "4");
+
+        var calibration = _store.Get("node-1").Calibration;
+        Assert.That(calibration.UsesRxOffset, Is.False);
+        Assert.That(calibration.RxAdjRssi, Is.EqualTo(4));
+
+        var settings = _store.Get("node-1");
+        settings.Calibration.RxAdjRssi = 6;
+        await _store.Set("node-1", settings);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_adj_rssi/set", "6", false), Times.Once);
+        _mqtt.Verify(x => x.EnqueueAsync("espresense/rooms/node-1/rx_offset_rssi/set", It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
     }
 }
