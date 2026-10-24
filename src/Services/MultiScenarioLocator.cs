@@ -41,7 +41,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var (lat, lon) = gps?.Report == true ? gps.Add(anchorLocation.X, anchorLocation.Y) : (null, null);
             var elevation = gps?.Report == true ? anchorLocation.Z + gps?.Elevation : null;
 
-            var anchorState = device.Room?.Name ?? device.Floor?.Name ?? "not_home";
+            // The anchor fixes where the device is, not whether it is here: once no node hears it, it's away.
+            var present = device.Nodes.Values.Any(dn => dn.Current);
+            var anchorState = present ? device.Room?.Name ?? device.Floor?.Name ?? "not_home" : "not_home";
             var stateChanged = device.ReportedState != anchorState;
             if (stateChanged)
             {
@@ -50,7 +52,6 @@ public class MultiScenarioLocator(DeviceTracker dl,
             }
 
             var locationChanged = device.ReportedLocation != anchorLocation;
-            device.ReportedLocation = anchorLocation;
             device.BestScenario = null;
 
             // Force publication when device transitions to anchored state or location changes
@@ -71,8 +72,12 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     last_seen = device.LastSeen
                 }, SerializerSettings.NullIgnore);
 
+                // Only record the location once the attributes are out, so a failed publish is retried next pass
                 if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
+                {
+                    device.ReportedLocation = anchorLocation;
                     globalEventDispatcher.OnDeviceChanged(device, false);
+                }
             }
 
             return;
