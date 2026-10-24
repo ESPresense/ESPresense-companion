@@ -26,14 +26,17 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    MqttCoordinator mqtt,
                                    GlobalEventDispatcher globalEventDispatcher,
                                    DeviceHistoryStore deviceHistory,
-                                   ILeaseService leaseService) : BackgroundService
+                                   ILeaseService leaseService,
+                                   RoomLearningService? roomLearning = null) : BackgroundService
 {
     private const string LocatingLeaseName = "locating";
 
     internal async Task ProcessDevice(Device device)
     {
+        state?.RefreshScenarios(device);
         if (device.IsAnchored && device.Anchor is { } anchor)
         {
+            if (roomLearning != null) await roomLearning.UpdateAsync(device);
             device.LastCalculated = DateTime.UtcNow;
             var anchorLocation = anchor.Location;
 
@@ -152,11 +155,14 @@ public class MultiScenarioLocator(DeviceTracker dl,
             .FirstOrDefault();
 
         device.BestScenario = bestScenario;
+        var previousRoom = device.Room;
+        if (roomLearning != null) await roomLearning.UpdateAsync(device);
+        if (previousRoom != device.Room) moved++;
 
         // -----------------------------------------------------------------
         // 6. Publish state / attributes if anything moved ----------------------
         // -----------------------------------------------------------------
-        if (bestScenario != null)
+        if (bestScenario != null || device.ActiveLearnedRoom != null)
         {
             var newState = device.Room?.Name ?? device.Floor?.Name ?? "not_home";
             if (newState != device.ReportedState)
@@ -176,6 +182,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 device.ReportedState = "not_home";
             }
         }
+
+        if (moved > 0 && bestScenario == null && device.ActiveLearnedRoom != null)
+            globalEventDispatcher.OnDeviceChanged(device, false);
 
         if (moved > 0 && bestScenario != null)
         {
@@ -266,6 +275,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
                 await using (lease)
                 {
+                    roomLearning?.ReloadTraining();
                     Log.Information("Acquired lease '{LeaseName}'", LocatingLeaseName);
                     await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
                     {

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using TextExtensions;
 using YamlDotNet.Serialization;
 using ESPresense.Extensions;
@@ -32,6 +32,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "optimization")]
         public ConfigOptimization Optimization { get; set; } = new();
 
+        [YamlMember(Alias = "room_learning")]
+        public RoomLearningConfig RoomLearning { get; set; } = new();
+
         [YamlMember(Alias = "locators")]
         public ConfigLocators Locators { get; set; } = new();
 
@@ -57,6 +60,12 @@ namespace ESPresense.Models
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
     }
 
+    public class RoomLearningConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+    }
+
     public partial class ConfigLocators
     {
         [YamlMember(Alias = "nadaraya_watson")]
@@ -76,6 +85,52 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
+
+        [YamlMember(Alias = "fingerprint")]
+        public FingerprintConfig Fingerprint { get; set; } = new();
+    }
+
+    public partial class FingerprintConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
+
+        /// <summary>Fingerprint survey file, relative to the config directory.</summary>
+        [YamlMember(Alias = "file")]
+        public string File { get; set; } = "fingerprints.json";
+
+        /// <summary>
+        /// "continuous" (default) matches against the survey smoothed over position, so devices between
+        /// surveyed spots are located between them; "knn" averages the k closest fingerprints.
+        /// </summary>
+        [YamlMember(Alias = "mode")]
+        public string Mode { get; set; } = "continuous";
+
+        /// <summary>Smoothing radius (m) of the continuous surface; about 0.8x the survey spacing.</summary>
+        [YamlMember(Alias = "bandwidth")]
+        public double Bandwidth { get; set; } = 0.6;
+
+        /// <summary>How many best-matching surface points to average (continuous mode).</summary>
+        [YamlMember(Alias = "top")]
+        public int Top { get; set; } = 20;
+
+        /// <summary>How many closest fingerprints to average (knn mode).</summary>
+        [YamlMember(Alias = "k")]
+        public int K { get; set; } = 3;
+
+        /// <summary>Fewest nodes a reading and a fingerprint must share to be compared.</summary>
+        [YamlMember(Alias = "min_common")]
+        public int MinCommon { get; set; } = 3;
+
+        /// <summary>
+        /// RSSI assumed for a node heard on only one side of a comparison (roughly the hearing limit);
+        /// null compares shared nodes only (knn mode only; continuous mode treats null as -100). On the robot survey -100 cut the worst errors sharply.
+        /// </summary>
+        [YamlMember(Alias = "missing_rssi")]
+        public double? MissingRssi { get; set; } = -100;
     }
 
     public partial class NadarayaWatsonConfig
