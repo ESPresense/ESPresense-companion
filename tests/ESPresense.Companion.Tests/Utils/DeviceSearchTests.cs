@@ -99,4 +99,26 @@ public class DeviceSearchTests
 
         Assert.That(result.Name, Is.EqualTo("Dryer vent"));
     }
+
+    [Test]
+    public void FullMacTypedWithSeparatorsRanksAsExact()
+    {
+        var full = MakeDevice("a4c138a4048c");
+        var longer = MakeDevice("a4c138a4048c99", null, true);
+
+        var result = Ids(new[] { longer, full }, "a4:c1:38:a4:04:8c");
+
+        Assert.That(result, Is.EqualTo(new[] { "a4c138a4048c", "a4c138a4048c99" }));
+    }
+
+    [Test]
+    public void IgnoresNonFiniteDistancesWhenPickingNearest()
+    {
+        var device = MakeDevice("a4c138a4048c", null, false, ("bad", double.NaN), ("kitchen", 2.97));
+
+        var result = DeviceSearch.Search(new[] { device }, "a4c138", 20, d => d.Name).Single();
+
+        Assert.That(result.NearestNode, Is.EqualTo("kitchen"));
+        Assert.That(result.NearestDistance, Is.EqualTo(2.97).Within(1e-9));
+    }
 }

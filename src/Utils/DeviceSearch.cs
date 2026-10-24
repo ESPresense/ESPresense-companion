@@ -70,10 +70,11 @@ public static class DeviceSearch
     private static int Tier(string query, string id, string strippedId, string? name)
     {
         if (query.Length == 0) return 2;
-        if (id.Equals(query, StringComparison.OrdinalIgnoreCase) || (name?.Equals(query, StringComparison.OrdinalIgnoreCase) ?? false))
+        var strippedQuery = Strip(query);
+        if (id.Equals(query, StringComparison.OrdinalIgnoreCase) || (name?.Equals(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (strippedQuery.Length > 0 && strippedId.Equals(strippedQuery, StringComparison.OrdinalIgnoreCase)))
             return 0;
 
-        var strippedQuery = Strip(query);
         if (id.StartsWith(query, StringComparison.OrdinalIgnoreCase) || (name?.StartsWith(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
             (strippedQuery.Length > 0 && strippedId.StartsWith(strippedQuery, StringComparison.OrdinalIgnoreCase)))
             return 1;
@@ -83,7 +84,9 @@ public static class DeviceSearch
     private static DeviceSearchResult ToResult(Device device, string? name)
     {
         var current = device.Nodes.Values.Where(n => n.Current).ToList();
-        var nearest = current.Count == 0 ? null : current.MinBy(n => n.Distance);
+        // NaN/Infinity would serialise as a string and break the client's toFixed
+        var finite = current.Where(n => double.IsFinite(n.Distance)).ToList();
+        var nearest = finite.Count == 0 ? null : finite.MinBy(n => n.Distance);
         return new DeviceSearchResult(
             device.Id,
             name,

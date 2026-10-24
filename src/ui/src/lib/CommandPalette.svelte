@@ -22,12 +22,18 @@
 		}
 	}
 
+	let opener: Element | null = null;
+
 	$effect(() => {
 		if (!open) {
 			clearTimeout(timer);
 			seq++; // drop any in-flight response
+			// Hand focus back to whatever had it, unless navigation already removed it.
+			if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+			opener = null;
 			return;
 		}
+		opener = document.activeElement;
 		query = '';
 		tick().then(() => input?.focus());
 	});

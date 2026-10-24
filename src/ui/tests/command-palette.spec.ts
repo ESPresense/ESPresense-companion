@@ -35,6 +35,16 @@ test('Ctrl+K opens the palette, Escape closes it', async ({ page }) => {
 	await expect(box(page)).toHaveCount(0);
 });
 
+test('Escape hands focus back to the sidebar button that opened it', async ({ page }) => {
+	await open(page);
+	const button = page.getByRole('button', { name: 'Find a device' });
+	await button.click();
+	await expect(box(page)).toBeFocused();
+
+	await page.keyboard.press('Escape');
+	await expect(button).toBeFocused();
+});
+
 test('the sidebar search button opens it too', async ({ page }) => {
 	await open(page);
 	await page.getByRole('button', { name: 'Find a device' }).click();
