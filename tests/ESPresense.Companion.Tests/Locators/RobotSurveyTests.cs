@@ -47,6 +47,10 @@ public class RobotSurveyTests
     /// <summary>Many spots: good spatial spread.</summary>
     private const string Spread = "robot-survey-spread.json";
 
+    /// <summary>Each spot visited from 2-3 directions, holding the arrival heading through the dwell (no turning in place):
+    /// the orientation effect at known spots, with the kitchen node at its 2026-10-24 position.</summary>
+    private const string Approach = "robot-survey-approach.json";
+
     internal static string LoadFixtureText(string file)
     {
         var dir = Environment.GetEnvironmentVariable("ESPRESENSE_SURVEY_DIR");
@@ -183,6 +187,7 @@ public class RobotSurveyTests
     /// </summary>
     [TestCase(Headings)]
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void Rigidity_SolverMustReproduceKnownSeparations(string fixture)
     {
         _survey = Load(fixture);
@@ -252,6 +257,7 @@ public class RobotSurveyTests
     /// </summary>
     [TestCase(Headings)]
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void ScaleSweep_SeparatesSolverFragilityFromDistanceInflation(string fixture)
     {
         _survey = Load(fixture);
@@ -477,6 +483,7 @@ public class RobotSurveyTests
     /// can recover from it, which is the point.
     /// </summary>
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void RangeConsistency_NodeRangeCannotChangeFasterThanTheRobotMoved(string fixture)
     {
         _survey = Load(fixture);
@@ -534,6 +541,7 @@ public class RobotSurveyTests
     /// between positions that are further apart.
     /// </summary>
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void BeaconMovesWithRobot(string fixture)
     {
         _survey = Load(fixture);
@@ -616,10 +624,11 @@ public class RobotSurveyTests
     /// locators achieved on that survey: they catch a change that makes a locator worse, they are
     /// not an accuracy target. Without them this is a diagnostic.
     /// </summary>
-    [Test]
-    public void Accuracy_FloorFrame_PerLocator()
+    [TestCase(Spread)]
+    [TestCase(Approach)]
+    public void Accuracy_FloorFrame_PerLocator(string fixture)
     {
-        _survey = Load(Spread);
+        _survey = Load(fixture);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
         RequireSpatialPoints(MinAccuracyPoints);
@@ -660,10 +669,11 @@ public class RobotSurveyTests
     /// solvers? Runs each solver on the spatial survey with every node, then without those, and
     /// compares absolute error and the rigidity slope (solved vs true separation; 1.0 is perfect).
     /// </summary>
-    [Test]
-    public void NodeExclusion_ThroughStructureNodesDragSolversToTheMiddle()
+    [TestCase(Spread)]
+    [TestCase(Approach)]
+    public void NodeExclusion_ThroughStructureNodesDragSolversToTheMiddle(string fixture)
     {
-        _survey = Load(Spread);
+        _survey = Load(fixture);
         RequireSpatialPoints(MinAccuracyPoints);
         if (ThroughStructureNodes.Length == 0) Assert.Ignore("fixture names no expect.throughStructureNodes");
         var floor = FirstFloor();
