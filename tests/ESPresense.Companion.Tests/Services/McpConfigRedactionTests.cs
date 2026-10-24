@@ -32,7 +32,7 @@ public class McpConfigRedactionTests
     public async Task GetConfigTool_DoesNotReturnMqttPassword()
     {
         var configLoader = new ConfigLoader(_configDir);
-        await configLoader.ConfigAsync(); // ensure the YAML has been loaded
+        await configLoader.LoadAsync(); // the constructor no longer loads; ConfigAsync alone would wait forever
 
         var mqtt = new Mock<IMqttCoordinator>().Object;
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt);
@@ -73,7 +73,7 @@ public class McpConfigRedactionTests
         // state://config is a separate MCP entry point from the get_config tool and
         // must be redacted too.
         var configLoader = new ConfigLoader(_configDir);
-        await configLoader.ConfigAsync();
+        await configLoader.LoadAsync(); // the constructor no longer loads; ConfigAsync alone would wait forever
 
         var mqtt = new Mock<IMqttCoordinator>().Object;
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt);

@@ -55,11 +55,13 @@ locators:
         Assert.That(result, Does.Contain("interval_secs: 3600"));
         Assert.That(result, Does.Contain("per_node_absorption"));
 
-        // Other sections preserved
+        // Other sections preserved, and the following section still starts on its own line
+        // (the old regex swallowed the newline, producing "per_node_absorptionlocators:").
         Assert.That(result, Does.Contain("mqtt:"));
         Assert.That(result, Does.Contain("host: localhost"));
-        Assert.That(result, Does.Contain("locators:"));
+        Assert.That(result, Does.Contain("\nlocators:\n"));
         Assert.That(result, Does.Contain("nearest_node:"));
+        Assert.That(result, Does.Not.Contain("per_node_absorptionlocators"));
     }
 
     [Test]
@@ -130,8 +132,9 @@ away_timeout: 120
 
         var result = await File.ReadAllTextAsync(_configPath);
 
-        Assert.That(result, Does.Contain("timeout: 60"));
-        Assert.That(result, Does.Contain("away_timeout: 120"));
+        // Each key on its own line (the old regex produced "timeout: 60away_timeout: 120").
+        Assert.That(result, Does.Contain("timeout: 60\n"));
+        Assert.That(result, Does.Contain("\naway_timeout: 120"));
     }
 
     [Test]
