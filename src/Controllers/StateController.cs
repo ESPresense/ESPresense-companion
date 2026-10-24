@@ -85,6 +85,21 @@ public class StateController : ControllerBase
         return d;
     }
 
+    /// <summary>
+    /// Searches every known device (tracked or not) by id, name, room or floor. Terms are AND-ed and a MAC
+    /// matches with or without separators. Returns at most <paramref name="limit"/> ranked results.
+    /// </summary>
+    [HttpGet("api/state/devices/search")]
+    public IEnumerable<DeviceSearchResult> SearchDevices([FromQuery] string? q = null, [FromQuery] int limit = 20)
+    {
+        limit = Math.Clamp(limit, 1, 100);
+        return DeviceSearch.Search(_state.Devices.Values, q, limit, d =>
+        {
+            var name = _dss.Get(d.Id)?.Name;
+            return string.IsNullOrWhiteSpace(name) ? d.Name : name;
+        });
+    }
+
     // GET: api/config
     [HttpGet("api/state/config")]
     public Config GetConfig()

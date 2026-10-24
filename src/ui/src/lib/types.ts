@@ -256,3 +256,16 @@ export interface DeviceHistory {
 	scenario: string | null;
 	best: boolean;
 }
+
+/** Matches the backend DeviceSearchResult (GET /api/state/devices/search). */
+export interface DeviceSearchResult {
+	id: string;
+	name: string | null;
+	tracked: boolean;
+	room: string | null;
+	floor: string | null;
+	nodes: number;
+	nearestNode: string | null;
+	nearestDistance: number | null;
+	lastSeen: string | null;
+}
