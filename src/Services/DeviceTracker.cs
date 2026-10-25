@@ -337,12 +337,6 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         }
     }
 
-    /// <summary>
-    /// Discards every device queued for locating and returns how many were dropped. Used by the locator when it
-    /// re-acquires the lease so a backlog accumulated while another instance was locating is not replayed.
-    /// </summary>
-    public int ClearLocateBacklog() => _toLocate.Clear();
-
     /// <summary>Number of devices currently queued for locating.</summary>
     internal int PendingLocateCount => _toLocate.Count;
 

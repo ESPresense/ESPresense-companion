@@ -39,22 +39,6 @@ internal sealed class DirtyDeviceSet
     }
 
     /// <summary>
-    /// Discards every pending id and returns how many were dropped.
-    /// </summary>
-    public int Clear()
-    {
-        var cleared = 0;
-        while (_order.TryDequeue(out var id))
-        {
-            if (_pending.TryRemove(id, out _)) cleared++;
-        }
-        // A concurrent Mark may have added to _pending but not yet to _order; drop those too so the id
-        // cannot get stuck as "pending" with no queue entry (Mark would then refuse it forever).
-        _pending.Clear();
-        return cleared;
-    }
-
-    /// <summary>
     /// Yields pending ids as they become available, each at most once per pass, until
     /// <paramref name="cancellationToken"/> is cancelled (which throws <see cref="OperationCanceledException"/>,
     /// matching <c>ChannelReader.ReadAllAsync</c>).

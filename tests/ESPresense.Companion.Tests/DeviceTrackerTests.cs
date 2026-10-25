@@ -176,18 +176,6 @@ public class DeviceTrackerTests
     }
 
     [Test]
-    public void ClearLocateBacklog_DropsEverythingPending()
-    {
-        _deviceTracker.MarkForLocate("one");
-        _deviceTracker.MarkForLocate("two");
-        _deviceTracker.MarkForLocate("one");
-
-        Assert.That(_deviceTracker.ClearLocateBacklog(), Is.EqualTo(2));
-        Assert.That(_deviceTracker.PendingLocateCount, Is.EqualTo(0));
-        Assert.That(_deviceTracker.ClearLocateBacklog(), Is.EqualTo(0));
-    }
-
-    [Test]
     public async Task OnDeviceMessageReceived_CoalescesMessagesFromManyNodes()
     {
         foreach (var nodeId in new[] { "n1", "n2", "n3" })
