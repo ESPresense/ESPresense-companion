@@ -72,11 +72,15 @@ public class MultiScenarioLocator(DeviceTracker dl,
                     last_seen = device.LastSeen
                 }, SerializerSettings.NullIgnore);
 
-                // Only record the location once the attributes are out, so a failed publish is retried next pass
                 if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
                 {
                     device.ReportedLocation = anchorLocation;
                     globalEventDispatcher.OnDeviceChanged(device, false);
+                }
+                else
+                {
+                    // Forget the state too, so the next pass retries even when the location already matches
+                    device.ReportedState = null;
                 }
             }
 
