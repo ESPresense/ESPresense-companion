@@ -8,6 +8,11 @@ const all = [
 	{ id: 'tv:family', name: 'Family TV', tracked: true, room: 'Family', floor: 'Ground', nodes: 3, nearestNode: 'family', nearestDistance: 1.2, lastSeen: new Date().toISOString() }
 ];
 
+const nodes = [
+	{ id: 'kitchen', name: 'Kitchen', online: true, sourceType: 'Config' },
+	{ id: 'nook', name: null, online: false, sourceType: 'Discovered' }
+];
+
 async function open(page: Page) {
 	await mockApi(page, { stubWebSocket: true });
 	const queries: string[] = [];
@@ -17,6 +22,7 @@ async function open(page: Page) {
 		const hits = all.filter((d) => !q || d.id.includes(q) || (d.name ?? '').toLowerCase().includes(q));
 		return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(hits) });
 	});
+	await page.route('**/api/state/nodes**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nodes) }));
 	await page.goto('/devices');
 	await expect(page.locator('table tbody tr').first()).toBeVisible();
 	return queries;
@@ -81,5 +87,18 @@ test('says so when nothing matches', async ({ page }) => {
 	await open(page);
 	await page.keyboard.press('Control+k');
 	await box(page).fill('zzzz');
-	await expect(page.getByText('No devices match.')).toBeVisible();
+	await expect(page.getByText('Nothing matches.')).toBeVisible();
+});
+
+test('finds nodes too, lists them first, and opens the node page', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('kit');
+
+	const options = page.getByRole('option');
+	await expect(options.first()).toContainText('Kitchen');
+	await expect(options.first()).toContainText('node');
+
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/nodes\/kitchen$/);
 });

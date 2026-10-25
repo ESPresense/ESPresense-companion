@@ -1,13 +1,26 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { apiFetch } from '$lib/api';
-	import { gotoDetail } from '$lib/urls';
-	import type { Device, DeviceSearchResult } from '$lib/types';
+	import { gotoDetail, gotoNodeById } from '$lib/urls';
+	import type { Device, DeviceSearchResult, Node } from '$lib/types';
+
+	type Row = { kind: 'node'; key: string; node: Node } | { kind: 'device'; key: string; device: DeviceSearchResult };
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	let query = $state('');
-	let results = $state<DeviceSearchResult[]>([]);
+	let deviceResults = $state<DeviceSearchResult[]>([]);
+	// Nodes are few, so fetch them once per open and filter in the browser.
+	let allNodes = $state<Node[]>([]);
+	const MAX_NODES = 5;
+
+	const nodeResults = $derived.by(() => {
+		const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+		if (!terms.length) return [];
+		return allNodes.filter((n) => terms.every((t) => n.id.toLowerCase().includes(t) || (n.name ?? '').toLowerCase().includes(t))).slice(0, MAX_NODES);
+	});
+
+	const results = $derived<Row[]>([...nodeResults.map((node): Row => ({ kind: 'node', key: `node:${node.id}`, node })), ...deviceResults.map((device): Row => ({ kind: 'device', key: `device:${device.id}`, device }))]);
 	let active = $state(0);
 	let loading = $state(false);
 	let failed = $state(false);
@@ -35,6 +48,9 @@
 		}
 		opener = document.activeElement;
 		query = '';
+		apiFetch<Node[]>('/api/state/nodes?includeTele=false')
+			.then((n) => (allNodes = n))
+			.catch((e) => console.error('Node list failed:', e));
 		tick().then(() => input?.focus());
 	});
 
@@ -53,23 +69,24 @@
 		try {
 			const found = await apiFetch<DeviceSearchResult[]>(`/api/state/devices/search?q=${encodeURIComponent(q)}&limit=20`);
 			if (mine !== seq) return;
-			results = found;
+			deviceResults = found;
 			active = 0;
 			failed = false;
 		} catch (e) {
 			if (mine !== seq) return;
 			console.error('Device search failed:', e);
-			results = [];
+			deviceResults = [];
 			failed = true;
 		} finally {
 			if (mine === seq) loading = false;
 		}
 	}
 
-	function pick(result: DeviceSearchResult | undefined) {
-		if (!result) return;
+	function pick(row: Row | undefined) {
+		if (!row) return;
 		open = false;
-		gotoDetail({ id: result.id } as Device);
+		if (row.kind === 'node') gotoNodeById(row.node.id);
+		else gotoDetail({ id: row.device.id } as Device);
 	}
 
 	function onInputKeydown(event: KeyboardEvent) {
@@ -87,6 +104,10 @@
 			pick(results[active]);
 		}
 	}
+
+	$effect(() => {
+		if (active >= results.length) active = 0;
+	});
 
 	$effect(() => {
 		// Keep the highlighted row in view while arrowing through a long list.
@@ -108,21 +129,32 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 	<div class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[12vh]" onclick={() => (open = false)}>
 		<div class="w-full max-w-xl mx-4 rounded-lg bg-surface-50-950 border border-surface-300-700 shadow-xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Find a device" tabindex="-1" onclick={(e) => e.stopPropagation()}>
-			<input bind:this={input} bind:value={query} onkeydown={onInputKeydown} type="text" role="combobox" aria-expanded="true" aria-controls="palette-results" aria-activedescendant={results.length ? `palette-option-${active}` : undefined} aria-label="Find a device" class="input w-full border-0 border-b border-surface-300-700 rounded-none px-4 py-3" placeholder="Find a device by name, id, MAC or room…" autocomplete="off" spellcheck="false" />
+			<input bind:this={input} bind:value={query} onkeydown={onInputKeydown} type="text" role="combobox" aria-expanded="true" aria-controls="palette-results" aria-activedescendant={results.length ? `palette-option-${active}` : undefined} aria-label="Find a device" class="input w-full border-0 border-b border-surface-300-700 rounded-none px-4 py-3" placeholder="Find a device or node by name, id, MAC or room…" autocomplete="off" spellcheck="false" />
 			<ul id="palette-results" role="listbox" class="max-h-96 overflow-auto">
-				{#each results as r, i (r.id)}
+				{#each results as row, i (row.key)}
 					<li id="palette-option-{i}" role="option" aria-selected={i === active}>
 						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-						<div class="flex items-center justify-between gap-3 px-4 py-2 cursor-pointer {i === active ? 'bg-primary-500/20' : ''}" onclick={() => pick(r)} onmousemove={() => (active = i)}>
-							<div class="min-w-0">
-								<div class="truncate font-medium">{r.name || r.id}</div>
-								<div class="truncate text-sm text-surface-600-400">
-									{#if r.name}<span class="font-mono">{r.id}</span> ·
-									{/if}{detail(r)}
+						<div class="flex items-center justify-between gap-3 px-4 py-2 cursor-pointer {i === active ? 'bg-primary-500/20' : ''}" onclick={() => pick(row)} onmousemove={() => (active = i)}>
+							{#if row.kind === 'node'}
+								<div class="min-w-0">
+									<div class="truncate font-medium">{row.node.name || row.node.id}</div>
+									<div class="truncate text-sm text-surface-600-400">
+										{#if row.node.name}<span class="font-mono">{row.node.id}</span> ·
+										{/if}{row.node.online ? 'online' : 'offline'}
+									</div>
 								</div>
-							</div>
-							{#if !r.tracked}
-								<span class="shrink-0 rounded px-2 py-0.5 text-xs bg-surface-200-800 text-surface-700-300">untracked</span>
+								<span class="shrink-0 rounded px-2 py-0.5 text-xs bg-primary-500/20 text-primary-700-300">node</span>
+							{:else}
+								<div class="min-w-0">
+									<div class="truncate font-medium">{row.device.name || row.device.id}</div>
+									<div class="truncate text-sm text-surface-600-400">
+										{#if row.device.name}<span class="font-mono">{row.device.id}</span> ·
+										{/if}{detail(row.device)}
+									</div>
+								</div>
+								{#if !row.device.tracked}
+									<span class="shrink-0 rounded px-2 py-0.5 text-xs bg-surface-200-800 text-surface-700-300">untracked</span>
+								{/if}
 							{/if}
 						</div>
 					</li>
@@ -131,7 +163,7 @@
 			{#if failed}
 				<p class="px-4 py-3 text-sm text-error-500">Search failed — is the backend running?</p>
 			{:else if !loading && results.length === 0}
-				<p class="px-4 py-3 text-sm text-surface-600-400">{query.trim() ? 'No devices match.' : 'No devices seen yet.'}</p>
+				<p class="px-4 py-3 text-sm text-surface-600-400">{query.trim() ? 'Nothing matches.' : 'No devices seen yet.'}</p>
 			{/if}
 		</div>
 	</div>

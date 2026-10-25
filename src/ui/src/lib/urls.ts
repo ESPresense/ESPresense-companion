@@ -14,6 +14,11 @@ export function gotoDetail(d: Device | Node | null) {
 	else goto(resolve(`/devices/${d?.id ?? ''}`));
 }
 
+/** Navigate to a node's detail page when only its id is at hand. */
+export function gotoNodeById(id: string) {
+	goto(resolve(`/nodes/${id}`));
+}
+
 /**
  * Navigate to the 3D view for the given device.
  *
