@@ -452,14 +452,25 @@
 		} else {
 			planCenter.set(0, 0, 0); // Default center if no rooms
 		}
+		// Mirror the plan to match the 2D map: there flip_x puts x=0 on the right
+		// and flip_y (the default) puts y=0 at the bottom, as the camera already does.
+		const flip = getFlipScale();
+		contentGroup.scale.set(flip.x, flip.y, 1);
 		rotationPivot.position.copy(planCenter);
-		contentGroup.position.copy(planCenter).negate();
+		contentGroup.position.set(-flip.x * planCenter.x, -flip.y * planCenter.y, -planCenter.z);
+		nodeGroup?.children.forEach((child) => {
+			if (child instanceof THREE.Mesh) child.scale.set(flip.x, flip.y, 1);
+		});
 
 		// Update controls target after centering
 		if (controls) {
 			controls.target.copy(planCenter);
 			controls.update();
 		}
+	}
+
+	function getFlipScale() {
+		return { x: config?.map?.flipX ? -1 : 1, y: config?.map?.flipY === false ? -1 : 1 };
 	}
 
 	// --- Node Rendering ---
@@ -499,6 +510,9 @@
 				mesh = new THREE.Mesh(nodeLogoGeometry.clone(), material);
 				mesh.position.set(node.location.x, node.location.y, node.location.z);
 				mesh.name = 'node#' + node.id;
+				// Undo the plan mirroring so the logo isn't drawn mirror-image
+				const flip = getFlipScale();
+				mesh.scale.set(flip.x, flip.y, 1);
 				mesh.castShadow = true;
 				mesh.receiveShadow = true;
 				nodeGroup?.add(mesh); // Check if nodeGroup exists

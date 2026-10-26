@@ -7,6 +7,7 @@ type MockApiOptions = {
 	nodes?: any[];
 	firmwareTypes?: FirmwareManifest;
 	releases?: Release[];
+	map?: { flipX?: boolean; flipY?: boolean };
 };
 
 /**
@@ -77,7 +78,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		],
 		devices: [],
 		gps: null,
-		map: { flipX: false, flipY: false, wallThickness: 1, wallOpacity: 0.35, wallColor: '#64748b' }
+		map: { flipX: false, flipY: false, wallThickness: 1, wallOpacity: 0.35, wallColor: '#64748b', ...options.map }
 	};
 
 	const demoDevices = [
