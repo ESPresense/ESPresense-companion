@@ -72,9 +72,9 @@ pnpm check
 
 `launchSettings.json` sets `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES=Microsoft.AspNetCore.SpaProxy`.
 That hosting startup is what launches `pnpm start` and redirects `/` to the Vite dev server.
-`dotnet watch` replaces that variable with its own `Microsoft.AspNetCore.Watch.BrowserRefresh`, so
-SpaProxy never loads: Vite is never started and `http://localhost:5279/` 404s on everything except
-`/api`. Other launch-profile variables (`ASPNETCORE_URLS`, `ASPNETCORE_ENVIRONMENT`) come through
+Since SDK 9.0.203 (reproduced on 10.0.100), `dotnet watch` replaces that variable with its own
+`Microsoft.AspNetCore.Watch.BrowserRefresh`, so SpaProxy never loads: Vite is never started and
+`http://localhost:5279/` 404s on everything except `/api`. Other launch-profile variables (`ASPNETCORE_URLS`, `ASPNETCORE_ENVIRONMENT`) come through
 fine -- watch composes this one variable from a list it never seeds with the profile's value, so the
 composed value wins. See dotnet/sdk#48480.
 
