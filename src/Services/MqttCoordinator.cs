@@ -83,13 +83,25 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
               !string.Equals(_lastConfig.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase));
     }
 
-    private async Task<ConfigMqtt?> GetUserConfig()
+    /// <summary>
+    /// The user's mqtt section if it names a host; otherwise the Supervisor broker with the user's
+    /// client-side settings (client_id, read_only, discovery_topic) applied, so read_only still holds
+    /// on the add-on where the host is usually left empty.
+    /// </summary>
+    private async Task<ConfigMqtt?> GetEffectiveConfig()
     {
         var c = await _cfg.ConfigAsync();
+        var user = c.Mqtt ??= new ConfigMqtt();
+        if (!string.IsNullOrEmpty(user.Host)) return user;
 
-        c.Mqtt ??= new ConfigMqtt();
+        var supervisor = await _supervisorConfigLoader.GetSupervisorConfig();
+        if (supervisor == null) return null;
 
-        return string.IsNullOrEmpty(c.Mqtt.Host) ? null : c.Mqtt;
+        var config = supervisor.Clone(); // the loader caches its instance
+        config.ClientId = user.ClientId;
+        config.ReadOnly = user.ReadOnly;
+        config.DiscoveryTopic = user.DiscoveryTopic;
+        return config;
     }
 
     private async Task<IMqttClient> GetClient()
@@ -161,7 +173,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
 
     private async Task<IMqttClient> InitializeClientAsync()
     {
-        var config = await GetUserConfig() ?? await _supervisorConfigLoader.GetSupervisorConfig();
+        var config = await GetEffectiveConfig();
         if (config == null)
         {
             throw new InvalidOperationException("No MQTT server setup, fix your config.yaml");
