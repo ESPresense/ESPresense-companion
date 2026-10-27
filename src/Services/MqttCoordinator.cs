@@ -43,6 +43,10 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
     private Task<IMqttClient>? _initTask;
     private Task? _reconnectTask;
     private ConfigMqtt? _lastConfig;
+    // The user's own mqtt section as of the last connect. ConfigChanged compares against this rather
+    // than _lastConfig: on the add-on _lastConfig carries the Supervisor host, which the user's (empty)
+    // host would never match, so every config.yaml edit would otherwise force a reconnect.
+    private ConfigMqtt? _lastUserConfig;
     private volatile bool _reconnectRequired;
     private string _discoveryTopic = "homeassistant";
     private volatile TaskCompletionSource _connectionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -69,18 +73,19 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
 
     private bool ConfigChanged(ConfigMqtt? config)
     {
-        if (config == null) return _lastConfig != null;
-        return _lastConfig != null &&
-             (!string.Equals(_lastConfig.Host, config.Host, StringComparison.OrdinalIgnoreCase) ||
-              _lastConfig.Port != config.Port ||
-              !string.Equals(_lastConfig.Username, config.Username) ||
-              !string.Equals(_lastConfig.Password, config.Password) ||
-              _lastConfig.Ssl != config.Ssl ||
-              _lastConfig.Insecure != config.Insecure ||
-              !string.Equals(_lastConfig.CaCertPath, config.CaCertPath) ||
-              !string.Equals(_lastConfig.ClientId, config.ClientId) ||
-              _lastConfig.ReadOnly != config.ReadOnly ||
-              !string.Equals(_lastConfig.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase));
+        var last = _lastUserConfig;
+        if (last == null) return false;
+        config ??= new ConfigMqtt();
+        return !string.Equals(last.Host, config.Host, StringComparison.OrdinalIgnoreCase) ||
+               last.Port != config.Port ||
+               !string.Equals(last.Username, config.Username) ||
+               !string.Equals(last.Password, config.Password) ||
+               last.Ssl != config.Ssl ||
+               last.Insecure != config.Insecure ||
+               !string.Equals(last.CaCertPath, config.CaCertPath) ||
+               !string.Equals(last.ClientId, config.ClientId) ||
+               last.ReadOnly != config.ReadOnly ||
+               !string.Equals(last.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -88,20 +93,20 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
     /// client-side settings (client_id, read_only, discovery_topic) applied, so read_only still holds
     /// on the add-on where the host is usually left empty.
     /// </summary>
-    private async Task<ConfigMqtt?> GetEffectiveConfig()
+    private async Task<(ConfigMqtt? Effective, ConfigMqtt User)> GetEffectiveConfig()
     {
         var c = await _cfg.ConfigAsync();
         var user = c.Mqtt ??= new ConfigMqtt();
-        if (!string.IsNullOrEmpty(user.Host)) return user;
+        if (!string.IsNullOrEmpty(user.Host)) return (user, user);
 
         var supervisor = await _supervisorConfigLoader.GetSupervisorConfig();
-        if (supervisor == null) return null;
+        if (supervisor == null) return (null, user);
 
         var config = supervisor.Clone(); // the loader caches its instance
         config.ClientId = user.ClientId;
         config.ReadOnly = user.ReadOnly;
         config.DiscoveryTopic = user.DiscoveryTopic;
-        return config;
+        return (config, user);
     }
 
     private async Task<IMqttClient> GetClient()
@@ -173,7 +178,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
 
     private async Task<IMqttClient> InitializeClientAsync()
     {
-        var config = await GetEffectiveConfig();
+        var (config, userConfig) = await GetEffectiveConfig();
         if (config == null)
         {
             throw new InvalidOperationException("No MQTT server setup, fix your config.yaml");
@@ -331,6 +336,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         // does not start a reconnect loop on a client that is about to be disposed above.
         _mqttClient = mqttClient;
         _lastConfig = config.Clone();
+        _lastUserConfig = userConfig.Clone();
         _discoveryTopic = config.DiscoveryTopic;
         _reconnectRequired = false;
 
