@@ -5,10 +5,11 @@
 
 	import { devices, nodes, relative } from '$lib/stores';
 
-	import type { Node, Floor, LayerCakeContext } from '$lib/types';
+	import { getLayerCakeContext } from 'layercake';
+	import type { Node, Floor, MapScales } from '$lib/types';
 	import type { ScaleOrdinal } from 'd3';
 
-	const { xScale, yScale } = getContext<LayerCakeContext>('LayerCake');
+	const chart = getLayerCakeContext<MapScales>();
 	const colors = getContext<ScaleOrdinal<string, string>>('colors');
 
 	const r = tweened(0, { duration: 100, easing: cubicOut });
@@ -76,7 +77,7 @@
 </defs>
 
 <path
-	d="M{$xScale(n.location.x)},{$yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
+	d="M{chart.xScale(n.location.x)},{chart.yScale(n.location.y)} m -5,0 5,-5 5,5 -5,5 z"
 	fill={colors(n.id)}
 	role="figure"
 	aria-label={`Select node ${n.name}`}
@@ -96,17 +97,17 @@
 		unselect();
 	}}
 />
-<text x={$xScale(n.location.x) + 7} y={$yScale(n.location.y) + 3.5} fill="white" font-size="10px">{n.name}</text>
+<text x={chart.xScale(n.location.x) + 7} y={chart.yScale(n.location.y) + 3.5} fill="white" font-size="10px">{n.name}</text>
 {#if radarDist && $r > 0}
-	<text x={$xScale(n.location.x)} y={$yScale(n.location.y) + 15} fill="white" font-size="10px">
+	<text x={chart.xScale(n.location.x)} y={chart.yScale(n.location.y) + 15} fill="white" font-size="10px">
 		{#if radarVar !== null && radarVar !== undefined}
 			{radarDist.toFixed(2) ?? 'n/a'} ± {Math.sqrt(radarVar).toFixed(2)}
 		{:else}
 			{radarDist.toFixed(2) ?? 'n/a'}
 		{/if}
 	</text>
-	<ellipse style="pointer-events: none" cx={$xScale(n.location.x)} cy={$yScale(n.location.y)} fill="none" stroke={colors(n.id)} rx={Math.abs($xScale(0) - $xScale($r))} ry={Math.abs($yScale(0) - $yScale($r))} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
-	<ellipse style="pointer-events: none" cx={$xScale(n.location.x)} cy={$yScale(n.location.y)} fill={`url(#variance-gradient-${n.id})`} rx={2 * Math.abs($xScale(0) - $xScale($r + $v))} ry={2 * Math.abs($yScale(0) - $yScale($r + $v))} fill-opacity="0.5" />
-	<line x1={$xScale(n.location.x - hr)} y1={$yScale(n.location.y)} x2={$xScale(n.location.x + hr)} y2={$yScale(n.location.y)} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
-	<line x1={$xScale(n.location.x)} y1={$yScale(n.location.y - hr)} x2={$xScale(n.location.x)} y2={$yScale(n.location.y + hr)} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
+	<ellipse style="pointer-events: none" cx={chart.xScale(n.location.x)} cy={chart.yScale(n.location.y)} fill="none" stroke={colors(n.id)} rx={Math.abs(chart.xScale(0) - chart.xScale($r))} ry={Math.abs(chart.yScale(0) - chart.yScale($r))} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
+	<ellipse style="pointer-events: none" cx={chart.xScale(n.location.x)} cy={chart.yScale(n.location.y)} fill={`url(#variance-gradient-${n.id})`} rx={2 * Math.abs(chart.xScale(0) - chart.xScale($r + $v))} ry={2 * Math.abs(chart.yScale(0) - chart.yScale($r + $v))} fill-opacity="0.5" />
+	<line x1={chart.xScale(n.location.x - hr)} y1={chart.yScale(n.location.y)} x2={chart.xScale(n.location.x + hr)} y2={chart.yScale(n.location.y)} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
+	<line x1={chart.xScale(n.location.x)} y1={chart.yScale(n.location.y - hr)} x2={chart.xScale(n.location.x)} y2={chart.yScale(n.location.y + hr)} stroke={colors(n.id)} stroke-width="2" stroke-opacity={0.25 + 0.75 * hit} />
 {/if}

@@ -136,6 +136,9 @@ public class Device
         {
             _kalmanLocation.Reset(anchor.Location);
             BestScenario = null;
+            // Forget what was published so the locator republishes state and the Anchored attributes,
+            // even when the anchor's room and position match the last located report.
+            ReportedState = null;
         }
         else
         {

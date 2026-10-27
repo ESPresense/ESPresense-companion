@@ -41,15 +41,17 @@ public class MultiScenarioLocator(DeviceTracker dl,
             var (lat, lon) = gps?.Report == true ? gps.Add(anchorLocation.X, anchorLocation.Y) : (null, null);
             var elevation = gps?.Report == true ? anchorLocation.Z + gps?.Elevation : null;
 
-            var stateChanged = device.ReportedState != "not_home";
+            // The anchor fixes where the device is, not whether it is here: once no node hears it, it's away.
+            var present = device.Nodes.Values.Any(dn => dn.Current);
+            var anchorState = present ? device.Room?.Name ?? device.Floor?.Name ?? "not_home" : "not_home";
+            var stateChanged = device.ReportedState != anchorState;
             if (stateChanged)
             {
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", retain: true))
-                    device.ReportedState = "not_home";
+                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", anchorState, retain: true))
+                    device.ReportedState = anchorState;
             }
 
             var locationChanged = device.ReportedLocation != anchorLocation;
-            device.ReportedLocation = anchorLocation;
             device.BestScenario = null;
 
             // Force publication when device transitions to anchored state or location changes
@@ -71,7 +73,15 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 }, SerializerSettings.NullIgnore);
 
                 if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
+                {
+                    device.ReportedLocation = anchorLocation;
                     globalEventDispatcher.OnDeviceChanged(device, false);
+                }
+                else
+                {
+                    // Forget the state too, so the next pass retries even when the location already matches
+                    device.ReportedState = null;
+                }
             }
 
             return;
