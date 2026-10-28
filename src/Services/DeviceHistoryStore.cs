@@ -40,7 +40,7 @@ public class DeviceHistoryStore
         lock (_openLock)
         {
             if (_storageDir == null) return _sqliteConnection!;
-            var path = Path.GetFullPath(Path.Combine(_storageDir, c.History.Path));
+            var path = Path.GetFullPath(Path.Combine(_storageDir, string.IsNullOrWhiteSpace(c.History.Path) ? "history.db" : c.History.Path));
             if (_sqliteConnection == null)
             {
                 SQLitePCL.Batteries.Init();

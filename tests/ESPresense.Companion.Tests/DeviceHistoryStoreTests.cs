@@ -75,4 +75,18 @@ history:
         Assert.That(File.Exists(Path.Combine(storageDir, "sub", "devices.db")), Is.True);
         Assert.That(await store.List("dev-1"), Has.Count.EqualTo(1));
     }
+
+    [Test]
+    public async Task HistoryPath_BlankFallsBackToDefault()
+    {
+        var workDir = Path.Combine(Path.GetTempPath(), "espresense-history-" + Guid.NewGuid().ToString("N"));
+        var storageDir = Path.Combine(workDir, ".storage");
+        var cfg = await LoadConfig(historyEnabled: true, path: "", workDir: workDir);
+        var store = new DeviceHistoryStore(storageDir, cfg);
+
+        await store.Add(new DeviceHistory { Id = "dev-1", When = DateTime.UtcNow, Best = true });
+
+        Assert.That(File.Exists(Path.Combine(storageDir, "history.db")), Is.True);
+        Assert.That(await store.List("dev-1"), Has.Count.EqualTo(1));
+    }
 }
