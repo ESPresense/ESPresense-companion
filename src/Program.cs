@@ -4,7 +4,6 @@ using ESPresense.Services;
 using MQTTnet.Diagnostics.Logger;
 using Serilog;
 using Serilog.Events;
-using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
 using ESPresense.Controllers;
@@ -38,20 +37,6 @@ builder.Services.AddHostedService(a => configLoader);
 builder.Services.AddDataProtection()
     .UseEphemeralDataProtectionProvider();
 
-builder.Services.AddSingleton(a =>
-{
-    SQLitePCL.Batteries.Init();
-    var databasePath = Path.Combine(storageDir, "history.db");
-    Directory.CreateDirectory(Path.GetDirectoryName(databasePath) ?? throw new InvalidOperationException("HOME not found"));
-    var sqLiteConnection = new SQLiteAsyncConnection(databasePath)
-    {
-        Trace = true,
-        Tracer = Log.Debug
-    };
-
-    return sqLiteConnection;
-});
-
 builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttCoordinator>();
@@ -60,7 +45,7 @@ builder.Services.AddSingleton<TelemetryService>();
 builder.Services.AddSingleton<GlobalEventDispatcher>();
 builder.Services.AddSingleton<DeviceTracker>();
 builder.Services.AddSingleton<SupervisorConfigLoader>();
-builder.Services.AddSingleton<DeviceHistoryStore>();
+builder.Services.AddSingleton(a => new DeviceHistoryStore(storageDir, a.GetRequiredService<ConfigLoader>()));
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();

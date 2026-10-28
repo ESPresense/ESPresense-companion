@@ -13,7 +13,6 @@ namespace ESPresense.Models
             return new Config
             {
                 Mqtt = Mqtt?.Clone(),
-                Bounds = Bounds?.Select(b => b.ToArray()).ToArray(),
                 Timeout = Timeout,
                 AwayTimeout = AwayTimeout,
                 Gps = Gps.Clone(),
@@ -165,7 +164,7 @@ namespace ESPresense.Models
             return new ConfigHistory
             {
                 Enabled = Enabled,
-                Database = Database,
+                Path = Path,
                 ExpireAfter = ExpireAfter
             };
         }
@@ -267,7 +266,6 @@ namespace ESPresense.Models
                 Id = Id,
                 Point = Point?.ToArray(),
                 Floors = Floors?.ToArray(),
-                Enabled = Enabled,
                 Stationary = Stationary
             };
         }

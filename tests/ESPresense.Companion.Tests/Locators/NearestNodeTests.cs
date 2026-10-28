@@ -180,4 +180,19 @@ public class NearestNodeTests
         Assert.That(scenario.Floor, Is.EqualTo(floor));
         Assert.That(scenario.Room, Is.EqualTo(floor.Rooms.Values.First()));
     }
+
+    [TestCase(9.0, true)]
+    [TestCase(11.0, false)]
+    public async Task Locate_IgnoresNodesBeyondMaxDistance(double distance, bool expected)
+    {
+        (await _configLoader.ConfigAsync()).Locators.NearestNode.MaxDistance = 10;
+        var floor = CreateTestFloor("main", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 1.0 });
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1.0, 1.0, 0.0), floor);
+        var device = CreateDeviceWithNode(node, distance);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.EqualTo(expected));
+    }
 }
