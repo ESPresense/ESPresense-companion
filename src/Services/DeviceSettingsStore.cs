@@ -18,6 +18,27 @@ namespace ESPresense.Services
             return dsId ?? dsAlias;
         }
 
+        /// <summary>
+        /// Raised with the device ids a settings change made dead: the alias a device used to have, and the raw
+        /// settings key once it has an alias (nodes report the alias from then on).
+        /// </summary>
+        public event Func<IReadOnlyList<string>, Task>? DeviceIdsRetiredAsync;
+
+        /// <summary>
+        /// True when <paramref name="id"/> is a settings key that now has a different alias, and no other settings
+        /// entry uses it as its alias. Nodes no longer report a device under such an id.
+        /// </summary>
+        public virtual bool IsRetired(string id)
+        {
+            return _storeById.TryGetValue(id, out var ds) && ds.Id != null && ds.Id != id && !_storeByAlias.ContainsKey(id);
+        }
+
+        private bool IsClaimed(string id)
+        {
+            if (_storeByAlias.ContainsKey(id)) return true;
+            return _storeById.TryGetValue(id, out var ds) && (ds.Id == null || ds.Id == id);
+        }
+
         public virtual async Task Set(string id, DeviceSettings ds)
         {
             var existing = Get(id);
@@ -41,12 +62,21 @@ namespace ESPresense.Services
                 // still points at the previous settings object, so an alias taken over by another device is
                 // left alone). Otherwise Get(oldAlias) keeps resolving here and Set(oldAlias) keeps throwing
                 // "Cannot write to alias".
-                if (_storeById.TryGetValue(arg.DeviceId, out var previous) && previous.Id != null && previous.Id != arg.Payload.Id)
-                    _storeByAlias.TryRemove(new KeyValuePair<string, DeviceSettings>(previous.Id, previous));
+                _storeById.TryGetValue(arg.DeviceId, out var previous);
+                var droppedAlias = previous?.Id != null && previous.Id != arg.Payload.Id
+                    && _storeByAlias.TryRemove(new KeyValuePair<string, DeviceSettings>(previous.Id, previous));
 
                 _storeById.AddOrUpdate(arg.DeviceId, _ => arg.Payload, (_, _) => arg.Payload);
                 if (arg.Payload.Id != null) _storeByAlias.AddOrUpdate(arg.Payload.Id, _ => arg.Payload, (_, _) => arg.Payload);
                 ApplyToDevice(arg.DeviceId, arg.Payload);
+
+                // Nodes now report this device under its new id, so the old alias and the raw key are dead and
+                // their Home Assistant entities would linger forever.
+                if (previous?.Id == arg.Payload.Id) return;
+                var retired = new List<string>();
+                if (droppedAlias && !IsClaimed(previous!.Id!)) retired.Add(previous.Id!);
+                if (IsRetired(arg.DeviceId)) retired.Add(arg.DeviceId);
+                if (retired.Count > 0 && DeviceIdsRetiredAsync != null) await DeviceIdsRetiredAsync(retired);
             };
 
             await Task.Delay(-1, stoppingToken);
