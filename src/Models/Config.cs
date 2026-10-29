@@ -140,7 +140,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }
 
-        // Don't fall back to a node whose distance to the device is above this (metres).
+        // Don't fall back to a node whose distance to the device is above this (metres). Unset or <= 0: no limit.
         [YamlMember(Alias = "max_distance")]
         public double? MaxDistance { get; set; }
     }

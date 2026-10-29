@@ -108,7 +108,7 @@ locators:
 
   nearest_node:
     enabled: true
-    max_distance: 10 # Don't fall back to a node more than 10 m from the device
+    max_distance: 10 # Don't fall back to a node more than 10 m from the device (leave out or 0 for no limit)
 
 filtering:
   # Kalman Filter Parameters
