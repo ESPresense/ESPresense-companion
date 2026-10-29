@@ -30,21 +30,25 @@ public class DeviceCleanupService(State state, DeviceService deviceService, ILog
         try
         {
             var retention = state.Config?.DeviceRetentionTimeSpan ?? TimeSpan.FromDays(30);
-            var cutoff = DateTime.UtcNow - retention;
+            var now = DateTime.UtcNow;
+            var cutoff = now - retention;
+
+            // Devices restored from discovery without a retained last_seen would never expire; start their clock now.
+            var stamped = await deviceService.StampUnseenDevicesAsync(now);
 
             var inactiveDevices = deviceService.GetInactiveDevices(cutoff).ToList();
             var total = deviceService.GetAllDevices().Count();
 
             if (inactiveDevices.Count == 0)
             {
-                logger.LogInformation("DeviceCleanup: evaluated {Total} devices; 0 removals. Cutoff={Cutoff:o}", total, cutoff);
+                logger.LogInformation("DeviceCleanup: evaluated {Total} devices; stamped {Stamped} with no last seen; 0 removals. Cutoff={Cutoff:o}", total, stamped, cutoff);
                 return;
             }
 
             var deviceIds = inactiveDevices.Select(d => d.Id).ToList();
             var removedCount = await deviceService.DeleteBulkAsync(deviceIds, "auto-cleanup");
 
-            logger.LogInformation("DeviceCleanup: evaluated {Total} devices; removed {Removed}. Cutoff={Cutoff:o}", total, removedCount, cutoff);
+            logger.LogInformation("DeviceCleanup: evaluated {Total} devices; stamped {Stamped} with no last seen; removed {Removed}. Cutoff={Cutoff:o}", total, stamped, removedCount, cutoff);
         }
         catch (Exception ex)
         {
