@@ -67,8 +67,11 @@ public class DeviceHistoryStore
     {
         try
         {
-            _enabled = c.History.Enabled;
-            if (!_enabled) return;
+            if (!c.History.Enabled)
+            {
+                _enabled = false;
+                return;
+            }
             var db = Connection(c);
             await db.CreateTableAsync<DeviceHistory>();
             await db.CreateIndexAsync("IX_DeviceHistory_When", "DeviceHistory", "When");
@@ -78,6 +81,9 @@ public class DeviceHistoryStore
    BEGIN
      DELETE FROM DeviceHistory WHERE `When` <= (NEW.`When`-{c.History.ExpireAfterTimeSpan.Ticks});
    END;");
+            // Only after the schema exists: on a hot-reload enable, Ready() can still be
+            // awaiting the previous (completed) task while this one runs.
+            _enabled = true;
         }
         catch (Exception ex)
         {
