@@ -108,7 +108,7 @@ locators:
 
   nearest_node:
     enabled: true
-    max_distance: 10
+    max_distance: 10 # Don't fall back to a node more than 10 m from the device
 
 filtering:
   # Kalman Filter Parameters
@@ -123,6 +123,7 @@ filtering:
 history:
   enabled: false # Enable to log history to db (Beta)
   expire_after: 24h # Expire after 24 hours
+  # path: history.db # SQLite file, relative to .storage in the config folder (restart to apply)
 
 # Floors w/ the points to draw it in meters
 floors:

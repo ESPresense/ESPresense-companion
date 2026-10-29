@@ -41,9 +41,6 @@ namespace ESPresense.Models
         [YamlMember(Alias = "history")]
         public ConfigHistory History { get; set; } = new();
 
-        [YamlMember(Alias = "bounds")]
-        public double[][] Bounds { get; set; } = [];
-
         [YamlMember(Alias = "floors")]
         public ConfigFloor[] Floors { get; set; } = Array.Empty<ConfigFloor>();
 
@@ -143,6 +140,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }
 
+        // Don't fall back to a node whose distance to the device is above this (metres).
         [YamlMember(Alias = "max_distance")]
         public double? MaxDistance { get; set; }
     }
@@ -190,8 +188,9 @@ namespace ESPresense.Models
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
 
-        [YamlMember(Alias = "db")]
-        public string Database { get; set; } = "sqlite:///espresense.db";
+        // SQLite file; relative paths are under <config dir>/.storage. Read once at startup.
+        [YamlMember(Alias = "path")]
+        public string Path { get; set; } = "history.db";
 
         [YamlMember(Alias = "expire_after")] public string ExpireAfter { get; set; } = "24h";
 
@@ -326,9 +325,6 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "floors")]
         public string[]? Floors { get; set; }
-
-        [YamlMember(Alias = "enabled")]
-        public bool Enabled { get; set; } = true;
 
         [YamlMember(Alias = "stationary")]
         public bool Stationary { get; set; } = true;

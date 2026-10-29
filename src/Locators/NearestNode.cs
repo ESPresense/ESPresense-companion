@@ -21,8 +21,10 @@ internal class NearestNode : ILocate
     public bool Locate(Scenario scenario)
     {
         var device = _device;
-        var nodes = device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
-        var nearest = nodes.FirstOrDefault();
+        var maxDistance = _state.Config?.Locators?.NearestNode?.MaxDistance;
+        var nearest = device.Nodes.Values
+            .Where(a => a.Current && (maxDistance == null || a.Distance <= maxDistance))
+            .MinBy(a => a.Distance);
         if (nearest == null) return false;
 
         var node = nearest.Node!;
