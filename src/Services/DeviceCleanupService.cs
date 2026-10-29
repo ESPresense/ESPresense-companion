@@ -9,10 +9,15 @@ namespace ESPresense.Services;
 /// </summary>
 public class DeviceCleanupService(State state, DeviceService deviceService, DeviceSettingsStore deviceSettingsStore, ILogger<DeviceCleanupService> logger) : BackgroundService
 {
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        // Here rather than in ExecuteAsync, which may start after StartAsync returns and miss an alias change.
+        deviceSettingsStore.DeviceIdsRetiredAsync += RemoveRetired;
+        return base.StartAsync(cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        deviceSettingsStore.DeviceIdsRetiredAsync += RemoveRetired;
-
         var retention = state.Config?.DeviceRetentionTimeSpan ?? TimeSpan.FromDays(30);
         logger.LogInformation("DeviceCleanup: starting. Retention={Retention}", retention);
 

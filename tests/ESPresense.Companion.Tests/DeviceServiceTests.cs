@@ -53,6 +53,8 @@ public class DeviceServiceTests
         state.Devices[restored.Id] = restored;
         state.Devices[seen.Id] = seen;
 
+        mqttMock.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
+
         var stamped = await service.StampUnseenDevicesAsync(now);
 
         Assert.That(stamped, Is.EqualTo(1));
@@ -66,7 +68,8 @@ public class DeviceServiceTests
     [Test]
     public async Task StampedDevice_ExpiresOneRetentionPeriodLater()
     {
-        var (service, state, _) = CreateService();
+        var (service, state, mqttMock) = CreateService();
+        mqttMock.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
         var now = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
         var retention = TimeSpan.FromDays(30);
         var restored = new Device("tile:dead", "espresense_tile_dead", TimeSpan.FromSeconds(30));
@@ -78,5 +81,19 @@ public class DeviceServiceTests
 
         Assert.That(service.GetInactiveDevices(now.AddDays(1) - retention), Is.Empty);
         Assert.That(service.GetInactiveDevices(now.AddDays(31) - retention), Has.Member(restored));
+    }
+
+    [Test]
+    public async Task StampUnseenDevicesAsync_LeavesDeviceUnstampedWhenPublishFails()
+    {
+        var (service, state, mqttMock) = CreateService();
+        mqttMock.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(false);
+        var restored = new Device("iBeacon:dead", "espresense_ibeacon_dead", TimeSpan.FromSeconds(30));
+        state.Devices[restored.Id] = restored;
+
+        var stamped = await service.StampUnseenDevicesAsync(DateTime.UtcNow);
+
+        Assert.That(stamped, Is.EqualTo(0));
+        Assert.That(restored.LastSeen, Is.Null, "left for the next pass to retry");
     }
 }

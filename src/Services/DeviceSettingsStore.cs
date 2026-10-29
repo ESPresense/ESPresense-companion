@@ -74,7 +74,14 @@ namespace ESPresense.Services
                 // their Home Assistant entities would linger forever.
                 if (previous?.Id == arg.Payload.Id) return;
                 var retired = new List<string>();
-                if (droppedAlias && !IsClaimed(previous!.Id!)) retired.Add(previous.Id!);
+                if (droppedAlias)
+                {
+                    // Another key may still use the alias even though this one wrote the map last; point the alias
+                    // back at it instead of retiring it.
+                    var other = _storeById.Values.FirstOrDefault(ds => ds.Id == previous!.Id);
+                    if (other != null) _storeByAlias.TryAdd(previous!.Id!, other);
+                    else if (!IsClaimed(previous!.Id!)) retired.Add(previous.Id!);
+                }
                 if (IsRetired(arg.DeviceId)) retired.Add(arg.DeviceId);
                 if (retired.Count > 0 && DeviceIdsRetiredAsync != null) await DeviceIdsRetiredAsync(retired);
             };

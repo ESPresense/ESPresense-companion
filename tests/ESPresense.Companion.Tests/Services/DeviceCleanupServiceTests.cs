@@ -38,7 +38,7 @@ public class DeviceCleanupServiceTests
 
         await _store.StartAsync(CancellationToken.None);
         _receive = await subscribed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await _cleanup.StartAsync(CancellationToken.None); // subscribes before its first delay
+        await _cleanup.StartAsync(CancellationToken.None); // subscribes to alias retirements before returning
     }
 
     [TearDown]

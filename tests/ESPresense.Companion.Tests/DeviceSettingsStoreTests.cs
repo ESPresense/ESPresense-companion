@@ -421,6 +421,22 @@ public class DeviceSettingsStoreTests
     }
 
     [Test]
+    public async Task AliasChange_By_Last_Writer_Should_Keep_Alias_Still_Used_By_Another_Key()
+    {
+        var retired = new List<string>();
+        _deviceSettingsStore.DeviceIdsRetiredAsync += ids => { retired.AddRange(ids); return Task.CompletedTask; };
+
+        await ReceiveDeviceConfigAsync("keys:one", new DeviceSettings { Id = "keys:shared", OriginalId = "keys:one" });
+        await ReceiveDeviceConfigAsync("keys:two", new DeviceSettings { Id = "keys:shared", OriginalId = "keys:two" });
+        retired.Clear();
+        // The key that wrote the alias map last moves away; keys:one still uses the alias
+        await ReceiveDeviceConfigAsync("keys:two", new DeviceSettings { Id = "keys:two-new", OriginalId = "keys:two" });
+
+        Assert.That(retired, Is.EquivalentTo(new[] { "keys:two" }));
+        Assert.That(_deviceSettingsStore.Get("keys:shared")?.OriginalId, Is.EqualTo("keys:one"));
+    }
+
+    [Test]
     public async Task Settings_Whose_Id_Equals_Key_Are_Not_Retired()
     {
         var retired = new List<string>();
