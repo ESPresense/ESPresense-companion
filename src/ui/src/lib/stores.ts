@@ -204,12 +204,13 @@ function createCalibrationStore() {
 
 			const controller = new AbortController();
 			request = controller;
+			// Timeout so a stalled request can't wedge `request` and stop all later polls.
+			const timeout = setTimeout(() => controller.abort(), 10000);
 
 			try {
-				// Timeout so a stalled request can't wedge `request` and stop all later polls.
 				const data = await apiFetch<CalibrationResponse>('/api/state/calibration', {
 					cache: 'no-store',
-					signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])
+					signal: controller.signal
 				});
 				if (!stopped) set(data);
 			} catch (error) {
@@ -217,6 +218,7 @@ function createCalibrationStore() {
 					console.error('Error fetching calibration:', error);
 				}
 			} finally {
+				clearTimeout(timeout);
 				if (request === controller) request = undefined;
 			}
 		}
