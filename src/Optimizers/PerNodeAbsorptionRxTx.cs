@@ -157,20 +157,27 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         {
             var solver = new BfgsBMinimizer(1e-8, 1e-8, 1e-8, 10000);
             var result = solver.FindMinimum(ObjectiveFunction.Gradient(Objective, Gradient), lower, upper, initial);
-            var x = result.MinimizingPoint;
+            var x = result.MinimizingPoint.Clone();
+            for (int i = 0; i < totalParams; i++) x[i] = Math.Clamp(x[i], lower[i], upper[i]);
+
+            // Each node's own dB residuals at the fitted values, rather than the global objective, which
+            // is the same for every node and includes the priors.
+            var rms = new NodeResidualRms();
+            for (int i = 0; i < measures.Count; i++)
+                rms.Add(measures[i].m, Residual(x, i), weights[i]);
 
             foreach (var id in rxIds)
             {
                 var n = or.Nodes.GetOrAdd(id);
-                n.RxAdjRssi = Math.Clamp(x[rxIndex[id]], optimization.RxAdjRssiMin, optimization.RxAdjRssiMax);
-                n.Absorption = Math.Clamp(x[rxIndex[id] + 1], optimization.AbsorptionMin, optimization.AbsorptionMax);
-                n.Error = result.FunctionInfoAtMinimum.Value;
+                n.RxAdjRssi = x[rxIndex[id]];
+                n.Absorption = x[rxIndex[id] + 1];
+                n.Error = rms.Get(id);
             }
             foreach (var id in txIds)
             {
                 var n = or.Nodes.GetOrAdd(id);
-                n.TxRefRssi = Math.Clamp(x[txIndex[id]], optimization.TxRefRssiMin, optimization.TxRefRssiMax);
-                n.Error = result.FunctionInfoAtMinimum.Value;
+                n.TxRefRssi = x[txIndex[id]];
+                n.Error = rms.Get(id);
             }
         }
         catch (Exception ex)

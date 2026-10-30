@@ -4,6 +4,7 @@ using ESPresense.Utils;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace ESPresense.Optimizers;
@@ -404,7 +405,46 @@ internal class OptimizationRunner : BackgroundService
             if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
             if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
             if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
+
+            var atLimit = LimitsReached(
+                result.Absorption != null ? nodeSettings.Calibration.Absorption : null,
+                result.RxAdjRssi != null ? nodeSettings.Calibration.RxAdjRssi : null,
+                result.TxRefRssi != null ? nodeSettings.Calibration.TxRefRssi : null,
+                optimization);
+            if (atLimit.Count > 0)
+                Log.Warning("Applied {0,-20}: at the configured limit: {1}. The fit wanted to go further, so these are the limits rather than fitted values; check the node's placement or the optimization limits",
+                    id, string.Join(", ", atLimit));
+
             await _nsd.Set(id, nodeSettings);
         }
+    }
+
+    /// <summary>
+    /// Which of the values being applied sit on a configured optimization limit. Checked on what is
+    /// actually applied, not the raw fit: rxAdj and txRef are stored as whole dB and absorption is
+    /// published to two decimals, so a fit of 29.6 against a limit of 30 lands on the limit.
+    /// A limit pair with min == max pins the value on purpose and is not reported.
+    /// </summary>
+    internal static List<string> LimitsReached(double? absorption, int? rxAdjRssi, int? txRefRssi, ConfigOptimization optimization)
+    {
+        var reached = new List<string>();
+
+        // Limits are compared in the same rounding as the value, so a limit that is not a whole dB
+        // (or not two decimals of absorption) still counts as reached by the nearest value that can be applied.
+        void Check(string name, double? value, double min, double max, string format)
+        {
+            if (value == null || max <= min) return;
+            var shown = value.Value.ToString(format, CultureInfo.InvariantCulture);
+            if (value <= min) reached.Add($"{name}={shown} ({name}_min)");
+            else if (value >= max) reached.Add($"{name}={shown} ({name}_max)");
+        }
+
+        static double Published(double v) => Math.Round(v, 2, MidpointRounding.AwayFromZero);
+
+        Check("absorption", absorption.HasValue ? Published(absorption.Value) : null,
+            Published(optimization.AbsorptionMin), Published(optimization.AbsorptionMax), "0.00");
+        Check("rx_adj_rssi", rxAdjRssi, Math.Round(optimization.RxAdjRssiMin), Math.Round(optimization.RxAdjRssiMax), "0");
+        Check("tx_ref_rssi", txRefRssi, Math.Round(optimization.TxRefRssiMin), Math.Round(optimization.TxRefRssiMax), "0");
+        return reached;
     }
 }

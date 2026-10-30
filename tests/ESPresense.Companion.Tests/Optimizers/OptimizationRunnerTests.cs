@@ -168,14 +168,70 @@ public class OptimizationRunnerTests
         Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
     }
 
-    private sealed class UnroundedAbsorptionOptimizer : IOptimizer
+    private static ConfigOptimization Limits(params (string Key, double Value)[] limits) =>
+        new() { Limits = limits.ToDictionary(l => l.Key, l => l.Value) };
+
+    [Test]
+    public void LimitsReached_ValueThatRoundsOntoTheLimit_IsReported()
     {
-        public string Name => "Unrounded";
+        // The runner stores rxAdj 29.6 as 30, so against a limit of 30 it is applied at the limit.
+        var reached = OptimizationRunner.LimitsReached(null, (int)Math.Round(29.6), null, Limits(("rx_adj_rssi_max", 30)));
+
+        Assert.That(reached, Is.EqualTo(new[] { "rx_adj_rssi=30 (rx_adj_rssi_max)" }));
+    }
+
+    [Test]
+    public void LimitsReached_AbsorptionPublishedOntoTheLimit_IsReported()
+    {
+        // Absorption goes out to two decimals: 3.996 is published as 4.00.
+        Assert.That(OptimizationRunner.LimitsReached(3.996, null, null, Limits(("absorption_max", 4))),
+            Is.EqualTo(new[] { "absorption=4.00 (absorption_max)" }));
+        Assert.That(OptimizationRunner.LimitsReached(3.99, null, null, Limits(("absorption_max", 4))), Is.Empty);
+    }
+
+    [Test]
+    public void LimitsReached_EachLimitAndEdge_IsNamed()
+    {
+        var reached = OptimizationRunner.LimitsReached(2.0, 30, -70, new ConfigOptimization());
+
+        Assert.That(reached, Is.EqualTo(new[]
+        {
+            "absorption=2.00 (absorption_min)",
+            "rx_adj_rssi=30 (rx_adj_rssi_max)",
+            "tx_ref_rssi=-70 (tx_ref_rssi_min)"
+        }));
+    }
+
+    [Test]
+    public void LimitsReached_InsideLimits_OrNotApplied_IsNotReported()
+    {
+        Assert.That(OptimizationRunner.LimitsReached(3.0, 29, -69, new ConfigOptimization()), Is.Empty);
+        Assert.That(OptimizationRunner.LimitsReached(null, null, null, new ConfigOptimization()), Is.Empty);
+    }
+
+    [Test]
+    public void LimitsReached_LimitPinnedOnPurpose_IsNotReported()
+    {
+        // min == max is how a value is held fixed; it sits on the limit by design every cycle.
+        var reached = OptimizationRunner.LimitsReached(3.0, null, null, Limits(("absorption_min", 3), ("absorption_max", 3)));
+
+        Assert.That(reached, Is.Empty);
+    }
+
+    private sealed class CapturingSink : Serilog.Core.ILogEventSink
+    {
+        public List<Serilog.Events.LogEvent> Events { get; } = new();
+        public void Emit(Serilog.Events.LogEvent logEvent) => Events.Add(logEvent);
+    }
+
+    private sealed class AbsorptionOptimizer(double absorption) : IOptimizer
+    {
+        public string Name => "Absorption";
 
         public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
         {
             var results = new OptimizationResults();
-            results.Nodes["rx"] = new ProposedValues { Absorption = 2.9996 };
+            results.Nodes["rx"] = new ProposedValues { Absorption = absorption };
             return results;
         }
     }
@@ -194,7 +250,7 @@ public class OptimizationRunnerTests
     [Test]
     public async Task RunCycle_ScoresAProposalAtTheValueThatWillBeApplied()
     {
-        await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5 }, new UnroundedAbsorptionOptimizer());
+        await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5 }, new AbsorptionOptimizer(2.9996));
 
         Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
     }
@@ -259,5 +315,31 @@ public class OptimizationRunnerTests
         // 31 snapshots of 5 measurements, 20% (7 snapshots) held out
         Assert.That(_state.OptimizerState.TrainingSamples, Is.EqualTo(24 * 5));
         Assert.That(_state.OptimizerState.ValidationSamples, Is.EqualTo(7 * 5));
+    }
+
+    [TestCase(3.0, 3.0, true)]
+    [TestCase(2.996, 3.0, true)]
+    [TestCase(3.0, 4.0, false)]
+    public async Task RunCycle_AppliedValueAtLimit_LogsWarning(double proposed, double absorptionMax, bool expectWarning)
+    {
+        var sink = new CapturingSink();
+        var previous = Serilog.Log.Logger;
+        Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Verbose().WriteTo.Sink(sink).CreateLogger();
+        try
+        {
+            var optimization = new ConfigOptimization { Enabled = true, MinSamples = 5, Limits = { ["absorption_max"] = absorptionMax } };
+            await RunCycle(SnapshotWith(5), optimization, new AbsorptionOptimizer(proposed));
+        }
+        finally
+        {
+            Serilog.Log.Logger = previous;
+        }
+
+        _mqtt.Verify(x => x.EnqueueAsync(AbsorptionTopic, It.IsAny<string?>(), false), Times.Once, "the proposal should have been applied");
+        var warnings = sink.Events.Where(e => e.Level == Serilog.Events.LogEventLevel.Warning).Select(e => e.RenderMessage()).ToList();
+        if (expectWarning)
+            Assert.That(warnings, Has.One.Contains("absorption=3.00 (absorption_max)"));
+        else
+            Assert.That(warnings, Is.Empty);
     }
 }

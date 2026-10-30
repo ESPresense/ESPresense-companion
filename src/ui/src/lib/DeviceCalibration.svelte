@@ -559,7 +559,7 @@
 
 		{#if selectedFloorId}
 			<div class="card h-[400px] relative overflow-hidden">
-				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
+				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} embedded={true} bind:calibrationSpot />
 			</div>
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<div class="text-sm text-surface-700-300">

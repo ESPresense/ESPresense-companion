@@ -363,10 +363,10 @@ public class StateController : ControllerBase
     }
 
     /// <summary>
-    /// Resets calibration settings for every node by setting TxRefRssi, RxAdjRssi, and Absorption to zero.
+    /// Resets every node's TxRefRssi, RxAdjRssi and Absorption to the node's own defaults.
     /// </summary>
     /// <remarks>
-    /// Iterates over all nodes, updates their calibration values to zero asynchronously, and returns an HTTP 200 response on success. If an exception occurs during the process, logs the error and returns an HTTP 500 response with an error message.
+    /// Returns HTTP 200 on success; logs the error and returns HTTP 500 if a reset fails.
     /// </remarks>
     [HttpPost("api/state/calibration/reset")]
     public async Task<IActionResult> ResetCalibration()
@@ -375,13 +375,7 @@ public class StateController : ControllerBase
         {
             // Reset calibration for all nodes
             foreach (var node in _state.Nodes.Values)
-            {
-                var nodeSettings = _nsd.Get(node.Id);
-                nodeSettings.Calibration.TxRefRssi = 0;
-                nodeSettings.Calibration.RxAdjRssi = 0;
-                nodeSettings.Calibration.Absorption = 0;
-                await _nsd.Set(node.Id, nodeSettings);
-            }
+                await _nsd.ResetCalibration(node.Id);
 
             _state.ResetCalibrationMetrics();
 

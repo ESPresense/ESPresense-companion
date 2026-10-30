@@ -41,4 +41,42 @@ public class DeviceServiceTests
         Assert.That(state.Devices.ContainsKey(device.Id), Is.False);
         mqttMock.Verify();
     }
+
+    [Test]
+    public async Task StampUnseenDevicesAsync_StampsAndPersistsOnlyDevicesWithoutLastSeen()
+    {
+        var (service, state, mqttMock) = CreateService();
+        var now = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
+        var seenAt = now.AddDays(-2);
+        var restored = new Device("iBeacon:dead", "espresense_ibeacon_dead", TimeSpan.FromSeconds(30));
+        var seen = new Device("phone:alive", null, TimeSpan.FromSeconds(30)) { LastSeen = seenAt };
+        state.Devices[restored.Id] = restored;
+        state.Devices[seen.Id] = seen;
+
+        var stamped = await service.StampUnseenDevicesAsync(now);
+
+        Assert.That(stamped, Is.EqualTo(1));
+        Assert.That(restored.LastSeen, Is.EqualTo(now));
+        Assert.That(seen.LastSeen, Is.EqualTo(seenAt));
+        mqttMock.Verify(m => m.TryEnqueueAsync("espresense/companion/iBeacon:dead/attributes",
+            It.Is<string>(p => p.Contains("\"last_seen\":\"2026-10-29T12:00:00Z\"")), true), Times.Once);
+        mqttMock.Verify(m => m.TryEnqueueAsync("espresense/companion/phone:alive/attributes", It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
+    public async Task StampedDevice_ExpiresOneRetentionPeriodLater()
+    {
+        var (service, state, _) = CreateService();
+        var now = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
+        var retention = TimeSpan.FromDays(30);
+        var restored = new Device("tile:dead", "espresense_tile_dead", TimeSpan.FromSeconds(30));
+        state.Devices[restored.Id] = restored;
+
+        Assert.That(service.GetInactiveDevices(now - retention), Is.Empty, "unstamped: never matched");
+
+        await service.StampUnseenDevicesAsync(now);
+
+        Assert.That(service.GetInactiveDevices(now.AddDays(1) - retention), Is.Empty);
+        Assert.That(service.GetInactiveDevices(now.AddDays(31) - retention), Has.Member(restored));
+    }
 }
