@@ -4,7 +4,9 @@ public sealed record OptimizationDataSplit(
     OptimizationSnapshot Training,
     IReadOnlyList<OptimizationSnapshot> Validation)
 {
-    public const int MinimumSnapshots = 3;
+    // Two held-out snapshots at least: the every-snapshot check in RunCycleAsync needs more than one to mean anything.
+    public const int MinimumValidationSnapshots = 2;
+    public const int MinimumSnapshots = MinimumValidationSnapshots + 2;
 
     public static bool TryCreate(
         IEnumerable<OptimizationSnapshot> snapshots,
@@ -19,7 +21,7 @@ public sealed record OptimizationDataSplit(
         }
 
         var fraction = Math.Clamp(validationFraction, 0.1, 0.5);
-        var validationCount = Math.Max(1, (int)Math.Ceiling(ordered.Length * fraction));
+        var validationCount = Math.Max(MinimumValidationSnapshots, (int)Math.Ceiling(ordered.Length * fraction));
         var trainingCount = ordered.Length - validationCount;
         if (trainingCount < 2)
         {

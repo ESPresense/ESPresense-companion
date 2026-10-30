@@ -34,13 +34,24 @@ public class OptimizationDataSplitTests
     }
 
     [Test]
+    public void TryCreate_HoldsOutAtLeastTwoSnapshots()
+    {
+        var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        OptimizationSnapshot[] Make(int count) => Enumerable.Range(0, count).Select(index => Snapshot(start.AddMinutes(index), index)).ToArray();
+
+        Assert.That(OptimizationDataSplit.TryCreate(Make(3), 0.1, out _), Is.False);
+        Assert.That(OptimizationDataSplit.TryCreate(Make(4), 0.1, out var split), Is.True);
+        Assert.That(split!.Validation, Has.Count.EqualTo(2));
+    }
+
+    [Test]
     public void CombinedTrainingSnapshot_GroupsNodesByIdAcrossSamples()
     {
         var first = Snapshot(DateTime.UtcNow, 1);
         var second = Snapshot(DateTime.UtcNow.AddSeconds(1), 2);
         first.Measures[0].Rx = new OptNode { Id = "receiver" };
         second.Measures[0].Rx = new OptNode { Id = "RECEIVER" };
-        var snapshots = new[] { first, second, Snapshot(DateTime.UtcNow.AddSeconds(2), 3) };
+        var snapshots = new[] { first, second, Snapshot(DateTime.UtcNow.AddSeconds(2), 3), Snapshot(DateTime.UtcNow.AddSeconds(3), 4) };
 
         OptimizationDataSplit.TryCreate(snapshots, 0.2, out var split);
 
