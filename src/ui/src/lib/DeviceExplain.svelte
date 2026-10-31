@@ -95,8 +95,8 @@
 			{#if explanation.room.nearestOtherRoom}
 				<p>Nearest other room: {place(explanation.room.nearestOtherRoom)}, {metres(explanation.room.nearestOtherDistance)}</p>
 			{/if}
-			{#if explanation.room.previousState}
-				<p>Was {explanation.room.previousState} until {new Date(explanation.room.stateChanged ?? '').toLocaleTimeString()}</p>
+			{#if explanation.room.previousState && explanation.room.stateChanged}
+				<p>Was {explanation.room.previousState} until {new Date(explanation.room.stateChanged).toLocaleTimeString()}</p>
 			{/if}
 		</section>
 
