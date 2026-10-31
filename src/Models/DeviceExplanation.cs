@@ -142,14 +142,14 @@ public sealed record DeviceExplanation(
         var inside = at is { } p && (room?.Polygon?.EnclosesPoint(p) ?? false);
         var nearest = at is { } q
             ? floor?.Rooms.Values
-                .Where(r => r != room && r.Polygon != null)
+                .Where(r => r != room && r.Polygon is not null)
                 .Select(r => (room: r, distance: DistanceToEdge(r.Polygon!, q)))
                 .MinBy(r => r.distance)
             : null;
 
         return new ExplainedRoom(
             Place(room), inside,
-            at is { } e && room?.Polygon != null ? DistanceToEdge(room.Polygon, e) : null,
+            at is { } e && room?.Polygon is not null ? DistanceToEdge(room.Polygon, e) : null,
             Place(nearest?.room), nearest?.distance,
             device.ReportedState, device.PreviousReportedState, device.ReportedStateChanged);
     }
