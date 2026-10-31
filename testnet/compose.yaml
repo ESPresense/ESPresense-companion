@@ -1,0 +1,85 @@
+# One test net: a private broker fed one-way from the live broker, and a Companion that can only see it.
+# Start it with testnet/up.sh, which sets the variables below. See testnet/README.md.
+name: testnet-${TESTNET_NAME:?run this through testnet/up.sh}
+
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    networks: [isolated]
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  relay:
+    build: relay
+    command: ["python", "relay.py"]
+    restart: unless-stopped
+    environment:
+      LIVE_HOST: ${LIVE_HOST:?set LIVE_HOST in testnet/.env}
+      LIVE_PORT: ${LIVE_PORT:-1883}
+      LIVE_TLS: ${LIVE_TLS:-false}
+      LIVE_USERNAME: ${LIVE_USERNAME:-}
+      LIVE_PASSWORD: ${LIVE_PASSWORD:-}
+      TEST_HOST: broker
+      CLIENT_ID: espresense-testnet-${TESTNET_NAME}
+      RECORD_TRAFFIC: ${RECORD_TRAFFIC:-false}
+      DATA_DIR: /data
+    volumes:
+      - data:/data
+    networks: [isolated, uplink]
+    depends_on:
+      broker:
+        condition: service_healthy
+
+  # Copies the house config in with its mqtt section replaced, so the live credentials never reach Companion.
+  config:
+    build: relay
+    command: ["python", "prepare_config.py", "/house/config.yaml", "/config/espresense/config.yaml"]
+    network_mode: none
+    volumes:
+      - ${HOUSE_CONFIG:?set HOUSE_CONFIG in testnet/.env}:/house/config.yaml:ro
+      - config:/config
+
+  companion:
+    image: testnet-companion:${TESTNET_NAME}
+    build: ${SOURCE_DIR:-..}
+    restart: unless-stopped
+    networks: [isolated]
+    cpus: ${COMPANION_CPUS:-4}
+    mem_limit: ${COMPANION_MEMORY:-2g}
+    volumes:
+      - config:/config
+    depends_on:
+      broker:
+        condition: service_healthy
+      config:
+        condition: service_completed_successfully
+
+  # The isolated network can't publish ports, so this is the only way in to the UI.
+  ui:
+    image: alpine/socat
+    command: ["TCP-LISTEN:8267,fork,reuseaddr", "TCP:companion:8267"]
+    networks: [isolated, uplink]
+    ports:
+      - "${UI_BIND:-127.0.0.1}:${UI_PORT:-0}:8267"
+    depends_on: [companion]
+
+  # A stand-in for the live broker, used by testnet/smoke.sh.
+  fake-live:
+    image: eclipse-mosquitto:2
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    profiles: [smoke]
+    networks: [uplink]
+
+networks:
+  # internal: no route out of Docker, so a Companion bug can't reach the live broker or the LAN.
+  isolated:
+    internal: true
+  uplink:
+
+volumes:
+  config:
+  data:
