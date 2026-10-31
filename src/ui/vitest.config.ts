@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
+import sveltekitConfig from './sveltekit.config.js';
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [sveltekit(sveltekitConfig)],
 	test: {
 		include: ['src/**/*.{test,spec,vitest}.{js,ts}'],
 		globals: false, // Don't use global expect, import explicitly

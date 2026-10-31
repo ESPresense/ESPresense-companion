@@ -10,8 +10,8 @@ import { isNode, type Device, type Node } from '$lib/types';
  * @param d - The target Device or Node. If `d` is `null` or has no `id`, the generated URL will include `undefined`.
  */
 export function gotoDetail(d: Device | Node | null) {
-	if (isNode(d)) goto(resolve(`/nodes/${d?.id ?? ''}`));
-	else goto(resolve(`/devices/${d?.id ?? ''}`));
+	if (isNode(d)) goto(resolve(`nodes/${d?.id ?? ''}`));
+	else goto(resolve(`devices/${d?.id ?? ''}`));
 }
 
 /**
@@ -20,7 +20,7 @@ export function gotoDetail(d: Device | Node | null) {
  * @param deviceId - The device identifier to include in the path; if `null` the literal `"null"` will be placed in the URL (`.../3d/null`).
  */
 export function gotoDetail3d(deviceId: string | null) {
-	goto(resolve(`/3d/${deviceId ?? ''}`));
+	goto(resolve(`3d/${deviceId ?? ''}`));
 }
 
 /**
@@ -44,5 +44,5 @@ export function gotoNodes() {
 
 export function gotoCalibration(target?: Device | string | null) {
 	const id = typeof target === 'string' ? target : target?.id;
-	goto(resolve(id ? `/calibration/devices/${id}` : '/calibration'));
+	goto(id ? resolve(`calibration/devices/${id}`) : resolve('/calibration'));
 }
