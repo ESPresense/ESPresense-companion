@@ -1,30 +1,12 @@
-using System.Reflection;
 using ESPresense.Controllers;
 using ESPresense.Locators;
 using ESPresense.Models;
 using ESPresense.Services;
-using Newtonsoft.Json;
 
 namespace ESPresense.Companion.Tests;
 
 public class DeviceTrackerTests
 {
-    private IList<TestData> testDatas = new List<TestData>();
-
-    [SetUp]
-    public async Task Setup()
-    {
-        await using var example = Assembly.GetExecutingAssembly().GetManifestResourceStream("ESPresense.Companion.Tests.TestData.stationary.jsonp") ?? throw new Exception("Could not find embedded stationary.jsonp");
-        using var sr = new StreamReader(example);
-        while (true)
-        {
-            var line = await sr.ReadLineAsync();
-            if (line == null) break;
-            var testData = JsonConvert.DeserializeObject<TestData>(line);
-            if (testData!=null) testDatas.Add(testData);
-        }
-    }
-
     [Test]
     public void TestMultiScenarioLocator()
     {
@@ -37,7 +19,5 @@ public class DeviceTrackerTests
         var deviceSettingsStore = new DeviceSettingsStore(mqtt, state);
 
         var locator = new DeviceTracker(state, mqtt, new TelemetryService(mqtt), new GlobalEventDispatcher(), deviceSettingsStore);
-        // Use testData to test locator...
-        // Assert.That(result, Is.EqualTo(expectedResult));
     }
 }

@@ -5,7 +5,7 @@ using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore) : BackgroundService
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore, RoomLearningService? roomLearning = null) : BackgroundService
 {
     private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
     private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
@@ -25,6 +25,8 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     /// </remarks>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (roomLearning != null) roomLearning.CorrectionRequested += QueueForLocation;
+
         mqtt.DeviceMessageReceivedAsync += (e) =>
         {
             globalEventDispatcher.OnDeviceMessageReceived(e);
@@ -76,7 +78,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             {
                 var d = new Device(id, arg.AutoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = arg.AutoDiscover.Message.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
                 d.KalmanFilter.Settings = state.KalmanSettings;
-                foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
+                state.BuildScenarios(d);
                 Log.Information("[+] Track: {Device} (disc)", d);
                 return d;
             });
@@ -115,7 +117,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                     {
                         var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
                         d.KalmanFilter.Settings = state.KalmanSettings;
-                        foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
+                        state.BuildScenarios(d);
                         return d;
                     });
                     tele.UpdateDevicesCount(state.Devices.Count);
@@ -170,8 +172,11 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         var processTask = ProcessDevicesAsync(stoppingToken);
         var idleCheckTask = CheckIdleDevicesAsync(stoppingToken);
 
-        await Task.WhenAll(processTask, idleCheckTask);
+        try { await Task.WhenAll(processTask, idleCheckTask); }
+        finally { if (roomLearning != null) roomLearning.CorrectionRequested -= QueueForLocation; }
     }
+
+    private void QueueForLocation(Device device) => _toLocateChannel.Writer.TryWrite(device);
 
     private async Task ProcessDevicesAsync(CancellationToken stoppingToken)
     {
@@ -252,6 +257,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             else
             {
                 Log.Information("[-] Track {Device}", device);
+                if (roomLearning != null) await roomLearning.RemoveAsync(device, false);
                 foreach (var ad in device.HassAutoDiscovery)
                     await ad.Delete(mqtt);
             }

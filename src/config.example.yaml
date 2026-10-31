@@ -110,6 +110,28 @@ locators:
     enabled: true
     max_distance: 10 # Don't fall back to a node more than 10 m from the device (leave out or 0 for no limit)
 
+  # Matches a device's raw RSSI per node against a survey of known spots instead of ranging.
+  # Needs a fingerprint file beside this config: {"fingerprints": [{"floor": "first", "x": 1.0,
+  # "y": 2.0, "z": 1.0, "rssi": {"node_a": -71.2, "node_b": -80.5, "node_c": -88.0}}]},
+  # rssi = published rssi + rxAdj.
+  # To collect samples: choose "I'm here" on a device map (or open its Calibrate page),
+  # place the marker at its actual position, and Collect sample. Keep still for 15 seconds.
+  # The same sample offers an optional device calibration update.
+  # Samples append to the file below; enable this locator to use them for positioning.
+  # Survey at the height devices are carried (about 1 m): node geometry changes with height.
+  # Every node the survey heard is used, including nodes on other floors or not placed on the map.
+  fingerprint:
+    enabled: false
+    floors: ["first", "second"]
+    file: fingerprints.json
+    mode: continuous     # or knn: average the k closest fingerprints
+    bandwidth: 0.6       # continuous: smoothing radius in metres, about 0.8x the survey spacing
+    top: 20              # continuous: how many best-matching surface points to average
+    k: 3
+    min_common: 3
+    missing_rssi: -100   # assumed for a node heard on one side only (continuous mode treats null as -100)
+                         # knn mode only: an explicit null compares shared nodes only
+
 filtering:
   # Kalman Filter Parameters
   process_noise: 0.01      # Controls how quickly the filter adapts to change. Lower = smoother but more lag.
@@ -338,3 +360,7 @@ devices:
 # Devices to NOT track
 exclude_devices:
   - id: "iBeacon:e5ca1ade-f007-ba11-0000-000000000000-*" # These are junk, we alias them to node:*
+
+# Opt in to Home Assistant room correction and per-device room learning.
+room_learning:
+  enabled: false

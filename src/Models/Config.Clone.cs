@@ -23,6 +23,7 @@ namespace ESPresense.Models
                 ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
                 History = History.Clone(),
                 Locators = Locators.Clone(),
+                RoomLearning = new RoomLearningConfig { Enabled = RoomLearning.Enabled },
                 Optimization = Optimization.Clone()
             };
         }

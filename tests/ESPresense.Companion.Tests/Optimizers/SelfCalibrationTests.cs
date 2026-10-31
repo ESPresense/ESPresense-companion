@@ -58,9 +58,11 @@ public class SelfCalibrationTests
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
 
-        // ConfigLoader loads asynchronously; the optimizers need Config.Optimization.
-        for (var i = 0; i < 200 && _configLoader.Config == null; i++) Thread.Sleep(10);
-        Assert.That(_configLoader.Config, Is.Not.Null, "config did not load");
+        // ConfigLoader loads asynchronously and State takes its copy on the ConfigChanged event. The
+        // optimizers read State.Config, so wait for that, not just the loader, or the first test can
+        // start between the two and fail with "Optimization config not found".
+        for (var i = 0; i < 200 && _state.Config?.Optimization == null; i++) Thread.Sleep(10);
+        Assert.That(_state.Config?.Optimization, Is.Not.Null, "config did not load");
     }
 
     [TearDown]
@@ -393,7 +395,7 @@ public class SelfCalibrationTests
         TestContext.WriteLine($"mode {mode}: cycle applied calibration to {applied.Count} receivers (absorption/rxAdj)");
         foreach (var id in applied) TestContext.WriteLine($"  {id,-6} {Describe(nss, id)}");
         TestContext.WriteLine($"\nheld-out median |range error|: before cycle {before:0.00} m, after {after:0.00} m " +
-                              $"(nodes' own reported distances: {reported:0.00} m)");
+                              $"(at firmware defaults: {reported:0.00} m)");
 
         Assert.That(applied, Is.Not.Empty, $"a calibration cycle ({mode}) applied nothing on cold-start defaults");
         Assert.That(after, Is.LessThanOrEqualTo(before * maxRatio),
@@ -512,9 +514,13 @@ public class SelfCalibrationTests
             return errs.Count == 0 ? double.NaN : Median(errs);
         }
 
-        var locators = new[] { "gaussnewton", "nelder", "mle", "nadaraya", "nearest" };
+        // Only the locators that solve a position from the ranges are scored. nadaraya blends node
+        // positions by a kernel on distance and nearest just picks the shortest range, so a calibration
+        // that rescales every range moves them little or not at all; both stay in the table for reference.
+        var solvers = new[] { "gaussnewton", "nelder", "mle" };
+        var locators = solvers.Concat(new[] { "nadaraya", "nearest" }).ToArray();
         TestContext.WriteLine($"mode {mode}: held-out median XY position error (m) by locator");
-        TestContext.WriteLine($"{"locator",-12} {"cold",8} {"calibrated",11} {"reported",9}");
+        TestContext.WriteLine($"{"locator",-12} {"cold",8} {"calibrated",11} {"defaults",9}");
         var ratios = new List<double>();
         foreach (var which in locators)
         {
@@ -522,12 +528,13 @@ public class SelfCalibrationTests
             var k = MedianXyError(which, (id, m) => Ranged(m, nss.Get(id)));
             var r = MedianXyError(which, (_, m) => m.Dist);
             TestContext.WriteLine($"{which,-12} {c,8:0.00} {k,11:0.00} {r,9:0.00}");
-            if (double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
+            if (solvers.Contains(which) && double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
         }
 
-        Assert.That(ratios, Is.Not.Empty, "no locator produced fixes");
-        Assert.That(Median(ratios), Is.LessThan(0.8),
-            $"the applied calibration ({mode}) should cut held-out position error well below cold-start defaults across locators; median ratio {Median(ratios):0.00}");
+        Assert.That(ratios, Has.Count.EqualTo(solvers.Length), "a solving locator produced no fixes");
+        Assert.That(ratios.Average(), Is.LessThan(0.8),
+            $"the applied calibration ({mode}) should cut the solving locators' held-out position error by at least 20% on average; " +
+            $"ratios {string.Join(", ", ratios.Select(x => x.ToString("0.00")))}");
     }
 
     private sealed class Survey
@@ -554,13 +561,17 @@ public class SelfCalibrationTests
         public Dictionary<string, Meas> M { get; set; } = new();
     }
 
+    /// <summary>
+    /// The fixture keeps the raw radio reading only (published rssi + rxAdj): nothing the live
+    /// optimizer sets is recorded, so RxAdj is absent (0) and Dist is what a node at firmware defaults
+    /// (rssi@1m -59, absorption 2.7) would report.
+    /// </summary>
     private sealed class Meas
     {
-        /// <summary>As published: the node subtracts its rxAdj before reporting (BleFingerprint.cpp), so raw = Rssi + RxAdj.</summary>
         public double Rssi { get; set; }
-        public double Dist { get; set; }
         public double Sd { get; set; }
-        /// <summary>The node's rxAdj at capture, when the fixture records it; without it proposals are relative to that unknown.</summary>
         public double? RxAdj { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public double Dist => Math.Pow(10, (TxRef - Rssi) / (10 * 2.7));
     }
 }

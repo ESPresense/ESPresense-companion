@@ -18,6 +18,46 @@ public class MultiScenarioLocatorTests
     }
 
     [Test]
+    public async Task PublishesFloorNameWhenCurrentScenarioHasNoRoom()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "floor-fallback-" + Guid.NewGuid());
+        Directory.CreateDirectory(directory);
+        using var loader = new ConfigLoader(directory);
+        await loader.ConfigAsync();
+        var connection = new SQLiteAsyncConnection(":memory:");
+        try
+        {
+            var mqtt = new Mock<MqttCoordinator>(loader, NullLogger<MqttCoordinator>.Instance,
+                new MqttNetLogger(), new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
+            mqtt.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
+            var state = new State(loader, new NodeTelemetryStore(mqtt.Object));
+            var events = new GlobalEventDispatcher();
+            var tracker = new DeviceTracker(state, mqtt.Object, new TelemetryService(mqtt.Object), events,
+                new DeviceSettingsStore(mqtt.Object, state));
+            var locator = new MultiScenarioLocator(tracker, state, mqtt.Object, events,
+                new DeviceHistoryStore(connection, loader), Mock.Of<ILeaseService>());
+            var floor = new Floor();
+            floor.Update(loader.Config!, new ConfigFloor { Id = "first", Name = "First floor" });
+            var device = new Device("floor-only", null, TimeSpan.FromSeconds(30));
+            device.Scenarios.Add(new Scenario(loader.Config, new DummyLocator(), "Floor only")
+            {
+                Floor = floor, Room = null, Confidence = 90, LastHit = DateTime.UtcNow
+            });
+
+            await locator.ProcessDevice(device);
+
+            Assert.That(device.ReportedState, Is.EqualTo("First floor"));
+            mqtt.Verify(m => m.TryEnqueueAsync("espresense/companion/floor-only", "First floor", true), Times.Once);
+        }
+        finally
+        {
+            await connection.CloseAsync();
+            await loader.StopAsync(CancellationToken.None);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
     public async Task NotHomeStateWhenAllScenariosExpire()
     {
         // Arrange minimal environment
