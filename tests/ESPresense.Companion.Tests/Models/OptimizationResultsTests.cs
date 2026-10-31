@@ -37,4 +37,22 @@ public class OptimizationResultsTests
         Assert.That(double.IsFinite(rmse), Is.True);
         Assert.That(samples, Is.EqualTo(2), "the co-located measure must not be counted");
     }
+
+    [Test]
+    public void QuantizeForApplication_MatchesTheAppliedPrecision()
+    {
+        var results = new OptimizationResults
+        {
+            Nodes = new Dictionary<string, ProposedValues>
+            {
+                ["node"] = new() { Absorption = 2.746, RxAdjRssi = 1.6, TxRefRssi = -59.6 }
+            }
+        };
+
+        var quantized = results.QuantizeForApplication().Nodes["node"];
+
+        Assert.That(quantized.Absorption, Is.EqualTo(2.75));
+        Assert.That(quantized.RxAdjRssi, Is.EqualTo(2));
+        Assert.That(quantized.TxRefRssi, Is.EqualTo(-60));
+    }
 }

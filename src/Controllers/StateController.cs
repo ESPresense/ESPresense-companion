@@ -183,6 +183,7 @@ public class StateController : ControllerBase
 
         c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
         c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
+        (c.BestRMSE, c.BestR) = _state.RecordCalibrationMetrics(c.RMSE, c.R);
         return c;
     }
 
@@ -375,6 +376,8 @@ public class StateController : ControllerBase
             // Reset calibration for all nodes
             foreach (var node in _state.Nodes.Values)
                 await _nsd.ResetCalibration(node.Id);
+
+            _state.ResetCalibrationMetrics();
 
             return Ok(new { message = "Calibration reset successfully" });
         }

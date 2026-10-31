@@ -9,6 +9,8 @@ public class DeviceToNode(Device device, Node node)
     public double? DistVar { get; set; }
 
     public double Rssi { get; set; }
+    /// <summary>The node's rxAdj when it sent this reading; the firmware publishes rssi = raw - rxAdj.</summary>
+    public double? RssiRxAdj { get; set; }
     public double? RssiVar { get; set; }
     public double RefRssi { get; set; }
 
@@ -22,6 +24,7 @@ public class DeviceToNode(Device device, Node node)
     public bool ReadMessage(DeviceMessage payload)
     {
         Rssi = payload.Rssi;
+        RssiRxAdj = payload.RssiRxAdj;
         RssiVar = payload.RssiVar;
         RefRssi = payload.RefRssi;
         NewName(payload.Name);

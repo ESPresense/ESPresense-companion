@@ -14,12 +14,12 @@ public class OptimizationSnapshot
 
     public ILookup<OptNode, Measure> ByRx()
     {
-        return Measures.ToLookup(a => a.Rx);
+        return Measures.ToLookup(a => a.Rx, OptNodeIdComparer.Instance);
     }
 
     public ILookup<OptNode, Measure> ByTx()
     {
-        return Measures.ToLookup(a => a.Tx);
+        return Measures.ToLookup(a => a.Tx, OptNodeIdComparer.Instance);
     }
 
     public string[] GetNodeIds()
@@ -27,6 +27,22 @@ public class OptimizationSnapshot
         return Measures.SelectMany(m => new[] { m.Rx.Id, m.Tx.Id })
             .Distinct()
             .ToArray();
+    }
+}
+
+internal sealed class OptNodeIdComparer : IEqualityComparer<OptNode>
+{
+    public static OptNodeIdComparer Instance { get; } = new();
+
+    public bool Equals(OptNode? x, OptNode? y)
+    {
+        return ReferenceEquals(x, y) ||
+               (x != null && y != null && StringComparer.OrdinalIgnoreCase.Equals(x.Id, y.Id));
+    }
+
+    public int GetHashCode(OptNode obj)
+    {
+        return StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Id);
     }
 }
 

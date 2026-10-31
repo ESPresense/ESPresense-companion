@@ -39,8 +39,10 @@ device_retention: 30d
 
 optimization:
   enabled: true
-  interval_secs: 3600
-  keep_snapshot_mins: 5   # How long to keep optimization snapshots (default: 5 minutes)
+  sample_interval_secs: 30        # How often a measurement snapshot is taken (default: 30)
+  training_window_mins: 60        # Rolling history kept for training and validation (default: 30)
+  optimization_interval_secs: 900 # How often proposals are evaluated and possibly applied (default: 900)
+  validation_fraction: 0.2        # Newest fraction of the history held out to validate proposals (default: 0.2)
   min_samples: 5          # Minimum measurements an optimizer result must be evaluated on before it is applied (default: 5)
   optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:

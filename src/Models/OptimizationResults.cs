@@ -17,6 +17,24 @@ public class OptimizationResults
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
     /// <summary>
+    /// Rounds the proposal to the precision that is actually applied (absorption to 2 decimals, rxAdj and txRef
+    /// to whole dB, matching <see cref="NodeSettingsStore"/>), so a proposal is scored as the value the node
+    /// will really get rather than a fractional one that is never applied.
+    /// </summary>
+    public OptimizationResults QuantizeForApplication() => new()
+    {
+        Nodes = Nodes.ToDictionary(
+            pair => pair.Key,
+            pair => new ProposedValues
+            {
+                Absorption = pair.Value.Absorption is { } absorption ? Math.Round(absorption, 2) : null,
+                RxAdjRssi = pair.Value.RxAdjRssi is { } rxAdjRssi ? Math.Round(rxAdjRssi) : null,
+                TxRefRssi = pair.Value.TxRefRssi is { } txRefRssi ? Math.Round(txRefRssi) : null,
+                Error = pair.Value.Error
+            })
+    };
+
+    /// <summary>
     /// Scores this proposal against <paramref name="oss"/>. With <paramref name="deviceFrame"/> the
     /// proposed txRef values are ignored in favour of the transmitters' current ones: that is how a
     /// device is ranged (with its own rssi@1m, which no optimizer touches), so it is the frame in
@@ -24,6 +42,14 @@ public class OptimizationResults
     /// transmitter k dB hot" from "every receiver k dB hot"; scoring in both frames can.
     /// </summary>
     public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss, bool deviceFrame = false)
+        => Evaluate(oss, nss.Get, deviceFrame);
+
+    /// <summary>
+    /// Same as above, but node settings come from <paramref name="getSettings"/>. A cycle passes a view frozen
+    /// when it started, so every proposal is scored against the same incumbent however the store changes
+    /// (for example when an earlier cycle's MQTT writes are echoed back) while the cycle runs.
+    /// </summary>
+    public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, bool deviceFrame = false)
     {
         List<double> predictedValues = new();
         List<double> measuredValues = new();
@@ -33,8 +59,8 @@ public class OptimizationResults
             foreach (var m in os.Measures)
             {
                 if (m.Tx?.Id == null || m.Rx?.Id == null) continue;
-                var tx = nss.Get(m.Tx.Id);
-                var rx = nss.Get(m.Rx.Id);
+                var tx = getSettings(m.Tx.Id);
+                var rx = getSettings(m.Rx.Id);
 
                 Nodes.TryGetValue(m.Tx.Id, out var txPv);
                 Nodes.TryGetValue(m.Rx.Id, out var rxPv);
