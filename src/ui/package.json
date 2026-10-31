@@ -50,7 +50,7 @@
 		"prettier-plugin-svelte": "^4.0.1",
 		"s-ago": "^2.2.0",
 		"svelte": "^5.57.3",
-		"svelte-check": "^4.7.6",
+		"svelte-check": "^4.7.7",
 		"svelte-eslint-parser": "^1.8.0",
 		"svelte-table": "^0.6.5",
 		"tailwindcss": "^4.3.3",
