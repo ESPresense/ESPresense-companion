@@ -303,7 +303,7 @@ nodes:
     point: [9, 7.3, 1]
     floors: ["first"]
   - name: Nook
-    point: [7.6, 1.6, 0.7]
+    point: [7.66, 0.7, 0.36]
     floors: ["first"]
   - name: Dining
     point: [16.4, 3.1, 0.4]
