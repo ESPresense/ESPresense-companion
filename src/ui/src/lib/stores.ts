@@ -5,6 +5,8 @@ import { WSManager } from './wsManager';
 
 export const config = writable<Config>();
 export const showAll = writable<boolean>(false);
+// The untracked device a detail page has open: delivered without turning on showAll.
+export const includedDevice = writable<string | null>(null);
 export const showAllFloors = writable<boolean>(false);
 
 export const relativeTimer = function () {
@@ -86,6 +88,11 @@ export const devices = readable<Device[]>([], function start(set) {
 	let pollTimer: NodeJS.Timeout;
 	let isPolling = false;
 
+	function deviceFilter() {
+		const include = get(includedDevice);
+		return `showAll=${get(showAll)}${include ? `&include=${encodeURIComponent(include)}` : ''}`;
+	}
+
 	function updateDevicesFromMap() {
 		set(Array.from(deviceMap.values()));
 	}
@@ -94,8 +101,9 @@ export const devices = readable<Device[]>([], function start(set) {
 		if (isPolling) return;
 
 		isPolling = true;
+		const filter = deviceFilter();
 		try {
-			const devices = await apiFetch<Device[]>(`/api/state/devices?showAll=${get(showAll)}`);
+			const devices = await apiFetch<Device[]>(`/api/state/devices?${filter}`);
 
 			// Replace the entire map instead of accumulating devices
 			deviceMap = new Map(devices.map((device: Device) => [device.id, device]));
@@ -105,6 +113,8 @@ export const devices = readable<Device[]>([], function start(set) {
 		} finally {
 			isPolling = false;
 		}
+		// The filter changed while this poll was out, so its answer is for the old one
+		if (filter !== deviceFilter()) fetchDevices();
 	}
 
 	fetchDevices();
@@ -143,12 +153,22 @@ export const devices = readable<Device[]>([], function start(set) {
 			type: 'showAll',
 			value: '' + get(showAll)
 		});
+		wsManager.sendMessage({
+			command: 'changeFilter',
+			type: 'include',
+			value: get(includedDevice) ?? ''
+		});
 	}
 
 	// Subscribe to showAll changes and trigger immediate poll when it changes
 	const unsubscribeShowUntracked = showAll.subscribe(() => {
 		sendFilter();
 		// Force an immediate poll when showAll changes
+		fetchDevices();
+	});
+
+	const unsubscribeIncluded = includedDevice.subscribe(() => {
+		sendFilter();
 		fetchDevices();
 	});
 
@@ -162,6 +182,7 @@ export const devices = readable<Device[]>([], function start(set) {
 		wsManager.unsubscribeFromEvent('configChanged', configChangedCallback);
 		wsManager.unsubscribeFromEvent('time', timeCallback);
 		unsubscribeShowUntracked();
+		unsubscribeIncluded();
 		unsubscribeOpen();
 	};
 });

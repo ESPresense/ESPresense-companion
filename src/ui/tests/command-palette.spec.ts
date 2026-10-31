@@ -1,0 +1,154 @@
+import { expect, test, type Page } from '@playwright/test';
+import { mockApi } from './mock-api';
+
+// #1730: an untracked bare MAC used to be reachable only via "Show All". Ctrl+K searches everything
+// server-side, so the page never has to load or render the full list.
+const all = [
+	{ kind: 'node', id: 'kitchen', name: 'Kitchen', detail: 'online', badge: 'node' },
+	{ kind: 'node', id: 'a?b', name: null, detail: 'offline', badge: 'node' },
+	{ kind: 'device', id: 'a4c138a4048c', name: null, detail: '8 nodes · nearest kitchen 2.97 m', badge: 'untracked' },
+	{ kind: 'device', id: 'tv:family', name: 'Family TV', detail: 'Family · 3 nodes · nearest family 1.20 m', badge: null }
+];
+
+async function open(page: Page) {
+	await mockApi(page, { stubWebSocket: true });
+	const queries: string[] = [];
+	await page.route('**/api/state/search**', (route) => {
+		const q = (new URL(route.request().url()).searchParams.get('q') ?? '').toLowerCase();
+		queries.push(q);
+		const hits = all.filter((r) => (q ? r.id.includes(q) || (r.name ?? '').toLowerCase().includes(q) : r.kind === 'device'));
+		return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(hits) });
+	});
+	await page.goto('/devices');
+	await expect(page.locator('table tbody tr').first()).toBeVisible();
+	return queries;
+}
+
+const box = (page: Page) => page.getByRole('combobox', { name: 'Find anything' });
+
+test('Ctrl+K opens the palette, Escape closes it', async ({ page }) => {
+	await open(page);
+	await expect(box(page)).toHaveCount(0);
+
+	await page.keyboard.press('Control+k');
+	await expect(box(page)).toBeFocused();
+
+	await page.keyboard.press('Escape');
+	await expect(box(page)).toHaveCount(0);
+});
+
+test('Escape hands focus back to the sidebar button that opened it', async ({ page }) => {
+	await open(page);
+	const button = page.getByRole('button', { name: 'Find anything' });
+	await button.click();
+	await expect(box(page)).toBeFocused();
+
+	await page.keyboard.press('Escape');
+	await expect(button).toBeFocused();
+});
+
+test('the sidebar search button opens it too', async ({ page }) => {
+	await open(page);
+	await page.getByRole('button', { name: 'Find anything' }).click();
+	await expect(box(page)).toBeFocused();
+});
+
+test('finds an untracked MAC with its nearest node, and flags it untracked', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('a4c138');
+
+	const options = page.getByRole('option');
+	await expect(options).toHaveCount(1);
+	await expect(options.first()).toContainText('a4c138a4048c');
+	await expect(options.first()).toContainText('8 nodes · nearest kitchen 2.97 m');
+	await expect(options.first()).toContainText('untracked');
+});
+
+test('arrow keys move the selection and Enter opens that device', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await expect(page.getByRole('option')).toHaveCount(2);
+	await expect(page.getByRole('option').first()).toHaveAttribute('aria-selected', 'true');
+
+	await page.keyboard.press('ArrowDown');
+	await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true');
+
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/devices\/tv%3Afamily$/);
+	await expect(box(page)).toHaveCount(0);
+});
+
+test('says so when nothing matches', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('zzzz');
+	await expect(page.getByText('Nothing matches.')).toBeVisible();
+});
+
+test('finds nodes too and opens the node page', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('kit');
+
+	const options = page.getByRole('option');
+	await expect(options.first()).toContainText('Kitchen');
+	await expect(options.first()).toContainText('node');
+
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/nodes\/kitchen$/);
+});
+
+test('encodes a node id that is not URL safe', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('a?b');
+	await expect(page.getByRole('option')).toHaveCount(1);
+
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/nodes\/a%3Fb$/);
+});
+
+test('Enter does not open a row left over from the previous query', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('family');
+	await expect(page.getByRole('option')).toHaveCount(1);
+
+	await box(page).fill('family tv zzz');
+	await page.keyboard.press('Enter');
+	await expect(page.getByText('Nothing matches.')).toBeVisible();
+	await expect(page).toHaveURL(/\/devices$/);
+});
+
+test('Tab stays in the palette', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await expect(box(page)).toBeFocused();
+
+	await page.keyboard.press('Tab');
+	await expect(box(page)).toBeFocused();
+});
+
+test('an untracked device opens with its map, without Show All', async ({ page }) => {
+	await open(page);
+	const id = 'a4c138a4048c';
+	const device = { id, name: 'Dryer', confidence: 80, location: { x: 1, y: 1, z: 1 }, floor: { id: 'first', name: 'First' }, nodes: {} };
+	const requests: string[] = [];
+	await page.route('**/api/state/devices?**', (route) => {
+		const url = new URL(route.request().url());
+		requests.push(url.search);
+		return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(url.searchParams.get('include') === id ? [device] : []) });
+	});
+	await page.route(`**/api/device/${id}`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ settings: { id }, details: [] }) }));
+
+	await page.keyboard.press('Control+k');
+	await box(page).fill('a4c138');
+	await expect(page.getByRole('option')).toHaveCount(1);
+	await page.keyboard.press('Enter');
+
+	await expect(page).toHaveURL(new RegExp(`/devices/${id}$`));
+	await expect(page.getByText('Dryer').first()).toBeVisible();
+	await expect(page.getByText('Unknown Device')).toHaveCount(0);
+	expect(requests.at(-1)).toContain('showAll=false');
+});

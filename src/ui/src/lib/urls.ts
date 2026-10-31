@@ -1,6 +1,6 @@
 import { resolve } from '$app/paths';
 import { goto } from '$app/navigation';
-import { isNode, type Device, type Node } from '#lib/types.js';
+import { isNode, type Device, type Node, type SearchResult } from '#lib/types.js';
 
 /**
  * Navigate to the detail page for a Node or Device.
@@ -12,6 +12,13 @@ import { isNode, type Device, type Node } from '#lib/types.js';
 export function gotoDetail(d: Device | Node | null) {
 	if (isNode(d)) goto(resolve(`nodes/${d?.id ?? ''}`));
 	else goto(resolve(`devices/${d?.id ?? ''}`));
+}
+
+/** Navigate to the page a search result leads to. */
+export function gotoSearchResult(r: SearchResult) {
+	const id = encodeURIComponent(r.id);
+	if (r.kind === 'node') goto(resolve(`nodes/${id}`));
+	else goto(resolve(`devices/${id}`));
 }
 
 /**

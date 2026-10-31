@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { apiFetch } from '#lib/api.js';
-	import { devices } from '#lib/stores.js';
+	import { devices, includedDevice } from '#lib/stores.js';
 	import { readable } from 'svelte/store';
 	import type { DeviceSetting } from '#lib/types.js';
 	import { Accordion } from '@skeletonlabs/skeleton-svelte';
@@ -15,15 +15,21 @@
 
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
 
+	$effect(() => {
+		includedDevice.set(data.settings?.id ?? null);
+		return () => includedDevice.set(null);
+	});
+
 	let accordionValue = $state(['details']);
 
 	const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
 		const deviceId = data.settings?.id;
 		if (!deviceId) return () => {};
+		const url = `/api/device/${encodeURIComponent(deviceId)}`;
 
 		async function fetchAndSet() {
 			try {
-				const result = await apiFetch<{ details?: DeviceDetailItem[] }>(`/api/device/${deviceId}`);
+				const result = await apiFetch<{ details?: DeviceDetailItem[] }>(url);
 				set(result.details || []);
 			} catch (ex) {
 				console.error(`Error fetching device details: ${ex instanceof Error ? ex.message : String(ex)}`);
