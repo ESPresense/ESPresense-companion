@@ -27,6 +27,7 @@
 	let input = $state<HTMLInputElement>();
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let seq = 0;
+	let nodesSeq = 0;
 
 	function onWindowKeydown(event: KeyboardEvent) {
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -41,6 +42,7 @@
 		if (!open) {
 			clearTimeout(timer);
 			seq++; // drop any in-flight response
+			nodesSeq++;
 			// Hand focus back to whatever had it, unless navigation already removed it.
 			if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
 			opener = null;
@@ -48,8 +50,11 @@
 		}
 		opener = document.activeElement;
 		query = '';
+		const mineNodes = ++nodesSeq;
 		apiFetch<Node[]>('/api/state/nodes?includeTele=false')
-			.then((n) => (allNodes = n))
+			.then((n) => {
+				if (mineNodes === nodesSeq) allNodes = n;
+			})
 			.catch((e) => console.error('Node list failed:', e));
 		tick().then(() => input?.focus());
 	});
@@ -59,6 +64,11 @@
 		if (!open) return;
 		const q = query;
 		clearTimeout(timer);
+		// Old rows answer the old query: Enter must not open one while the new search is pending.
+		seq++;
+		deviceResults = [];
+		active = 0;
+		loading = true;
 		timer = setTimeout(() => search(q), q ? 120 : 0);
 		return () => clearTimeout(timer);
 	});

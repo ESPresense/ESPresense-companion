@@ -102,3 +102,15 @@ test('finds nodes too, lists them first, and opens the node page', async ({ page
 	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(/\/nodes\/kitchen$/);
 });
+
+test('Enter does not open a row left over from the previous query', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('family');
+	await expect(page.getByRole('option')).toHaveCount(1);
+
+	await box(page).fill('family tv zzz');
+	await page.keyboard.press('Enter');
+	await expect(page.getByText('Nothing matches.')).toBeVisible();
+	await expect(page).toHaveURL(/\/devices$/);
+});

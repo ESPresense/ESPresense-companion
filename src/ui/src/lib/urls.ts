@@ -16,7 +16,7 @@ export function gotoDetail(d: Device | Node | null) {
 
 /** Navigate to a node's detail page when only its id is at hand. */
 export function gotoNodeById(id: string) {
-	goto(resolve(`/nodes/${id}`));
+	goto(resolve(`nodes/${encodeURIComponent(id)}`));
 }
 
 /**
