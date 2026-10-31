@@ -4,6 +4,7 @@
 	import { getToastStore } from '$lib/toast/toastStore';
 	import { showConfirm } from '$lib/modal/modalStore';
 	import { tooltip } from '$lib/tooltip';
+	import { errorColor } from '$lib/explain';
 	import SlideToggle from '$lib/SlideToggle.svelte';
 	import { onMount } from 'svelte';
 
@@ -20,15 +21,7 @@
 		if (percent == null) {
 			return '';
 		}
-		// Clamp percent between -2 and +2
-		percent = Math.max(-2, Math.min(percent, 2));
-
-		// Clamp the color mapping between -1 and +1 for hue purposes
-		const colorPercent = Math.max(-1, Math.min(percent, 1));
-
-		// Map colorPercent (-1 to +1) to hue (240° blue -> 120° green -> 0° red)
-		const hue = 240 - (colorPercent + 1) * (240 / 2); // Shift from 240° to 0°
-		return `background-color: hsl(${hue}, 50%, 50%)`;
+		return `background-color: ${errorColor(percent)}`;
 	}
 
 	function value(n1: any, data_point: number) {

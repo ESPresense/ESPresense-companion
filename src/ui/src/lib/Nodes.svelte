@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
 	import { config, nodes } from '$lib/stores';
-	import type { Floor, Node } from '$lib/types';
+	import { bestScenario } from '$lib/explain';
+	import type { DeviceExplanation, Floor, Node } from '$lib/types';
 
 	import NodeMarker from './NodeMarker.svelte';
 
@@ -10,12 +11,14 @@
 		floorId?: string | null;
 		deviceId?: string | null;
 		nodeId?: string | null;
+		explanation?: DeviceExplanation | null;
 		onhovered?: ((node: Node | null) => void) | undefined;
 		onselected?: ((node: Node) => void) | undefined;
 	}
 
-	let { transform = zoomIdentity, floorId = null, deviceId = null, nodeId = null, onhovered = undefined, onselected = undefined }: Props = $props();
+	let { transform = zoomIdentity, floorId = null, deviceId = null, nodeId = null, explanation = null, onhovered = undefined, onselected = undefined }: Props = $props();
 
+	let best = $derived(bestScenario(explanation));
 	let floor: Floor | undefined = $derived($config?.floors?.find((f) => f.id == floorId));
 	// `floors` is null for nodes that aren't placed in the config yet, so it must be guarded
 	// as well as `n` — otherwise selecting a floor throws once per poll tick.
@@ -25,7 +28,7 @@
 <g transform={transform.toString()}>
 	{#if nodes}
 		{#each selectedNodes as n (n.id)}
-			<NodeMarker {n} {deviceId} {nodeId} {floor} {onhovered} {onselected} />
+			<NodeMarker {n} {deviceId} {nodeId} {floor} fix={best?.nodes.find((f) => f.id === n.id)} fixScale={best?.scale ?? 1} {onhovered} {onselected} />
 		{/each}
 	{/if}
 </g>

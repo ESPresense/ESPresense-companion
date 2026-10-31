@@ -37,7 +37,7 @@ namespace ESPresense.Controllers
         public ActionResult<DeviceExplanation> Explain(string id)
         {
             var device = FindDevice(id, _deviceSettingsStore.Get(id));
-            return device == null ? NotFound() : DeviceExplanation.From(device);
+            return device == null ? NotFound() : DeviceExplanation.From(device, NodeBias.Find(_state.ReadMeasures()));
         }
 
         private Device? FindDevice(string id, DeviceSettings? settings) =>

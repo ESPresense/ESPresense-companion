@@ -33,6 +33,13 @@ public readonly record struct ExplainedScenario(
     double? Scale, double? Error, double? PearsonCorrelation, int? Iterations, string ReasonForExit, int? Fixes,
     IReadOnlyList<ExplainedNode> Nodes);
 
+/// <summary>
+/// One standard deviation of the fit's horizontal position, from the geometry of the nodes it used
+/// and how well they agreed. Long and thin means the nodes pin one direction and not the other.
+/// </summary>
+/// <param name="AngleDegrees">Direction of the major axis, counter-clockwise from the map's +x</param>
+public readonly record struct ExplainedEllipse(ExplainedPoint Center, double SemiMajor, double SemiMinor, double AngleDegrees);
+
 public readonly record struct ExplainedFloor(ExplainedPlace Floor, double Probability, int? Confidence);
 
 /// <param name="Inside">Whether the best scenario's position is inside Room's polygon right now;
@@ -55,9 +62,15 @@ public sealed record DeviceExplanation(
     IReadOnlyList<ExplainedReading> Nodes,
     IReadOnlyList<ExplainedScenario> Scenarios,
     IReadOnlyList<ExplainedFloor> Floors,
-    ExplainedRoom Room)
+    ExplainedRoom Room,
+    ExplainedEllipse? Uncertainty,
+    IReadOnlyList<string> Hints)
 {
-    public static DeviceExplanation From(Device device)
+    private const double LargeResidual = 1.5;
+    private const double NearWall = 0.5;
+    private const double CloseFloorRace = 0.1;
+
+    public static DeviceExplanation From(Device device, IReadOnlyList<NodeBias>? biases = null)
     {
         var links = device.Nodes.Values.Where(dn => dn.Node != null).OrderBy(dn => dn.Distance).ToArray();
         var best = device.BestScenario;
@@ -74,13 +87,91 @@ public sealed record DeviceExplanation(
             .OrderByDescending(f => f.Probability)
             .ToArray();
 
+        var explained = scenarios.Select(s => ExplainScenario(s, s == best, links)).ToArray();
+        var room = RoomDecision(device, best);
+
         return new DeviceExplanation(
             device.Id, device.Name, device.IsAnchored,
             ExplainedPoint.From(device.Location), device.Confidence,
             links.Select(Reading).ToArray(),
-            scenarios.Select(s => ExplainScenario(s, s == best, links)).ToArray(),
+            explained,
             floors,
-            RoomDecision(device, best));
+            room,
+            device.IsAnchored ? null : Ellipse(best?.Trace),
+            BuildHints(device, links, explained.Where(s => s.Best).Select(s => (ExplainedScenario?)s).FirstOrDefault(), floors, room, biases ?? []));
+    }
+
+    private static string[] BuildHints(Device device, DeviceToNode[] links, ExplainedScenario? best, ExplainedFloor[] floors, ExplainedRoom room, IReadOnlyList<NodeBias> biases)
+    {
+        var hints = new List<string>();
+        var heard = links.Count(dn => dn.Current);
+
+        if (device.IsAnchored) hints.Add("Anchored: the position comes from the anchor, so the locators don't run.");
+        else if (heard == 0) hints.Add("No node hears this device right now.");
+        else if (!device.Track) hints.Add($"Heard by {heard} node(s), but not tracked, so the locators don't run. Add it to devices: in the config to locate it.");
+        else if (best == null) hints.Add($"Heard by {heard} node(s), but no locator has produced a position yet.");
+
+        if (best is { } b)
+        {
+            if (b.OutcomeReason != null) hints.Add($"{b.Name} has no real fit. {b.OutcomeReason}.");
+
+            var worst = b.Nodes.Where(n => n.Residual != null).OrderByDescending(n => Math.Abs(n.Residual!.Value)).Select(n => (ExplainedNode?)n).FirstOrDefault();
+            if (worst is { Residual: var r } w && Math.Abs(r!.Value) >= LargeResidual)
+                hints.Add($"{w.Name ?? w.Id} disagrees most with this fit: it reads {Math.Abs(r.Value):F1} m {(r > 0 ? "long" : "short")}.");
+        }
+
+        if (floors.Length > 1 && floors[0].Probability - floors[1].Probability < CloseFloorRace)
+            hints.Add($"The floor race is close: {floors[0].Floor.Name} {floors[0].Probability:P0}, {floors[1].Floor.Name} {floors[1].Probability:P0}.");
+
+        if (!device.IsAnchored)
+        {
+            if (room.Room == null && room.NearestOtherRoom is { } nearest && best is { Outcome: not LocatorOutcome.NoFix })
+                hints.Add($"The position isn't inside any room. The nearest is {nearest.Name} at {room.NearestOtherDistance:F1} m.");
+            else if (room.Room is { } current && !room.Inside && best != null)
+                hints.Add($"The position has drifted outside {current.Name}, but the room only updates after a move of 10 cm.");
+            else if (room is { Inside: true, DistanceToEdge: < NearWall, NearestOtherRoom: { } next, NearestOtherDistance: < 2 * NearWall })
+                hints.Add($"Only {room.DistanceToEdge:F1} m from {room.Room?.Name}'s wall, next to {next.Name}, so the room may flip.");
+        }
+
+        var used = best?.Nodes.Where(n => n.Used).Select(n => n.Id).ToHashSet() ?? [];
+        hints.AddRange(biases.Where(n => used.Contains(n.Id)).Select(n => n.Hint));
+
+        return hints.ToArray();
+    }
+
+    private static ExplainedEllipse? Ellipse(LocatorTrace? trace)
+    {
+        if (trace is not { Fit: { } fit, Used.Length: >= 3 } solved) return null;
+
+        double weightSum = solved.Used.Sum(u => u.Weight ?? 0);
+        if (!(weightSum > 0)) return null;
+
+        double xx = 0, xy = 0, yy = 0, squared = 0;
+        foreach (var u in solved.Used)
+        {
+            var range = fit.DistanceTo(u.Location);
+            if (range < 1e-6) continue;
+            var weight = (u.Weight ?? 0) * solved.Used.Length / weightSum;
+            var (ux, uy) = ((fit.X - u.Location.X) / range, (fit.Y - u.Location.Y) / range);
+            xx += weight * ux * ux;
+            xy += weight * ux * uy;
+            yy += weight * uy * uy;
+            squared += weight * Math.Pow(u.Measured - range * solved.Scale, 2);
+        }
+
+        var det = xx * yy - xy * xy;
+        if (!(det > 1e-9)) return null;
+
+        var variance = squared / (solved.Used.Length - 2);
+        var (covXx, covXy, covYy) = (variance * yy / det, -variance * xy / det, variance * xx / det);
+
+        var mean = (covXx + covYy) / 2;
+        var spread = Math.Sqrt(Math.Pow((covXx - covYy) / 2, 2) + covXy * covXy);
+        return new ExplainedEllipse(
+            ExplainedPoint.From(fit)!.Value,
+            Math.Sqrt(mean + spread),
+            Math.Sqrt(Math.Max(0, mean - spread)),
+            0.5 * Math.Atan2(2 * covXy, covXx - covYy) * 180 / Math.PI);
     }
 
     private static ExplainedReading Reading(DeviceToNode dn) => new(
