@@ -134,7 +134,7 @@ floors:
   - id: first
     name: First Floor
     # Bounds (x,y,z) of map in meters
-    bounds: [[0, 0, 0], [17, 18, 3]]
+    bounds: [[0, 0, -1.5], [17, 18, 3]] # Below 0 so a multi_floor solve just under the floor stays on this floor
     rooms:
       - name: Powder
         # Optional room color in hex; if omitted, server assigns a deterministic color
@@ -209,8 +209,7 @@ floors:
         points:
           - [10.1, 12.9]
           - [12.6, 12.9]
-          - [12.6, 10.4]
-          - [11.45, 10.4]
+          - [12.6, 9.3]
           - [11.45, 9.3]
           - [10.5, 8.5]
           - [8.08, 8.5]
@@ -229,7 +228,9 @@ floors:
           - [0, 5.4]
       - name: Downstairs Hall
         points:
-          - [3.5, 6.5]
+          - [3.5, 5.4]
+          - [5.0, 5.4]
+          - [5.6, 5.4]
           - [5.6, 6.5]
           - [7.9, 6.5]
           - [8.7, 7.4]
@@ -293,7 +294,7 @@ nodes:
     point: [1, 17.3, 0.7]
     floors: ["first"]
   - name: Office
-    point: [6.8, 13.5, 3.6]
+    point: [8.8, 13.2, 3.6]
     floors: ["second"]
   - name: Family
     point: [0.4, 0.4, 0.4]
@@ -302,23 +303,23 @@ nodes:
     point: [9, 7.3, 1]
     floors: ["first"]
   - name: Nook
-    point: [7, 0.7, 0.4]
+    point: [7.6, 1.6, 0.7]
     floors: ["first"]
   - name: Dining
     point: [16.3, 2.6, 0.4]
-    floors: ["first", "second"]
+    floors: ["first"]
   - name: Basement
-    point: [15.8, 11.5, -0.5]
+    point: [15.8, 11.5, 0.0]
     floors: ["first"]
   - name: Laundry
     point: [4.3, 7.6, 1.4]
     floors: ["first"]
   - name: Back Stairs
-    point: [4.5, 7.5, 3.4]
+    point: [5.8, 4.6, 3.4]
     floors: ["second"]
   - name: Foyer
-    point: [9.9, 8.6, 0.4]
-    floors: ["first", "second"]
+    point: [10.9, 9.3, 0.4]
+    floors: ["first"]
   - name: VW EOS
     stationary: false
     point: [-2, 15, 0.5]
