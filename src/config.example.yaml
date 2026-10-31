@@ -58,8 +58,11 @@ optimization:
 
 
 locators:
+  # Per-floor locators (nadaraya_watson, nelder_mead, bfgs, mle) solve each floor separately and
+  # the highest-confidence floor wins, which can favor a floor with few nodes. multi_floor solves
+  # across all nodes in 3D and takes the floor from the result, so it is the default here.
   nadaraya_watson:
-    enabled: true
+    enabled: false
     floors: ["first", "second"]
     bandwidth: 0.5
     kernel: gaussian
@@ -98,13 +101,14 @@ locators:
         sigma: 0.30
 
   multi_floor:
-    enabled: false
+    enabled: true
     weighting:
       # Node weighting algorithm for MultiFloor (cross-floor localization)
       # Options: equal, linear, gaussian, exponential
       algorithm: gaussian
       props:
-        sigma: 0.30
+        # Too low (0.10) leans on the nearest few nodes and pulls upstairs devices downstairs
+        sigma: 0.25
 
   nearest_node:
     enabled: true
@@ -205,8 +209,7 @@ floors:
         points:
           - [10.1, 12.9]
           - [12.6, 12.9]
-          - [12.6, 10.4]
-          - [11.45, 10.4]
+          - [12.6, 9.3]
           - [11.45, 9.3]
           - [10.5, 8.5]
           - [8.08, 8.5]
@@ -289,7 +292,7 @@ nodes:
     point: [1, 17.3, 0.7]
     floors: ["first"]
   - name: Office
-    point: [6.8, 13.5, 3.6]
+    point: [8.8, 13.2, 3.6]
     floors: ["second"]
   - name: Family
     point: [0.4, 0.4, 0.4]
@@ -298,13 +301,16 @@ nodes:
     point: [9, 7.3, 1]
     floors: ["first"]
   - name: Nook
-    point: [7, 0.7, 0.4]
+    point: [7.66, 0.7, 0.4]
     floors: ["first"]
   - name: Dining
-    point: [16.3, 2.6, 0.4]
+    point: [16.4, 3.1, 0.4]
     floors: ["first", "second"]
   - name: Basement
     point: [15.8, 11.5, -0.5]
+    floors: ["first"]
+  - name: Living
+    point: [16.5, 11.4, 0.36]
     floors: ["first"]
   - name: Laundry
     point: [4.3, 7.6, 1.4]
@@ -313,7 +319,7 @@ nodes:
     point: [4.5, 7.5, 3.4]
     floors: ["second"]
   - name: Foyer
-    point: [9.9, 8.6, 0.4]
+    point: [10.9, 9.3, 0.4]
     floors: ["first", "second"]
   - name: VW EOS
     stationary: false
