@@ -186,7 +186,7 @@ public class State
                     Distance = deviceNode.Distance,
                     DistVar = deviceNode.DistVar,
                     Rssi = deviceNode.Rssi,
-                    RssiRxAdj = null,
+                    RssiRxAdj = deviceNode.RssiRxAdj,
                     RssiVar = deviceNode.RssiVar,
                     RefRssi = deviceNode.RefRssi,
                     Tx = anchorNode,

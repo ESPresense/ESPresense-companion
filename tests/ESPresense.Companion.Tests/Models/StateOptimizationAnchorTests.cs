@@ -122,6 +122,30 @@ public class StateOptimizationAnchorTests
     }
 
     [Test]
+    public void TakeOptimizationSnapshot_AnchorMeasureCarriesTheRxAdjItWasTakenWith()
+    {
+        var node = new Node("node1", NodeSourceType.Config);
+        node.Update(_configLoader.Config!, new ConfigNode { Name = "Node 1", Point = new double[] { 0, 0, 0 } }, Enumerable.Empty<Floor>());
+        _state.Nodes["node1"] = node;
+
+        var device = new Device("anchored-device", null, TimeSpan.FromSeconds(30));
+        device.SetAnchor(new DeviceAnchor(new Point3D(2.5, 2.5, 0), null, null));
+        _state.Devices["anchored-device"] = device;
+
+        var deviceNode = new DeviceToNode(device, node);
+        device.Nodes["node1"] = deviceNode;
+        deviceNode.ReadMessage(new DeviceMessage { Rssi = -60, RssiRxAdj = 4, RefRssi = -59, Distance = 3.5 });
+        var before = _state.TakeOptimizationSnapshot().Measures.Single(m => m.Tx.Id == device.Id);
+
+        // The node's rxAdj moves from 4 to 7, so the same signal is now published 3 dB lower.
+        deviceNode.ReadMessage(new DeviceMessage { Rssi = -63, RssiRxAdj = 7, RefRssi = -59, Distance = 3.5 });
+        var after = _state.TakeOptimizationSnapshot().Measures.Single(m => m.Tx.Id == device.Id);
+
+        Assert.That(before.GetAdjustedRssi(5), Is.EqualTo(-61));
+        Assert.That(after.GetAdjustedRssi(5), Is.EqualTo(before.GetAdjustedRssi(5)), "readings from either side of an rxAdj change must agree once re-based");
+    }
+
+    [Test]
     public void TakeOptimizationSnapshot_OnlyIncludesCurrentMeasurements()
     {
         // Arrange
