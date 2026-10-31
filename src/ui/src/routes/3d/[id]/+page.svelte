@@ -1,24 +1,19 @@
 <script lang="ts">
 	// Page to display the 3D map for a SINGLE device and its history
 	import { onMount, onDestroy } from 'svelte';
-	// `$app/stores` is deprecated, but `$app/state` is not reactive under legacy `$:`/`derived()`;
-	// this page is converted to runes in Phase 4.
-	import { page } from '$app/stores'; // To get route params
+	import { page } from '$app/state'; // To get route params
 	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 	import { devices, nodes, config } from '$lib/stores';
 	import Map3D from '$lib/Map3D.svelte';
 	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
 	import { apiFetch } from '$lib/api';
-	import { derived } from 'svelte/store';
 
 	// --- Route Param ---
-	let deviceId = $derived($page.params.id ?? null); // Get device ID from URL
+	let deviceId = $derived(page.params.id ?? null); // Get device ID from URL
 
 	// --- Data Stores & Derived State ---
 	// Find the specific device based on the route ID
-	const currentDevice = derived([devices, page], ([$devices, $page]) => {
-		return $devices.find((d) => d.id === $page.params.id) || null;
-	});
+	let currentDevice = $derived($devices.find((d) => d.id === deviceId) || null);
 
 	// --- State for this page ---
 	let guiInstance: GUI | null = null;
@@ -133,9 +128,9 @@
 </svelte:head>
 
 <div class="w-full h-full relative">
-	{#if $config && $currentDevice && $nodes}
-		<Map3D devicesToShow={displayMode === 'current' ? [$currentDevice] : []} nodesToShow={$nodes} config={$config} historyData={displayMode === 'history' ? deviceHistoryData : []} showDevices={displayMode === 'current'} showHistoryPath={displayMode === 'history'} bind:showNodes bind:zRotationSpeed />
-	{:else if !$currentDevice && $devices}
+	{#if $config && currentDevice && $nodes}
+		<Map3D devicesToShow={displayMode === 'current' ? [currentDevice] : []} nodesToShow={$nodes} config={$config} historyData={displayMode === 'history' ? deviceHistoryData : []} showDevices={displayMode === 'current'} showHistoryPath={displayMode === 'history'} bind:showNodes bind:zRotationSpeed />
+	{:else if !currentDevice && $devices}
 		<div class="absolute inset-0 flex items-center justify-center text-white">
 			Device with ID '{deviceId}' not found.
 		</div>
