@@ -202,3 +202,30 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		expect(transmitterRows).toContain('Tx: Another Transmitter');
 	});
 });
+
+test('the calibration page leads with the self-test and its next step', async ({ page }) => {
+	await mockApi(page, { stubWebSocket: true });
+	await page.route('**/api/accuracy', (route) =>
+		route.fulfill({
+			json: {
+				timestamp: '2026-10-31T12:00:00Z',
+				placed: 8,
+				solved: 7,
+				unsolved: 1,
+				median: 1.4,
+				p95: 3.2,
+				worst: { id: 'e', name: 'Kitchen', error: 3.2, linkError: 2.6, neighbours: 6 },
+				guidance: 'Start with Kitchen: its links are 2.6 m from the map when most nodes are within 0.8 m. Check its placement or height.',
+				nodes: [],
+				hints: []
+			}
+		})
+	);
+	await page.goto('/calibration');
+
+	const accuracy = page.getByTestId('position-accuracy');
+	await expect(accuracy).toContainText('Typical error 1.4 m');
+	await expect(accuracy).toContainText('worst node Kitchen, links 2.6 m off');
+	await expect(accuracy).toContainText('Start with Kitchen');
+	await expect(accuracy).toContainText('7 of 8 solved');
+});

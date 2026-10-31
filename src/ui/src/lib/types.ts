@@ -323,3 +323,19 @@ export type DeviceExplanation = {
 	uncertainty: ExplainedEllipse | null;
 	hints: string[];
 };
+
+export type NodeSelfTest = { id: string; name: string | null; error: number | null; linkError: number | null; neighbours: number };
+
+// Mirrors PositionAccuracy in src/Models/PositionAccuracy.cs
+export type PositionAccuracy = {
+	timestamp: string;
+	placed: number;
+	solved: number;
+	unsolved: number;
+	median: number | null;
+	p95: number | null;
+	worst: NodeSelfTest | null;
+	guidance: string;
+	nodes: NodeSelfTest[];
+	hints: string[];
+};

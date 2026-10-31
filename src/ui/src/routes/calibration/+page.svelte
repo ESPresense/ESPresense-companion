@@ -2,6 +2,7 @@
 	import NodeCalibrationMatrix from '$lib/NodeCalibrationMatrix.svelte';
 	import DeviceCalibrationManager from '$lib/DeviceCalibrationManager.svelte';
 	import CalibrationTabs from '$lib/CalibrationTabs.svelte';
+	import PositionAccuracy from '$lib/PositionAccuracy.svelte';
 
 	let calibrationType = $state('node');
 </script>
@@ -19,6 +20,7 @@
 	</div>
 	{#if calibrationType === 'node'}
 		<section>
+			<PositionAccuracy />
 			<NodeCalibrationMatrix />
 		</section>
 	{:else if calibrationType === 'device'}
