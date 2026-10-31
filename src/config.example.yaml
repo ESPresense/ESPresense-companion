@@ -311,6 +311,9 @@ nodes:
   - name: Basement
     point: [15.8, 11.5, -0.5]
     floors: ["first"]
+  - name: Living
+    point: [16.5, 11.4, 0.4]
+    floors: ["first"]
   - name: Laundry
     point: [4.3, 7.6, 1.4]
     floors: ["first"]
