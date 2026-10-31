@@ -23,7 +23,7 @@
     <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
     <PackageReference Include="MathNet.Spatial" Version="0.6.0" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.33" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
     <PackageReference Include="MQTTnet" Version="5.2.0.1603" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
