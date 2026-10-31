@@ -36,6 +36,39 @@ public class Scenario(Config? config, ILocate locator, string? name)
     public DateTime? LastHit { get; set; }
     public double Probability { get; set; } = 1.0;
 
+    /// <summary>
+    /// The unfiltered position from the latest <see cref="UpdateLocation"/>, before Kalman smoothing
+    /// </summary>
+    [JsonIgnore] public Point3D Fit { get; private set; }
+
+    /// <summary>
+    /// What the latest locator pass used; replaced whole so a reader never sees half a pass
+    /// </summary>
+    [JsonIgnore] public LocatorTrace? Trace { get; set; }
+
+    public string LocatorName => Locator switch
+    {
+        NelderMeadMultilateralizer => "Nelder-Mead",
+        BfgsMultilateralizer => "BFGS",
+        MLEMultilateralizer => "MLE",
+        GaussNewtonMultilateralizer => "Gauss-Newton",
+        NadarayaWatsonMultilateralizer => "Nadaraya-Watson",
+        MultiFloorMultilateralizer => "MultiFloor",
+        NearestNode => "Nearest Node",
+        AnchorLocator => "Anchored",
+        _ => Locator.GetType().Name
+    };
+
+    internal bool IsNearestNode => Locator is NearestNode;
+
+    /// <summary>
+    /// Locator and floor together: <see cref="Name"/> alone is the floor, shared by every locator on
+    /// it. Name stays as it is because it's published as best_scenario and stored in history.
+    /// </summary>
+    public string Label => Locator is BaseMultilateralizer or NadarayaWatsonMultilateralizer
+        ? $"{LocatorName} ({Name})"
+        : LocatorName;
+
     public bool Locate()
     {
         return Locator.Locate(this);
@@ -45,6 +78,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
     {
         LastHit = DateTime.UtcNow;
         LastLocation = Location;
+        Fit = newLocation;
 
         // Use the KalmanLocation to get a filtered position
         _kalmanLocation.Update(newLocation);

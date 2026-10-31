@@ -27,6 +27,7 @@ public class MultiFloorMultilateralizer : ILocate
     public bool Locate(Scenario scenario)
     {
         var confidence = scenario.Confidence;
+        double[]? solvedWeights = null;
         var solver = new NelderMeadSimplex(1e-7, 10000);
 
         double Error(IList<double> x, DeviceToNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
@@ -72,6 +73,7 @@ public class MultiFloorMultilateralizer : ILocate
                     var result = solver.FindMinimum(obj, init);
                     scenario.UpdateLocation(new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]));
                     scenario.Scale = result.MinimizingPoint[3];
+                    solvedWeights = weights;
                     scenario.Fixes = pos.Count;
                     scenario.Minimum = nodes.Min(a => (double?) a.Distance);
                     scenario.LastHit = nodes.Max(a => a.LastHit);
@@ -117,6 +119,9 @@ public class MultiFloorMultilateralizer : ILocate
         }
 
         scenario.Confidence = confidence;
+        scenario.Trace = pos.Count <= 0
+            ? LocatorTrace.NoFix(null, nodes)
+            : LocatorTrace.Finished(null, nodes, solvedWeights, scenario.Fit, scenario.Scale ?? 1);
 
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;

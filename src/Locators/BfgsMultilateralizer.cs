@@ -29,6 +29,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
             return false;
 
         int confidence = scenario.Confidence ?? 0;
+        double[]? solvedWeights = null;
         try
         {
             if (nodes.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
@@ -82,6 +83,7 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                 var solver = new BfgsBMinimizer(1e-5, 1e-5, 1e-5, 1000);
                 var result = solver.FindMinimum(obj, lowerBound, upperBound, initialGuess);
                 scenario.UpdateLocation(new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]));
+                solvedWeights = Enumerable.Range(0, nodes.Length).Select(i => Weight(i, nodes.Length)).ToArray();
                 scenario.Fixes = nodes.Length;
                 scenario.Error = result.FunctionInfoAtMinimum.Value;
                 scenario.Iterations = result switch
@@ -113,6 +115,6 @@ public class BfgsMultilateralizer : BaseMultilateralizer
             confidence = HandleLocatorException(ex, scenario, guess);
         }
 
-        return FinalizeScenario(scenario, confidence);
+        return FinalizeScenario(scenario, confidence, nodes, solvedWeights);
     }
 }

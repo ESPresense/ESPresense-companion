@@ -303,7 +303,7 @@ public class BaseMultilateralizerTests
 
         public bool PublicFinalizeScenario(Scenario scenario, int confidence)
         {
-            return FinalizeScenario(scenario, confidence);
+            return FinalizeScenario(scenario, confidence, []);
         }
 
         public static Vector<double> PublicDirectionOrFallback(Vector<double> from, Vector<double> to)

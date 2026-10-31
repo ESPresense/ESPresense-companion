@@ -28,10 +28,20 @@ namespace ESPresense.Controllers
         {
             var deviceSettings = _deviceSettingsStore.Get(id);
             var details = new List<KeyValuePair<string, string>>();
-            if (deviceSettings?.Id != null && _state.Devices.TryGetValue(deviceSettings.Id, out var device))
+            if (FindDevice(id, deviceSettings) is { } device)
                 details.AddRange(device.GetDetails());
             return new DeviceSettingsDetails(deviceSettings ?? new DeviceSettings { Id = id, OriginalId = id }, details);
         }
+
+        [HttpGet("{id}/explain")]
+        public ActionResult<DeviceExplanation> Explain(string id)
+        {
+            var device = FindDevice(id, _deviceSettingsStore.Get(id));
+            return device == null ? NotFound() : DeviceExplanation.From(device);
+        }
+
+        private Device? FindDevice(string id, DeviceSettings? settings) =>
+            _state.Devices.TryGetValue(settings?.Id ?? id, out var device) ? device : null;
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Set(string id, [FromBody] DeviceSettings value)
