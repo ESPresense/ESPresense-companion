@@ -27,6 +27,7 @@ public class NelderMeadMultilateralizer : BaseMultilateralizer
             return false;
 
         int confidence = scenario.Confidence ?? 0;
+        double[]? solvedWeights = null;
         try
         {
             if (nodes.Length < 3 || Floor.Bounds == null || Floor.Bounds.Length < 2)
@@ -71,6 +72,7 @@ public class NelderMeadMultilateralizer : BaseMultilateralizer
                 var minimizingPoint = result.MinimizingPoint.PointwiseMinimum(upperBound).PointwiseMaximum(lowerBound);
                 scenario.UpdateLocation(new Point3D(minimizingPoint[0], minimizingPoint[1], minimizingPoint[2]));
                 scenario.Scale = minimizingPoint[3];
+                solvedWeights = weights;
                 scenario.Fixes = nodes.Length;
                 scenario.Error = result.FunctionInfoAtMinimum.Value;
                 scenario.Iterations = result switch
@@ -108,6 +110,6 @@ public class NelderMeadMultilateralizer : BaseMultilateralizer
             confidence = HandleLocatorException(ex, scenario, guess);
         }
 
-        return FinalizeScenario(scenario, confidence);
+        return FinalizeScenario(scenario, confidence, nodes, solvedWeights, scenario.Scale ?? 1);
     }
 }
