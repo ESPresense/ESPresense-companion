@@ -121,10 +121,19 @@ public class MultiFloorMultilateralizer : ILocate
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;
 
-        var floors = _state.Floors.Values.Where(a => a.Contained(scenario.Location.Z));
+        // The solve is unbounded in z, so it can land below the lowest floor or between floors;
+        // fall back to the floor nearest in z so the device still gets a floor (and room) for the map and HA.
+        var z = scenario.Location.Z;
+        var floors = _state.Floors.Values.Where(a => a.Contained(z)).ToList();
+        if (floors.Count == 0 && NearestFloor(z) is { } nearest) floors.Add(nearest);
         var room = floors.SelectMany(a => a.Rooms.Values).FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
         if (scenario.Room != room) scenario.Room = room;
+        scenario.Floor = room?.Floor ?? floors.FirstOrDefault();
         Log.Debug("New location {0} {1}@{2}", _device, _device.Room?.Name ?? "Unknown", scenario.Location);
         return true;
     }
+
+    private Floor? NearestFloor(double z) => _state.Floors.Values
+        .Where(f => f.Bounds is { Length: >= 2 })
+        .MinBy(f => Math.Max(0, Math.Max(f.Bounds![0].Z - z, z - f.Bounds[1].Z)));
 }

@@ -2,9 +2,10 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
+import sveltekitConfig from './sveltekit.config.js';
 
 export default defineConfig({
-	plugins: [devtoolsJson(), tailwindcss(), sveltekit()],
+	plugins: [devtoolsJson(), tailwindcss(), sveltekit(sveltekitConfig)],
 
 	build: {
 		sourcemap: true

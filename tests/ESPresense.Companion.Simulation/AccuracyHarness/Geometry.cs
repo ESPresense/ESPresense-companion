@@ -17,6 +17,12 @@ public sealed class HarnessScenario
     [JsonPropertyName("tracks")] public HarnessTrack[] Tracks { get; init; } = Array.Empty<HarnessTrack>();
 
     /// <summary>
+    /// Height of the tracked device (m). Omitted means the device shares each station's
+    /// height, i.e. ranges are purely horizontal.
+    /// </summary>
+    [JsonPropertyName("device_z")] public double? DeviceZ { get; init; }
+
+    /// <summary>
     /// First-match-wins lookup of the room containing (x,y). Room bounds are
     /// inclusive on both sides — a point on a shared boundary belongs to
     /// the room declared first in the scenario file. This is deterministic

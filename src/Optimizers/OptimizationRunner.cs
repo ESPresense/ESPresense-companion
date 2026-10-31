@@ -4,6 +4,7 @@ using ESPresense.Utils;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace ESPresense.Optimizers;
@@ -132,17 +133,40 @@ internal class OptimizationRunner : BackgroundService
     }
 
     /// <summary>
-    /// Runs one optimization pass: evaluates the baseline over <paramref name="oss"/>, then each optimizer's
-    /// proposal for <paramref name="os"/>, applying any proposal whose composite score beats the current best.
-    /// An evaluation backed by fewer than <see cref="ConfigOptimization.MinSamples"/> measurements is rejected
-    /// outright: with only a handful of points a proposal can fit the very samples it was derived from
-    /// (RMSE ~ 0) and "beat" the baseline without having been validated by anything, which would push an
-    /// unverified calibration to a real node over MQTT during cold start or on sparse installs.
+    /// Runs one optimization pass: evaluates the incumbent settings over <paramref name="oss"/>, then each
+    /// optimizer's proposal for <paramref name="os"/>, and applies the single best proposal that passes
+    /// every check below. The checks exist because a calibration that is wrong but scores well is pushed
+    /// to real nodes over MQTT, and the history of this gate is a history of proposals that did exactly that.
+    ///
+    /// Min samples: an evaluation backed by fewer than <see cref="ConfigOptimization.MinSamples"/>
+    /// measurements is rejected outright; with a handful of points a proposal can fit the very samples
+    /// it was derived from (RMSE ~ 0) and "beat" the baseline without having been validated by anything.
+    ///
+    /// Held-out scoring: when the history holds snapshots besides the one the optimizers fitted, proposals
+    /// are scored only on those others. A proposal that memorised its own snapshot's radio noise scores
+    /// well on itself however wrong it is, and on a cold start the gate would wave it straight through.
+    ///
+    /// Device frame: a proposal that moves txRef must also win with txRef held, because node-to-node data
+    /// cannot tell "every transmitter k dB loud" from "every receiver k dB deaf" while every device, ranged
+    /// with its own rssi@1m, can. Scoring in RSSI space is blind to that shift; the robot survey showed it
+    /// as rxAdj climbing cycle after cycle.
+    ///
+    /// Every snapshot: the proposal must beat the incumbent on each eval snapshot on its own, not just on
+    /// the aggregate. rxAdj and absorption trade off almost perfectly over the narrow band of distances
+    /// one receiver sees, so on a home that has not changed, noise alone used to move settings by several
+    /// dB every cycle along that ridge.
+    ///
+    /// Best of: proposals are all scored against the same incumbent and only the best is applied, rather
+    /// than applied greedily in list order, which let an absorption-only proposal land on top of another
+    /// optimizer's rxAdj: a pair nobody fitted.
     /// </summary>
     internal async Task RunCycleAsync(OptimizationSnapshot os, List<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
     {
+        var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
+        if (evalSet.Count == 0) evalSet = oss;
+
         var baselineResults = new OptimizationResults();
-        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(oss, _nsd);
+        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(evalSet, _nsd);
         if (baselineSamples < optimization.MinSamples)
         {
             Log.Debug("Optimization skipped: baseline evaluated on {0} measurements, need at least {1} (min_samples)", baselineSamples, optimization.MinSamples);
@@ -166,10 +190,15 @@ internal class OptimizationRunner : BackgroundService
 
         var currentSettings = os.GetNodeIds().ToDictionary(id => id, _nsd.Get);
 
+        // Every optimizer is scored against the same incumbent and only the best passing proposal is
+        // applied. Applying them greedily in sequence made the outcome depend on list order, and let an
+        // absorption-only proposal land on top of another optimizer's rxAdj: a pair nobody fitted.
+        (IOptimizer Optimizer, OptimizationResults Results, double Composite, double Corr, double Rmse)? best = null;
+
         foreach (var optimizer in optimizers)
         {
             var results = optimizer.Optimize(os, currentSettings);
-            var (corr, rmse, samples) = results.Evaluate(oss, _nsd);
+            var (corr, rmse, samples) = results.Evaluate(evalSet, _nsd);
             if (samples < optimization.MinSamples)
             {
                 Log.Debug("Optimizer {0,-24} rejected: evaluated on {1} measurements, need at least {2} (min_samples)",
@@ -191,24 +220,108 @@ internal class OptimizationRunner : BackgroundService
                 continue;
             }
 
-            Log.Information("Optimizer {0,-24} found better results: Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
-                optimizer.Name, composite, bestScore, corr, rmse);
-            _state.OptimizerState.BestR = corr;
-            _state.OptimizerState.BestRMSE = rmse;
-
-            foreach (var (id, result) in results.Nodes)
+            // A proposal that moves txRef must also win with txRef held where it is: devices are ranged
+            // with their own rssi@1m, so a txRef/rxAdj shift that cancels node-to-node is a plain range
+            // bias for every device. See OptimizationResults.Evaluate.
+            if (results.Nodes.Values.Any(r => r.TxRefRssi != null))
             {
-                Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
-                    id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
-
-                var nodeSettings = _nsd.Get(id);
-                if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
-                if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
-                if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
-                await _nsd.Set(id, nodeSettings);
+                var (dCorr, dRmse, _) = results.Evaluate(evalSet, _nsd, deviceFrame: true);
+                var deviceComposite = (dCorr * correlationWeight) + ((1 - dRmse / (1 + dRmse)) * rmseWeight);
+                if (double.IsNaN(deviceComposite) || double.IsInfinity(deviceComposite) || deviceComposite <= bestScore)
+                {
+                    Log.Information("Optimizer {0,-24} rejected: better node-to-node (Composite={1:0.000}) but not with txRef held (Composite={2:0.000} <= Best={3:0.000}); the gain is a txRef/rxAdj shift devices would see as range bias",
+                        optimizer.Name, composite, deviceComposite, bestScore);
+                    continue;
+                }
             }
 
-            bestScore = composite;
+            // On a home that has not changed, successive snapshots differ only by noise, and rxAdj and
+            // absorption trade off almost perfectly over the narrow band of distances one receiver sees.
+            // A proposal that is ahead on the aggregate because one snapshot's noise favours it would be
+            // applied, then undone by the next cycle's noise, and settings wander along that ridge
+            // indefinitely. So it must also win against the incumbent on every eval snapshot by itself.
+            if (evalSet.Count > 1)
+            {
+                var losesOn = evalSet.Where(snap =>
+                {
+                    var one = new List<OptimizationSnapshot> { snap };
+                    var (bc, br, bs) = baselineResults.Evaluate(one, _nsd);
+                    var (pc, pr, ps) = results.Evaluate(one, _nsd);
+                    if (bs < optimization.MinSamples || ps < optimization.MinSamples) return false;
+                    var baseOne = (bc * correlationWeight) + ((1 - br / (1 + br)) * rmseWeight);
+                    var propOne = (pc * correlationWeight) + ((1 - pr / (1 + pr)) * rmseWeight);
+                    return double.IsNaN(propOne) || propOne <= baseOne;
+                }).Count();
+                if (losesOn > 0)
+                {
+                    Log.Information("Optimizer {0,-24} rejected: better on the aggregate (Composite={1:0.000} > Best={2:0.000}) but not on {3} of {4} snapshots on their own; treating the gain as noise",
+                        optimizer.Name, composite, bestScore, losesOn, evalSet.Count);
+                    continue;
+                }
+            }
+
+            Log.Information("Optimizer {0,-24} found better results: Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
+                optimizer.Name, composite, bestScore, corr, rmse);
+            if (best == null || composite > best.Value.Composite)
+                best = (optimizer, results, composite, corr, rmse);
         }
+
+        if (best == null) return;
+
+        var (chosen, chosenResults, chosenComposite, chosenCorr, chosenRmse) = best.Value;
+        Log.Information("Applying {0} (Composite={1:0.000}, R={2:0.000}, RMSE={3:0.000})", chosen.Name, chosenComposite, chosenCorr, chosenRmse);
+        _state.OptimizerState.BestR = chosenCorr;
+        _state.OptimizerState.BestRMSE = chosenRmse;
+
+        foreach (var (id, result) in chosenResults.Nodes)
+        {
+            Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
+                id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
+
+            var nodeSettings = _nsd.Get(id);
+            if (result.Absorption != null) nodeSettings.Calibration.Absorption = result.Absorption;
+            if (result.RxAdjRssi != null) nodeSettings.Calibration.RxAdjRssi = (int?)Math.Round(result.RxAdjRssi.Value);
+            if (result.TxRefRssi != null) nodeSettings.Calibration.TxRefRssi = (int?)Math.Round(result.TxRefRssi.Value);
+
+            var atLimit = LimitsReached(
+                result.Absorption != null ? nodeSettings.Calibration.Absorption : null,
+                result.RxAdjRssi != null ? nodeSettings.Calibration.RxAdjRssi : null,
+                result.TxRefRssi != null ? nodeSettings.Calibration.TxRefRssi : null,
+                optimization);
+            if (atLimit.Count > 0)
+                Log.Warning("Applied {0,-20}: at the configured limit: {1}. The fit wanted to go further, so these are the limits rather than fitted values; check the node's placement or the optimization limits",
+                    id, string.Join(", ", atLimit));
+
+            await _nsd.Set(id, nodeSettings);
+        }
+    }
+
+    /// <summary>
+    /// Which of the values being applied sit on a configured optimization limit. Checked on what is
+    /// actually applied, not the raw fit: rxAdj and txRef are stored as whole dB and absorption is
+    /// published to two decimals, so a fit of 29.6 against a limit of 30 lands on the limit.
+    /// A limit pair with min == max pins the value on purpose and is not reported.
+    /// </summary>
+    internal static List<string> LimitsReached(double? absorption, int? rxAdjRssi, int? txRefRssi, ConfigOptimization optimization)
+    {
+        var reached = new List<string>();
+
+        // Limits are compared in the same rounding as the value, so a limit that is not a whole dB
+        // (or not two decimals of absorption) still counts as reached by the nearest value that can be applied.
+        void Check(string name, double? value, double min, double max, string format)
+        {
+            if (value == null || max <= min) return;
+            var shown = value.Value.ToString(format, CultureInfo.InvariantCulture);
+            if (value <= min) reached.Add($"{name}={shown} ({name}_min)");
+            else if (value >= max) reached.Add($"{name}={shown} ({name}_max)");
+        }
+
+        static double Published(double v) => Math.Round(v, 2, MidpointRounding.AwayFromZero);
+
+        Check("absorption", absorption.HasValue ? Published(absorption.Value) : null,
+            Published(optimization.AbsorptionMin), Published(optimization.AbsorptionMax), "0.00");
+        Check("rx_adj_rssi", rxAdjRssi, Math.Round(optimization.RxAdjRssiMin), Math.Round(optimization.RxAdjRssiMax), "0");
+        Check("tx_ref_rssi", txRefRssi, Math.Round(optimization.TxRefRssiMin), Math.Round(optimization.TxRefRssiMax), "0");
+        return reached;
     }
 }

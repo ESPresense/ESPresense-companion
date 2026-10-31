@@ -364,6 +364,90 @@ public class DeviceSettingsStoreTests
         Assert.That(_deviceSettingsStore.Get("keys:one-new"), Is.Not.Null);
     }
 
+    [Test]
+    public async Task AliasRename_Should_Retire_Raw_Key_Then_Previous_Alias()
+    {
+        var retired = new List<IReadOnlyList<string>>();
+        _deviceSettingsStore.DeviceIdsRetiredAsync += ids => { retired.Add(ids); return Task.CompletedTask; };
+
+        // Name only: nothing retired
+        await ReceiveDeviceConfigAsync("irk:70f7", new DeviceSettings { Name = "iPhone" });
+        Assert.That(retired, Is.Empty);
+
+        // First alias: the raw key is dead
+        await ReceiveDeviceConfigAsync("irk:70f7", new DeviceSettings { Id = "phone:piper", Name = "iPhone" });
+        Assert.That(retired, Has.Count.EqualTo(1));
+        Assert.That(retired[0], Is.EquivalentTo(new[] { "irk:70f7" }));
+
+        // Same alias again (e.g. a name edit): nothing new
+        await ReceiveDeviceConfigAsync("irk:70f7", new DeviceSettings { Id = "phone:piper", Name = "Piper" });
+        Assert.That(retired, Has.Count.EqualTo(1));
+
+        // Rename: the previous alias is dead (and the raw key still is)
+        await ReceiveDeviceConfigAsync("irk:70f7", new DeviceSettings { Id = "phone:old-iphone", Name = "iPhone" });
+        Assert.That(retired, Has.Count.EqualTo(2));
+        Assert.That(retired[1], Is.EquivalentTo(new[] { "phone:piper", "irk:70f7" }));
+
+        Assert.That(_deviceSettingsStore.IsRetired("irk:70f7"), Is.True);
+        Assert.That(_deviceSettingsStore.IsRetired("phone:old-iphone"), Is.False);
+    }
+
+    [Test]
+    public async Task AliasRemoved_Should_Retire_Alias_But_Not_Raw_Key()
+    {
+        var retired = new List<string>();
+        _deviceSettingsStore.DeviceIdsRetiredAsync += ids => { retired.AddRange(ids); return Task.CompletedTask; };
+
+        await ReceiveDeviceConfigAsync("irk:70f7", new DeviceSettings { Id = "phone:piper" });
+        retired.Clear();
+        await ReceiveDeviceConfigAsync("irk:70f7", new DeviceSettings { Name = "iPhone" });
+
+        Assert.That(retired, Is.EquivalentTo(new[] { "phone:piper" }));
+        Assert.That(_deviceSettingsStore.IsRetired("irk:70f7"), Is.False);
+    }
+
+    [Test]
+    public async Task AliasChange_Should_Not_Retire_Alias_Taken_Over_By_Another_Device()
+    {
+        var retired = new List<string>();
+        _deviceSettingsStore.DeviceIdsRetiredAsync += ids => { retired.AddRange(ids); return Task.CompletedTask; };
+
+        await ReceiveDeviceConfigAsync("keys:one", new DeviceSettings { Id = "keys:shared" });
+        await ReceiveDeviceConfigAsync("keys:two", new DeviceSettings { Id = "keys:shared" });
+        retired.Clear();
+        await ReceiveDeviceConfigAsync("keys:one", new DeviceSettings { Id = "keys:one-new" });
+
+        Assert.That(retired, Is.EquivalentTo(new[] { "keys:one" }));
+    }
+
+    [Test]
+    public async Task AliasChange_By_Last_Writer_Should_Keep_Alias_Still_Used_By_Another_Key()
+    {
+        var retired = new List<string>();
+        _deviceSettingsStore.DeviceIdsRetiredAsync += ids => { retired.AddRange(ids); return Task.CompletedTask; };
+
+        await ReceiveDeviceConfigAsync("keys:one", new DeviceSettings { Id = "keys:shared", OriginalId = "keys:one" });
+        await ReceiveDeviceConfigAsync("keys:two", new DeviceSettings { Id = "keys:shared", OriginalId = "keys:two" });
+        retired.Clear();
+        // The key that wrote the alias map last moves away; keys:one still uses the alias
+        await ReceiveDeviceConfigAsync("keys:two", new DeviceSettings { Id = "keys:two-new", OriginalId = "keys:two" });
+
+        Assert.That(retired, Is.EquivalentTo(new[] { "keys:two" }));
+        Assert.That(_deviceSettingsStore.Get("keys:shared")?.OriginalId, Is.EqualTo("keys:one"));
+    }
+
+    [Test]
+    public async Task Settings_Whose_Id_Equals_Key_Are_Not_Retired()
+    {
+        var retired = new List<string>();
+        _deviceSettingsStore.DeviceIdsRetiredAsync += ids => { retired.AddRange(ids); return Task.CompletedTask; };
+
+        await ReceiveDeviceConfigAsync("keys:darrell", new DeviceSettings { Id = "keys:darrell", Name = "Keys" });
+
+        Assert.That(retired, Is.Empty);
+        Assert.That(_deviceSettingsStore.IsRetired("keys:darrell"), Is.False);
+    }
+
     private Task ReceiveDeviceConfigAsync(string deviceId, DeviceSettings deviceSettings)
     {
         return _receive(new DeviceSettingsEventArgs { DeviceId = deviceId, Payload = deviceSettings });

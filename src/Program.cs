@@ -4,7 +4,6 @@ using ESPresense.Services;
 using MQTTnet.Diagnostics.Logger;
 using Serilog;
 using Serilog.Events;
-using SQLite;
 using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
 using ESPresense.Controllers;
@@ -38,20 +37,6 @@ builder.Services.AddHostedService(a => configLoader);
 builder.Services.AddDataProtection()
     .UseEphemeralDataProtectionProvider();
 
-builder.Services.AddSingleton(a =>
-{
-    SQLitePCL.Batteries.Init();
-    var databasePath = Path.Combine(storageDir, "history.db");
-    Directory.CreateDirectory(Path.GetDirectoryName(databasePath) ?? throw new InvalidOperationException("HOME not found"));
-    var sqLiteConnection = new SQLiteAsyncConnection(databasePath)
-    {
-        Trace = true,
-        Tracer = Log.Debug
-    };
-
-    return sqLiteConnection;
-});
-
 builder.Services.AddSingleton<HttpClient>();
 builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
 builder.Services.AddSingleton<MqttCoordinator>();
@@ -60,7 +45,7 @@ builder.Services.AddSingleton<TelemetryService>();
 builder.Services.AddSingleton<GlobalEventDispatcher>();
 builder.Services.AddSingleton<DeviceTracker>();
 builder.Services.AddSingleton<SupervisorConfigLoader>();
-builder.Services.AddSingleton<DeviceHistoryStore>();
+builder.Services.AddSingleton(a => new DeviceHistoryStore(storageDir, a.GetRequiredService<ConfigLoader>()));
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
@@ -116,7 +101,17 @@ app.UseSerilogRequestLogging(o =>
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");
 app.UseSwaggerUI(c => c.RoutePrefix = "api/swagger");
 
-app.UseStaticFiles();
+// Without Cache-Control, browsers (and the HA ingress iframe) heuristically cached index.html off Last-Modified
+// and kept running the previous build after an add-on update. Hashed assets never change. Everything else is
+// good for a minute, then revalidates (ETag makes that a cheap 304). Not "public": ingress responses are per-user.
+var spaFiles = new StaticFileOptions
+{
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl =
+        ctx.Context.Request.Path.StartsWithSegments("/_app/immutable")
+            ? "public, max-age=31536000, immutable"
+            : "max-age=60, must-revalidate"
+};
+app.UseStaticFiles(spaFiles);
 app.UseRouting();
 app.MapMcp("/api/mcp");
 app.MapHealthChecks("/healthz");
@@ -125,6 +120,6 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller}/{action=Index}/{id?}");
 
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html", spaFiles);
 
 app.Run();

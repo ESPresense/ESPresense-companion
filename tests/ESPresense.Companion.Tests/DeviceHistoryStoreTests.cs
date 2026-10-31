@@ -10,13 +10,14 @@ public class DeviceHistoryStoreTests
     [OneTimeSetUp]
     public void InitSqlite() => SQLitePCL.Batteries.Init();
 
-    private static async Task<ConfigLoader> LoadConfig(bool historyEnabled)
+    private static async Task<ConfigLoader> LoadConfig(bool historyEnabled, string? path = null, string? workDir = null)
     {
-        var workDir = Path.Combine(Path.GetTempPath(), "espresense-history-" + Guid.NewGuid().ToString("N"));
+        workDir ??= Path.Combine(Path.GetTempPath(), "espresense-history-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workDir);
         await File.WriteAllTextAsync(Path.Combine(workDir, "config.yaml"), $@"
 history:
   enabled: {historyEnabled.ToString().ToLowerInvariant()}
+{(path == null ? "" : $"  path: {path}")}
 ");
         var cfg = new ConfigLoader(workDir);
         await cfg.StartAsync(CancellationToken.None);
@@ -59,5 +60,33 @@ history:
         var history = await store.List("dev-1");
         Assert.That(history, Is.Not.Null.And.Count.EqualTo(1));
         Assert.That(history![0].X, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task HistoryPath_IsResolvedUnderTheStorageDir()
+    {
+        var workDir = Path.Combine(Path.GetTempPath(), "espresense-history-" + Guid.NewGuid().ToString("N"));
+        var storageDir = Path.Combine(workDir, ".storage");
+        var cfg = await LoadConfig(historyEnabled: true, path: "sub/devices.db", workDir: workDir);
+        var store = new DeviceHistoryStore(storageDir, cfg);
+
+        await store.Add(new DeviceHistory { Id = "dev-1", When = DateTime.UtcNow, Best = true });
+
+        Assert.That(File.Exists(Path.Combine(storageDir, "sub", "devices.db")), Is.True);
+        Assert.That(await store.List("dev-1"), Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task HistoryPath_BlankFallsBackToDefault()
+    {
+        var workDir = Path.Combine(Path.GetTempPath(), "espresense-history-" + Guid.NewGuid().ToString("N"));
+        var storageDir = Path.Combine(workDir, ".storage");
+        var cfg = await LoadConfig(historyEnabled: true, path: "", workDir: workDir);
+        var store = new DeviceHistoryStore(storageDir, cfg);
+
+        await store.Add(new DeviceHistory { Id = "dev-1", When = DateTime.UtcNow, Best = true });
+
+        Assert.That(File.Exists(Path.Combine(storageDir, "history.db")), Is.True);
+        Assert.That(await store.List("dev-1"), Has.Count.EqualTo(1));
     }
 }

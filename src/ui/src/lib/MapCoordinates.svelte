@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { isEditableTarget } from './dom';
-	import { getContext } from 'svelte';
 	import { zoomIdentity } from 'd3-zoom';
 	import { getToastStore } from '$lib/toast/toastStore';
-	import type { LayerCakeContext } from '$lib/types';
+	import { getLayerCakeContext } from 'layercake';
+	import type { MapScales } from '$lib/types';
 	const toastStore = getToastStore();
 	let { transform = zoomIdentity } = $props();
 	// Plain state, not derived: the mouse handler owns these. As `$:` assignments they
@@ -14,10 +14,10 @@
 	let copiedCoords: string[] = [];
 	let hasFocus = false;
 
-	const { xScale, yScale, width, height, padding } = getContext<LayerCakeContext>('LayerCake');
+	const chart = getLayerCakeContext<MapScales>();
 
 	function updateCoordinates(event: MouseEvent) {
-		if (!$xScale || !$yScale) return;
+		if (!chart.xScale || !chart.yScale) return;
 
 		const target = event.target as SVGElement;
 		const svg = target.ownerSVGElement || (target as SVGSVGElement);
@@ -35,15 +35,13 @@
 			// Convert screen coordinates to SVG coordinates
 			const svgPoint = point.matrixTransform(screenCTM.inverse());
 
-			// Adjust for padding from context
-			const adjustedX = svgPoint.x - ($padding?.left ?? 0);
-			const adjustedY = svgPoint.y - ($padding?.top ?? 0);
+			// layercake 11 insets the <svg> itself by the padding (rather than translating a <g> inside it),
+			// so svg coordinates are already layer coordinates; subtracting the padding again shifts the readout.
+			const transformedX = (svgPoint.x - transform.x) / transform.k;
+			const transformedY = (svgPoint.y - transform.y) / transform.k;
 
-			const transformedX = (adjustedX - transform.x) / transform.k;
-			const transformedY = (adjustedY - transform.y) / transform.k;
-
-			cursorX = $xScale.invert(transformedX);
-			cursorY = $yScale.invert(transformedY);
+			cursorX = chart.xScale.invert(transformedX);
+			cursorY = chart.yScale.invert(transformedY);
 		} catch (error) {
 			console.error('Error updating coordinates:', error);
 		}
@@ -92,7 +90,7 @@
 
 <svelte:window onmousemove={updateCoordinates} onkeydown={handleKeydown} onblur={handleFocusOut} />
 
-<g transform="translate({$width - 120}, {$height - 40})">
+<g transform="translate({chart.width - 120}, {chart.height - 40})">
 	<rect width="110" height="30" rx="4" fill="#2563eb" class="shadow-lg" />
 	<text x="55" y="19" text-anchor="middle" fill="white" font-size="12">
 		X: {Math.round(cursorX * 10) / 10}, Y: {Math.round(cursorY * 10) / 10}

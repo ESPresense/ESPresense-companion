@@ -16,12 +16,8 @@
 
 	let { firmwareSource, node, flavor = $bindable(), cpu = $bindable(), version, artifact, parent }: Props = $props();
 
-	enum Progress {
-		Form,
-		Updating,
-		Failed,
-		Success
-	}
+	// Not an enum: Vite 8 inlines enum members in the script and drops the declaration, leaving the markup's references undefined.
+	const Progress = { Form: 0, Updating: 1, Failed: 2, Success: 3 } as const;
 
 	const toastStore = getToastStore();
 
@@ -48,7 +44,7 @@
 		return str.replace(/\d+/g, '');
 	}
 
-	let progress: Progress = $state(Progress.Form);
+	let progress: number = $state(Progress.Form);
 	let percentComplete: number = $state(0);
 	let firmware: string = $state()!;
 	let url: string = $derived(getFirmwareUrl(firmwareSource, version, artifact, firmware) ?? '#ERR');

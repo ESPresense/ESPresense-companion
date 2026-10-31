@@ -1,0 +1,13 @@
+#!/bin/sh
+# `dotnet watch` with the UI intact.
+#
+# launchSettings.json sets ASPNETCORE_HOSTINGSTARTUPASSEMBLIES=Microsoft.AspNetCore.SpaProxy,
+# which is what launches `pnpm start` and redirects / to the Vite dev server. `dotnet watch`
+# replaces that variable with its own Microsoft.AspNetCore.Watch.BrowserRefresh -- it composes this
+# one variable from a list it never seeds with the launch profile's value -- so SpaProxy never loads
+# and localhost:5279 serves nothing but /api. https://github.com/dotnet/sdk/issues/48480
+#
+# Suppressing browser refresh stops watch injecting its hosting startup, so SpaProxy survives.
+# Nothing is lost: Vite owns the page and does its own HMR, so watch's browser refresh was
+# never doing anything useful for this SPA anyway.
+exec env DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH=1 dotnet watch --project "$(dirname "$0")/src" "$@"

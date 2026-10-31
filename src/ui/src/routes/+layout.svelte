@@ -1,7 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
+	import { page, updated } from '$app/state';
+	import { beforeNavigate } from '$app/navigation';
 	import type { Snippet } from 'svelte';
 	import Modal from '$lib/modal/Modal.svelte';
 	import Toast from '$lib/toast/Toast.svelte';
@@ -22,6 +23,12 @@
 	const { children }: { children?: Snippet } = $props();
 	const current = $derived(page.url.pathname);
 	let paletteOpen = $state(false);
+
+	// SvelteKit polls _app/version.json; once a newer build is live, finish the next in-app navigation with a
+	// full page load so the new bundle is picked up instead of running the old one until the tab is closed.
+	beforeNavigate(({ willUnload, to }) => {
+		if (updated.current && !willUnload && to?.url) location.href = to.url.href;
+	});
 
 	// `resolve()` is typed per route, so each href is resolved individually.
 	const resolvedRoutes = [

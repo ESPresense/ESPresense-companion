@@ -412,17 +412,28 @@
 	let device = $derived($devices?.find((d: any) => d.id === deviceSettings.id));
 	// Initialize from device data when available
 	$effect.pre(() => {
-		if ($devices && deviceSettings?.id && !calibrationSpot) {
-			const device = $devices?.find((d: any) => d.id === deviceSettings.id);
-			if (device) {
-				if (device.floor !== null) {
-					selectedFloorId = device.floor.id;
-				}
-				if (device.location?.x != null && device.location?.y != null) {
-					calibrationSpot = { x: device.location.x, y: device.location.y };
-				}
+		// Wait for `$devices` to load (it starts null/[] and fills asynchronously) so a located device opens
+		// at its real position rather than the fallback below, which would then block the real one.
+		if (!$devices || !deviceSettings?.id || calibrationSpot) return;
+
+		// Only look up the real position once the list actually has entries; a loaded-but-empty list is a
+		// valid state (e.g. calibrating the first device before anything has been located) that must still
+		// reach the fallback below, or #1730 returns for "zero devices ever".
+		const device = $devices.find((d: any) => d.id === deviceSettings.id);
+		if (device) {
+			if (device.floor !== null) {
+				selectedFloorId = device.floor.id;
+			}
+			if (device.location?.x != null && device.location?.y != null) {
+				calibrationSpot = { x: device.location.x, y: device.location.y };
 			}
 		}
+		// A device that has never been located (untracked, or heard by too few nodes) has no floor and
+		// no location, and with no spot there was nothing to drag, so it could never be anchored from
+		// here (#1730). Fall back to the first floor and the middle of it.
+		if (!selectedFloorId) selectedFloorId = $config?.floors?.[0]?.id ?? null;
+		const b = $config?.floors?.find((f: any) => f.id === selectedFloorId)?.bounds;
+		if (!calibrationSpot && b) calibrationSpot = { x: (b[0][0] + b[1][0]) / 2, y: (b[0][1] + b[1][1]) / 2 };
 	});
 	let floor = $derived($config?.floors.find((f: any) => f.id === selectedFloorId));
 	let bounds = $derived(floor?.bounds);
@@ -548,7 +559,7 @@
 
 		{#if selectedFloorId}
 			<div class="card h-[400px] relative overflow-hidden">
-				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} calibrate={true} bind:calibrationSpot />
+				<Map floorId={selectedFloorId} deviceId={device?.id} exclusive={true} embedded={true} bind:calibrationSpot />
 			</div>
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<div class="text-sm text-surface-700-300">
