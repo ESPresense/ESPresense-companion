@@ -316,7 +316,7 @@ nodes:
     point: [4.3, 7.6, 1.4]
     floors: ["first"]
   - name: Back Stairs
-    point: [5.8, 4.6, 3.4]
+    point: [4.5, 7.5, 3.4]
     floors: ["second"]
   - name: Foyer
     point: [10.9, 9.3, 0.4]
