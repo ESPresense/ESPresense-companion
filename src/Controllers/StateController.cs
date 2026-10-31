@@ -74,16 +74,19 @@ public class StateController : ControllerBase
 
     // GET: api/rooms
     [HttpGet("api/state/devices")]
-    public IEnumerable<Device> GetDevices([FromQuery] bool showAll = false)
+    public IEnumerable<Device> GetDevices([FromQuery] bool showAll = false, [FromQuery] string? include = null)
     {
         IEnumerable<Device> d = _state.Devices.Values;
-        if (!showAll) d = d.Where(a => a is { Track: true });
+        if (!showAll) d = d.Where(a => a.Track || IsIncluded(a.Id, include));
 
         // Populate configured RefRssi from DeviceSettings
         EnrichDevices(d);
 
         return d;
     }
+
+    /// <summary>An untracked device the client has open, which it wants despite the showAll filter.</summary>
+    private static bool IsIncluded(string? id, string? include) => !string.IsNullOrEmpty(include) && string.Equals(id, include, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Searches everything known (nodes and devices, tracked or not) by id, name, room or floor. Terms are
@@ -220,6 +223,7 @@ public class StateController : ControllerBase
     [Route("/ws")]
     public async Task Get([FromQuery] bool showAll = false)
     {
+        string? include = null; // set by the changeFilter command
         if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -246,7 +250,7 @@ public class StateController : ControllerBase
         void OnLocatorStateChanged(object? sender, LocatorStateEventArgs e) => EnqueueAndSignal(new { type = "locatorStateChanged", data = e.LocatorState });
         void OnDeviceChanged(object? sender, DeviceEventArgs e)
         {
-            if (showAll || (e.Device?.Track ?? false) || e.TrackChanged)
+            if (showAll || (e.Device?.Track ?? false) || e.TrackChanged || IsIncluded(e.Device?.Id, include))
             {
                 // Enrich device with ConfiguredRefRssi before sending
                 if (e.Device != null)
@@ -318,6 +322,8 @@ public class StateController : ControllerBase
                                 case "changefilter":
                                     if (command.Type == "showAll")
                                         showAll = command.Value == "true";
+                                    else if (command.Type == "include")
+                                        include = command.Value;
                                     break;
                                 case "subscribe":
                                     if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.Value))

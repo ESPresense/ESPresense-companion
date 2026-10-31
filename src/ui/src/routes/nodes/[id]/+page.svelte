@@ -32,7 +32,7 @@
 			const id = data.settings?.id;
 			if (!id) return;
 			try {
-				const result = await apiFetch<NodeSettingDetails>(`/api/node/${id}`);
+				const result = await apiFetch<NodeSettingDetails>(`/api/node/${encodeURIComponent(id)}`);
 				set(result.details);
 			} catch (ex) {
 				console.error(ex);

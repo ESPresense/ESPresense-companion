@@ -81,6 +81,8 @@
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			open = false;
+		} else if (event.key === 'Tab') {
+			event.preventDefault(); // nothing else in the dialog takes focus; don't let it reach the page behind
 		} else if (event.key === 'ArrowDown') {
 			event.preventDefault();
 			if (results.length) active = (active + 1) % results.length;

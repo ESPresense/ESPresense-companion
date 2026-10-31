@@ -1,7 +1,7 @@
 import { apiUrl } from '$lib/api';
 
 export async function load({ fetch, params }) {
-	return await fetch(apiUrl(`/api/node/${params.id}`))
+	return await fetch(apiUrl(`/api/node/${encodeURIComponent(params.id ?? '')}`))
 		.then((response) => {
 			if (!response.ok) throw new Error(response.statusText);
 			var data = response.json();

@@ -16,8 +16,9 @@ export function gotoDetail(d: Device | Node | null) {
 
 /** Navigate to the page a search result leads to. */
 export function gotoSearchResult(r: SearchResult) {
-	if (r.kind === 'node') goto(resolve(`nodes/${encodeURIComponent(r.id)}`));
-	else goto(resolve(`devices/${r.id}`));
+	const id = encodeURIComponent(r.id);
+	if (r.kind === 'node') goto(resolve(`nodes/${id}`));
+	else goto(resolve(`devices/${id}`));
 }
 
 /**

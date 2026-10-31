@@ -75,7 +75,7 @@ test('arrow keys move the selection and Enter opens that device', async ({ page 
 	await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true');
 
 	await page.keyboard.press('Enter');
-	await expect(page).toHaveURL(/\/devices\/tv:family$/);
+	await expect(page).toHaveURL(/\/devices\/tv%3Afamily$/);
 	await expect(box(page)).toHaveCount(0);
 });
 
@@ -119,4 +119,36 @@ test('Enter does not open a row left over from the previous query', async ({ pag
 	await page.keyboard.press('Enter');
 	await expect(page.getByText('Nothing matches.')).toBeVisible();
 	await expect(page).toHaveURL(/\/devices$/);
+});
+
+test('Tab stays in the palette', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await expect(box(page)).toBeFocused();
+
+	await page.keyboard.press('Tab');
+	await expect(box(page)).toBeFocused();
+});
+
+test('an untracked device opens with its map, without Show All', async ({ page }) => {
+	await open(page);
+	const id = 'a4c138a4048c';
+	const device = { id, name: 'Dryer', confidence: 80, location: { x: 1, y: 1, z: 1 }, floor: { id: 'first', name: 'First' }, nodes: {} };
+	const requests: string[] = [];
+	await page.route('**/api/state/devices?**', (route) => {
+		const url = new URL(route.request().url());
+		requests.push(url.search);
+		return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(url.searchParams.get('include') === id ? [device] : []) });
+	});
+	await page.route(`**/api/device/${id}`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ settings: { id }, details: [] }) }));
+
+	await page.keyboard.press('Control+k');
+	await box(page).fill('a4c138');
+	await expect(page.getByRole('option')).toHaveCount(1);
+	await page.keyboard.press('Enter');
+
+	await expect(page).toHaveURL(new RegExp(`/devices/${id}$`));
+	await expect(page.getByText('Dryer').first()).toBeVisible();
+	await expect(page.getByText('Unknown Device')).toHaveCount(0);
+	expect(requests.at(-1)).toContain('showAll=false');
 });
