@@ -36,7 +36,7 @@ public class StateControllerConfigRedactionTests
     public async Task GetConfig_ResponseBody_OmitsMqttPassword()
     {
         var configLoader = new ConfigLoader(_configDir);
-        await configLoader.ConfigAsync();
+        await configLoader.LoadAsync(); // the constructor no longer loads; ConfigAsync alone would wait forever
 
         var mqtt = new Mock<IMqttCoordinator>();
         var nodeTelemetryStore = new NodeTelemetryStore(mqtt.Object);
