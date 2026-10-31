@@ -3,7 +3,7 @@ using ESPresense.Utils;
 
 namespace ESPresense.Companion.Tests.Utils;
 
-public class DeviceSearchTests
+public class SearchTests
 {
     private static Device MakeDevice(string id, string? name = null, bool track = false, params (string Node, double Dist)[] hits)
     {
@@ -17,7 +17,7 @@ public class DeviceSearchTests
     }
 
     private static List<string> Ids(IEnumerable<Device> devices, string? q, int limit = 20) =>
-        DeviceSearch.Search(devices, q, limit, d => d.Name).Select(r => r.Id).ToList();
+        Search.Find(devices.Select(d => Search.Device(d, d.Name)), q, limit).Select(r => r.Id).ToList();
 
     [Test]
     public void FindsAnUntrackedBareMacByPrefixOrSubstring()
@@ -82,12 +82,11 @@ public class DeviceSearchTests
     {
         var device = MakeDevice("a4c138a4048c", null, false, ("kitchen", 2.97), ("nook", 2.63), ("laundry", 5.52));
 
-        var result = DeviceSearch.Search(new[] { device }, "a4c138", 20, d => d.Name).Single();
+        var result = Search.Find([Search.Device(device, device.Name)], "a4c138", 20).Single();
 
-        Assert.That(result.Nodes, Is.EqualTo(3));
-        Assert.That(result.NearestNode, Is.EqualTo("nook"));
-        Assert.That(result.NearestDistance, Is.EqualTo(2.63).Within(1e-9));
-        Assert.That(result.Tracked, Is.False);
+        Assert.That(result.Kind, Is.EqualTo("device"));
+        Assert.That(result.Detail, Is.EqualTo("3 nodes · nearest nook 2.63 m"));
+        Assert.That(result.Badge, Is.EqualTo("untracked"));
     }
 
     [Test]
@@ -95,7 +94,7 @@ public class DeviceSearchTests
     {
         var device = MakeDevice("a4c138a4048c");
 
-        var result = DeviceSearch.Search(new[] { device }, "dryer", 20, _ => "Dryer vent").Single();
+        var result = Search.Find([Search.Device(device, "Dryer vent")], "dryer", 20).Single();
 
         Assert.That(result.Name, Is.EqualTo("Dryer vent"));
     }
@@ -116,9 +115,41 @@ public class DeviceSearchTests
     {
         var device = MakeDevice("a4c138a4048c", null, false, ("bad", double.NaN), ("kitchen", 2.97));
 
-        var result = DeviceSearch.Search(new[] { device }, "a4c138", 20, d => d.Name).Single();
+        var result = Search.Find([Search.Device(device, device.Name)], "a4c138", 20).Single();
 
-        Assert.That(result.NearestNode, Is.EqualTo("kitchen"));
-        Assert.That(result.NearestDistance, Is.EqualTo(2.97).Within(1e-9));
+        Assert.That(result.Detail, Is.EqualTo("2 nodes · nearest kitchen 2.97 m"));
+    }
+
+    [Test]
+    public void DeviceNobodyHearsSaysSo()
+    {
+        var result = Search.Find([Search.Device(MakeDevice("a4c138a4048c", null, true), null)], "", 20).Single();
+
+        Assert.That(result.Detail, Is.EqualTo("not heard recently"));
+        Assert.That(result.Badge, Is.Null);
+    }
+
+    [Test]
+    public void FindsNodesByIdNameOrFloor()
+    {
+        var node = Search.Node(new NodeStateTele { Id = "kitchen", Name = "Kitchen", Floors = ["ground"], Online = true });
+
+        var result = Search.Find([node], "ground", 20).Single();
+
+        Assert.That(result.Kind, Is.EqualTo("node"));
+        Assert.That(result.Detail, Is.EqualTo("online"));
+        Assert.That(Search.Find([node], "attic", 20), Is.Empty);
+    }
+
+    [Test]
+    public void RanksAcrossKinds_NodesFirstOnlyWithinATier()
+    {
+        var node = Search.Node(new NodeStateTele { Id = "kitchen-2", Name = null });
+        var exact = Search.Device(MakeDevice("kitchen"), null);
+        var prefix = Search.Device(MakeDevice("kitchen-speaker", null, true), null);
+
+        var result = Search.Find([prefix, node, exact], "kitchen", 20).Select(r => r.Id);
+
+        Assert.That(result, Is.EqualTo(new[] { "kitchen", "kitchen-2", "kitchen-speaker" }));
     }
 }

@@ -245,15 +245,11 @@ export interface DeviceHistory {
 	best: boolean;
 }
 
-/** Matches the backend DeviceSearchResult (GET /api/state/devices/search). */
-export interface DeviceSearchResult {
+/** Matches the backend SearchResult (GET /api/state/search). */
+export interface SearchResult {
+	kind: 'device' | 'node';
 	id: string;
 	name: string | null;
-	tracked: boolean;
-	room: string | null;
-	floor: string | null;
-	nodes: number;
-	nearestNode: string | null;
-	nearestDistance: number | null;
-	lastSeen: string | null;
+	detail: string;
+	badge: string | null;
 }

@@ -77,7 +77,7 @@
 
 			<!-- Footer Section -->
 			<div class="flex flex-col items-center pb-4">
-				<button type="button" onclick={() => (paletteOpen = true)} class="flex items-center justify-center w-12 h-12 rounded-lg hover:bg-surface-200-800 transition-colors duration-200 text-surface-700-300 hover:text-surface-950-50" title="Find a device (Ctrl+K)" aria-label="Find a device">
+				<button type="button" onclick={() => (paletteOpen = true)} class="flex items-center justify-center w-12 h-12 rounded-lg hover:bg-surface-200-800 transition-colors duration-200 text-surface-700-300 hover:text-surface-950-50" title="Find anything (Ctrl+K)" aria-label="Find anything">
 					<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
 				</button>
 				<a href="https://github.com/ESPresense/ESPresense-companion" target="_blank" class="flex items-center justify-center w-12 h-12 rounded-lg hover:bg-surface-200-800 transition-colors duration-200 text-surface-700-300 hover:text-surface-950-50 group" title="View on GitHub">

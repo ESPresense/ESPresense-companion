@@ -1,34 +1,30 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockApi } from './mock-api';
 
-// #1730: an untracked bare MAC used to be reachable only via "Show All". Ctrl+K searches every
-// device server-side, so the page never has to load or render the full list.
+// #1730: an untracked bare MAC used to be reachable only via "Show All". Ctrl+K searches everything
+// server-side, so the page never has to load or render the full list.
 const all = [
-	{ id: 'a4c138a4048c', name: null, tracked: false, room: null, floor: null, nodes: 8, nearestNode: 'kitchen', nearestDistance: 2.97, lastSeen: new Date().toISOString() },
-	{ id: 'tv:family', name: 'Family TV', tracked: true, room: 'Family', floor: 'Ground', nodes: 3, nearestNode: 'family', nearestDistance: 1.2, lastSeen: new Date().toISOString() }
-];
-
-const nodes = [
-	{ id: 'kitchen', name: 'Kitchen', online: true, sourceType: 'Config' },
-	{ id: 'nook', name: null, online: false, sourceType: 'Discovered' }
+	{ kind: 'node', id: 'kitchen', name: 'Kitchen', detail: 'online', badge: 'node' },
+	{ kind: 'node', id: 'a?b', name: null, detail: 'offline', badge: 'node' },
+	{ kind: 'device', id: 'a4c138a4048c', name: null, detail: '8 nodes · nearest kitchen 2.97 m', badge: 'untracked' },
+	{ kind: 'device', id: 'tv:family', name: 'Family TV', detail: 'Family · 3 nodes · nearest family 1.20 m', badge: null }
 ];
 
 async function open(page: Page) {
 	await mockApi(page, { stubWebSocket: true });
 	const queries: string[] = [];
-	await page.route('**/api/state/devices/search**', (route) => {
+	await page.route('**/api/state/search**', (route) => {
 		const q = (new URL(route.request().url()).searchParams.get('q') ?? '').toLowerCase();
 		queries.push(q);
-		const hits = all.filter((d) => !q || d.id.includes(q) || (d.name ?? '').toLowerCase().includes(q));
+		const hits = all.filter((r) => (q ? r.id.includes(q) || (r.name ?? '').toLowerCase().includes(q) : r.kind === 'device'));
 		return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(hits) });
 	});
-	await page.route('**/api/state/nodes**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nodes) }));
 	await page.goto('/devices');
 	await expect(page.locator('table tbody tr').first()).toBeVisible();
 	return queries;
 }
 
-const box = (page: Page) => page.getByRole('combobox', { name: 'Find a device' });
+const box = (page: Page) => page.getByRole('combobox', { name: 'Find anything' });
 
 test('Ctrl+K opens the palette, Escape closes it', async ({ page }) => {
 	await open(page);
@@ -43,7 +39,7 @@ test('Ctrl+K opens the palette, Escape closes it', async ({ page }) => {
 
 test('Escape hands focus back to the sidebar button that opened it', async ({ page }) => {
 	await open(page);
-	const button = page.getByRole('button', { name: 'Find a device' });
+	const button = page.getByRole('button', { name: 'Find anything' });
 	await button.click();
 	await expect(box(page)).toBeFocused();
 
@@ -53,7 +49,7 @@ test('Escape hands focus back to the sidebar button that opened it', async ({ pa
 
 test('the sidebar search button opens it too', async ({ page }) => {
 	await open(page);
-	await page.getByRole('button', { name: 'Find a device' }).click();
+	await page.getByRole('button', { name: 'Find anything' }).click();
 	await expect(box(page)).toBeFocused();
 });
 
@@ -90,7 +86,7 @@ test('says so when nothing matches', async ({ page }) => {
 	await expect(page.getByText('Nothing matches.')).toBeVisible();
 });
 
-test('finds nodes too, lists them first, and opens the node page', async ({ page }) => {
+test('finds nodes too and opens the node page', async ({ page }) => {
 	await open(page);
 	await page.keyboard.press('Control+k');
 	await box(page).fill('kit');
@@ -101,6 +97,16 @@ test('finds nodes too, lists them first, and opens the node page', async ({ page
 
 	await page.keyboard.press('Enter');
 	await expect(page).toHaveURL(/\/nodes\/kitchen$/);
+});
+
+test('encodes a node id that is not URL safe', async ({ page }) => {
+	await open(page);
+	await page.keyboard.press('Control+k');
+	await box(page).fill('a?b');
+	await expect(page.getByRole('option')).toHaveCount(1);
+
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/nodes\/a%3Fb$/);
 });
 
 test('Enter does not open a row left over from the previous query', async ({ page }) => {

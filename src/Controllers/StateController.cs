@@ -86,18 +86,21 @@ public class StateController : ControllerBase
     }
 
     /// <summary>
-    /// Searches every known device (tracked or not) by id, name, room or floor. Terms are AND-ed and a MAC
-    /// matches with or without separators. Returns at most <paramref name="limit"/> ranked results.
+    /// Searches everything known (nodes and devices, tracked or not) by id, name, room or floor. Terms are
+    /// AND-ed and a MAC matches with or without separators. Returns at most <paramref name="limit"/> ranked
+    /// results. An empty query lists devices only: nodes would otherwise fill the list ahead of them.
     /// </summary>
-    [HttpGet("api/state/devices/search")]
-    public IEnumerable<DeviceSearchResult> SearchDevices([FromQuery] string? q = null, [FromQuery] int limit = 20)
+    [HttpGet("api/state/search")]
+    public IEnumerable<SearchResult> SearchAll([FromQuery] string? q = null, [FromQuery] int limit = 20)
     {
         limit = Math.Clamp(limit, 1, 100);
-        return DeviceSearch.Search(_state.Devices.Values, q, limit, d =>
+        var items = _state.Devices.Values.Select(d =>
         {
             var name = _dss.Get(d.Id)?.Name;
-            return string.IsNullOrWhiteSpace(name) ? d.Name : name;
+            return Search.Device(d, string.IsNullOrWhiteSpace(name) ? d.Name : name);
         });
+        if (!string.IsNullOrWhiteSpace(q)) items = items.Concat(_mapper.ToNodeStateTeles(_state.Nodes.Values).Select(Search.Node));
+        return Search.Find(items, q, limit);
     }
 
     // GET: api/config

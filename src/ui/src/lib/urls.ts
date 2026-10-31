@@ -1,6 +1,6 @@
 import { resolve } from '$app/paths';
 import { goto } from '$app/navigation';
-import { isNode, type Device, type Node } from '$lib/types';
+import { isNode, type Device, type Node, type SearchResult } from '$lib/types';
 
 /**
  * Navigate to the detail page for a Node or Device.
@@ -14,9 +14,10 @@ export function gotoDetail(d: Device | Node | null) {
 	else goto(resolve(`devices/${d?.id ?? ''}`));
 }
 
-/** Navigate to a node's detail page when only its id is at hand. */
-export function gotoNodeById(id: string) {
-	goto(resolve(`nodes/${encodeURIComponent(id)}`));
+/** Navigate to the page a search result leads to. */
+export function gotoSearchResult(r: SearchResult) {
+	if (r.kind === 'node') goto(resolve(`nodes/${encodeURIComponent(r.id)}`));
+	else goto(resolve(`devices/${r.id}`));
 }
 
 /**
