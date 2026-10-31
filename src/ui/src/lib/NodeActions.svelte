@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/api';
-	import { gotoDetail } from '$lib/urls';
-	import type { Node, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import { getToastStore } from '$lib/toast/toastStore';
-	import { showComponent, showConfirm } from '$lib/modal/modalStore';
-	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getFirmwareUrl } from '$lib/firmware';
-	import Firmware from '$lib/modals/Firmware.svelte';
-	import NodeSettingsModal from '$lib/modals/NodeSettingsModal.svelte';
+	import { apiFetch } from '#lib/api.js';
+	import { gotoDetail } from '#lib/urls.js';
+	import type { Node, NodeSetting, NodeSettingDetails } from '#lib/types.js';
+	import { getToastStore } from '#lib/toast/toastStore.js';
+	import { showComponent, showConfirm } from '#lib/modal/modalStore.js';
+	import { updateMethod, firmwareSource, flavor, version, artifact, flavorNames, firmwareTypes, getFirmwareUrl } from '#lib/firmware.js';
+	import Firmware from '#lib/modals/Firmware.svelte';
+	import NodeSettingsModal from '#lib/modals/NodeSettingsModal.svelte';
 
 	interface Props {
 		row: Node; // Node data for this row

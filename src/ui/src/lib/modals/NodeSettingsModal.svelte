@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/api';
-	import type { NodeSetting } from '$lib/types';
-	import { getToastStore } from '$lib/toast/toastStore';
+	import { apiFetch } from '#lib/api.js';
+	import type { NodeSetting } from '#lib/types.js';
+	import { getToastStore } from '#lib/toast/toastStore.js';
 	import NodeSettings from '../NodeSettings.svelte'; // Import the fields component
 
 	interface Props {

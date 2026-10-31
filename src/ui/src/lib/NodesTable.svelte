@@ -1,8 +1,8 @@
 <script lang="ts">
-	import DataTable from '$lib/DataTable.svelte';
-	import { nodes } from '$lib/stores';
-	import { updateMethod, firmwareSource, flavor, version, artifact } from '$lib/firmware';
-	import type { Node } from '$lib/types';
+	import DataTable from '#lib/DataTable.svelte';
+	import { nodes } from '#lib/stores.js';
+	import { updateMethod, firmwareSource, flavor, version, artifact } from '#lib/firmware.js';
+	import type { Node } from '#lib/types.js';
 	import NodeActions from './NodeActions.svelte';
 	import NodeActiveId from './NodeActiveId.svelte';
 	import NodeIp from './NodeIp.svelte';

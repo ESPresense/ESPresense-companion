@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/api';
-	import type { DeviceSetting } from '$lib/types';
-	import { getToastStore } from '$lib/toast/toastStore';
+	import { apiFetch } from '#lib/api.js';
+	import type { DeviceSetting } from '#lib/types.js';
+	import { getToastStore } from '#lib/toast/toastStore.js';
 	import DeviceSettings from '../DeviceSettings.svelte'; // Import the refactored component
 
 	interface Props {

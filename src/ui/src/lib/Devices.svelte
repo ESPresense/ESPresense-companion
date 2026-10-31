@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { devices, showAllFloors } from '$lib/stores';
+	import { devices, showAllFloors } from '#lib/stores.js';
 	import { zoomIdentity } from 'd3-zoom';
 
 	import DeviceMarker from './DeviceMarker.svelte';

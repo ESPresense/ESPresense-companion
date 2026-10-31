@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { devices } from '$lib/stores';
-	import { gotoCalibration } from '$lib/urls';
-	import DataTable from '$lib/DataTable.svelte';
-	import DeviceActions from '$lib/DeviceActions.svelte';
-	import DeviceActiveId from '$lib/DeviceActiveId.svelte';
-	import SlideToggle from '$lib/SlideToggle.svelte';
-	import type { Device } from '$lib/types';
+	import { devices } from '#lib/stores.js';
+	import { gotoCalibration } from '#lib/urls.js';
+	import DataTable from '#lib/DataTable.svelte';
+	import DeviceActions from '#lib/DeviceActions.svelte';
+	import DeviceActiveId from '#lib/DeviceActiveId.svelte';
+	import SlideToggle from '#lib/SlideToggle.svelte';
+	import type { Device } from '#lib/types.js';
 	import ago from 's-ago';
 
 	let filteredDevices = $derived(

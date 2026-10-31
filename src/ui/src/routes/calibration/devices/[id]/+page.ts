@@ -1,4 +1,4 @@
-import { apiUrl } from '$lib/api';
+import { apiUrl } from '#lib/api.js';
 import type { LoadEvent } from '@sveltejs/kit';
 
 export async function load({ fetch, params }: LoadEvent) {

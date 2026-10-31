@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { calibration } from '$lib/stores';
-	import { apiFetch, apiUrl } from '$lib/api';
-	import { getToastStore } from '$lib/toast/toastStore';
-	import { showConfirm } from '$lib/modal/modalStore';
-	import { tooltip } from '$lib/tooltip';
-	import SlideToggle from '$lib/SlideToggle.svelte';
+	import { calibration } from '#lib/stores.js';
+	import { apiFetch, apiUrl } from '#lib/api.js';
+	import { getToastStore } from '#lib/toast/toastStore.js';
+	import { showConfirm } from '#lib/modal/modalStore.js';
+	import { tooltip } from '#lib/tooltip.js';
+	import SlideToggle from '#lib/SlideToggle.svelte';
 	import { onMount } from 'svelte';
 
 	enum DataPoint {

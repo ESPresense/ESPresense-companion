@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { gotoCalibration } from '$lib/urls';
+	import { gotoCalibration } from '#lib/urls.js';
 
 	interface Props {
 		deviceName?: string;
