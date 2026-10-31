@@ -4,17 +4,17 @@
 	import { page, updated } from '$app/state';
 	import { beforeNavigate } from '$app/navigation';
 	import type { Snippet } from 'svelte';
-	import Modal from '$lib/modal/Modal.svelte';
-	import Toast from '$lib/toast/Toast.svelte';
-	import CommandPalette from '$lib/CommandPalette.svelte';
+	import Modal from '#lib/modal/Modal.svelte';
+	import Toast from '#lib/toast/Toast.svelte';
+	import CommandPalette from '#lib/CommandPalette.svelte';
 
-	import logo from '$lib/images/logo.svg';
-	import github from '$lib/images/github.svg';
-	import map from '$lib/images/map.svg';
-	import nodes from '$lib/images/nodes.svg';
-	import devices from '$lib/images/devices.svg';
-	import calibration from '$lib/images/calibration.svg';
-	import cube from '$lib/images/cube.svg';
+	import logo from '#lib/images/logo.svg';
+	import github from '#lib/images/github.svg';
+	import map from '#lib/images/map.svg';
+	import nodes from '#lib/images/nodes.svg';
+	import devices from '#lib/images/devices.svg';
+	import calibration from '#lib/images/calibration.svg';
+	import cube from '#lib/images/cube.svg';
 	interface Props {
 		children?: import('svelte').Snippet;
 	}
@@ -26,18 +26,19 @@
 
 	// SvelteKit polls _app/version.json; once a newer build is live, finish the next in-app navigation with a
 	// full page load so the new bundle is picked up instead of running the old one until the tab is closed.
-	beforeNavigate(({ willUnload, to }) => {
+	beforeNavigate(({ willUnload, to, shallow, type }) => {
+		if (shallow && type === 'goto') return;
 		if (updated.current && !willUnload && to?.url) location.href = to.url.href;
 	});
 
 	// `resolve()` is typed per route, so each href is resolved individually.
 	const resolvedRoutes = [
 		{ resolved: resolve('/'), name: 'map', icon: map, alt: 'Map' },
-		{ resolved: resolve('/3d'), name: '3d', icon: cube, alt: '3D View' },
-		{ resolved: resolve('/geolocation'), name: 'geolocation', icon: map, alt: 'Geolocation' },
-		{ resolved: resolve('/devices'), name: 'devices', icon: devices, alt: 'Devices' },
-		{ resolved: resolve('/nodes'), name: 'nodes', icon: nodes, alt: 'Nodes' },
-		{ resolved: resolve('/calibration'), name: 'calibration', icon: calibration, alt: 'Calibration' }
+		{ resolved: resolve('3d'), name: '3d', icon: cube, alt: '3D View' },
+		{ resolved: resolve('geolocation'), name: 'geolocation', icon: map, alt: 'Geolocation' },
+		{ resolved: resolve('devices'), name: 'devices', icon: devices, alt: 'Devices' },
+		{ resolved: resolve('nodes'), name: 'nodes', icon: nodes, alt: 'Nodes' },
+		{ resolved: resolve('calibration'), name: 'calibration', icon: calibration, alt: 'Calibration' }
 	];
 </script>
 

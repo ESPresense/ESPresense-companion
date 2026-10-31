@@ -3,10 +3,10 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/state'; // To get route params
 	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
-	import { devices, nodes, config } from '$lib/stores';
-	import Map3D from '$lib/Map3D.svelte';
-	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
-	import { apiFetch } from '$lib/api';
+	import { devices, nodes, config } from '#lib/stores.js';
+	import Map3D from '#lib/Map3D.svelte';
+	import type { Device, Node, Config, DeviceHistory } from '#lib/types.js';
+	import { apiFetch } from '#lib/api.js';
 
 	// --- Route Param ---
 	let deviceId = $derived(page.params.id ?? null); // Get device ID from URL

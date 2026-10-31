@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/api';
-	import { nodes } from '$lib/stores';
+	import { apiFetch } from '#lib/api.js';
+	import { nodes } from '#lib/stores.js';
 	import { readable } from 'svelte/store';
-	import type { NodeSettingDetails } from '$lib/types';
+	import type { NodeSettingDetails } from '#lib/types.js';
 	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
-	import Map from '$lib/Map.svelte';
-	import NodeBreadcrumb from '$lib/NodeBreadcrumb.svelte';
+	import Map from '#lib/Map.svelte';
+	import NodeBreadcrumb from '#lib/NodeBreadcrumb.svelte';
 
 	// Only `data` is a real route prop; floorId is local state bound to child components.
 	let { data = {} as NodeSettingDetails }: { data?: NodeSettingDetails } = $props();

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
-	import { config, nodes } from '$lib/stores';
-	import type { Floor, Node } from '$lib/types';
+	import { config, nodes } from '#lib/stores.js';
+	import type { Floor, Node } from '#lib/types.js';
 
 	import NodeMarker from './NodeMarker.svelte';
 

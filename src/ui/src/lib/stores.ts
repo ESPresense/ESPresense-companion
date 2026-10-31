@@ -1,5 +1,5 @@
 import { readable, writable, derived, get } from 'svelte/store';
-import { apiFetch } from '$lib/api';
+import { apiFetch } from '#lib/api.js';
 import type { Device, Config, Node, CalibrationResponse, DeviceSetting } from './types';
 import { WSManager } from './wsManager';
 

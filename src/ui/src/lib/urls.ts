@@ -1,6 +1,6 @@
 import { resolve } from '$app/paths';
 import { goto } from '$app/navigation';
-import { isNode, type Device, type Node, type SearchResult } from '$lib/types';
+import { isNode, type Device, type Node, type SearchResult } from '#lib/types.js';
 
 /**
  * Navigate to the detail page for a Node or Device.
@@ -42,11 +42,11 @@ export function gotoMap() {
 }
 
 export function gotoDevices() {
-	goto(resolve('/devices'));
+	goto(resolve('devices'));
 }
 
 export function gotoNodes() {
-	goto(resolve('/nodes'));
+	goto(resolve('nodes'));
 }
 
 export function gotoCalibration(target?: Device | string | null) {

@@ -1,4 +1,4 @@
-import { apiUrl } from '$lib/api';
+import { apiUrl } from '#lib/api.js';
 
 export async function load({ fetch, params }) {
 	return await fetch(apiUrl(`/api/node/${encodeURIComponent(params.id ?? '')}`))

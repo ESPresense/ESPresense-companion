@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { apiFetch } from '$lib/api';
-	import { gotoSearchResult } from '$lib/urls';
-	import type { SearchResult } from '$lib/types';
+	import { apiFetch } from '#lib/api.js';
+	import { gotoSearchResult } from '#lib/urls.js';
+	import type { SearchResult } from '#lib/types.js';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 

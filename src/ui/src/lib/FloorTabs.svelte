@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { config, showAllFloors } from '$lib/stores';
+	import { config, showAllFloors } from '#lib/stores.js';
 	import SlideToggle from './SlideToggle.svelte';
 
 	interface Props {

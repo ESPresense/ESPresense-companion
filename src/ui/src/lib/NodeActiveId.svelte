@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Node } from '$lib/types';
-	import { tooltip } from '$lib/tooltip';
+	import type { Node } from '#lib/types.js';
+	import { tooltip } from '#lib/tooltip.js';
 	interface Props {
 		row: Node;
 		col: string;

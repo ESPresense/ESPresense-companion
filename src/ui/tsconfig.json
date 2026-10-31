@@ -1,15 +1,8 @@
 {
 	"extends": "$app/tsconfig",
 	"compilerOptions": {
-		"allowJs": true,
-		"checkJs": true,
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true,
-		"resolveJsonModule": true,
-		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true
 	},
-	"include": ["src", "tests", "*.ts", "sveltekit.config.js"]
-	// Path aliases are handled by https://svelte.dev/docs/kit/@sveltejs-kit-vite#alias
+	"include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }

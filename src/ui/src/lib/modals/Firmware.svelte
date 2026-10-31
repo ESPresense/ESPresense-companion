@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Progress as SkeletonProgress } from '@skeletonlabs/skeleton-svelte';
-	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '$lib/firmware';
-	import type { Node } from '$lib/types';
-	import { getToastStore } from '$lib/toast/toastStore';
+	import { firmwareTypes, cpuNames, getFirmwareUrl, firmwareUpdate } from '#lib/firmware.js';
+	import type { Node } from '#lib/types.js';
+	import { getToastStore } from '#lib/toast/toastStore.js';
 
 	interface Props {
 		firmwareSource: string;

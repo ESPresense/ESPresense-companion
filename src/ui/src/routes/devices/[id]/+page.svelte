@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/api';
-	import { devices, includedDevice } from '$lib/stores';
+	import { apiFetch } from '#lib/api.js';
+	import { devices, includedDevice } from '#lib/stores.js';
 	import { readable } from 'svelte/store';
-	import type { DeviceSetting } from '$lib/types';
+	import type { DeviceSetting } from '#lib/types.js';
 	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
-	import Map from '$lib/Map.svelte';
-	import DeviceBreadcrumb from '$lib/DeviceBreadcrumb.svelte';
+	import Map from '#lib/Map.svelte';
+	import DeviceBreadcrumb from '#lib/DeviceBreadcrumb.svelte';
 
 	// Define type for the details array items
 	type DeviceDetailItem = { key: string; value: string };
