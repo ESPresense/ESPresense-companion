@@ -1,10 +1,10 @@
 <script lang="ts">
-	import NodesTable from '$lib/NodesTable.svelte';
-	import { getToastStore } from '$lib/toast/toastStore';
-	import { apiFetch } from '$lib/api';
-	import { gotoDetail } from '$lib/urls';
-	import type { NodeSettingDetails } from '$lib/types';
-	import TriStateCheckbox from '$lib/TriStateCheckbox.svelte';
+	import NodesTable from '#lib/NodesTable.svelte';
+	import { getToastStore } from '#lib/toast/toastStore.js';
+	import { apiFetch } from '#lib/api.js';
+	import { gotoDetail } from '#lib/urls.js';
+	import type { NodeSettingDetails } from '#lib/types.js';
+	import TriStateCheckbox from '#lib/TriStateCheckbox.svelte';
 	import { onMount } from 'svelte';
 
 	let autoUpdate: boolean | null = $state(null);

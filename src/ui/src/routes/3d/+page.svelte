@@ -2,8 +2,8 @@
 	// Page to display the 3D map for ALL devices
 	import { onMount, onDestroy } from 'svelte';
 	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
-	import { devices, nodes, config } from '$lib/stores';
-	import Map3D from '$lib/Map3D.svelte'; // Import the new component
+	import { devices, nodes, config } from '#lib/stores.js';
+	import Map3D from '#lib/Map3D.svelte'; // Import the new component
 
 	// --- State for GUI Controls ---
 	let guiInstance: GUI | null = null;

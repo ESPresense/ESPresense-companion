@@ -62,5 +62,8 @@
 		"vite-plugin-devtools-json": "^1.1.1",
 		"vitest": "^5.0.3"
 	},
-	"type": "module"
+	"type": "module",
+	"imports": {
+		"#lib/*": "./src/lib/*"
+	}
 }

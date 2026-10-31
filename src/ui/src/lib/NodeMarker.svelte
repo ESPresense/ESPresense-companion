@@ -3,10 +3,10 @@
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 
-	import { devices, nodes, relative } from '$lib/stores';
+	import { devices, nodes, relative } from '#lib/stores.js';
 
 	import { getLayerCakeContext } from 'layercake';
-	import type { Node, Floor, MapScales } from '$lib/types';
+	import type { Node, Floor, MapScales } from '#lib/types.js';
 	import type { ScaleOrdinal } from 'd3';
 
 	const chart = getLayerCakeContext<MapScales>();

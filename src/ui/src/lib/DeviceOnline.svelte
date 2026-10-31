@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Device } from '$lib/types';
+	import type { Device } from '#lib/types.js';
 	interface Props {
 		row: Device;
 		col: string;
