@@ -306,7 +306,7 @@ nodes:
     point: [7.6, 1.6, 0.7]
     floors: ["first"]
   - name: Dining
-    point: [16.3, 2.6, 0.4]
+    point: [16.4, 1.7, 0.4]
     floors: ["first", "second"]
   - name: Basement
     point: [15.8, 11.5, -0.5]
