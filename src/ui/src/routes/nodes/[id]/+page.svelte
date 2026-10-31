@@ -9,9 +9,7 @@
 	import NodeBreadcrumb from '$lib/NodeBreadcrumb.svelte';
 
 	// Only `data` is a real route prop; floorId is local state bound to child components.
-	let { data = {} as NodeSettingDetails } = $props<{
-		data?: NodeSettingDetails;
-	}>();
+	let { data = {} as NodeSettingDetails }: { data?: NodeSettingDetails } = $props();
 	let floorId = $state<string | null>(null);
 	const node = $derived($nodes.find((d) => d.id === data.settings?.id));
 
