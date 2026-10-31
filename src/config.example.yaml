@@ -58,8 +58,11 @@ optimization:
 
 
 locators:
+  # Per-floor locators (nadaraya_watson, nelder_mead, bfgs, mle) solve each floor separately and
+  # the highest-confidence floor wins, which can favor a floor with few nodes. multi_floor solves
+  # across all nodes in 3D and takes the floor from the result, so it is the default here.
   nadaraya_watson:
-    enabled: true
+    enabled: false
     floors: ["first", "second"]
     bandwidth: 0.5
     kernel: gaussian
@@ -98,13 +101,14 @@ locators:
         sigma: 0.30
 
   multi_floor:
-    enabled: false
+    enabled: true
     weighting:
       # Node weighting algorithm for MultiFloor (cross-floor localization)
       # Options: equal, linear, gaussian, exponential
       algorithm: gaussian
       props:
-        sigma: 0.30
+        # Too low (0.10) leans on the nearest few nodes and pulls upstairs devices downstairs
+        sigma: 0.25
 
   nearest_node:
     enabled: true
