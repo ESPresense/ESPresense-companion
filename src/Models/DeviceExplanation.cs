@@ -121,7 +121,7 @@ public sealed record DeviceExplanation(
 
     private static ExplainedNode Used(LocatorTraceNode u, LocatorTrace trace)
     {
-        var fitted = trace.Fit is { } fit ? fit.DistanceTo(u.Link.Node!.Location) * trace.Scale : (double?)null;
+        var fitted = trace.Fit is { } fit ? fit.DistanceTo(u.Location) * trace.Scale : (double?)null;
         return new ExplainedNode(u.Link.Node?.Id, u.Link.Node?.Name, true, null, u.Measured, fitted, u.Measured - fitted, u.Weight);
     }
 
@@ -136,8 +136,8 @@ public sealed record DeviceExplanation(
     private static ExplainedRoom RoomDecision(Device device, Scenario? best)
     {
         var room = device.Room;
-        var at = best?.Location.ToPoint2D();
-        var floor = best?.Floor ?? room?.Floor;
+        var at = device.IsAnchored ? device.Location?.ToPoint2D() : best?.Location.ToPoint2D();
+        var floor = device.Floor ?? room?.Floor;
 
         var inside = at is { } p && (room?.Polygon?.EnclosesPoint(p) ?? false);
         var nearest = at is { } q

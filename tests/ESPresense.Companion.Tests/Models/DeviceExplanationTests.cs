@@ -319,6 +319,31 @@ public class DeviceExplanationTests
     }
 
     [Test]
+    public void Explain_AnchoredRoomDecisionUsesTheAnchor()
+    {
+        var kitchen = _ground.Rooms.Values.Single(r => r.Name == "Kitchen");
+        _device.SetAnchor(new DeviceAnchor(new Point3D(4, 5, 1), _ground, kitchen));
+
+        var room = DeviceExplanation.From(_device).Room;
+
+        Assert.That(room.Inside, Is.True);
+        Assert.That(room.DistanceToEdge, Is.EqualTo(1).Within(1e-9));
+        Assert.That(room.NearestOtherRoom?.Name, Is.EqualTo("Hall"));
+    }
+
+    [Test]
+    public void Explain_ResidualsUseWhereTheNodeWasWhenItWasUsed()
+    {
+        HearAroundKitchen();
+        _device.BestScenario = Run(new NelderMeadMultilateralizer(_device, _ground, _state));
+        var before = Node(DeviceExplanation.From(_device).Scenarios.Single(), "a").Fitted;
+
+        _device.Nodes["a"].Node.Update(_configLoader.Config!, new ConfigNode { Id = "a", Name = "a", Point = [9, 9, 1] }, [_ground]);
+
+        Assert.That(Node(DeviceExplanation.From(_device).Scenarios.Single(), "a").Fitted, Is.EqualTo(before));
+    }
+
+    [Test]
     public void Explain_DeviceNotYetLocatedDoesNotThrow()
     {
         Hear("a", new Point3D(0, 0, 1), 2, _ground);

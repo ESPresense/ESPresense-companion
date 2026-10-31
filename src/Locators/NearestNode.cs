@@ -29,7 +29,7 @@ internal class NearestNode : ILocate
         scenario.Trace = new LocatorTrace(
             nearest == null ? LocatorOutcome.NoFix : LocatorOutcome.Fallback,
             null,
-            nearest == null ? [] : [new LocatorTraceNode(nearest, nearest.Distance, null)],
+            nearest == null ? [] : [new LocatorTraceNode(nearest, nearest.Node!.Location, nearest.Distance, null)],
             MaxDistance: limited ? maxDistance : null);
         if (nearest == null) return false;
 

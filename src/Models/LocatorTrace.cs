@@ -36,7 +36,7 @@ public sealed record LocatorTrace(
             : new(LocatorOutcome.Solved, floor, Snapshot(nodes, solvedWeights), fit, scale);
 
     private static LocatorTraceNode[] Snapshot(IEnumerable<DeviceToNode> nodes, double[]? weights) =>
-        nodes.Select((dn, i) => new LocatorTraceNode(dn, dn.Distance, weights?[i])).ToArray();
+        nodes.Select((dn, i) => new LocatorTraceNode(dn, dn.Node.Location, dn.Distance, weights?[i])).ToArray();
 }
 
-public readonly record struct LocatorTraceNode(DeviceToNode Link, double Measured, double? Weight);
+public readonly record struct LocatorTraceNode(DeviceToNode Link, Point3D Location, double Measured, double? Weight);
