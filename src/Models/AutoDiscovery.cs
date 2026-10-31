@@ -124,6 +124,12 @@ public class AutoDiscovery
         [JsonProperty("origin")] public OriginRecord? Origin { get; set; }
 
         [JsonProperty("source_type")] public string? SourceType { get; set; }
+
+        [JsonProperty("unit_of_measurement")] public string? UnitOfMeasurement { get; set; }
+
+        [JsonProperty("device_class")] public string? DeviceClass { get; set; }
+
+        [JsonProperty("state_class")] public string? StateClass { get; set; }
     }
 
     public class DeviceRecord

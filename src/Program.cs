@@ -67,6 +67,8 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSe
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddHostedService<DeviceCleanupService>();
+builder.Services.AddSingleton<PositionAccuracyService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<PositionAccuracyService>());
 builder.Services.AddSingleton<State>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
