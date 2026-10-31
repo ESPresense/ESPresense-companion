@@ -6,7 +6,7 @@
 	import { pointer, select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
 	import { setContext } from 'svelte';
-	import type { Device, Node } from '$lib/types';
+	import type { Device, DeviceExplanation, Node } from '$lib/types';
 
 	import Rooms from './Rooms.svelte';
 	import Devices from './Devices.svelte';
@@ -15,6 +15,8 @@
 	import AxisY from './AxisY.svelte';
 	import MapCoordinates from './MapCoordinates.svelte';
 	import CalibrationSpot from './CalibrationSpot.svelte';
+	import FixEllipse from './FixEllipse.svelte';
+	import NodePairs from './NodePairs.svelte';
 
 	let svg: SVGElement | undefined = $state();
 	let transform = $state(zoomIdentity);
@@ -23,6 +25,7 @@
 		floorId?: string | null;
 		deviceId?: string | null;
 		nodeId?: string | null;
+		explanation?: DeviceExplanation | null;
 		exclusive?: boolean;
 		/** For maps embedded in a scrolling page: plain scroll scrolls the page; pinch or Ctrl+scroll zooms. */
 		embedded?: boolean;
@@ -30,7 +33,7 @@
 		onselected?: ((item: Device | Node) => void) | undefined;
 	}
 
-	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), exclusive = false, embedded = false, calibrationSpot = $bindable(null), onselected = undefined }: Props = $props();
+	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), explanation = null, exclusive = false, embedded = false, calibrationSpot = $bindable(null), onselected = undefined }: Props = $props();
 
 	function makeSquareBounds(bounds: number[][]): number[][] {
 		const maxDim = Math.max(bounds[1][0], bounds[1][1]);
@@ -222,7 +225,13 @@
 			<AxisX {transform} />
 			<AxisY {transform} />
 			<Rooms {transform} {floorId} />
-			<Nodes {transform} {floorId} {deviceId} {nodeId} onselected={selectedNode} onhovered={hoveredNode} />
+			{#if nodeId && exclusive}
+				<NodePairs {transform} {nodeId} {floorId} />
+			{/if}
+			<Nodes {transform} {floorId} {deviceId} {nodeId} {explanation} onselected={selectedNode} onhovered={hoveredNode} />
+			{#if explanation?.uncertainty}
+				<FixEllipse {transform} ellipse={explanation.uncertainty} />
+			{/if}
 			<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
 			{#if calibrationSpot}
 				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} />

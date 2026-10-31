@@ -344,6 +344,81 @@ public class DeviceExplanationTests
     }
 
     [Test]
+    public void Ellipse_RunsAlongTheDirectionTheNodesCantPin()
+    {
+        // Nodes in a line along y pin the fit along that line and leave it free across it
+        Hear("a", new Point3D(5, 1, 1), 4.6, _ground);
+        Hear("b", new Point3D(5.05, 5, 1), 1.2, _ground);
+        Hear("c", new Point3D(5, 9, 1), 4.1, _ground);
+        Hear("d", new Point3D(4.95, 3, 1), 2.5, _ground);
+        _device.BestScenario = Run(new NelderMeadMultilateralizer(_device, _ground, _state));
+
+        var ellipse = DeviceExplanation.From(_device).Uncertainty!.Value;
+
+        Assert.That(ellipse.SemiMajor, Is.GreaterThan(ellipse.SemiMinor * 1.2));
+        Assert.That(Math.Abs(ellipse.AngleDegrees), Is.LessThan(45));
+    }
+
+    [Test]
+    public void Ellipse_NeedsASolvedFit()
+    {
+        Hear("a", new Point3D(0, 0, 1), 2, _ground);
+        Hear("b", new Point3D(4, 0, 1), 2, _ground);
+        _device.BestScenario = Run(new NelderMeadMultilateralizer(_device, _ground, _state));
+
+        Assert.That(DeviceExplanation.From(_device).Uncertainty, Is.Null);
+    }
+
+    [Test]
+    public void Hints_NameTheNodeThatDisagrees()
+    {
+        HearAroundKitchen();
+        _device.Track = true;
+        _device.Nodes["e"].Distance += 4;
+        _device.BestScenario = Run(new BfgsMultilateralizer(_device, _ground, _state));
+
+        Assert.That(DeviceExplanation.From(_device).Hints, Has.Some.Match("^e disagrees most.*long"));
+    }
+
+    [Test]
+    public void Hints_SayWhyAnUntrackedDeviceHasNoPosition()
+    {
+        Hear("a", new Point3D(0, 0, 1), 2, _ground);
+
+        Assert.That(DeviceExplanation.From(_device).Hints.Single(), Does.Contain("not tracked"));
+    }
+
+    [Test]
+    public void Hints_CarryBiasOnlyForNodesInTheFix()
+    {
+        HearAroundKitchen();
+        _device.BestScenario = Run(new NelderMeadMultilateralizer(_device, _ground, _state));
+        var biases = new[] { new NodeBias("a", "a", 0.4, 6), new NodeBias("elsewhere", "elsewhere", 0.4, 6) };
+
+        var hints = DeviceExplanation.From(_device, biases).Hints;
+
+        Assert.That(hints, Has.Some.Match("^a reads 40% long"));
+        Assert.That(hints, Has.None.Contain("elsewhere"));
+    }
+
+    [Test]
+    public void Hints_WarnNearAWall()
+    {
+        HearAroundKitchen();
+        _device.Track = true;
+        var scenario = new Scenario(_state.Config, new NelderMeadMultilateralizer(_device, _ground, _state), "ground")
+        {
+            Floor = _ground,
+            Room = _ground.Rooms.Values.Single(r => r.Name == "Kitchen")
+        };
+        scenario.ResetLocation(new Point3D(4.8, 5, 1));
+        _device.Scenarios.Add(scenario);
+        _device.BestScenario = scenario;
+
+        Assert.That(DeviceExplanation.From(_device).Hints, Has.Some.Contain("next to Hall"));
+    }
+
+    [Test]
     public void Explain_DeviceNotYetLocatedDoesNotThrow()
     {
         Hear("a", new Point3D(0, 0, 1), 2, _ground);
