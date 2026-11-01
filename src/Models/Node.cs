@@ -56,7 +56,8 @@ public class Node(string id, NodeSourceType sourceType)
         Name = cn.Name;
         Floors = floors.ToArray();
         double[]? point = cn.Point?.EnsureLength(3);
-        Location = new Point3D(point?[0] ?? 0, point?[1] ?? 0, point?[2] ?? 0);
+        if (point == null) X = Y = Z = null;
+        else Location = new Point3D(point[0], point[1], point[2]);
         Stationary = cn.Stationary;
         SourceType = NodeSourceType.Config;
     }
