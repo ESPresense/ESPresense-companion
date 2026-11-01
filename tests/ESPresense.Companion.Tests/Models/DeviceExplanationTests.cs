@@ -419,6 +419,34 @@ public class DeviceExplanationTests
     }
 
     [Test]
+    public void Explain_FloorWithNoRoomsHasNoNearestRoom()
+    {
+        Hear("a", new Point3D(1, 1, 4), 2, _upstairs);
+        Hear("b", new Point3D(9, 1, 4), 2, _upstairs);
+        Hear("c", new Point3D(5, 9, 4), 2, _upstairs);
+        _device.BestScenario = Run(new NelderMeadMultilateralizer(_device, _upstairs, _state));
+
+        Assert.That(DeviceExplanation.From(_device).Room.NearestOtherRoom, Is.Null);
+    }
+
+    [Test]
+    public void Explain_OnlyRoomOnTheFloorHasNoNearestRoom()
+    {
+        var solo = CreateFloor("solo", 6, 9, Room("Attic", 0, 0, 10, 10));
+        var attic = solo.Rooms.Values.Single();
+        var scenario = new Scenario(_state.Config, new NelderMeadMultilateralizer(_device, solo, _state), "solo") { Floor = solo, Room = attic };
+        scenario.ResetLocation(new Point3D(5, 5, 7));
+        _device.Scenarios.Add(scenario);
+        _device.BestScenario = scenario;
+
+        var room = DeviceExplanation.From(_device).Room;
+
+        Assert.That(room.Room?.Name, Is.EqualTo("Attic"));
+        Assert.That(room.NearestOtherRoom, Is.Null);
+        Assert.That(room.NearestOtherDistance, Is.Null);
+    }
+
+    [Test]
     public void Explain_DeviceNotYetLocatedDoesNotThrow()
     {
         Hear("a", new Point3D(0, 0, 1), 2, _ground);
