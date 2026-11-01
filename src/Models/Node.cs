@@ -57,7 +57,8 @@ public class Node(string id, NodeSourceType sourceType)
         Name = cn.Name;
         Floors = floors.ToArray();
         double[]? point = cn.Point?.EnsureLength(3);
-        Location = new Point3D(point?[0] ?? 0, point?[1] ?? 0, point?[2] ?? 0);
+        if (point == null) X = Y = Z = null;
+        else Location = new Point3D(point[0], point[1], point[2]);
         ZOutOfBounds = point != null && Floors.Any(f => f.Bounds is { Length: >= 2 }) && !Floors.Any(f => f.Contained(Location.Z));
         if (ZOutOfBounds)
             Log.Warning("Node {Node} z={Z} is outside the z-range of its floor(s) {Floors}. Coordinates are absolute: z must include the floor's base elevation (a node 1.7m up on a floor whose bounds start at z=3 has z=4.7). This node will be excluded from locating on those floors.",
