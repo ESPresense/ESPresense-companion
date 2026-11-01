@@ -234,8 +234,8 @@ public sealed record DeviceExplanation(
         var nearest = at is { } q
             ? floor?.Rooms.Values
                 .Where(r => r != room && r.Polygon is not null)
-                .Select(r => (room: r, distance: DistanceToEdge(r.Polygon!, q)))
-                .MinBy(r => r.distance)
+                .Select(r => ((Room room, double distance)?)(r, DistanceToEdge(r.Polygon!, q)))
+                .MinBy(r => r!.Value.distance)
             : null;
 
         return new ExplainedRoom(
