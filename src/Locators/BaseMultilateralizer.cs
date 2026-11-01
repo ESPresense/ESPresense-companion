@@ -47,6 +47,7 @@ public abstract class BaseMultilateralizer : ILocate
         if (pos.Length <= 1)
         {
             ResetScenario(scenario);
+            scenario.Trace = LocatorTrace.NoFix(Floor, nodes);
             guess = Point3D.NaN;
             return false;
         }
@@ -135,10 +136,14 @@ public abstract class BaseMultilateralizer : ILocate
     /// <summary>
     /// Performs final validation and room assignment
     /// </summary>
+    /// <param name="nodes">The nodes this pass used</param>
+    /// <param name="solvedWeights">The fit's per-node weights, left null unless the fit completed</param>
+    /// <param name="solvedScale">The factor the fit applied to geometric distance</param>
     /// <returns>True if scenario has moved and is valid</returns>
-    protected bool FinalizeScenario(Scenario scenario, int confidence)
+    protected bool FinalizeScenario(Scenario scenario, int confidence, DeviceToNode[] nodes, double[]? solvedWeights = null, double solvedScale = 1)
     {
         scenario.Confidence = confidence;
+        scenario.Trace = LocatorTrace.Finished(Floor, nodes, solvedWeights, scenario.Fit, solvedScale);
 
         if (confidence <= 0) return false;
         if (Math.Abs(scenario.Location.DistanceTo(scenario.LastLocation)) < 0.1) return false;

@@ -23,6 +23,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             scenario.Confidence = 0;
             scenario.Room = null;
             scenario.Error = null;
+            scenario.Trace = LocatorTrace.NoFix(floor, heard);
             return false;
         }
 
@@ -33,6 +34,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
 
         Point3D est;
         double weightedError = 0;
+        double[]? solvedWeights = null;
 
         try
         {
@@ -61,6 +63,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
                 }).Sum() / wSum;
 
                 scenario.Error = weightedError;
+                solvedWeights = weights;
             }
 
             scenario.UpdateLocation(est);
@@ -90,6 +93,8 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             scenario.Error = null;
             Log.Error("Locator error for {Device}: {Message}", device, ex.Message);
         }
+
+        scenario.Trace = LocatorTrace.Finished(floor, heard, solvedWeights, scenario.Fit);
 
         if (scenario.Confidence <= 0) return false;
         if (scenario.Location.DistanceTo(scenario.LastLocation) < 0.1) return false;

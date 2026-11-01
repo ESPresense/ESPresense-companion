@@ -26,6 +26,11 @@ internal class NearestNode : ILocate
         var nearest = device.Nodes.Values
             .Where(a => a.Current && (!limited || a.Distance <= maxDistance))
             .MinBy(a => a.Distance);
+        scenario.Trace = new LocatorTrace(
+            nearest == null ? LocatorOutcome.NoFix : LocatorOutcome.Fallback,
+            null,
+            nearest == null ? [] : [new LocatorTraceNode(nearest, nearest.Node!.Location, nearest.Distance, null)],
+            MaxDistance: limited ? maxDistance : null);
         if (nearest == null) return false;
 
         var node = nearest.Node!;
