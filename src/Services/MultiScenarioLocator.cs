@@ -277,10 +277,10 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 await using (lease)
                 {
                     Log.Information("Acquired lease '{LeaseName}'", LocatingLeaseName);
+
                     await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
                     {
-                        if (!lease.HasLease())
-                            break;
+                        if (!lease.HasLease()) break;
 
                         await ProcessDevice(device);
                     }
