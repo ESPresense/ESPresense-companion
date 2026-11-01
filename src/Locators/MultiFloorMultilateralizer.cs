@@ -43,69 +43,55 @@ public class MultiFloorMultilateralizer : ILocate
         });
         var pos = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).Select(a => a.Node!.Location).ToList();
 
-        if (pos.Count <= 0)
+        // One node gives a distance but no position; NearestNode owns that case and enforces max_distance
+        if (pos.Count <= 1)
         {
             scenario.Scale = 1;
             confidence = 0;
         }
         else
         {
-            var guess = confidence < 5
-                ? pos.Count switch
-                {
-                    >= 2 => Point3D.MidPoint(pos[0], pos[1]),
-                    _ => pos[0]
-                }
-                : scenario.Location;
+            var guess = confidence < 5 ? Point3D.MidPoint(pos[0], pos[1]) : scenario.Location;
 
             try
             {
-                if (pos.Count > 1)
+                var init = Vector<double>.Build.Dense(new double[]
                 {
-                    var init = Vector<double>.Build.Dense(new double[]
-                    {
-                        guess.X,
-                        guess.Y,
-                        guess.Z,
-                        scenario.Scale ?? 1.0
-                    });
-                    var result = solver.FindMinimum(obj, init);
-                    scenario.UpdateLocation(new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]));
-                    scenario.Scale = result.MinimizingPoint[3];
-                    scenario.Fixes = pos.Count;
-                    scenario.Minimum = nodes.Min(a => (double?) a.Distance);
-                    scenario.LastHit = nodes.Max(a => a.LastHit);
-                    scenario.Error = result.FunctionInfoAtMinimum.Value;
+                    guess.X,
+                    guess.Y,
+                    guess.Z,
+                    scenario.Scale ?? 1.0
+                });
+                var result = solver.FindMinimum(obj, init);
+                scenario.UpdateLocation(new Point3D(result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]));
+                scenario.Scale = result.MinimizingPoint[3];
+                scenario.Fixes = pos.Count;
+                scenario.Minimum = nodes.Min(a => (double?) a.Distance);
+                scenario.LastHit = nodes.Max(a => a.LastHit);
+                scenario.Error = result.FunctionInfoAtMinimum.Value;
 
-                    if (nodes.Length >= 2)
-                    {
-                        var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
-                        var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
-                        scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
-                    }
-                    else
-                    {
-                        scenario.PearsonCorrelation = null; // Not enough data points
-                    }
-
-                    // Calculate number of possible nodes (all nodes since MultiFloor is floor-agnostic)
-                    // Note: This includes offline nodes since we don't have NodeTelemetryStore access
-                    int nodesPossibleTotal = _state.Nodes.Values.Count();
-
-                    // Use the centralized confidence calculation
-                    confidence = MathUtils.CalculateConfidence(
-                        scenario.Error,
-                        scenario.PearsonCorrelation,
-                        nodes.Length,
-                        nodesPossibleTotal
-                    );
+                if (nodes.Length >= 2)
+                {
+                    var measuredDistances = nodes.Select(dn => dn.Distance).ToList();
+                    var calculatedDistances = nodes.Select(dn => scenario.Location.DistanceTo(dn.Node!.Location)).ToList();
+                    scenario.PearsonCorrelation = MathUtils.CalculatePearsonCorrelation(measuredDistances, calculatedDistances);
                 }
                 else
                 {
-                    confidence = 1;
-                    scenario.Scale = 1;
-                    scenario.UpdateLocation(guess);
+                    scenario.PearsonCorrelation = null; // Not enough data points
                 }
+
+                // Calculate number of possible nodes (all nodes since MultiFloor is floor-agnostic)
+                // Note: This includes offline nodes since we don't have NodeTelemetryStore access
+                int nodesPossibleTotal = _state.Nodes.Values.Count();
+
+                // Use the centralized confidence calculation
+                confidence = MathUtils.CalculateConfidence(
+                    scenario.Error,
+                    scenario.PearsonCorrelation,
+                    nodes.Length,
+                    nodesPossibleTotal
+                );
             }
             catch (Exception ex)
             {
