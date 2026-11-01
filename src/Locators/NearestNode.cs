@@ -1,5 +1,4 @@
-﻿using ESPresense.Extensions;
-using ESPresense.Models;
+﻿using ESPresense.Models;
 using ESPresense.Utils;
 
 namespace ESPresense.Locators;
@@ -44,15 +43,15 @@ internal class NearestNode : ILocate
         IReadOnlyList<Floor> floors = node.HasLocation
             ? SpatialUtils.FindFloorsAt(location.Z, _state.Floors.Values)
             : node.Floors ?? [];
-        var rooms = floors.SelectMany(f => f.Rooms.Values).ToList();
 
         // Try to find the room:
         // 1. First try to find a room containing the node's location
         // 2. If that fails, try to match the node ID to a room name (nodes are often named after their room)
-        scenario.Room = rooms.FirstOrDefault(r => r.Polygon?.EnclosesPoint(location.ToPoint2D()) ?? false)
+        scenario.Room = floors.Select(f => SpatialUtils.FindRoomContaining(location, f)).FirstOrDefault(r => r != null)
             // Try matching node ID to room name (case-insensitive)
-            ?? rooms.FirstOrDefault(r => string.Equals(r.Name, node.Id, StringComparison.OrdinalIgnoreCase)
-                                      || string.Equals(r.Name, node.Name, StringComparison.OrdinalIgnoreCase));
+            ?? floors.SelectMany(f => f.Rooms.Values)
+                .FirstOrDefault(r => string.Equals(r.Name, node.Id, StringComparison.OrdinalIgnoreCase)
+                                  || string.Equals(r.Name, node.Name, StringComparison.OrdinalIgnoreCase));
         scenario.Floor = scenario.Room?.Floor ?? floors.FirstOrDefault();
 
         return true;
