@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { DeviceExplanation, ExplainedPlace } from '$lib/types';
-	import { ELLIPSE_95_PERCENT, errorColor, rejectionLabel } from '$lib/explain';
+	import type { DeviceExplanation, ExplainedPlace } from '#lib/types.js';
+	import { ELLIPSE_95_PERCENT, errorColor, rejectionLabel } from '#lib/explain.js';
 
 	let { explanation }: { explanation: DeviceExplanation | null } = $props();
 

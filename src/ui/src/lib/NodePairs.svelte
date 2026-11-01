@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
 	import { getLayerCakeContext } from 'layercake';
-	import { calibration, nodes } from '$lib/stores';
-	import { errorColor } from '$lib/explain';
-	import type { MapScales } from '$lib/types';
+	import { calibration, nodes } from '#lib/stores.js';
+	import { errorColor } from '#lib/explain.js';
+	import type { MapScales } from '#lib/types.js';
 
 	const chart = getLayerCakeContext<MapScales>();
 

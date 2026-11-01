@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
 	import { getLayerCakeContext } from 'layercake';
-	import { ellipsePoints } from '$lib/explain';
-	import type { ExplainedEllipse, MapScales } from '$lib/types';
+	import { ellipsePoints } from '#lib/explain.js';
+	import type { ExplainedEllipse, MapScales } from '#lib/types.js';
 
 	const chart = getLayerCakeContext<MapScales>();
 
