@@ -16,13 +16,16 @@ public class MultiFloorMultilateralizerTests
     private Mock<IMqttCoordinator> _mockMqttCoordinator;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
 
+        // Without a config file the loader installs the example, whose floors would mix with the test's
+        await File.WriteAllTextAsync(Path.Combine(_configDir, "config.yaml"), "floors: []\n");
         _configLoader = new ConfigLoader(_configDir);
+        await _configLoader.ConfigAsync();
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
     }
