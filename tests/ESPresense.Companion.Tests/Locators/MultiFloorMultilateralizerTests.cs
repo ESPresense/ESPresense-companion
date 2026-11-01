@@ -123,6 +123,30 @@ public class MultiFloorMultilateralizerTests
         return (locator.Locate(scenario), scenario);
     }
 
+    // The first fix seeds the Kalman filter, which then only creeps towards later ones, so a fix
+    // seeded from the origin shows every device starting at 0,0,0 and sliding into place
+    [TestCase(5)]
+    [TestCase(3)]
+    public void Locate_FirstFix_DoesNotStartFromTheOrigin(int heard)
+    {
+        var floor = CreateTestFloor("first", new double[] { -20, -20, 0 }, new double[] { 40, 40, 3 });
+        var truth = new Point3D(14, 9, 1);
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+        var at = new[] { new Point3D(12, 7, 1), new Point3D(17, 8, 2), new Point3D(13, 13, 1), new Point3D(19, 12, 1.5), new Point3D(10, 10, 0.5) };
+        foreach (var (location, i) in at.Take(heard).Select((l, i) => (l, i)))
+        {
+            var node = CreateTestNode($"n{i}", $"n{i}", location, floor);
+            device.Nodes[node.Id] = new DeviceToNode(device, node) { Distance = truth.DistanceTo(location), LastHit = DateTime.UtcNow };
+        }
+        var scenario = new Scenario(_configLoader.Config, new MultiFloorMultilateralizer(device, _state), "MultiFloor");
+
+        scenario.Locate();
+
+        // Horizontal only: three nodes leave two exact answers, mirrored through their plane
+        Assert.That(new Point2D(scenario.Location.X, scenario.Location.Y).DistanceTo(new Point2D(truth.X, truth.Y)), Is.LessThan(0.2));
+        Assert.That(scenario.Scale, Is.EqualTo(1).Within(0.01));
+    }
+
     [Test]
     public void Locate_SingleNode_ProducesNoFix()
     {
