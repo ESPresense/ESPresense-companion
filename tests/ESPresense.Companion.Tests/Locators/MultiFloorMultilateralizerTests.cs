@@ -112,12 +112,31 @@ public class MultiFloorMultilateralizerTests
 
     private (bool moved, Scenario scenario) LocateAt(Point3D location, params Floor[] floors)
     {
+        // Two zero-range nodes at one spot pin the solve there, whatever the floor layout
         var node = CreateTestNode("node1", "Node 1", location, floors);
-        var device = CreateDeviceWithNode(node, 1.0);
+        var device = CreateDeviceWithNode(node, 0.0);
+        var other = CreateTestNode("node2", "Node 2", location, floors);
+        device.Nodes[other.Id] = new DeviceToNode(device, other) { Distance = 0.0, LastHit = DateTime.UtcNow };
         var locator = new MultiFloorMultilateralizer(device, _state);
-        // Confidence starts low so the single-node fallback seeds the solve at the node, not the origin
+        // Confidence starts low so the solve is seeded at the nodes, not the origin
         var scenario = new Scenario(_configLoader.Config, locator, "MultiFloor") { Confidence = 0 };
         return (locator.Locate(scenario), scenario);
+    }
+
+    [Test]
+    public void Locate_SingleNode_ProducesNoFix()
+    {
+        var (ground, upstairs) = CreateTwoFloors();
+        var node = CreateTestNode("node1", "Node 1", new Point3D(2, 2, 1), ground, upstairs);
+        var device = CreateDeviceWithNode(node, 40.0);
+        var locator = new MultiFloorMultilateralizer(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "MultiFloor") { Confidence = 0 };
+
+        var moved = locator.Locate(scenario);
+
+        Assert.That(moved, Is.False);
+        Assert.That(scenario.Confidence, Is.EqualTo(0));
+        Assert.That(scenario.Room, Is.Null);
     }
 
     [Test]
