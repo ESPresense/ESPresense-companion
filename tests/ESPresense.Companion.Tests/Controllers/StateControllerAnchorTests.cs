@@ -125,6 +125,11 @@ public class StateControllerAnchorTests
         Assert.That(measurement["rssi"], Is.EqualTo(-65));
         Assert.That(measurement["mapDistance"], Is.EqualTo(4.0).Within(0.01)); // Expected distance from anchor to rx node
         Assert.That(measurement["diff"], Is.EqualTo(0.1).Within(0.01)); // 4.1 - 4.0
+
+        // One pair fits almost perfectly, so it must not become the best ever seen
+        Assert.That(calibration.RMSE, Is.GreaterThan(0));
+        Assert.That(calibration.BestRMSE, Is.Null);
+        Assert.That(calibration.BestR, Is.Null);
     }
 
     [Test]

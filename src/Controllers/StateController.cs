@@ -19,6 +19,8 @@ namespace ESPresense.Controllers;
 [ApiController]
 public class StateController : ControllerBase
 {
+    private const int MinPairsForBestMetrics = 5;
+
     private readonly ILogger<StateController> _logger;
     private readonly State _state;
     private readonly ConfigLoader _config;
@@ -204,7 +206,10 @@ public class StateController : ControllerBase
 
         c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
         c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
-        (c.BestRMSE, c.BestR) = _state.RecordCalibrationMetrics(c.RMSE, c.R);
+        // A handful of pairs can fit almost perfectly by chance, and a best-seen value sticks until reset.
+        (c.BestRMSE, c.BestR) = mapDistances.Count >= MinPairsForBestMetrics
+            ? _state.RecordCalibrationMetrics(c.RMSE, c.R)
+            : _state.RecordCalibrationMetrics(null, null);
         return c;
     }
 
