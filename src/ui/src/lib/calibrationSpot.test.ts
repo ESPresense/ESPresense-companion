@@ -40,6 +40,21 @@ describe('anchorSpot', () => {
 		expect(anchorSpot({ x: 1, y: 2, z: 4.7 }, floors, 'gone')?.floorId).toBe('upstairs');
 	});
 
+	it('tells apart floors at the same height by x and y', () => {
+		const wing = {
+			id: 'wing',
+			bounds: [
+				[20, 0, 0],
+				[30, 10, 3]
+			]
+		};
+		expect(anchorSpot({ x: 25, y: 5, z: 1 }, [ground, wing])?.floorId).toBe('wing');
+	});
+
+	it('takes the first floor containing a point on a shared boundary', () => {
+		expect(anchorSpot({ x: 1, y: 2, z: 3 }, floors)?.floorId).toBe('ground');
+	});
+
 	it('treats zero as a real coordinate', () => {
 		expect(anchorSpot({ x: 0, y: 0, z: 0 }, floors)).toEqual({ spot: { x: 0, y: 0, z: 0 }, height: 0, floorId: 'ground' });
 	});
