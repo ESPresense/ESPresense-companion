@@ -25,12 +25,9 @@ public class NearestNodeTests
         // Without a config file the loader installs the example, whose floors would mix with the test's
         await File.WriteAllTextAsync(Path.Combine(_configDir, "config.yaml"), "floors: []\n");
         _configLoader = new ConfigLoader(_configDir);
-        await _configLoader.ConfigAsync();
+        await _configLoader.LoadAsync(); // the constructor no longer loads
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
-
-        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
-        await _configLoader.LoadAsync();
     }
 
     [TearDown]
