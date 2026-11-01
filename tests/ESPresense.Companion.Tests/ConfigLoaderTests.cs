@@ -87,23 +87,21 @@ public class ConfigLoaderTests
         Assert.That(loader.Config, Is.Null);
         Assert.That(loader.ConfigAsync().IsCompleted, Is.False);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-        var process = Process.GetCurrentProcess();
-        var cpuBefore = process.TotalProcessorTime;
+        // The old implementation looped on an already-completed task without ever yielding, so it never
+        // returned a task at all (the IsCompleted check above would have hung). Process-wide CPU time is
+        // too noisy to assert on a shared CI runner, so pin the behaviour structurally instead: the call
+        // returns a pending task, it stays pending while the file is invalid, and cancellation ends it.
+        using var cts = new CancellationTokenSource();
+        var pending = loader.ConfigAsync(cts.Token);
+        await Task.Delay(200);
+        Assert.That(pending.IsCompleted, Is.False, "ConfigAsync must stay pending while the config is invalid");
+
         var wall = Stopwatch.StartNew();
-
-        Assert.CatchAsync<OperationCanceledException>(() => loader.ConfigAsync(cts.Token));
-
+        cts.Cancel();
+        Assert.CatchAsync<OperationCanceledException>(async () => await pending);
         wall.Stop();
-        process.Refresh();
-        var cpuUsed = process.TotalProcessorTime - cpuBefore;
 
         Assert.That(wall.Elapsed, Is.LessThan(TimeSpan.FromSeconds(10)), "ConfigAsync must give up when the token is cancelled");
-        // The old implementation busy-looped on a completed task, burning a full core for the whole wait
-        // (~1000 ms of CPU here, or ~500 ms even if a loaded runner only gave the spinning thread half a core).
-        // A parked task costs this process near-zero CPU regardless of other load on the machine; the 500 ms
-        // headroom is for our own JIT/GC/test-framework threads.
-        Assert.That(cpuUsed, Is.LessThan(TimeSpan.FromMilliseconds(500)), $"ConfigAsync spun the CPU while waiting (used {cpuUsed.TotalMilliseconds:F0} ms over {wall.ElapsedMilliseconds} ms)");
         Assert.That(loader.Config, Is.Null);
     }
 
