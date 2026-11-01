@@ -125,6 +125,31 @@ public class StateControllerAnchorTests
         Assert.That(measurement["rssi"], Is.EqualTo(-65));
         Assert.That(measurement["mapDistance"], Is.EqualTo(4.0).Within(0.01)); // Expected distance from anchor to rx node
         Assert.That(measurement["diff"], Is.EqualTo(0.1).Within(0.01)); // 4.1 - 4.0
+
+        // One pair fits almost perfectly, so it must not become the best ever seen
+        Assert.That(calibration.RMSE, Is.GreaterThan(0));
+        Assert.That(calibration.BestRMSE, Is.Null);
+        Assert.That(calibration.BestR, Is.Null);
+    }
+
+    [Test]
+    public void GetCalibration_TracksBestLiveDistanceMetrics()
+    {
+        var first = _state.RecordCalibrationMetrics(2.5, 0.7);
+        var worse = _state.RecordCalibrationMetrics(3.0, 0.6);
+        var mixed = _state.RecordCalibrationMetrics(2.0, 0.8);
+
+        Assert.That(first.BestRMSE, Is.EqualTo(2.5));
+        Assert.That(first.BestR, Is.EqualTo(0.7));
+        Assert.That(worse.BestRMSE, Is.EqualTo(2.5));
+        Assert.That(worse.BestR, Is.EqualTo(0.7));
+        Assert.That(mixed.BestRMSE, Is.EqualTo(2.0));
+        Assert.That(mixed.BestR, Is.EqualTo(0.8));
+
+        _state.ResetCalibrationMetrics();
+        var afterReset = _state.RecordCalibrationMetrics(4.0, 0.4);
+        Assert.That(afterReset.BestRMSE, Is.EqualTo(4.0));
+        Assert.That(afterReset.BestR, Is.EqualTo(0.4));
     }
 
     [Test]
