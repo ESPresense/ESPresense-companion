@@ -344,6 +344,39 @@ public class DeviceTrackerTests
     }
 
     [Test]
+    public void OnPreviousDeviceDiscovered_IgnoresEchoOfOurOwnClear()
+    {
+        var device = new Device("echo", null, TimeSpan.FromSeconds(30));
+        _state.Devices[device.Id] = device;
+        _deviceTracker.RememberSelfClear("disc-echo");
+
+        _deviceTracker.OnPreviousDeviceDiscovered(DiscoveryClear("disc-echo", device.Id));
+
+        Assert.That(_state.Devices.ContainsKey(device.Id), Is.True);
+    }
+
+    [Test]
+    public void OnPreviousDeviceDiscovered_StaleSelfClearDoesNotHideExternalDelete()
+    {
+        // Read-only mode publishes nothing, so no echo ever consumes the entry; a later external clear must still delete.
+        var device = new Device("stale-echo", null, TimeSpan.FromSeconds(30));
+        _state.Devices[device.Id] = device;
+        _deviceTracker.RememberSelfClear("disc-stale", DateTime.UtcNow.AddMinutes(-6));
+
+        _deviceTracker.OnPreviousDeviceDiscovered(DiscoveryClear("disc-stale", device.Id));
+
+        Assert.That(_state.Devices.ContainsKey(device.Id), Is.False);
+    }
+
+    private static PreviousDeviceDiscoveredEventArgs DiscoveryClear(string discoveryId, string deviceId) => new()
+    {
+        Topic = $"homeassistant/device_tracker/{discoveryId}/config",
+        DiscoveryId = discoveryId,
+        DeviceId = deviceId,
+        AutoDiscover = null
+    };
+
+    [Test]
     public void OnPreviousDeviceDiscovered_DeleteUsesDeviceIdWhenProvided()
     {
         var device = new Device("by-id", null, TimeSpan.FromSeconds(30));

@@ -95,7 +95,8 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     {
         if (arg.AutoDiscover == null)
         {
-            if (_selfClearedDiscoveryIds.TryRemove(arg.DiscoveryId, out _))
+            // A stale entry had no echo (e.g. read-only mode publishes nothing), so this clear is a real external one.
+            if (_selfClearedDiscoveryIds.TryRemove(arg.DiscoveryId, out var clearedAt) && DateTime.UtcNow - clearedAt <= SelfClearTtl)
             {
                 // Echo of the clear we published when the device stopped being tracked; the device stays.
                 Log.Debug("Ignoring our own discovery clear for {DiscoveryId}", arg.DiscoveryId);
@@ -161,7 +162,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     /// Records that we are about to clear the retained discovery config for <paramref name="discoveryId"/>, so the
     /// echo of that clear is not treated as an external delete. Stale entries are pruned on every insert.
     /// </summary>
-    internal void RememberSelfClear(string discoveryId)
+    internal void RememberSelfClear(string discoveryId, DateTime? clearedAt = null)
     {
         var now = DateTime.UtcNow;
         foreach (var entry in _selfClearedDiscoveryIds)
@@ -169,7 +170,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             if (now - entry.Value > SelfClearTtl)
                 _selfClearedDiscoveryIds.TryRemove(entry.Key, out _);
         }
-        _selfClearedDiscoveryIds[discoveryId] = now;
+        _selfClearedDiscoveryIds[discoveryId] = clearedAt ?? now;
     }
 
     /// <summary>

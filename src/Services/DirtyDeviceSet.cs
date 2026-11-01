@@ -50,11 +50,22 @@ internal sealed class DirtyDeviceSet
             // Consume the wake-up before draining so a mark that lands while we drain re-arms the signal.
             _signal.Reader.TryRead(out _);
 
-            while (_order.TryDequeue(out var id))
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                _pending.TryRemove(id, out _);
-                yield return id;
+                while (true)
+                {
+                    // Check before dequeuing: an id taken off _order but left in _pending could never be marked again.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!_order.TryDequeue(out var id)) break;
+                    _pending.TryRemove(id, out _);
+                    yield return id;
+                }
+            }
+            finally
+            {
+                // The consumer can stop mid-drain (lease lost, exception, cancellation). Mark ignores ids that are
+                // already pending, so without a re-arm the leftovers would wait for some other id to be marked.
+                if (!_order.IsEmpty) _signal.Writer.TryWrite(true);
             }
         }
     }
