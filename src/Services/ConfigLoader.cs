@@ -231,8 +231,13 @@ public class ConfigLoader : BackgroundService
     }
 
     /// <summary>
-    /// Completes with the first successfully parsed configuration. Does not poll or spin: while the file is
-    /// missing or invalid the returned task stays pending until <paramref name="ct"/> is cancelled.
+    /// Waits for the first successful parse, then returns the current configuration (so a caller arriving
+    /// after a reload sees the reloaded settings, not the first ones). Does not poll or spin: while no config
+    /// has loaded the returned task stays pending until <paramref name="ct"/> is cancelled.
     /// </summary>
-    public Task<Config> ConfigAsync(CancellationToken ct = default) => _firstLoad.Task.WaitAsync(ct);
+    public async Task<Config> ConfigAsync(CancellationToken ct = default)
+    {
+        var first = await _firstLoad.Task.WaitAsync(ct);
+        return Config ?? first;
+    }
 }

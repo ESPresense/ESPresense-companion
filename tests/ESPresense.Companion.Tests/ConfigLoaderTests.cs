@@ -181,8 +181,9 @@ public class ConfigLoaderTests
         Assert.That(changes, Is.EqualTo(2));
         Assert.That(loader.Config, Is.Not.SameAs(first));
         Assert.That(loader.Config!.Timeout, Is.EqualTo(99));
-        // ConfigAsync resolves to the first successful load; later loads are observed via Config/ConfigChanged.
-        Assert.That(await loader.ConfigAsync(), Is.SameAs(first));
+        // ConfigAsync only gates on the first load; it must hand back the current config, not the first one
+        // (MqttCoordinator calls it again when re-initialising after a config change).
+        Assert.That(await loader.ConfigAsync(), Is.SameAs(loader.Config));
     }
 
     [Test]
