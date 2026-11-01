@@ -110,6 +110,22 @@ public class State
     /// <returns>The newly created optimization snapshot containing active measurements.</returns>
     public OptimizationSnapshot TakeOptimizationSnapshot()
     {
+        var os = ReadMeasures();
+
+        // Remove expired snapshots by time
+        var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
+        var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
+        OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
+        OptimizationSnaphots.Add(os);
+
+        return os;
+    }
+
+    /// <summary>
+    /// The current node-to-node and anchor measurements, without adding them to the optimizer's history
+    /// </summary>
+    public OptimizationSnapshot ReadMeasures()
+    {
         Dictionary<string, OptNode> nodes = new();
         var os = new OptimizationSnapshot
         {
@@ -166,12 +182,6 @@ public class State
                 });
             }
         }
-
-        // Remove expired snapshots by time
-        var expiryMinutes = Config?.Optimization?.KeepSnapshotMins ?? 5;
-        var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
-        OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
-        OptimizationSnaphots.Add(os);
 
         return os;
     }
