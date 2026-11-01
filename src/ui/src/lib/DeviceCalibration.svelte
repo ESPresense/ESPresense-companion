@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { anchorSpot } from '#lib/calibrationSpot.js';
 	import { apiFetch, apiUrl } from '#lib/api.js';
 	import { devices, nodes, config, wsManager } from '#lib/stores.js';
 	import Map from '#lib/Map.svelte';
@@ -433,6 +434,12 @@
 		// here (#1730). Fall back to the first floor and the middle of it.
 		if (!selectedFloorId) selectedFloorId = $config?.floors?.[0]?.id ?? null;
 		const b = $config?.floors?.find((f: any) => f.id === selectedFloorId)?.bounds;
+		// An anchored device's position is known exactly: open at its saved height, not the default.
+		const anchor = anchorSpot(deviceSettings, b?.[0]?.[2] ?? 0);
+		if (anchor) {
+			calibrationSpot = anchor.spot;
+			calibrationSpotHeight = anchor.height;
+		}
 		if (!calibrationSpot && b) calibrationSpot = { x: (b[0][0] + b[1][0]) / 2, y: (b[0][1] + b[1][1]) / 2 };
 	});
 	let floor = $derived($config?.floors.find((f: any) => f.id === selectedFloorId));
@@ -448,7 +455,7 @@
 	});
 	// Update Z coordinate when height changes
 	$effect.pre(() => {
-		if (calibrationSpot && calibrationSpotHeight) {
+		if (calibrationSpot && calibrationSpotHeight != null) {
 			const floorLowerZ = bounds ? bounds[0][2] : 0;
 			calibrationSpot.z = floorLowerZ + calibrationSpotHeight;
 		}
