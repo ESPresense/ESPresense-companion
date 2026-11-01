@@ -256,6 +256,24 @@ public class NearestNodeTests
         Assert.That(scenario.Room, Is.Null);
     }
 
+    [Test]
+    public void Locate_UsesConfiguredFloorsForConfiguredNodeWithNoPoint()
+    {
+        CreateTestFloor("first", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 3.0 });
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 });
+
+        var node = new Node("node1", NodeSourceType.Config);
+        node.Update(_configLoader.Config!, new ConfigNode { Id = "node1" }, new[] { second });
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(node.HasLocation, Is.False);
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.EqualTo(second));
+    }
+
     [TestCase(9.0, true)]
     [TestCase(11.0, false)]
     public async Task Locate_IgnoresNodesBeyondMaxDistance(double distance, bool expected)
