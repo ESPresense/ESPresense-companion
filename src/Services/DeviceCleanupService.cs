@@ -4,10 +4,18 @@ using Microsoft.Extensions.Logging;
 namespace ESPresense.Services;
 
 /// <summary>
-/// Background service that periodically removes devices that have not been seen for a configured retention period.
+/// Background service that periodically removes devices that have not been seen for a configured retention period,
+/// and removes devices whose id a settings alias change made dead.
 /// </summary>
-public class DeviceCleanupService(State state, DeviceService deviceService, ILogger<DeviceCleanupService> logger) : BackgroundService
+public class DeviceCleanupService(State state, DeviceService deviceService, DeviceSettingsStore deviceSettingsStore, ILogger<DeviceCleanupService> logger) : BackgroundService
 {
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        // Here rather than in ExecuteAsync, which may start after StartAsync returns and miss an alias change.
+        deviceSettingsStore.DeviceIdsRetiredAsync += RemoveRetired;
+        return base.StartAsync(cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var retention = state.Config?.DeviceRetentionTimeSpan ?? TimeSpan.FromDays(30);
@@ -25,13 +33,16 @@ public class DeviceCleanupService(State state, DeviceService deviceService, ILog
         }
     }
 
-    private async Task RunCleanup(CancellationToken stoppingToken)
+    internal async Task RunCleanup(CancellationToken stoppingToken)
     {
         try
         {
             var retention = state.Config?.DeviceRetentionTimeSpan ?? TimeSpan.FromDays(30);
             var now = DateTime.UtcNow;
             var cutoff = now - retention;
+
+            // A raw settings key that now has an alias may have been rebuilt from retained discovery after a restart.
+            await RemoveRetired(state.Devices.Keys.Where(deviceSettingsStore.IsRetired).ToList());
 
             // Devices restored from discovery without a retained last_seen would never expire; start their clock now.
             var stamped = await deviceService.StampUnseenDevicesAsync(now);
@@ -53,6 +64,20 @@ public class DeviceCleanupService(State state, DeviceService deviceService, ILog
         catch (Exception ex)
         {
             logger.LogError(ex, "Error running device cleanup");
+        }
+    }
+
+    private async Task RemoveRetired(IReadOnlyList<string> deviceIds)
+    {
+        try
+        {
+            var removed = await deviceService.DeleteBulkAsync(deviceIds, "alias-changed");
+            if (removed > 0)
+                logger.LogInformation("DeviceCleanup: removed {Removed} devices whose id was replaced by an alias", removed);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error removing devices replaced by an alias");
         }
     }
 }

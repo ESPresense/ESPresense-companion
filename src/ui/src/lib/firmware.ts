@@ -1,6 +1,6 @@
 import { readable, writable, derived, type Writable } from 'svelte/store';
-import { apiFetch, apiUrl } from '$lib/api';
-import type { FirmwareManifest, Release, WorkflowRun } from '$lib/types';
+import { apiFetch, apiUrl } from '#lib/api.js';
+import type { FirmwareManifest, Release, WorkflowRun } from '#lib/types.js';
 
 export const updateMethod: Writable<string> = writable('self');
 export const firmwareSource: Writable<string> = writable('release');

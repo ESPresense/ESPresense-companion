@@ -1,7 +1,7 @@
 <script lang="ts">
-	import NodeCalibrationMatrix from '$lib/NodeCalibrationMatrix.svelte';
-	import DeviceCalibrationManager from '$lib/DeviceCalibrationManager.svelte';
-	import CalibrationTabs from '$lib/CalibrationTabs.svelte';
+	import NodeCalibrationMatrix from '#lib/NodeCalibrationMatrix.svelte';
+	import DeviceCalibrationManager from '#lib/DeviceCalibrationManager.svelte';
+	import CalibrationTabs from '#lib/CalibrationTabs.svelte';
 
 	let calibrationType = $state('node');
 </script>

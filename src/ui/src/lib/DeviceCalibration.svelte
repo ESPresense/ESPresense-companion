@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { apiFetch, apiUrl } from '$lib/api';
-	import { devices, nodes, config, wsManager } from '$lib/stores';
-	import Map from '$lib/Map.svelte';
-	import { getToastStore } from '$lib/toast/toastStore';
-	import type { DeviceSetting, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import type { DeviceMessage } from '$lib/types';
+	import { apiFetch, apiUrl } from '#lib/api.js';
+	import { devices, nodes, config, wsManager } from '#lib/stores.js';
+	import Map from '#lib/Map.svelte';
+	import { getToastStore } from '#lib/toast/toastStore.js';
+	import type { DeviceSetting, NodeSetting, NodeSettingDetails } from '#lib/types.js';
+	import type { DeviceMessage } from '#lib/types.js';
 	import { onMount, onDestroy, untrack } from 'svelte';
 
 	const toastStore = getToastStore();

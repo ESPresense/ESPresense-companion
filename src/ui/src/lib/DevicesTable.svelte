@@ -1,9 +1,9 @@
 <script lang="ts">
-	import DeviceActions from '$lib/DeviceActions.svelte';
-	import DeviceActiveId from '$lib/DeviceActiveId.svelte';
-	import { devices } from '$lib/stores';
-	import type { Device } from '$lib/types';
-	import DataTable from '$lib/DataTable.svelte';
+	import DeviceActions from '#lib/DeviceActions.svelte';
+	import DeviceActiveId from '#lib/DeviceActiveId.svelte';
+	import { devices } from '#lib/stores.js';
+	import type { Device } from '#lib/types.js';
+	import DataTable from '#lib/DataTable.svelte';
 	import ago from 's-ago';
 
 	interface Props {

@@ -5,9 +5,9 @@
 	import { fade } from 'svelte/transition';
 
 	import { getLayerCakeContext } from 'layercake';
-	import type { Device, MapScales } from '$lib/types';
-	import { config } from '$lib/stores';
-	import { getRoomColor } from '$lib/colors';
+	import type { Device, MapScales } from '#lib/types.js';
+	import { config } from '#lib/stores.js';
+	import { getRoomColor } from '#lib/colors.js';
 
 	const chart = getLayerCakeContext<MapScales>();
 	interface Props {

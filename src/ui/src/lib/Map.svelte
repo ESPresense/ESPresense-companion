@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { isEditableTarget } from './dom';
 	import { LayerCake, Svg } from 'layercake';
-	import { config } from '$lib/stores';
+	import { config } from '#lib/stores.js';
 	import { scaleOrdinal, schemeCategory10 } from 'd3';
 	import { pointer, select } from 'd3-selection';
 	import { zoom, zoomIdentity } from 'd3-zoom';
 	import { setContext } from 'svelte';
-	import type { Device, Node } from '$lib/types';
+	import type { Device, Node } from '#lib/types.js';
 
 	import Rooms from './Rooms.svelte';
 	import Devices from './Devices.svelte';
