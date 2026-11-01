@@ -171,6 +171,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "training_window_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? TrainingWindowMins { get; set; }
         [YamlMember(Alias = "optimization_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? OptimizationIntervalSecs { get; set; }
         [YamlMember(Alias = "validation_fraction")] public double ValidationFraction { get; set; } = 0.2;
+        [YamlMember(Alias = "minimum_improvement")] public double MinimumImprovement { get; set; } = 0; // How far a proposal's overall score must beat the current calibration's
 
         // Legacy timing keys. Keep these as deserialization fallbacks for existing installations.
         [YamlMember(Alias = "interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? IntervalSecs { get; set; }

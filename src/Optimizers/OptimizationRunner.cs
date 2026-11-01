@@ -327,7 +327,7 @@ internal class OptimizationRunner : BackgroundService
             // Use weights from ConfigOptimization
             var composite = (corr * correlationWeight) + ((1 - rmse / (1 + rmse)) * rmseWeight);
 
-            if (double.IsNaN(composite) || double.IsInfinity(composite) || composite <= bestScore)
+            if (double.IsNaN(composite) || double.IsInfinity(composite) || composite <= bestScore + optimization.MinimumImprovement)
             {
                 Log.Information("Optimizer {0,-24} found worse results: Composite={1:0.000} <= Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
                     optimizer.Name, composite, bestScore, corr, rmse);

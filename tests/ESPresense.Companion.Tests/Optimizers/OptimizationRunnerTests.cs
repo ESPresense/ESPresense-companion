@@ -160,6 +160,14 @@ public class OptimizationRunnerTests
     }
 
     [Test]
+    public async Task RunCycle_GainBelowMinimumImprovement_IsNotApplied()
+    {
+        await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5, MinimumImprovement = 2 });
+
+        _mqtt.Verify(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
     public async Task RunCycle_AtLeastMinSamples_IsEvaluatedAndApplied()
     {
         await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5 });

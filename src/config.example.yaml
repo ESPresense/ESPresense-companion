@@ -43,6 +43,7 @@ optimization:
   training_window_mins: 60        # Rolling history kept for training and validation (default: 30)
   optimization_interval_secs: 900 # How often proposals are evaluated and possibly applied (default: 900)
   validation_fraction: 0.2        # Newest fraction of the history held out to validate proposals (default: 0.2)
+  minimum_improvement: 0          # How far a proposal's score (0-1) must beat the current calibration's (default: 0)
   min_samples: 5          # Minimum measurements an optimizer result must be evaluated on before it is applied (default: 5)
   optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:

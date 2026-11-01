@@ -154,6 +154,7 @@ namespace ESPresense.Models
                 TrainingWindowMins = TrainingWindowMins,
                 OptimizationIntervalSecs = OptimizationIntervalSecs,
                 ValidationFraction = ValidationFraction,
+                MinimumImprovement = MinimumImprovement,
                 IntervalSecs = IntervalSecs,
                 KeepSnapshotMins = KeepSnapshotMins,
                 MinSamples = MinSamples,

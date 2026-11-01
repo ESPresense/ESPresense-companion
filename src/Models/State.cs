@@ -133,7 +133,7 @@ public class State
     /// <remarks>
     /// Iterates through all nodes and their receiver measurements, recording only those marked as current into a new snapshot
     /// timestamped with the current UTC time. It then removes any snapshots older than the configured expiration threshold
-    /// (defaulting to 5 minutes) before adding the new snapshot to the collection.
+    /// (the training window, 30 minutes by default) before adding the new snapshot to the collection.
     /// </remarks>
     /// <returns>The newly created optimization snapshot containing active measurements.</returns>
     public OptimizationSnapshot TakeOptimizationSnapshot()
