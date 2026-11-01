@@ -153,6 +153,19 @@ public class PositionAccuracyTests
     }
 
     [Test]
+    public async Task RunOnce_ClearsTheRetainedValueWhenNothingSolves()
+    {
+        string? state = "stale";
+        _mqtt.Setup(m => m.EnqueueAsync(PositionAccuracyService.StateTopic, It.IsAny<string?>(), true))
+            .Callback<string, string?, bool>((_, payload, _) => state = payload)
+            .Returns(Task.CompletedTask);
+
+        await new PositionAccuracyService(_state, _mqtt.Object).RunOnce();
+
+        Assert.That(state, Is.EqualTo("None"));
+    }
+
+    [Test]
     public void Topics_AreNotMistakenForDeviceAttributes()
     {
         Assert.That(PositionAccuracyService.DetailsTopic, Does.Not.Match("^espresense/companion/[^/]+/attributes$"));

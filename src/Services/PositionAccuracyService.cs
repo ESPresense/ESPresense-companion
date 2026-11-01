@@ -24,14 +24,14 @@ public class PositionAccuracyService(State state, IMqttCoordinator mqtt) : Backg
     /// </summary>
     public PositionAccuracy Latest => _latest ??= PositionAccuracy.Measure(state);
 
-    internal async Task RunOnce()
+    internal async Task RunOnce(CancellationToken ct = default)
     {
         var accuracy = _latest = PositionAccuracy.Measure(state);
 
         // Sent every run so the sensor comes back if the retained config is lost
-        await Discovery().Send(mqtt);
-        if (accuracy.Median is { } median)
-            await mqtt.EnqueueAsync(StateTopic, $"{median:F2}", true);
+        await Discovery().Send(mqtt).WaitAsync(ct);
+        // HA reads None as unknown; without it the retained value would outlive a failing test
+        await mqtt.EnqueueAsync(StateTopic, accuracy.Median is { } median ? $"{median:F2}" : "None", true).WaitAsync(ct);
         await mqtt.EnqueueAsync(DetailsTopic, JsonConvert.SerializeObject(new
         {
             median_m = accuracy.Median,
@@ -43,7 +43,7 @@ public class PositionAccuracyService(State state, IMqttCoordinator mqtt) : Backg
             unsolved = accuracy.Unsolved,
             guidance = accuracy.Guidance,
             last_tested = accuracy.Timestamp
-        }, SerializerSettings.NullIgnore), true);
+        }, SerializerSettings.NullIgnore), true).WaitAsync(ct);
     }
 
     private static AutoDiscovery Discovery() => new("sensor", "espresense_companion_position_accuracy", new AutoDiscovery.DiscoveryRecord
@@ -73,7 +73,7 @@ public class PositionAccuracyService(State state, IMqttCoordinator mqtt) : Backg
         {
             try
             {
-                await RunOnce();
+                await RunOnce(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
