@@ -52,7 +52,7 @@ public class MultiFloorMultilateralizer : ILocate
         }
         else
         {
-            var guess = confidence < 5 ? Point3D.MidPoint(pos[0], pos[1]) : scenario.Location;
+            var guess = (confidence ?? 0) < 5 ? Point3D.MidPoint(pos[0], pos[1]) : scenario.Location;
 
             try
             {
