@@ -181,6 +181,99 @@ public class NearestNodeTests
         Assert.That(scenario.Room, Is.EqualTo(floor.Rooms.Values.First()));
     }
 
+    [Test]
+    public void Locate_UsesFloorNodeIsOnNotFloorsItIsConfiguredFor()
+    {
+        var points = new[]
+        {
+            new[] { 0.0, 0.0 },
+            new[] { 2.0, 0.0 },
+            new[] { 2.0, 2.0 },
+            new[] { 0.0, 2.0 }
+        };
+        var first = CreateTestFloor("first", new[] { -5.0, -5.0, 0.0 }, new[] { 5.0, 5.0, 3.0 }, CreateRoom("Kitchen", points));
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 }, CreateRoom("Bedroom", points));
+
+        // On the first floor, but only configured to help locate on the second
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1.0, 1.0, 1.0), second);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.EqualTo(first));
+        Assert.That(scenario.Room, Is.EqualTo(first.Rooms.Values.First()));
+    }
+
+    [TestCase(7.0, "second")]
+    [TestCase(-1.0, "first")]
+    public void Locate_SnapsToNearestFloorInZ(double z, string expected)
+    {
+        var first = CreateTestFloor("first", new[] { -5.0, -5.0, 0.0 }, new[] { 5.0, 5.0, 3.0 });
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 });
+
+        // List order would otherwise decide
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1.0, 1.0, z), first, second);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor?.Id, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Locate_UsesFloorByZWhenNodeIsOutsideItsFootprint()
+    {
+        var first = CreateTestFloor("first", new[] { -5.0, -5.0, 0.0 }, new[] { 5.0, 5.0, 3.0 });
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 });
+
+        var node = CreateTestNode("node1", "Node 1", new Point3D(9.0, 1.0, 4.0), first, second);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.EqualTo(second));
+    }
+
+    [Test]
+    public void Locate_LeavesFloorUnsetForDiscoveredNodeWithNoPosition()
+    {
+        CreateTestFloor("main", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 1.0 });
+
+        var node = new Node("node1", NodeSourceType.Discovered);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.Null);
+        Assert.That(scenario.Room, Is.Null);
+    }
+
+    [Test]
+    public void Locate_UsesConfiguredFloorsForConfiguredNodeWithNoPoint()
+    {
+        CreateTestFloor("first", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 3.0 });
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 });
+
+        var node = new Node("node1", NodeSourceType.Config);
+        node.Update(_configLoader.Config!, new ConfigNode { Id = "node1" }, new[] { second });
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(node.HasLocation, Is.False);
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.EqualTo(second));
+    }
+
     [TestCase(9.0, true)]
     [TestCase(11.0, false)]
     public async Task Locate_IgnoresNodesBeyondMaxDistance(double distance, bool expected)

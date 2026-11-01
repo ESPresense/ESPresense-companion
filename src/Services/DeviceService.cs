@@ -109,10 +109,11 @@ public class DeviceService
         var stamped = 0;
         foreach (var device in _state.Devices.Values.Where(d => d.LastSeen == null).ToList())
         {
+            // Only stamp once the stamp is persisted; otherwise the next pass retries rather than a restart resetting the clock.
+            var payload = JsonConvert.SerializeObject(new { last_seen = now });
+            if (!await _mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true)) continue;
             device.LastSeen = now;
             stamped++;
-            var payload = JsonConvert.SerializeObject(new { last_seen = now });
-            await _mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true);
         }
         return stamped;
     }

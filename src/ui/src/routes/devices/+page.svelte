@@ -1,11 +1,11 @@
 <script lang="ts">
-	import DevicesTable from '$lib/DevicesTable.svelte';
-	import SlideToggle from '$lib/SlideToggle.svelte';
-	import { gotoDetail } from '$lib/urls';
-	import { showAll, wsManager } from '$lib/stores';
+	import DevicesTable from '#lib/DevicesTable.svelte';
+	import SlideToggle from '#lib/SlideToggle.svelte';
+	import { gotoDetail } from '#lib/urls.js';
+	import { showAll, wsManager } from '#lib/stores.js';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
-	import { apiUrl } from '$lib/api';
+	import { apiUrl } from '#lib/api.js';
 
 	let locatingStatus = $state('Starting');
 

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { polygonCentroid } from 'd3';
 	import { getLayerCakeContext } from 'layercake';
-	import type { MapScales, Room } from '$lib/types';
-	import { config } from '$lib/stores';
-	import { getRoomColor } from '$lib/colors';
+	import type { MapScales, Room } from '#lib/types.js';
+	import { config } from '#lib/stores.js';
+	import { getRoomColor } from '#lib/colors.js';
 
 	const chart = getLayerCakeContext<MapScales>();
 

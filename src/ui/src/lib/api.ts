@@ -1,11 +1,11 @@
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 
 /**
  * Builds a backend URL that respects the app's base path (e.g. Home Assistant ingress).
  * Use this for `/api/...` and `/ws...` paths instead of `resolve()`, which is typed for SvelteKit routes only.
  */
 export function apiUrl(path: string): string {
-	return `${base}${path}`;
+	return `${resolve('/')}${path.slice(1)}`;
 }
 
 /**

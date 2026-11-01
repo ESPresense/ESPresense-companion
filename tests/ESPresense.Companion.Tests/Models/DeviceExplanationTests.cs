@@ -181,7 +181,7 @@ public class DeviceExplanationTests
 
         Assert.That(nelderMead.Trace!.Outcome, Is.EqualTo(LocatorOutcome.NoFix));
         Assert.That(nadaraya.Trace!.Outcome, Is.EqualTo(LocatorOutcome.NoFix));
-        Assert.That(multiFloor.Trace!.Outcome, Is.EqualTo(heard == 0 ? LocatorOutcome.NoFix : LocatorOutcome.Fallback));
+        Assert.That(multiFloor.Trace!.Outcome, Is.EqualTo(LocatorOutcome.NoFix));
     }
 
     [Test]

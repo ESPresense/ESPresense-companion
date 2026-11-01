@@ -3,11 +3,11 @@
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 
-	import { devices, nodes, relative } from '$lib/stores';
+	import { devices, nodes, relative } from '#lib/stores.js';
 
 	import { getLayerCakeContext } from 'layercake';
-	import { errorColor } from '$lib/explain';
-	import type { ExplainedNode, Node, Floor, MapScales } from '$lib/types';
+	import { errorColor } from '#lib/explain.js';
+	import type { ExplainedNode, Node, Floor, MapScales } from '#lib/types.js';
 	import type { ScaleOrdinal } from 'd3';
 
 	const chart = getLayerCakeContext<MapScales>();

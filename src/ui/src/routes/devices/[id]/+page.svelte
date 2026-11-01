@@ -1,27 +1,33 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/api';
-	import { devices } from '$lib/stores';
+	import { apiFetch } from '#lib/api.js';
+	import { devices, includedDevice } from '#lib/stores.js';
 	import { readable } from 'svelte/store';
-	import type { DeviceExplanation, DeviceSetting } from '$lib/types';
+	import type { DeviceExplanation, DeviceSetting } from '#lib/types.js';
 	import { Accordion } from '@skeletonlabs/skeleton-svelte';
 
-	import Map from '$lib/Map.svelte';
-	import DeviceBreadcrumb from '$lib/DeviceBreadcrumb.svelte';
-	import DeviceExplain from '$lib/DeviceExplain.svelte';
+	import Map from '#lib/Map.svelte';
+	import DeviceBreadcrumb from '#lib/DeviceBreadcrumb.svelte';
+	import DeviceExplain from '#lib/DeviceExplain.svelte';
 
 	let { data = {} }: { data: { settings?: DeviceSetting } } = $props();
 
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
+
+	$effect(() => {
+		includedDevice.set(data.settings?.id ?? null);
+		return () => includedDevice.set(null);
+	});
 
 	let accordionValue = $state(['explain']);
 
 	const explanation = readable<DeviceExplanation | null>(null, (set) => {
 		const deviceId = data.settings?.id;
 		if (!deviceId) return () => {};
+		const url = `/api/device/${encodeURIComponent(deviceId)}/explain`;
 
 		async function fetchAndSet() {
 			try {
-				set(await apiFetch<DeviceExplanation>(`/api/device/${deviceId}/explain`));
+				set(await apiFetch<DeviceExplanation>(url));
 			} catch (ex) {
 				console.error(`Error fetching device explanation: ${ex instanceof Error ? ex.message : String(ex)}`);
 				set(null);

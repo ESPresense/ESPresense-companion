@@ -9,10 +9,10 @@
 	import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 	import type { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 	import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-	import type { Device, Node, Config, DeviceHistory } from '$lib/types';
+	import type { Device, Node, Config, DeviceHistory } from '#lib/types.js';
 	import type { Group } from 'three';
-	import { gotoDetail3d } from '$lib/urls';
-	import logoSvg from '$lib/images/logo.svg?raw';
+	import { gotoDetail3d } from '#lib/urls.js';
+	import logoSvg from '#lib/images/logo.svg?raw';
 
 	// --- Internal State ---
 	let container: HTMLDivElement = $state()!;
@@ -149,7 +149,7 @@
 		walls: new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.6 })
 	};
 
-	import { hexToThreeNumber, getRoomColor as getRoomColor2D } from '$lib/colors';
+	import { hexToThreeNumber, getRoomColor as getRoomColor2D } from '#lib/colors.js';
 	interface Props {
 		// --- Props ---
 		devicesToShow?: Device[];

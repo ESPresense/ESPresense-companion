@@ -323,3 +323,12 @@ export type DeviceExplanation = {
 	uncertainty: ExplainedEllipse | null;
 	hints: string[];
 };
+
+/** Matches the backend SearchResult (GET /api/state/search). */
+export interface SearchResult {
+	kind: 'device' | 'node';
+	id: string;
+	name: string | null;
+	detail: string;
+	badge: string | null;
+}

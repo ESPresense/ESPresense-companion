@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
-	import { config, nodes } from '$lib/stores';
-	import { bestScenario } from '$lib/explain';
-	import type { DeviceExplanation, Floor, Node } from '$lib/types';
+	import { config, nodes } from '#lib/stores.js';
+	import { bestScenario } from '#lib/explain.js';
+	import type { DeviceExplanation, Floor, Node } from '#lib/types.js';
 
 	import NodeMarker from './NodeMarker.svelte';
 
