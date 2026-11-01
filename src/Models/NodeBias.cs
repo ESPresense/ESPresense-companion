@@ -14,7 +14,7 @@ public readonly record struct NodeBias(string Id, string? Name, double Percent, 
     private const int MinLinks = 3;
 
     public string Hint =>
-        $"{Name ?? Id} reads {Math.Abs(Percent):P0} {(Percent > 0 ? "long" : "short")} against its {Links} neighbours. Check its placement or height.";
+        $"{Name ?? Id} reads {Math.Abs(Percent) * 100:F0}% {(Percent > 0 ? "long" : "short")} against its {Links} neighbours. Check its placement or height.";
 
     public static IReadOnlyList<NodeBias> Find(OptimizationSnapshot snapshot)
     {

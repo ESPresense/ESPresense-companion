@@ -121,7 +121,7 @@ public sealed record DeviceExplanation(
         }
 
         if (floors.Length > 1 && floors[0].Probability - floors[1].Probability < CloseFloorRace)
-            hints.Add($"The floor race is close: {floors[0].Floor.Name} {floors[0].Probability:P0}, {floors[1].Floor.Name} {floors[1].Probability:P0}.");
+            hints.Add($"The floor race is close: {floors[0].Floor.Name} {floors[0].Probability * 100:F0}%, {floors[1].Floor.Name} {floors[1].Probability * 100:F0}%.");
 
         if (!device.IsAnchored)
         {
