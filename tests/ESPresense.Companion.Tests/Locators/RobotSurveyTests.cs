@@ -65,12 +65,15 @@ public class RobotSurveyTests
     private string[] ThroughStructureNodes => _survey.Expect?.ThroughStructureNodes?.ToArray() ?? Array.Empty<string>();
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         var mqtt = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
+        // Without a config file the loader installs the example, whose floors and nodes would replace the test's
+        await File.WriteAllTextAsync(Path.Combine(_configDir, "config.yaml"), "floors: []\n");
         _configLoader = new ConfigLoader(_configDir);
+        await _configLoader.ConfigAsync();
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
     }
@@ -90,7 +93,9 @@ public class RobotSurveyTests
         {
             Id = "first",
             Name = "First",
-            Bounds = _survey.FloorBounds["first"]
+            Bounds = _survey.FloorBounds["first"],
+            Rooms = _survey.Rooms.Where(r => r.Floor == "first")
+                .Select(r => new ConfigRoom { Id = r.Id, Name = r.Id, Points = r.Points.ToArray() }).ToArray()
         });
         _state.Floors[floor.Id] = floor;
         return floor;
@@ -124,6 +129,10 @@ public class RobotSurveyTests
 
     /// <summary>Runs one locator against one set of per-node distances; null if it produced no fix.</summary>
     private Point3D? Solve(string which, Dictionary<string, double> dists, Floor floor, Dictionary<string, Node> nodes)
+        => SolveScenario(which, dists, floor, nodes)?.Location;
+
+    /// <summary>Like <see cref="Solve"/>, but keeps the scenario so a test can read the room the locator chose.</summary>
+    private Scenario? SolveScenario(string which, Dictionary<string, double> dists, Floor floor, Dictionary<string, Node> nodes)
     {
         var device = new Device($"robot-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
         foreach (var (id, d) in dists)
@@ -132,7 +141,7 @@ public class RobotSurveyTests
 
         var loc = Make(which, device, floor, _state);
         var scenario = new Scenario(_configLoader.Config, loc, which);
-        return loc.Locate(scenario) ? scenario.Location : null;
+        return loc.Locate(scenario) ? scenario : null;
     }
 
     /// <summary>
@@ -567,21 +576,6 @@ public class RobotSurveyTests
 
     private static double Pct(List<double> sorted, double q) => sorted[(int)Math.Round(q * (sorted.Count - 1))];
 
-    private string? RoomAt(double x, double y)
-    {
-        foreach (var r in _survey.Rooms.Where(r => r.Floor == "first"))
-        {
-            var inside = false;
-            for (int i = 0, j = r.Points.Count - 1; i < r.Points.Count; j = i++)
-            {
-                double xi = r.Points[i][0], yi = r.Points[i][1], xj = r.Points[j][0], yj = r.Points[j][1];
-                if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
-            }
-            if (inside) return r.Id;
-        }
-        return null;
-    }
-
     private sealed record AccuracyResult(int Fixes, int Points, double Median, double P90, double Max, int RoomHits, int RoomTotal);
 
     /// <summary>Absolute floorplan error for one locator over every survey point that has floor coordinates.</summary>
@@ -593,11 +587,11 @@ public class RobotSurveyTests
         foreach (var p in pts)
         {
             var dists = p.M.Where(kv => exclude == null || !exclude.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Dist);
-            if (Solve(which, dists, floor, nodes) is not { } fix) continue;
-            errs.Add(Math.Sqrt(Math.Pow(fix.X - p.FloorX!.Value, 2) + Math.Pow(fix.Y - p.FloorY!.Value, 2)));
+            if (SolveScenario(which, dists, floor, nodes) is not { } fix) continue;
+            errs.Add(Math.Sqrt(Math.Pow(fix.Location.X - p.FloorX!.Value, 2) + Math.Pow(fix.Location.Y - p.FloorY!.Value, 2)));
             if (p.FloorRoom == null) continue;
             total++;
-            if (RoomAt(fix.X, fix.Y) == p.FloorRoom) hits++;
+            if (fix.Room?.Id == p.FloorRoom) hits++;
         }
         errs.Sort();
         return errs.Count == 0
@@ -653,6 +647,50 @@ public class RobotSurveyTests
         var n = _survey.Points.Count(p => p.FloorX.HasValue);
         if (n < min)
             Assert.Ignore($"needs {min}+ surveyed positions with floor coordinates, fixture has {n}");
+    }
+
+    /// <summary>
+    /// Room polygons leave gaps and fixes are metres uncertain, so a fix often lands in no room.
+    /// locators.room_snap_distance must recover those: more visits placed in the right room, and
+    /// fewer with no room at all, while the coordinates stay exactly as solved.
+    /// </summary>
+    [Test]
+    public void RoomSnap_RecoversFixesThatLandInNoRoom()
+    {
+        _survey = Load(Spread);
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+        RequireSpatialPoints(MinAccuracyPoints);
+        var points = _survey.Points.Where(p => p.FloorRoom != null).ToList();
+
+        (List<Point3D> Fixes, int Hits, int NoRoom, int WrongRoom) Run(string which, double snap)
+        {
+            _configLoader.Config!.Locators.RoomSnapDistance = snap;
+            var scenarios = points
+                .Select(p => (p.FloorRoom, Fix: SolveScenario(which, p.M.ToDictionary(kv => kv.Key, kv => kv.Value.Dist), floor, nodes)))
+                .Where(s => s.Fix != null).ToList();
+            return (scenarios.Select(s => s.Fix!.Location).ToList(),
+                scenarios.Count(s => s.Fix!.Room?.Id == s.FloorRoom),
+                scenarios.Count(s => s.Fix!.Room == null),
+                scenarios.Count(s => s.Fix!.Room != null && s.Fix.Room.Id != s.FloorRoom));
+        }
+
+        TestContext.WriteLine($"{"locator",-13}{"hits off",10}{"hits on",9}{"none off",10}{"none on",9}{"wrong off",11}{"wrong on",10}");
+        var results = new[] { "nelder", "mle", "gaussnewton", "bfgs", "multifloor", "nadaraya" }
+            .Select(which => (Which: which, Off: Run(which, 0), On: Run(which, 1.0))).ToList();
+        foreach (var (which, off, on) in results)
+            TestContext.WriteLine($"{which,-13}{off.Hits,10}{on.Hits,9}{off.NoRoom,10}{on.NoRoom,9}{off.WrongRoom,11}{on.WrongRoom,10}");
+
+        Assert.Multiple(() =>
+        {
+            foreach (var (which, off, on) in results)
+            {
+                Assert.That(on.Hits, Is.GreaterThanOrEqualTo(off.Hits), $"{which} lost right-room visits");
+                Assert.That(on.NoRoom, Is.LessThanOrEqualTo(off.NoRoom), $"{which} left more visits without a room");
+                Assert.That(on.Fixes, Is.EqualTo(off.Fixes), $"{which}: snapping must only change the room, never the location");
+            }
+            Assert.That(results.Sum(r => r.On.NoRoom), Is.LessThan(results.Sum(r => r.Off.NoRoom)), "snapping recovered no fix");
+        });
     }
 
     /// <summary>

@@ -61,6 +61,10 @@ optimization:
 
 
 locators:
+  # A fix that lands outside every room gets the nearest room within this many metres,
+  # instead of only the floor. The reported x/y stays as solved. 0 turns it off.
+  room_snap_distance: 1.0
+
   # Per-floor locators (nadaraya_watson, nelder_mead, bfgs, mle) solve each floor separately and
   # the highest-confidence floor wins, which can favor a floor with few nodes. multi_floor solves
   # across all nodes in 3D and takes the floor from the result, so it is the default here.

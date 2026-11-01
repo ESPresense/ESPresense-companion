@@ -39,7 +39,8 @@ namespace ESPresense.Models
                 Bfgs = Bfgs.Clone(),
                 Mle = Mle.Clone(),
                 MultiFloor = MultiFloor.Clone(),
-                NearestNode = NearestNode.Clone()
+                NearestNode = NearestNode.Clone(),
+                RoomSnapDistance = RoomSnapDistance
             };
         }
     }

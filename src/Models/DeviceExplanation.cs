@@ -47,10 +47,12 @@ public readonly record struct ExplainedFloor(ExplainedPlace Floor, double Probab
 /// <param name="DistanceToEdge">Distance from that position to Room's nearest wall</param>
 /// <param name="NearestOtherRoom">The next room over: where a drift across that wall would land</param>
 /// <param name="PreviousState">What was published before the current state</param>
+/// <param name="Snapped">The position is in no room, and Room is the nearest one within locators.room_snap_distance</param>
 public readonly record struct ExplainedRoom(
     ExplainedPlace? Room, bool Inside, double? DistanceToEdge,
     ExplainedPlace? NearestOtherRoom, double? NearestOtherDistance,
-    string? State, string? PreviousState, DateTime? StateChanged);
+    string? State, string? PreviousState, DateTime? StateChanged,
+    bool Snapped);
 
 /// <summary>
 /// Why a device is where it is, in the order the decision was made: what was heard, what each
@@ -127,6 +129,8 @@ public sealed record DeviceExplanation(
         {
             if (room.Room == null && room.NearestOtherRoom is { } nearest && best is { Outcome: not LocatorOutcome.NoFix })
                 hints.Add($"The position isn't inside any room. The nearest is {nearest.Name} at {room.NearestOtherDistance:F1} m.");
+            else if (room is { Snapped: true, Room: { } nearestRoom })
+                hints.Add($"The position isn't inside any room, so it takes the nearest: {nearestRoom.Name}, {room.DistanceToEdge:F1} m away.");
             else if (room.Room is { } current && !room.Inside && best != null)
                 hints.Add($"The position has drifted outside {current.Name}, but the room only updates after a move of 10 cm.");
             else if (room is { Inside: true, DistanceToEdge: < NearWall, NearestOtherRoom: { } next, NearestOtherDistance: < 2 * NearWall })
@@ -238,11 +242,16 @@ public sealed record DeviceExplanation(
                 .MinBy(r => r!.Value.distance)
             : null;
 
+        var distanceToEdge = at is { } e && room?.Polygon is not null ? DistanceToEdge(room.Polygon, e) : (double?)null;
+        var inNoRoom = at is { } o && !(floor?.Rooms.Values.Any(r => r.Polygon?.EnclosesPoint(o) ?? false) ?? false);
+        var snapped = !device.IsAnchored && inNoRoom && distanceToEdge <= room?.Floor?.RoomSnapDistance;
+
         return new ExplainedRoom(
             Place(room), inside,
-            at is { } e && room?.Polygon is not null ? DistanceToEdge(room.Polygon, e) : null,
+            distanceToEdge,
             Place(nearest?.room), nearest?.distance,
-            device.ReportedState, device.PreviousReportedState, device.ReportedStateChanged);
+            device.ReportedState, device.PreviousReportedState, device.ReportedStateChanged,
+            snapped);
     }
 
     private static double DistanceToEdge(Polygon2D polygon, Point2D point) =>

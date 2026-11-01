@@ -99,8 +99,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         if (scenario.Confidence <= 0) return false;
         if (scenario.Location.DistanceTo(scenario.LastLocation) < 0.1) return false;
 
-        scenario.Room = floor.Rooms.Values.FirstOrDefault(r =>
-            r.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
+        scenario.Room = SpatialUtils.FindRoomNearest(scenario.Location, floor.Rooms.Values, floor.RoomSnapDistance);
 
         return true;
     }

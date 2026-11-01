@@ -255,6 +255,33 @@ public class DeviceExplanationTests
     }
 
     [Test]
+    public void Room_SnappedFix_IsExplainedAsTheNearestRoom_NotAsDrift()
+    {
+        var floor = new Floor();
+        floor.Update(new Config(), new ConfigFloor
+        {
+            Id = "snap", Name = "Snap",
+            Bounds = [[0, 0, 0], [20, 20, 3]],
+            Rooms = [Room("Kitchen", 0, 0, 4, 4)]
+        });
+        var scenario = new Scenario(null, Mock.Of<ILocate>(), "snap")
+        {
+            Floor = floor,
+            Room = floor.Rooms.Values.Single()
+        };
+        scenario.ResetLocation(new Point3D(4.6, 2, 1));
+        _device.Scenarios.Add(scenario);
+        _device.BestScenario = scenario;
+
+        var explanation = DeviceExplanation.From(_device);
+
+        Assert.That(explanation.Room.Snapped, Is.True);
+        Assert.That(explanation.Room.Inside, Is.False);
+        Assert.That(explanation.Hints, Has.Some.Contains("takes the nearest: Kitchen"));
+        Assert.That(explanation.Hints, Has.None.Contains("drifted"));
+    }
+
+    [Test]
     public void ReportedState_NullingToForceARepublishIsNotAStateChange()
     {
         _device.ReportedState = "Hall";
