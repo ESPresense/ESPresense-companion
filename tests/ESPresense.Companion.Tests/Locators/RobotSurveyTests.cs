@@ -65,7 +65,7 @@ public class RobotSurveyTests
     private string[] ThroughStructureNodes => _survey.Expect?.ThroughStructureNodes?.ToArray() ?? Array.Empty<string>();
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         var mqtt = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
@@ -73,6 +73,9 @@ public class RobotSurveyTests
         _configLoader = new ConfigLoader(_configDir);
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
     }
 
     [TearDown]

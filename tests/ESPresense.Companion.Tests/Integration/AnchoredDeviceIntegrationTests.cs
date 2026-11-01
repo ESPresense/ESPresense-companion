@@ -21,7 +21,7 @@ public class AnchoredDeviceIntegrationTests
     private DeviceSettingsStore _deviceSettingsStore;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
@@ -30,6 +30,15 @@ public class AnchoredDeviceIntegrationTests
         _configLoader = new ConfigLoader(_configDir);
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
+        // The example config has floors and enabled locators; GetScenarios would then yield those before
+        // the floors/rooms each test builds, so start from a blank slate.
+        _state.Floors.Clear();
+        _configLoader.Config!.Floors = Array.Empty<ConfigFloor>();
+        _configLoader.Config!.Locators = null;
+
         _deviceSettingsStore = new DeviceSettingsStore(_mockMqttCoordinator.Object, _state);
     }
 
@@ -142,7 +151,6 @@ public class AnchoredDeviceIntegrationTests
     public void AnchoredDevice_WithOverlappingRooms_SelectsCorrectRoom()
     {
         // Arrange
-        _state.Floors.Clear();
         var floor = CreateTestFloor("floor1", "Test Floor",
             new double[] { -10, -10, -10 },
             new double[] { 10, 10, 10 });
@@ -350,7 +358,6 @@ public class AnchoredDeviceIntegrationTests
     public void AnchorLocator_WithFloors_AssignsCorrectFloorAndRoom()
     {
         // Arrange
-        _state.Floors.Clear(); // Clear any floors from example config
         var floor = CreateTestFloor("floor1", "Test Floor",
             new double[] { -10, -10, -10 },
             new double[] { 10, 10, 10 });

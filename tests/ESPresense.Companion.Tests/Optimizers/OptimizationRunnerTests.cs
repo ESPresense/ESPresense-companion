@@ -21,7 +21,7 @@ public class OptimizationRunnerTests
     private string _configDir = null!;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mqtt = new Mock<IMqttCoordinator>();
         _mqtt.Setup(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
@@ -32,6 +32,9 @@ public class OptimizationRunnerTests
 
         _configLoader = new ConfigLoader(_configDir);
         _state = new State(_configLoader, new NodeTelemetryStore(_mqtt.Object));
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
         _nss = new NodeSettingsStore(_mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
         _runner = new OptimizationRunner(_state, _nss, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>());
     }

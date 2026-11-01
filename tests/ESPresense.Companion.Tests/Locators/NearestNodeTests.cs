@@ -28,6 +28,9 @@ public class NearestNodeTests
         await _configLoader.ConfigAsync();
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
     }
 
     [TearDown]
