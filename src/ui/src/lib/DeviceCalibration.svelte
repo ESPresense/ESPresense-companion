@@ -421,6 +421,19 @@
 		// valid state (e.g. calibrating the first device before anything has been located) that must still
 		// reach the fallback below, or #1730 returns for "zero devices ever".
 		const device = $devices.find((d: any) => d.id === deviceSettings.id);
+
+		// An anchored device's position is known exactly, so open at its saved height, not the default.
+		// Height is relative to a floor, so wait for the config: guessing here would lock in a wrong z.
+		if (isAnchored) {
+			const anchor = anchorSpot(deviceSettings, $config?.floors, device?.floor?.id);
+			if (anchor) {
+				selectedFloorId = anchor.floorId;
+				calibrationSpot = anchor.spot;
+				calibrationSpotHeight = anchor.height;
+			}
+			return;
+		}
+
 		if (device) {
 			if (device.floor !== null) {
 				selectedFloorId = device.floor.id;
@@ -434,12 +447,6 @@
 		// here (#1730). Fall back to the first floor and the middle of it.
 		if (!selectedFloorId) selectedFloorId = $config?.floors?.[0]?.id ?? null;
 		const b = $config?.floors?.find((f: any) => f.id === selectedFloorId)?.bounds;
-		// An anchored device's position is known exactly: open at its saved height, not the default.
-		const anchor = anchorSpot(deviceSettings, b?.[0]?.[2] ?? 0);
-		if (anchor) {
-			calibrationSpot = anchor.spot;
-			calibrationSpotHeight = anchor.height;
-		}
 		if (!calibrationSpot && b) calibrationSpot = { x: (b[0][0] + b[1][0]) / 2, y: (b[0][1] + b[1][1]) / 2 };
 	});
 	let floor = $derived($config?.floors.find((f: any) => f.id === selectedFloorId));
