@@ -78,14 +78,33 @@ public static class SpatialUtils
             var polygon = room.Polygon;
             if (polygon == null) continue;
             if (polygon.EnclosesPoint(point)) return room;
+            if (maxDistance <= 0) continue;
 
-            foreach (var edge in polygon.Edges)
-            {
-                var distance = edge.ClosestPointTo(point).DistanceTo(point);
-                if (!(distance <= nearestDistance)) continue; // written so a NaN fix never gets a room
-                nearestDistance = distance;
-                nearest = room;
-            }
+            var distance = DistanceToEdge(polygon, point);
+            if (!(distance <= nearestDistance)) continue; // written so a NaN fix never gets a room
+            nearestDistance = distance;
+            nearest = room;
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
+    /// Distance from a point to the nearest wall of a polygon. Works from the vertices because
+    /// Polygon2D.Edges throws on a repeated vertex, which a hand-drawn room can easily have.
+    /// </summary>
+    public static double DistanceToEdge(Polygon2D polygon, Point2D point)
+    {
+        var vertices = polygon.Vertices.ToArray();
+        var nearest = double.PositiveInfinity;
+
+        for (var i = 0; i < vertices.Length; i++)
+        {
+            var start = vertices[i];
+            var along = vertices[(i + 1) % vertices.Length] - start;
+            var lengthSquared = along.DotProduct(along);
+            var t = lengthSquared > 0 ? Math.Clamp((point - start).DotProduct(along) / lengthSquared, 0, 1) : 0;
+            nearest = Math.Min(nearest, (start + t * along).DistanceTo(point));
         }
 
         return nearest;

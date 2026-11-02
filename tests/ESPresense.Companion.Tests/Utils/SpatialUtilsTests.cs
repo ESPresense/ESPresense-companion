@@ -73,6 +73,20 @@ public class SpatialUtilsTests
     }
 
     [Test]
+    public void RepeatedVertex_DoesNotThrow()
+    {
+        var room = new Room();
+        room.Update(new Config(), new Floor(), new ConfigRoom
+        {
+            Id = "repeat",
+            Name = "repeat",
+            Points = new[] { new[] { 0.0, 0.0 }, new[] { 4.0, 0.0 }, new[] { 4.0, 0.0 }, new[] { 4.0, 4.0 }, new[] { 0.0, 4.0 } }
+        });
+
+        Assert.That(SpatialUtils.FindRoomNearest(new Point3D(4.5, 2, 1), new[] { room }, 1.0), Is.SameAs(room));
+    }
+
+    [Test]
     public void ClosedPolygon_StillWorks()
     {
         var room = new Room();

@@ -1,3 +1,4 @@
+using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Locators;
 using MathNet.Spatial.Euclidean;
@@ -238,13 +239,14 @@ public sealed record DeviceExplanation(
         var nearest = at is { } q
             ? floor?.Rooms.Values
                 .Where(r => r != room && r.Polygon is not null)
-                .Select(r => ((Room room, double distance)?)(r, DistanceToEdge(r.Polygon!, q)))
+                .Select(r => ((Room room, double distance)?)(r, SpatialUtils.DistanceToEdge(r.Polygon!, q)))
                 .MinBy(r => r!.Value.distance)
             : null;
 
-        var distanceToEdge = at is { } e && room?.Polygon is not null ? DistanceToEdge(room.Polygon, e) : (double?)null;
+        var distanceToEdge = at is { } e && room?.Polygon is not null ? SpatialUtils.DistanceToEdge(room.Polygon, e) : (double?)null;
         var inNoRoom = at is { } o && !(floor?.Rooms.Values.Any(r => r.Polygon?.EnclosesPoint(o) ?? false) ?? false);
-        var snapped = !device.IsAnchored && inNoRoom && distanceToEdge <= room?.Floor?.RoomSnapDistance;
+        // NearestNode picks its room from the node, not from how far away the room is
+        var snapped = !device.IsAnchored && best is { IsNearestNode: false } && inNoRoom && distanceToEdge <= room?.Floor?.RoomSnapDistance;
 
         return new ExplainedRoom(
             Place(room), inside,
@@ -253,9 +255,6 @@ public sealed record DeviceExplanation(
             device.ReportedState, device.PreviousReportedState, device.ReportedStateChanged,
             snapped);
     }
-
-    private static double DistanceToEdge(Polygon2D polygon, Point2D point) =>
-        polygon.Edges.Select(e => e.ClosestPointTo(point).DistanceTo(point)).DefaultIfEmpty(double.PositiveInfinity).Min();
 
     private static ExplainedPlace Place(Floor floor) => new(floor.Id, floor.Name);
     private static ExplainedPlace? PlaceOrNull(Floor? floor) => floor == null ? null : Place(floor);
