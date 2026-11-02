@@ -28,7 +28,7 @@
 		"@types/d3": "^7.4.3",
 		"@types/d3-interpolate": "^3.0.4",
 		"@types/d3-selection": "^3.0.12",
-		"@types/d3-zoom": "^3.0.8",
+		"@types/d3-zoom": "^3.0.9",
 		"@types/node": "^26.6.1",
 		"@types/three": "^0.186.0",
 		"@typescript-eslint/eslint-plugin": "^8.65.0",
