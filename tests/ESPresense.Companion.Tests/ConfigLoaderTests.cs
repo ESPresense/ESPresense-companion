@@ -187,6 +187,21 @@ public class ConfigLoaderTests
     }
 
     [Test]
+    public async Task SaveSectionAsync_ReplacesAWholeCrlfSectionWithABlankLineInside()
+    {
+        await File.WriteAllTextAsync(_configPath, "optimization:\r\n  enabled: false\r\n\r\n  interval_secs: 99\r\ntimeout: 45\r\n");
+        var loader = new ConfigLoader(_tempDir);
+        await loader.LoadAsync();
+
+        await loader.SaveSectionAsync("optimization", new Dictionary<string, object> { ["enabled"] = true });
+
+        var text = await File.ReadAllTextAsync(_configPath);
+        Assert.That(text, Does.Not.Contain("interval_secs"), "no line of the old section may survive");
+        Assert.That(loader.Config!.Optimization.Enabled, Is.True);
+        Assert.That(loader.Config.Timeout, Is.EqualTo(45));
+    }
+
+    [Test]
     [Platform(Exclude = "Win")]
     public async Task SaveSectionAsync_KeepsTheFileMode()
     {

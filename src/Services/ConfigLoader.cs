@@ -186,7 +186,7 @@ public class ConfigLoader : BackgroundService
             // Match from ^sectionName: through its indented lines (and blank lines between them), stopping
             // before the newline that precedes the next top-level key / comment / EOF. The previous pattern's
             // `\n\s*` swallowed that newline, producing e.g. "timeout: 60mqtt:" and corrupting the file.
-            var pattern = $@"^{Regex.Escape(sectionName)}:.*(?:(?:\n[ \t]*(?=\n))*\n[ \t]+.*)*";
+            var pattern = $@"^{Regex.Escape(sectionName)}:.*(?:(?:\r?\n[ \t]*(?=\r?\n))*\r?\n[ \t]+.*)*";
             var match = Regex.Match(text, pattern, RegexOptions.Multiline);
 
             string replaced;
