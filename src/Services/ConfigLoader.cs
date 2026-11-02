@@ -197,11 +197,17 @@ public class ConfigLoader : BackgroundService
 
             // Write to a temp file in the same directory and rename it over config.yaml: a rename is atomic,
             // so no reader (our poll or anything else) can ever observe a truncated or half-written file.
-            var tempPath = _configPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            // Rename onto the real file, not a symlink pointing at it, and give the temp file config.yaml's mode
+            // before it holds any content: the file carries the MQTT password and may be locked down.
+            var targetPath = new FileInfo(_configPath).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? _configPath;
+            var tempPath = targetPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
+                File.Create(tempPath).Dispose();
+                if (!OperatingSystem.IsWindows())
+                    File.SetUnixFileMode(tempPath, File.GetUnixFileMode(targetPath));
                 await File.WriteAllTextAsync(tempPath, replaced);
-                File.Move(tempPath, _configPath, overwrite: true);
+                File.Move(tempPath, targetPath, overwrite: true);
             }
             catch
             {

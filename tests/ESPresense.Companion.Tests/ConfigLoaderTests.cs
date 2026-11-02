@@ -187,6 +187,41 @@ public class ConfigLoaderTests
     }
 
     [Test]
+    [Platform(Exclude = "Win")]
+    public async Task SaveSectionAsync_KeepsTheFileMode()
+    {
+        await File.WriteAllTextAsync(_configPath, ValidYaml);
+        File.SetUnixFileMode(_configPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        var loader = new ConfigLoader(_tempDir);
+        await loader.LoadAsync();
+
+        await loader.SaveSectionAsync("timeout", 60);
+
+        Assert.That(File.GetUnixFileMode(_configPath), Is.EqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite),
+            "config.yaml holds the MQTT password; a save must not widen its permissions");
+    }
+
+    [Test]
+    [Platform(Exclude = "Win")]
+    public async Task SaveSectionAsync_WritesThroughASymlink()
+    {
+        var realDir = Path.Combine(_tempDir, "real");
+        Directory.CreateDirectory(realDir);
+        var realPath = Path.Combine(realDir, "my-config.yaml");
+        await File.WriteAllTextAsync(realPath, ValidYaml);
+        File.CreateSymbolicLink(_configPath, realPath);
+        var loader = new ConfigLoader(_tempDir);
+        await loader.LoadAsync();
+
+        await loader.SaveSectionAsync("timeout", 60);
+
+        Assert.That(new FileInfo(_configPath).LinkTarget, Is.EqualTo(realPath), "the save must not replace the symlink");
+        Assert.That(await File.ReadAllTextAsync(realPath), Does.Contain("timeout: 60"));
+        Assert.That(loader.Config!.Timeout, Is.EqualTo(60));
+        Assert.That(Directory.GetFiles(realDir, "*.tmp"), Is.Empty);
+    }
+
+    [Test]
     public async Task SaveSectionAsync_AppliesImmediatelyAndNeverYieldsBlankConfig()
     {
         await File.WriteAllTextAsync(_configPath, ValidYaml);
