@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { isEditableTarget } from './dom';
 	import { zoomIdentity } from 'd3-zoom';
-	import { getToastStore } from '$lib/toast/toastStore';
+	import { getToastStore } from '#lib/toast/toastStore.js';
 	import { getLayerCakeContext } from 'layercake';
-	import type { MapScales } from '$lib/types';
+	import type { MapScales } from '#lib/types.js';
 	const toastStore = getToastStore();
 	let { transform = zoomIdentity } = $props();
 	// Plain state, not derived: the mouse handler owns these. As `$:` assignments they

@@ -18,6 +18,7 @@ A Home Assistant Add-on / Docker container that solves indoor positions using MQ
 2. [Configuration Guide](https://espresense.com/companion/configuration)
 3. [Node Setup](https://espresense.com/companion/configuration#node-placement)
 4. [Optimization Guide](https://espresense.com/companion/optimization)
+5. [Teach room predictions from Home Assistant](docs/room-learning.md)
 
 ## Need Help?
 - Join our [Discord Community](https://discord.gg/jbqmn7V6n6)

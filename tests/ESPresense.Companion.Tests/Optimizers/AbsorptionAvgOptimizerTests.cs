@@ -15,7 +15,7 @@ public class AbsorptionAvgOptimizerTests
     private string _configDir = null!;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         var mqtt = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
@@ -24,6 +24,9 @@ public class AbsorptionAvgOptimizerTests
         _configLoader = new ConfigLoader(_configDir);
         _nodeTelemetryStore = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
     }
 
     [TearDown]

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
 	import { getLayerCakeContext } from 'layercake';
-	import type { MapScales } from '$lib/types';
+	import type { MapScales } from '#lib/types.js';
 
 	// Get the scales from the LayerCake context.
 	const chart = getLayerCakeContext<MapScales>();

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { config, devices, nodes } from '$lib/stores';
-	import { internalToGps } from '$lib/gpsUtils';
-	import type { ConfigGps, Device, Node, Floor, Room } from '$lib/types';
+	import { config, devices, nodes } from '#lib/stores.js';
+	import { internalToGps } from '#lib/gpsUtils.js';
+	import type { ConfigGps, Device, Node, Floor, Room } from '#lib/types.js';
 
 	// OpenLayers imports
 	import Map from 'ol/Map';

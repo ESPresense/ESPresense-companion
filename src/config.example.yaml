@@ -8,6 +8,9 @@ mqtt:
   # insecure: true  # skip certificate validation entirely
   username:
   password:
+  client_id: espresense-companion  # MQTT client id (default: espresense-companion)
+  read_only: false  # true = subscribe only, never publish; every publish is logged instead (default: false).
+                    # Legacy: a client_id containing "read" also enables read-only mode; prefer this flag.
   discovery_topic: homeassistant  # Home Assistant MQTT discovery topic prefix (default: homeassistant)
 
 # This gets added to the x,y,z to derive a gps location
@@ -36,8 +39,11 @@ device_retention: 30d
 
 optimization:
   enabled: true
-  interval_secs: 3600
-  keep_snapshot_mins: 5   # How long to keep optimization snapshots (default: 5 minutes)
+  sample_interval_secs: 30        # How often a measurement snapshot is taken (default: 30)
+  training_window_mins: 60        # Rolling history kept for training and validation (default: 30)
+  optimization_interval_secs: 900 # How often proposals are evaluated and possibly applied (default: 900)
+  validation_fraction: 0.2        # Newest fraction of the history held out to validate proposals (default: 0.2)
+  minimum_improvement: 0          # How far a proposal's score (0-1) must beat the current calibration's (default: 0)
   min_samples: 5          # Minimum measurements an optimizer result must be evaluated on before it is applied (default: 5)
   optimizer: per_node_absorption # Options global_absorption, per_node_absorption, legacy (default: legacy)
   limits:
@@ -55,8 +61,11 @@ optimization:
 
 
 locators:
+  # Per-floor locators (nadaraya_watson, nelder_mead, bfgs, mle) solve each floor separately and
+  # the highest-confidence floor wins, which can favor a floor with few nodes. multi_floor solves
+  # across all nodes in 3D and takes the floor from the result, so it is the default here.
   nadaraya_watson:
-    enabled: true
+    enabled: false
     floors: ["first", "second"]
     bandwidth: 0.5
     kernel: gaussian
@@ -95,17 +104,40 @@ locators:
         sigma: 0.30
 
   multi_floor:
-    enabled: false
+    enabled: true
     weighting:
       # Node weighting algorithm for MultiFloor (cross-floor localization)
       # Options: equal, linear, gaussian, exponential
       algorithm: gaussian
       props:
-        sigma: 0.30
+        # Too low (0.10) leans on the nearest few nodes and pulls upstairs devices downstairs
+        sigma: 0.25
 
   nearest_node:
     enabled: true
-    max_distance: 10
+    max_distance: 10 # Don't fall back to a node more than 10 m from the device (leave out or 0 for no limit)
+
+  # Matches a device's raw RSSI per node against a survey of known spots instead of ranging.
+  # Needs a fingerprint file beside this config: {"fingerprints": [{"floor": "first", "x": 1.0,
+  # "y": 2.0, "z": 1.0, "rssi": {"node_a": -71.2, "node_b": -80.5, "node_c": -88.0}}]},
+  # rssi = published rssi + rxAdj.
+  # To collect samples: choose "I'm here" on a device map (or open its Calibrate page),
+  # place the marker at its actual position, and Collect sample. Keep still for 15 seconds.
+  # The same sample offers an optional device calibration update.
+  # Samples append to the file below; enable this locator to use them for positioning.
+  # Survey at the height devices are carried (about 1 m): node geometry changes with height.
+  # Every node the survey heard is used, including nodes on other floors or not placed on the map.
+  fingerprint:
+    enabled: false
+    floors: ["first", "second"]
+    file: fingerprints.json
+    mode: continuous     # or knn: average the k closest fingerprints
+    bandwidth: 0.6       # continuous: smoothing radius in metres, about 0.8x the survey spacing
+    top: 20              # continuous: how many best-matching surface points to average
+    k: 3
+    min_common: 3
+    missing_rssi: -100   # assumed for a node heard on one side only (continuous mode treats null as -100)
+                         # knn mode only: an explicit null compares shared nodes only
 
 filtering:
   # Kalman Filter Parameters
@@ -120,6 +152,7 @@ filtering:
 history:
   enabled: false # Enable to log history to db (Beta)
   expire_after: 24h # Expire after 24 hours
+  # path: history.db # SQLite file, relative to .storage in the config folder (restart to apply)
 
 # Floors w/ the points to draw it in meters
 floors:
@@ -294,13 +327,16 @@ nodes:
     point: [9, 7.3, 1]
     floors: ["first"]
   - name: Nook
-    point: [7, 0.7, 0.4]
+    point: [7.66, 0.7, 0.4]
     floors: ["first"]
   - name: Dining
-    point: [16.3, 2.6, 0.4]
+    point: [16.4, 3.1, 0.4]
     floors: ["first", "second"]
   - name: Basement
     point: [15.8, 11.5, -0.5]
+    floors: ["first"]
+  - name: Living
+    point: [16.5, 11.4, 0.36]
     floors: ["first"]
   - name: Laundry
     point: [4.3, 7.6, 1.4]
@@ -309,7 +345,7 @@ nodes:
     point: [4.5, 7.5, 3.4]
     floors: ["second"]
   - name: Foyer
-    point: [9.9, 8.6, 0.4]
+    point: [10.9, 9.3, 0.4]
     floors: ["first", "second"]
   - name: VW EOS
     stationary: false
@@ -334,3 +370,7 @@ devices:
 # Devices to NOT track
 exclude_devices:
   - id: "iBeacon:e5ca1ade-f007-ba11-0000-000000000000-*" # These are junk, we alias them to node:*
+
+# Opt in to Home Assistant room correction and per-device room learning.
+room_learning:
+  enabled: false

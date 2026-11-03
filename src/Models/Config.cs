@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using TextExtensions;
 using YamlDotNet.Serialization;
 using ESPresense.Extensions;
@@ -32,6 +32,9 @@ namespace ESPresense.Models
         [YamlMember(Alias = "optimization")]
         public ConfigOptimization Optimization { get; set; } = new();
 
+        [YamlMember(Alias = "room_learning")]
+        public RoomLearningConfig RoomLearning { get; set; } = new();
+
         [YamlMember(Alias = "locators")]
         public ConfigLocators Locators { get; set; } = new();
 
@@ -40,9 +43,6 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "history")]
         public ConfigHistory History { get; set; } = new();
-
-        [YamlMember(Alias = "bounds")]
-        public double[][] Bounds { get; set; } = [];
 
         [YamlMember(Alias = "floors")]
         public ConfigFloor[] Floors { get; set; } = Array.Empty<ConfigFloor>();
@@ -55,6 +55,12 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "exclude_devices")]
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
+    }
+
+    public class RoomLearningConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
     }
 
     public partial class ConfigLocators
@@ -76,6 +82,52 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
+
+        [YamlMember(Alias = "fingerprint")]
+        public FingerprintConfig Fingerprint { get; set; } = new();
+    }
+
+    public partial class FingerprintConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
+
+        /// <summary>Fingerprint survey file, relative to the config directory.</summary>
+        [YamlMember(Alias = "file")]
+        public string File { get; set; } = "fingerprints.json";
+
+        /// <summary>
+        /// "continuous" (default) matches against the survey smoothed over position, so devices between
+        /// surveyed spots are located between them; "knn" averages the k closest fingerprints.
+        /// </summary>
+        [YamlMember(Alias = "mode")]
+        public string Mode { get; set; } = "continuous";
+
+        /// <summary>Smoothing radius (m) of the continuous surface; about 0.8x the survey spacing.</summary>
+        [YamlMember(Alias = "bandwidth")]
+        public double Bandwidth { get; set; } = 0.6;
+
+        /// <summary>How many best-matching surface points to average (continuous mode).</summary>
+        [YamlMember(Alias = "top")]
+        public int Top { get; set; } = 20;
+
+        /// <summary>How many closest fingerprints to average (knn mode).</summary>
+        [YamlMember(Alias = "k")]
+        public int K { get; set; } = 3;
+
+        /// <summary>Fewest nodes a reading and a fingerprint must share to be compared.</summary>
+        [YamlMember(Alias = "min_common")]
+        public int MinCommon { get; set; } = 3;
+
+        /// <summary>
+        /// RSSI assumed for a node heard on only one side of a comparison (roughly the hearing limit);
+        /// null compares shared nodes only (knn mode only; continuous mode treats null as -100). On the robot survey -100 cut the worst errors sharply.
+        /// </summary>
+        [YamlMember(Alias = "missing_rssi")]
+        public double? MissingRssi { get; set; } = -100;
     }
 
     public partial class NadarayaWatsonConfig
@@ -143,6 +195,7 @@ namespace ESPresense.Models
         [YamlMember(Alias = "enabled")]
         public bool Enabled { get; set; }
 
+        // Don't fall back to a node whose distance to the device is above this (metres). Unset or <= 0: no limit.
         [YamlMember(Alias = "max_distance")]
         public double? MaxDistance { get; set; }
     }
@@ -169,11 +222,23 @@ namespace ESPresense.Models
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
         [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "legacy"; // Options: global_absorption, per_node_absorption, legacy
-        [YamlMember(Alias = "interval_secs")] public int IntervalSecs { get; set; } = 60;
-        [YamlMember(Alias = "keep_snapshot_mins")] public int KeepSnapshotMins { get; set; } = 5;
-        [YamlMember(Alias = "min_samples")] public int MinSamples { get; set; } = 5; // Minimum measurements an optimizer result must be evaluated on before it can be applied
+        [YamlMember(Alias = "sample_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? SampleIntervalSecs { get; set; }
+        [YamlMember(Alias = "training_window_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? TrainingWindowMins { get; set; }
+        [YamlMember(Alias = "optimization_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? OptimizationIntervalSecs { get; set; }
+        [YamlMember(Alias = "validation_fraction")] public double ValidationFraction { get; set; } = 0.2;
+        [YamlMember(Alias = "minimum_improvement")] public double MinimumImprovement { get; set; } = 0; // How far a proposal's overall score must beat the current calibration's
+
+        // Legacy timing keys. Keep these as deserialization fallbacks for existing installations.
+        [YamlMember(Alias = "interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? IntervalSecs { get; set; }
+        [YamlMember(Alias = "keep_snapshot_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? KeepSnapshotMins { get; set; }
+        [YamlMember(Alias = "min_samples")] public int MinSamples { get; set; } = 5; // Minimum holdout measurements a candidate must be evaluated on before it can be applied
         [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set; } = new();
         [YamlMember(Alias = "weights")] public Dictionary<string, double> Weights { get; set; } = new();
+
+        [YamlIgnore] public int EffectiveSampleIntervalSecs => Math.Max(1, SampleIntervalSecs ?? 30);
+        [YamlIgnore] public int EffectiveTrainingWindowMins => Math.Max(1, TrainingWindowMins ?? KeepSnapshotMins ?? 30);
+        [YamlIgnore] public int EffectiveOptimizationIntervalSecs => Math.Max(1, OptimizationIntervalSecs ?? IntervalSecs ?? 900);
+        [YamlIgnore] public double EffectiveValidationFraction => Math.Clamp(ValidationFraction, 0.1, 0.5);
 
         [YamlIgnore] public double AbsorptionMin => Limits.TryGetValue("absorption_min", out var val) ? val : 2;
         [YamlIgnore] public double AbsorptionMax => Limits.TryGetValue("absorption_max", out var val) ? val : 4;
@@ -190,8 +255,9 @@ namespace ESPresense.Models
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
 
-        [YamlMember(Alias = "db")]
-        public string Database { get; set; } = "sqlite:///espresense.db";
+        // SQLite file; relative paths are under <config dir>/.storage. Read once at startup.
+        [YamlMember(Alias = "path")]
+        public string Path { get; set; } = "history.db";
 
         [YamlMember(Alias = "expire_after")] public string ExpireAfter { get; set; } = "24h";
 
@@ -258,6 +324,14 @@ namespace ESPresense.Models
         [JsonProperty("discovery_topic")]
         [YamlMember(Alias = "discovery_topic")]
         public string DiscoveryTopic { get; set; } = "homeassistant";
+
+        /// <summary>
+        /// When true the companion subscribes and processes messages but never publishes; each publish
+        /// is logged at Information level instead. Defaults to false.
+        /// </summary>
+        [JsonProperty("read_only")]
+        [YamlMember(Alias = "read_only")]
+        public bool ReadOnly { get; set; }
     }
 
     public partial class ConfigDevice
@@ -318,9 +392,6 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "floors")]
         public string[]? Floors { get; set; }
-
-        [YamlMember(Alias = "enabled")]
-        public bool Enabled { get; set; } = true;
 
         [YamlMember(Alias = "stationary")]
         public bool Stationary { get; set; } = true;

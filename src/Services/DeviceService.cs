@@ -1,6 +1,7 @@
 using ESPresense.Controllers;
 using ESPresense.Models;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace ESPresense.Services;
 
@@ -9,13 +10,15 @@ namespace ESPresense.Services;
 /// </summary>
 public class DeviceService
 {
+    private readonly RoomLearningService? _roomLearning;
     private readonly State _state;
     private readonly IMqttCoordinator _mqtt;
     private readonly GlobalEventDispatcher _events;
     private readonly ILogger<DeviceService> _logger;
 
-    public DeviceService(State state, IMqttCoordinator mqtt, GlobalEventDispatcher events, ILogger<DeviceService> logger)
+    public DeviceService(State state, IMqttCoordinator mqtt, GlobalEventDispatcher events, ILogger<DeviceService> logger, RoomLearningService? roomLearning = null)
     {
+        _roomLearning = roomLearning;
         _state = state;
         _mqtt = mqtt;
         _events = events;
@@ -96,6 +99,28 @@ public class DeviceService
     }
 
     /// <summary>
+    /// Gives every device without a LastSeen a provisional one of <paramref name="now"/> and publishes it to the
+    /// device's retained attributes topic. A device rebuilt from retained discovery with no retained
+    /// <c>last_seen</c> otherwise has LastSeen == null forever and <see cref="GetInactiveDevices"/> never matches it;
+    /// publishing the stamp keeps the clock running across restarts, so such a device expires one retention period
+    /// after it was first stamped instead of never. A device that is heard again gets its real LastSeen from the nodes.
+    /// </summary>
+    /// <returns>Number of devices stamped</returns>
+    public async Task<int> StampUnseenDevicesAsync(DateTime now)
+    {
+        var stamped = 0;
+        foreach (var device in _state.Devices.Values.Where(d => d.LastSeen == null).ToList())
+        {
+            // Only stamp once the stamp is persisted; otherwise the next pass retries rather than a restart resetting the clock.
+            var payload = JsonConvert.SerializeObject(new { last_seen = now });
+            if (!await _mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true)) continue;
+            device.LastSeen = now;
+            stamped++;
+        }
+        return stamped;
+    }
+
+    /// <summary>
     /// Gets a device by ID.
     /// </summary>
     /// <param name="deviceId">The device ID</param>
@@ -128,6 +153,7 @@ public class DeviceService
     {
         try
         {
+            if (_roomLearning != null) await _roomLearning.RemoveAsync(device, true);
             // Clean up Home Assistant auto-discovery entries
             foreach (var ad in device.HassAutoDiscovery)
             {

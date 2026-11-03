@@ -11,6 +11,8 @@ namespace ESPresense.Models;
 public class Device
 {
     private DateTime? _lastSeen;
+    private string? _reportedState;
+    private string? _lastReportedState;
 
     // Kalman filter for location smoothing (settings are shared globally)
     private readonly KalmanLocation _kalmanLocation = new();
@@ -51,10 +53,10 @@ public class Device
     public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
     [STJ.JsonConverter(typeof(RoomConverter))]
-    public Room? Room => Anchor?.Room ?? BestScenario?.Room;
+    public Room? Room => Anchor?.Room ?? ActiveLearnedRoom?.Room ?? BestScenario?.Room;
 
     [STJ.JsonConverter(typeof(FloorConverter))]
-    public Floor? Floor => Anchor?.Floor ?? BestScenario?.Floor;
+    public Floor? Floor => Anchor?.Floor ?? ActiveLearnedRoom?.Room.Floor ?? BestScenario?.Floor;
 
     public int? Confidence => IsAnchored ? 100 : BestScenario?.Confidence;
 
@@ -79,8 +81,22 @@ public class Device
     [STJ.JsonIgnore] public bool Check { get; set; }
     [STJ.JsonIgnore] public bool Track { get; set; }
 
+    [STJ.JsonIgnore] public LearnedRoomPrediction? LearnedRoom { get; set; }
+    [STJ.JsonIgnore] public LearnedRoomPrediction? ActiveLearnedRoom =>
+        !IsAnchored && LearnedRoom is { } learned && learned.ValidUntil > DateTime.UtcNow ? learned : null;
+
     [STJ.JsonIgnore] public Scenario? BestScenario { get; set; }
-    [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; } = new List<Scenario>();
+    [STJ.JsonIgnore] public IList<Scenario> Scenarios { get; private set; } = new List<Scenario>();
+
+    /// <summary>The <see cref="State.LocatorsVersion"/> the scenarios were built from; -1 if not built from config.</summary>
+    [STJ.JsonIgnore] public int LocatorsVersion { get; private set; } = -1;
+
+    /// <summary>Swaps in a new list rather than editing the old one, so a reader mid-enumeration is unaffected.</summary>
+    public void ReplaceScenarios(IEnumerable<Scenario> scenarios, int locatorsVersion)
+    {
+        Scenarios = scenarios.ToList();
+        LocatorsVersion = locatorsVersion;
+    }
 
     [STJ.JsonConverter(typeof(Point3DConverter))]
     public Point3D? Location => Anchor?.Location ?? (BestScenario == null ? null : _kalmanLocation.Location);
@@ -88,7 +104,23 @@ public class Device
     [STJ.JsonIgnore] public DateTime? LastCalculated { get; set; }
 
     [STJ.JsonIgnore] public IList<AutoDiscovery> HassAutoDiscovery { get; set; } = new List<AutoDiscovery>();
-    [STJ.JsonIgnore] public string? ReportedState { get; set; }
+    [STJ.JsonIgnore]
+    public string? ReportedState
+    {
+        get => _reportedState;
+        set
+        {
+            _reportedState = value;
+            if (value == null || value == _lastReportedState) return; // null only forces a republish
+            PreviousReportedState = _lastReportedState;
+            ReportedStateChanged = DateTime.UtcNow;
+            _lastReportedState = value;
+        }
+    }
+
+    [STJ.JsonIgnore] public string? PreviousReportedState { get; private set; }
+    [STJ.JsonIgnore] public DateTime? ReportedStateChanged { get; private set; }
+
     [STJ.JsonConverter(typeof(TimeSpanMillisConverter))]
     public TimeSpan Timeout { get; set; }
 
@@ -136,6 +168,9 @@ public class Device
         {
             _kalmanLocation.Reset(anchor.Location);
             BestScenario = null;
+            // Forget what was published so the locator republishes state and the Anchored attributes,
+            // even when the anchor's room and position match the last located report.
+            ReportedState = null;
         }
         else
         {
@@ -145,20 +180,20 @@ public class Device
 
     public virtual IEnumerable<KeyValuePair<string, string>> GetDetails()
     {
-        yield return new KeyValuePair<string, string>("Best Scenario", $"{BestScenario?.Name}");
+        yield return new KeyValuePair<string, string>("Best Scenario", $"{BestScenario?.Label}");
 
         var scenarios = Scenarios.OrderByDescending(s => s.Probability).ToArray();
         foreach (var s in scenarios)
         {
-            yield return new KeyValuePair<string, string>($"{s.Name} Probability", $"{s.Probability:F4}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Room", $"{s.Room}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Confidence", $"{s.Confidence}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Pearson Correlation", $"{s.PearsonCorrelation:F4}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Fixes", $"{s.Fixes}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Error", $"{s.Error}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Iterations", $"{s.Iterations}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Scale", $"{s.Scale}");
-            yield return new KeyValuePair<string, string>($"{s.Name} ReasonForExit", $"{s.ReasonForExit}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Probability", $"{s.Probability:F4}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Room", $"{s.Room?.Name ?? s.Room?.Id}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Confidence", $"{s.Confidence}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Pearson Correlation", $"{s.PearsonCorrelation:F4}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Fixes", $"{s.Fixes}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Error", $"{s.Error}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Iterations", $"{s.Iterations}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Scale", $"{s.Scale}");
+            yield return new KeyValuePair<string, string>($"{s.Label} ReasonForExit", $"{s.ReasonForExit}");
         }
 
         var deviceNodes = Nodes.Values.Where(dn => dn.Node != null).OrderBy(dn => dn.Distance).ToList();
@@ -184,9 +219,11 @@ public class Device
 
         foreach (var s in scenarios)
         {
-            yield return new KeyValuePair<string, string>($"{s.Name} X", $"{s.Location.X:##.000}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Y", $"{s.Location.Y:##.000}");
-            yield return new KeyValuePair<string, string>($"{s.Name} Z", $"{s.Location.Z:##.000}");
+            yield return new KeyValuePair<string, string>($"{s.Label} X", $"{s.Location.X:##.000}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Y", $"{s.Location.Y:##.000}");
+            yield return new KeyValuePair<string, string>($"{s.Label} Z", $"{s.Location.Z:##.000}");
         }
     }
 }
+
+public sealed record LearnedRoomPrediction(Room Room, DateTime ValidUntil, string Source);

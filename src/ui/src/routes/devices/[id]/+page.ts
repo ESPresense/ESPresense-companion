@@ -1,8 +1,8 @@
-import { apiUrl } from '$lib/api';
+import { apiUrl } from '#lib/api.js';
 import type { LoadEvent } from '@sveltejs/kit';
 
 export async function load({ fetch, params }: LoadEvent) {
-	return await fetch(apiUrl(`/api/device/${params.id}`))
+	return await fetch(apiUrl(`/api/device/${encodeURIComponent(params.id ?? '')}`))
 		.then((response) => {
 			if (!response.ok) throw new Error(response.statusText);
 			var data = response.json();

@@ -5,7 +5,7 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
 	import { getLayerCakeContext } from 'layercake';
-	import type { MapScales } from '$lib/types';
+	import type { MapScales } from '#lib/types.js';
 
 	/** LayerCake scales are linear here, but ordinal (band) scales are detected at runtime. */
 	type AxisScale = MapScales['x'] & { bandwidth?: () => number };

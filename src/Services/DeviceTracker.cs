@@ -1,14 +1,22 @@
-using System.Threading.Channels;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using ESPresense.Controllers;
+using ESPresense.Events;
 using ESPresense.Models;
 using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore) : BackgroundService
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore, RoomLearningService? roomLearning = null) : BackgroundService
 {
-    private readonly Channel<Device> _toProcessChannel = Channel.CreateUnbounded<Device>();
-    private readonly Channel<Device> _toLocateChannel = Channel.CreateUnbounded<Device>();
+    // Coalescing work sets: a device heard by N nodes is marked N times but processed/located once per pass.
+    private readonly DirtyDeviceSet _toProcess = new();
+    private readonly DirtyDeviceSet _toLocate = new();
+
+    // Discovery ids whose retained config we cleared ourselves (untrack). The clear echoes back through our own
+    // subscription and must not be mistaken for an external delete. Entries expire after SelfClearTtl.
+    private readonly ConcurrentDictionary<string, DateTime> _selfClearedDiscoveryIds = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan SelfClearTtl = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Attaches MQTT event handlers to manage device discovery, messages and attributes, then runs background processing loops.
@@ -21,10 +29,12 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     ///   - Handle discovery and deletion of device_tracker autodiscovery entries (creates Device entries for discovered trackers).
     ///   - Process incoming device messages: update node and device state, telemetry counters, and enqueue devices for processing or locating.
     ///   - Restore a device's LastSeen from attributes when available.
-    /// - Starts and awaits two long-running background tasks: ProcessDevicesAsync and CheckIdleDevicesAsync, which consume internal channels to evaluate and locate devices.
+    /// - Starts and awaits two long-running background tasks: ProcessDevicesAsync and CheckIdleDevicesAsync, which consume internal dirty sets to evaluate and locate devices.
     /// </remarks>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (roomLearning != null) roomLearning.CorrectionRequested += QueueForLocation;
+
         mqtt.DeviceMessageReceivedAsync += (e) =>
         {
             globalEventDispatcher.OnDeviceMessageReceived(e);
@@ -33,102 +43,8 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
 
         mqtt.MqttMessageMalformed += (s, e) => { tele.IncrementMalformedMessages(); };
 
-        // Handle device discovery
-        mqtt.PreviousDeviceDiscovered += (s, arg) =>
-        {
-            if (arg.AutoDiscover == null)
-            {
-                // Handle null AutoDiscover (message deletion)
-                var deleteDeviceId = arg.AutoDiscover?.Message?.StateTopic?.Split('/').Last();
-                if (deleteDeviceId != null && state.Devices.TryRemove(deleteDeviceId, out var removedDevice))
-                {
-                    Log.Debug("[-] Removed device: {Device} (disc)", removedDevice);
-                }
-                else
-                {
-                    Log.Debug("Device not found for deletion: {DeviceId}", deleteDeviceId);
-                }
-                return;
-            }
-
-            if (arg.AutoDiscover.Component != "device_tracker")
-            {
-                Log.Debug("Ignoring, component isn't device_tracker (" + arg.AutoDiscover.Component + ")");
-                return;
-            }
-            if (arg.AutoDiscover.Message?.StateTopic == null) return;
-            var deviceId = arg.AutoDiscover.Message.StateTopic.Split("/").Last();
-            bool isNode = deviceId.StartsWith("node:");
-            if (isNode) return;
-
-            // Discovery is how an excluded device comes back from the dead: we hold no state across
-            // restarts, so we rebuild from retained discovery messages -- including ones we published
-            // before the device was excluded. Creating it here with Track=true republishes it to Home
-            // Assistant, and only the next check untracks and deletes it again, so every restart
-            // resurrects the entity it just removed. Honour the exclusion before it exists.
-            if (state.IsExcluded(deviceId, arg.AutoDiscover.Message.Name))
-            {
-                Log.Debug("Ignoring excluded device {DeviceId} (disc)", deviceId);
-                return;
-            }
-
-            var device = state.Devices.GetOrAdd(deviceId, id =>
-            {
-                var d = new Device(id, arg.AutoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = arg.AutoDiscover.Message.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
-                d.KalmanFilter.Settings = state.KalmanSettings;
-                foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
-                Log.Information("[+] Track: {Device} (disc)", d);
-                return d;
-            });
-        };
-
-        // Handle device messages
-        mqtt.DeviceMessageReceivedAsync += async arg =>
-        {
-            bool isNode = arg.DeviceId.StartsWith("node:");
-
-            var rx = state.Nodes.GetOrAdd(arg.NodeId, id =>
-            {
-                if (tele.AddUnknownNode(id))
-                    Log.Warning("Unknown node {nodeId}", id);
-                return new Node(id, NodeSourceType.Discovered);
-            });
-
-            if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
-            {
-                rx.Nodes.GetOrAdd(tx.Id, f => new NodeToNode(tx, rx)).ReadMessage(arg.Payload);
-                if (tx is { HasLocation: true, Stationary: true })
-                {
-                    if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
-                        tx.RxNodes.GetOrAdd(arg.NodeId, f => new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
-                }
-                else isNode = false; // if transmitter is not stationary, treat it as a device
-            }
-            else isNode = false; // if transmitter is not configured, treat it as a device
-
-            if (!isNode)
-            {
-                if (rx.HasLocation)
-                {
-                    tele.IncrementMessages();
-                    var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
-                    {
-                        var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
-                        d.KalmanFilter.Settings = state.KalmanSettings;
-                        foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
-                        return d;
-                    });
-                    tele.UpdateDevicesCount(state.Devices.Count);
-                    var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
-                    if (moved) tele.IncrementMoved();
-                    await _toProcessChannel.Writer.WriteAsync(device, stoppingToken);
-                }
-                else
-                {
-                    tele.IncrementSkipped();
-                }
-            }
-        };
+        mqtt.PreviousDeviceDiscovered += (s, arg) => OnPreviousDeviceDiscovered(arg);
+        mqtt.DeviceMessageReceivedAsync += OnDeviceMessageReceivedAsync;
 
         // Handle device attributes to restore LastSeen values
         mqtt.DeviceAttributesReceivedAsync += async arg =>
@@ -170,17 +86,155 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         var processTask = ProcessDevicesAsync(stoppingToken);
         var idleCheckTask = CheckIdleDevicesAsync(stoppingToken);
 
-        await Task.WhenAll(processTask, idleCheckTask);
+        try { await Task.WhenAll(processTask, idleCheckTask); }
+        finally { if (roomLearning != null) roomLearning.CorrectionRequested -= QueueForLocation; }
+    }
+
+    private void QueueForLocation(Device device) => MarkForLocate(device.Id);
+
+    /// <summary>
+    /// Handles a Home Assistant discovery message previously published by the companion: creates a tracked
+    /// device for a device_tracker entry, or removes the device when the retained message was cleared.
+    /// </summary>
+    internal void OnPreviousDeviceDiscovered(PreviousDeviceDiscoveredEventArgs arg)
+    {
+        if (arg.AutoDiscover == null)
+        {
+            // A stale entry had no echo (e.g. read-only mode publishes nothing), so this clear is a real external one.
+            if (_selfClearedDiscoveryIds.TryRemove(arg.DiscoveryId, out var clearedAt) && DateTime.UtcNow - clearedAt <= SelfClearTtl)
+            {
+                // Echo of the clear we published when the device stopped being tracked; the device stays.
+                Log.Debug("Ignoring our own discovery clear for {DiscoveryId}", arg.DiscoveryId);
+                return;
+            }
+
+            // The retained discovery message was cleared externally: remove the device it advertised. The topic
+            // only carries the discovery id, so resolve the device through the discovery entries it published.
+            var deviceId = arg.DeviceId ?? FindDeviceIdByDiscoveryId(arg.DiscoveryId);
+            if (deviceId != null && state.Devices.TryRemove(deviceId, out var removedDevice))
+            {
+                Log.Information("[-] Removed device: {Device} (disc)", removedDevice);
+                tele.UpdateDevicesCount(state.Devices.Count);
+                globalEventDispatcher.OnDeviceRemoved(removedDevice.Id);
+            }
+            else
+            {
+                Log.Debug("Device not found for deletion: {DiscoveryId}", arg.DiscoveryId);
+            }
+            return;
+        }
+
+        var autoDiscover = arg.AutoDiscover;
+        if (autoDiscover.Component != "device_tracker")
+        {
+            Log.Debug("Ignoring, component isn't device_tracker (" + autoDiscover.Component + ")");
+            return;
+        }
+        var discoveredId = arg.DeviceId ?? autoDiscover.Message?.StateTopic?.Split("/").Last();
+        if (discoveredId == null) return;
+        bool isNode = discoveredId.StartsWith("node:");
+        if (isNode) return;
+
+        // Discovery is how an excluded device comes back from the dead: we hold no state across
+        // restarts, so we rebuild from retained discovery messages -- including ones we published
+        // before the device was excluded. Creating it here with Track=true republishes it to Home
+        // Assistant, and only the next check untracks and deletes it again, so every restart
+        // resurrects the entity it just removed. Honour the exclusion before it exists.
+        if (state.IsExcluded(discoveredId, autoDiscover.Message?.Name))
+        {
+            Log.Debug("Ignoring excluded device {DeviceId} (disc)", discoveredId);
+            return;
+        }
+
+        state.Devices.GetOrAdd(discoveredId, id =>
+        {
+            var d = new Device(id, autoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = autoDiscover.Message?.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
+            d.KalmanFilter.Settings = state.KalmanSettings;
+            state.BuildScenarios(d);
+            Log.Information("[+] Track: {Device} (disc)", d);
+            return d;
+        });
+    }
+
+    private string? FindDeviceIdByDiscoveryId(string discoveryId)
+    {
+        return state.Devices.Values
+            .FirstOrDefault(d => d.HassAutoDiscovery.Any(ad => ad.Component == "device_tracker" && string.Equals(ad.DiscoveryId, discoveryId, StringComparison.OrdinalIgnoreCase)))
+            ?.Id;
+    }
+
+    /// <summary>
+    /// Records that we are about to clear the retained discovery config for <paramref name="discoveryId"/>, so the
+    /// echo of that clear is not treated as an external delete. Stale entries are pruned on every insert.
+    /// </summary>
+    internal void RememberSelfClear(string discoveryId, DateTime? clearedAt = null)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var entry in _selfClearedDiscoveryIds)
+        {
+            if (now - entry.Value > SelfClearTtl)
+                _selfClearedDiscoveryIds.TryRemove(entry.Key, out _);
+        }
+        _selfClearedDiscoveryIds[discoveryId] = clearedAt ?? now;
+    }
+
+    /// <summary>
+    /// Handles a device (or node-as-transmitter) measurement from a node and marks the device for processing.
+    /// </summary>
+    internal Task OnDeviceMessageReceivedAsync(DeviceMessageEventArgs arg)
+    {
+        bool isNode = arg.DeviceId.StartsWith("node:");
+
+        var rx = state.Nodes.GetOrAdd(arg.NodeId, id =>
+        {
+            if (tele.AddUnknownNode(id))
+                Log.Warning("Unknown node {nodeId}", id);
+            return new Node(id, NodeSourceType.Discovered);
+        });
+
+        if (isNode && state.Nodes.TryGetValue(arg.DeviceId.Substring(5), out var tx))
+        {
+            rx.Nodes.GetOrAdd(tx.Id, f => new NodeToNode(tx, rx)).ReadMessage(arg.Payload);
+            if (tx is { HasLocation: true, Stationary: true })
+            {
+                if (rx is { HasLocation: true, Stationary: true }) // both nodes are stationary
+                    tx.RxNodes.GetOrAdd(arg.NodeId, f => new RxNode { Tx = tx, Rx = rx }).ReadMessage(arg.Payload);
+            }
+            else isNode = false; // if transmitter is not stationary, treat it as a device
+        }
+        else isNode = false; // if transmitter is not configured, treat it as a device
+
+        if (!isNode)
+        {
+            // Fingerprinting matches raw rssi per node and needs no node coordinates, so a receiver that
+            // was never placed on the map (rx.HasLocation false) is still a feature, not noise. Ranging
+            // locators already restrict their candidate nodes to ones placed on the target floor
+            // (BaseMultilateralizer filters on Node.Floors), so they still ignore it on their own.
+            tele.IncrementMessages();
+            var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
+            {
+                var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
+                d.KalmanFilter.Settings = state.KalmanSettings;
+                state.BuildScenarios(d);
+                return d;
+            });
+            tele.UpdateDevicesCount(state.Devices.Count);
+            var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
+            if (moved) tele.IncrementMoved();
+            _toProcess.Mark(device.Id);
+        }
+        return Task.CompletedTask;
     }
 
     private async Task ProcessDevicesAsync(CancellationToken stoppingToken)
     {
-        await foreach (var device in _toProcessChannel.Reader.ReadAllAsync(stoppingToken))
+        await foreach (var deviceId in _toProcess.ReadAllAsync(stoppingToken))
         {
             if (stoppingToken.IsCancellationRequested) break;
+            if (!state.Devices.TryGetValue(deviceId, out var device)) continue; // removed while pending
             var trackChanged = await CheckDeviceAsync(device);
             if (device.Track)
-                await _toLocateChannel.Writer.WriteAsync(device, stoppingToken);
+                MarkForLocate(device.Id);
             else
                 globalEventDispatcher.OnDeviceChanged(device, trackChanged);
         }
@@ -192,13 +246,22 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         {
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
 
-            var now = DateTime.UtcNow;
-            foreach (var device in state.Devices.Values)
+            MarkIdleDevices(DateTime.UtcNow);
+        }
+    }
+
+    /// <summary>
+    /// Queues every tracked device that has never been located, or was last located more than its timeout ago,
+    /// so it gets re-evaluated (and, if still tracked, re-located) even when no node is reporting it.
+    /// </summary>
+    internal void MarkIdleDevices(DateTime now)
+    {
+        foreach (var device in state.Devices.Values)
+        {
+            if (device is { Track: true, Confidence: > 0 or null }
+                && (device.LastCalculated is null || now - device.LastCalculated.Value > device.Timeout))
             {
-                if (device is { Track: true, Confidence: > 0 or null } && now - device.LastCalculated > device.Timeout)
-                {
-                    await _toProcessChannel.Writer.WriteAsync(device, stoppingToken);
-                }
+                _toProcess.Mark(device.Id);
             }
         }
     }
@@ -252,16 +315,37 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             else
             {
                 Log.Information("[-] Track {Device}", device);
+                if (roomLearning != null) await roomLearning.RemoveAsync(device, false);
                 foreach (var ad in device.HassAutoDiscovery)
+                {
+                    RememberSelfClear(ad.DiscoveryId);
                     await ad.Delete(mqtt);
+                }
             }
             return true;
         }
         return false;
     }
 
-    public IAsyncEnumerable<Device> GetConsumingEnumerable(CancellationToken cancellationToken)
+    /// <summary>
+    /// Yields each device that needs locating, at most once per pass regardless of how many nodes reported it.
+    /// Devices are looked up by id when dequeued; a device removed while pending is skipped.
+    /// Throws <see cref="OperationCanceledException"/> when <paramref name="cancellationToken"/> is cancelled.
+    /// </summary>
+    public async IAsyncEnumerable<Device> GetConsumingEnumerable([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        return _toLocateChannel.Reader.ReadAllAsync(cancellationToken);
+        await foreach (var deviceId in _toLocate.ReadAllAsync(cancellationToken))
+        {
+            if (state.Devices.TryGetValue(deviceId, out var device))
+                yield return device;
+        }
     }
+
+    /// <summary>Number of devices currently queued for locating.</summary>
+    internal int PendingLocateCount => _toLocate.Count;
+
+    /// <summary>Number of devices currently queued for processing.</summary>
+    internal int PendingProcessCount => _toProcess.Count;
+
+    internal void MarkForLocate(string deviceId) => _toLocate.Mark(deviceId);
 }

@@ -17,7 +17,7 @@ public class NadarayaWatsonMultilateralizerTests
     private Mock<NodeTelemetryStore> _mockNodeTelemetryStore;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
@@ -28,6 +28,9 @@ public class NadarayaWatsonMultilateralizerTests
         _mockNodeTelemetryStore = new Mock<NodeTelemetryStore>(_mockMqttCoordinator.Object);
         _mockNodeTelemetryStore.Setup(n => n.Online(It.IsAny<string>())).Returns(true);
         _state = new State(_configLoader, _nodeTelemetryStore);
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
     }
 
     [TearDown]

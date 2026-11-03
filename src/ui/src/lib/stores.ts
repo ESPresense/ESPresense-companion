@@ -1,10 +1,12 @@
 import { readable, writable, derived, get } from 'svelte/store';
-import { apiFetch } from '$lib/api';
+import { apiFetch } from '#lib/api.js';
 import type { Device, Config, Node, CalibrationResponse, DeviceSetting } from './types';
 import { WSManager } from './wsManager';
 
 export const config = writable<Config>();
 export const showAll = writable<boolean>(false);
+// The untracked device a detail page has open: delivered without turning on showAll.
+export const includedDevice = writable<string | null>(null);
 export const showAllFloors = writable<boolean>(false);
 
 export const relativeTimer = function () {
@@ -86,6 +88,11 @@ export const devices = readable<Device[]>([], function start(set) {
 	let pollTimer: NodeJS.Timeout;
 	let isPolling = false;
 
+	function deviceFilter() {
+		const include = get(includedDevice);
+		return `showAll=${get(showAll)}${include ? `&include=${encodeURIComponent(include)}` : ''}`;
+	}
+
 	function updateDevicesFromMap() {
 		set(Array.from(deviceMap.values()));
 	}
@@ -94,8 +101,9 @@ export const devices = readable<Device[]>([], function start(set) {
 		if (isPolling) return;
 
 		isPolling = true;
+		const filter = deviceFilter();
 		try {
-			const devices = await apiFetch<Device[]>(`/api/state/devices?showAll=${get(showAll)}`);
+			const devices = await apiFetch<Device[]>(`/api/state/devices?${filter}`);
 
 			// Replace the entire map instead of accumulating devices
 			deviceMap = new Map(devices.map((device: Device) => [device.id, device]));
@@ -105,6 +113,8 @@ export const devices = readable<Device[]>([], function start(set) {
 		} finally {
 			isPolling = false;
 		}
+		// The filter changed while this poll was out, so its answer is for the old one
+		if (filter !== deviceFilter()) fetchDevices();
 	}
 
 	fetchDevices();
@@ -143,12 +153,22 @@ export const devices = readable<Device[]>([], function start(set) {
 			type: 'showAll',
 			value: '' + get(showAll)
 		});
+		wsManager.sendMessage({
+			command: 'changeFilter',
+			type: 'include',
+			value: get(includedDevice) ?? ''
+		});
 	}
 
 	// Subscribe to showAll changes and trigger immediate poll when it changes
 	const unsubscribeShowUntracked = showAll.subscribe(() => {
 		sendFilter();
 		// Force an immediate poll when showAll changes
+		fetchDevices();
+	});
+
+	const unsubscribeIncluded = includedDevice.subscribe(() => {
+		sendFilter();
 		fetchDevices();
 	});
 
@@ -162,6 +182,7 @@ export const devices = readable<Device[]>([], function start(set) {
 		wsManager.unsubscribeFromEvent('configChanged', configChangedCallback);
 		wsManager.unsubscribeFromEvent('time', timeCallback);
 		unsubscribeShowUntracked();
+		unsubscribeIncluded();
 		unsubscribeOpen();
 	};
 });
@@ -192,22 +213,62 @@ export const nodes = readable<Node[]>([], function start(set) {
 	};
 });
 
-// Calibration polling store
-export const calibration = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
-	let outstanding = false;
-	async function fetchAndSet() {
-		if (outstanding) return;
-		outstanding = true;
-		try {
-			// Timeout so a stalled request can't wedge `outstanding` and stop all later polls.
-			set(await apiFetch<CalibrationResponse>('/api/state/calibration', { signal: AbortSignal.timeout(10000) }));
-		} catch (error) {
-			console.error('Error fetching calibration:', error);
-		} finally {
-			outstanding = false;
+function createCalibrationStore() {
+	let activeRefresh: (() => Promise<void>) | undefined;
+
+	const store = readable<CalibrationResponse>({ matrix: {} }, function start(set) {
+		let request: AbortController | undefined;
+		let stopped = false;
+
+		async function fetchAndSet() {
+			if (stopped || request || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
+
+			const controller = new AbortController();
+			request = controller;
+			// Timeout so a stalled request can't wedge `request` and stop all later polls.
+			const timeout = setTimeout(() => controller.abort(), 10000);
+
+			try {
+				const data = await apiFetch<CalibrationResponse>('/api/state/calibration', {
+					cache: 'no-store',
+					signal: controller.signal
+				});
+				if (!stopped) set(data);
+			} catch (error) {
+				if ((error as Error)?.name !== 'AbortError') {
+					console.error('Error fetching calibration:', error);
+				}
+			} finally {
+				clearTimeout(timeout);
+				if (request === controller) request = undefined;
+			}
 		}
-	}
-	fetchAndSet();
-	const interval = setInterval(fetchAndSet, 1000);
-	return () => clearInterval(interval);
-});
+
+		const refreshWhenVisible = () => {
+			if (document.visibilityState === 'visible') void fetchAndSet();
+		};
+
+		activeRefresh = fetchAndSet;
+		void fetchAndSet();
+		const interval = setInterval(fetchAndSet, 5000);
+		if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshWhenVisible);
+		if (typeof window !== 'undefined') window.addEventListener('focus', fetchAndSet);
+
+		return () => {
+			stopped = true;
+			request?.abort();
+			clearInterval(interval);
+			if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshWhenVisible);
+			if (typeof window !== 'undefined') window.removeEventListener('focus', fetchAndSet);
+			if (activeRefresh === fetchAndSet) activeRefresh = undefined;
+		};
+	});
+
+	return {
+		subscribe: store.subscribe,
+		refresh: () => activeRefresh?.() ?? Promise.resolve()
+	};
+}
+
+// Calibration changes continuously while optimization collects and validates samples.
+export const calibration = createCalibrationStore();

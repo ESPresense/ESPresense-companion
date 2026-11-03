@@ -85,7 +85,7 @@ public class GaussNewtonMultilateralizer : BaseMultilateralizer
             nodesPossibleOnline
         );
 
-        return FinalizeScenario(scenario, confidence);
+        return FinalizeScenario(scenario, confidence, nodes);
     }
 
     private Tuple<Vector3[], float[]> SelectNonColinearTransmitters(DeviceToNode[] dns, int numberOfTransmitters = 4)
