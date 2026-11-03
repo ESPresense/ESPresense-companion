@@ -40,7 +40,27 @@ namespace ESPresense.Models
                 Bfgs = Bfgs.Clone(),
                 Mle = Mle.Clone(),
                 MultiFloor = MultiFloor.Clone(),
-                NearestNode = NearestNode.Clone()
+                NearestNode = NearestNode.Clone(),
+                Fingerprint = Fingerprint.Clone()
+            };
+        }
+    }
+
+    public partial class FingerprintConfig
+    {
+        public FingerprintConfig Clone()
+        {
+            return new FingerprintConfig
+            {
+                Enabled = Enabled,
+                Floors = Floors?.ToArray(),
+                File = File,
+                Mode = Mode,
+                Bandwidth = Bandwidth,
+                Top = Top,
+                K = K,
+                MinCommon = MinCommon,
+                MissingRssi = MissingRssi
             };
         }
     }
