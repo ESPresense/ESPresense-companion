@@ -74,6 +74,7 @@ public class State
                 foreach (var device in Devices.Values)
                 {
                     device.KalmanFilter.Settings = KalmanSettings;
+                    foreach (var scenario in device.Scenarios) scenario.KalmanFilter.Settings = KalmanSettings;
                 }
             }
 

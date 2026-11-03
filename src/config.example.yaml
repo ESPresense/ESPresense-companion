@@ -121,7 +121,7 @@ filtering:
   # Kalman Filter Parameters
   process_noise: 0.01      # Controls how quickly the filter adapts to change. Lower = smoother but more lag.
   measurement_noise: 0.1   # Controls how much new measurements are trusted. Higher = trust model more (smoother).
-  max_velocity: 0.5        # Maximum expected velocity in m/s. Used to reject/dampen impossible movements.
+  max_velocity: 1.5        # Fastest expected movement in m/s (walking is ~1.4). Fixes beyond it are trusted less.
 
   # Smoothing Parameters
   smoothing_weight: 0.7    # Weight given to previous state (0.0-1.0). Higher = more stable/repeatable.

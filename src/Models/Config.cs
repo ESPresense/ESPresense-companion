@@ -353,7 +353,7 @@ namespace ESPresense.Models
         public double MeasurementNoise { get; set; } = 0.1;
 
         [YamlMember(Alias = "max_velocity")]
-        public double MaxVelocity { get; set; } = 0.5;
+        public double MaxVelocity { get; set; } = 1.5;
 
         [YamlMember(Alias = "smoothing_weight")]
         public double SmoothingWeight { get; set; } = 0.7;

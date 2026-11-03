@@ -64,6 +64,44 @@ public class MultiScenarioLocatorTests
         mqttMock.Verify();
     }
 
+    private class FixAt(Point3D fit) : ILocate
+    {
+        public bool Locate(Scenario scenario)
+        {
+            scenario.Confidence = 100;
+            scenario.UpdateLocation(fit);
+            return true;
+        }
+    }
+
+    [Test]
+    public async Task DeviceFilterIsFedTheRawFitNotTheScenariosSmoothedPosition()
+    {
+        var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg");
+        Directory.CreateDirectory(workDir);
+        var configLoader = new ConfigLoader(workDir);
+        var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(),
+            new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
+        mqttMock.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var tracker = new DeviceTracker(state, mqttMock.Object, new TelemetryService(mqttMock.Object), new GlobalEventDispatcher(),
+            new DeviceSettingsStore(mqttMock.Object, state));
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(),
+            new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader), new Mock<ILeaseService>().Object);
+
+        var device = new Device("id", null, TimeSpan.FromSeconds(30));
+        var scenario = new Scenario(null, new FixAt(new Point3D(10, 0, 0)), "kitchen");
+        scenario.UpdateLocation(new Point3D(0, 0, 0)); // the scenario's own filter starts at the origin
+        device.Scenarios.Add(scenario);
+
+        await locator.ProcessDevice(device);
+
+        // A 10 m jump a moment later is mostly ignored by the scenario's filter. The device's filter is fresh, so it
+        // starts wherever it's fed: at the raw fit, not at the scenario's already-smoothed position.
+        Assert.That(scenario.Location.X, Is.LessThan(5));
+        Assert.That(device.Location?.X, Is.EqualTo(10).Within(1e-6));
+    }
+
     [Test]
     public async Task AnchoredDevicePublishesFixedAttributes()
     {

@@ -10,7 +10,10 @@ public class Scenario(Config? config, ILocate locator, string? name)
     private Config? Config { get; } = config;
     private ILocate Locator { get; } = locator;
 
-    private readonly KalmanLocation _kalmanLocation = new();
+    private readonly KalmanLocation _kalmanLocation = new(KalmanFilterSettings.FromConfig(config?.Filtering));
+
+    /// <summary>Smooths this scenario's own position; <see cref="State"/> updates its settings on a config reload</summary>
+    [JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
 
     public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
     public int? Confidence { get; set; }
@@ -88,6 +91,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
     {
         LastHit = DateTime.UtcNow;
         LastLocation = newLocation;
+        Fit = newLocation;
         _kalmanLocation.Reset(newLocation);
     }
 }

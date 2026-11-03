@@ -8,6 +8,12 @@ namespace ESPresense.Models;
 /// </summary>
 public class KalmanLocation
 {
+    /// <summary>Longer than this without a fix (the device timeout) and the filter starts over at the next fix</summary>
+    private const double MaxGapSeconds = 30;
+
+    /// <summary>Caps one prediction step, so a slow update can't carry the velocity metres past the last fix</summary>
+    private const double MaxPredictSeconds = 10;
+
     private Matrix<double>? _kalmanStateEstimate;
     private Matrix<double>? _kalmanErrorCovariance;
     private DateTime? _lastLocationUpdate;
@@ -41,7 +47,7 @@ public class KalmanLocation
         var now = DateTime.UtcNow;
         var settings = Settings;
         var dt = _lastLocationUpdate.HasValue
-            ? (now - _lastLocationUpdate.Value).TotalSeconds
+            ? Math.Min((now - _lastLocationUpdate.Value).TotalSeconds, MaxPredictSeconds)
             : 0.1; // Default to 100ms if no previous update
 
         // Create state transition matrix and process noise matrix
@@ -94,40 +100,23 @@ public class KalmanLocation
     /// <returns>The filtered location after applying the update</returns>
     public Point3D Update(Point3D newLocation, DateTime now)
     {
-        // Initialize Kalman filter if this is the first update
-        if (_kalmanStateEstimate == null || _kalmanErrorCovariance == null)
-        {
-            InitializeKalmanFilter(newLocation);
-            Location = newLocation;
-            _lastLocationUpdate = now;
-            return Location;
-        }
-
         // Calculate time delta
         var dt = _lastLocationUpdate.HasValue
             ? (now - _lastLocationUpdate.Value).TotalSeconds
             : 0.1; // Default to 100ms if no previous update
+
+        // First fix, or back after a gap: the old velocity says nothing about where it is now, so start over
+        if (_kalmanStateEstimate == null || _kalmanErrorCovariance == null || dt > MaxGapSeconds)
+        {
+            InitializeKalmanFilter(newLocation, now);
+            Location = newLocation;
+            return Location;
+        }
         _lastLocationUpdate = now;
 
         var settings = Settings;
 
-        dt = Math.Max(dt, 0.001); // Minimum 1ms interval
-
-        // Check if the proposed move exceeds human movement capabilities
-        // Calculate the distance between the current and new location
-        double distanceToNewLocation = Location.DistanceTo(newLocation);
-
-        // Calculate the maximum possible distance a human could have moved in this timeframe
-        double maxPossibleDistance = settings.MaxVelocity * dt;
-
-        // If the new location is too far away, adjust the measurement noise based on how extreme the movement is
-        double dynamicMeasurementNoise = settings.MeasurementNoise;
-        if (distanceToNewLocation > maxPossibleDistance)
-        {
-            // Scale up the measurement noise based on how much the movement exceeds the maximum
-            double excessFactor = distanceToNewLocation / maxPossibleDistance;
-            dynamicMeasurementNoise *= excessFactor * excessFactor; // Square it for more aggressive rejection
-        }
+        dt = Math.Clamp(dt, 0.001, MaxPredictSeconds);
 
         // Update state transition matrix based on dt
         var F = CreateStateTransitionMatrix(dt);
@@ -139,6 +128,20 @@ public class KalmanLocation
 
         // Apply velocity constraints to the predicted state
         ConstrainVelocity(settings);
+
+        // Distrust a fix further from the prediction than a person could have strayed. Judged against the
+        // prediction, not the last estimate: an estimate that lags would make every fix look like a jump, and
+        // distrusting them makes it lag more.
+        var predicted = new Point3D(_kalmanStateEstimate[0, 0], _kalmanStateEstimate[1, 0], _kalmanStateEstimate[2, 0]);
+        double distanceToNewLocation = predicted.DistanceTo(newLocation);
+        double maxPossibleDistance = settings.MaxVelocity * dt;
+        double dynamicMeasurementNoise = settings.MeasurementNoise;
+        if (distanceToNewLocation > maxPossibleDistance)
+        {
+            // Scale up the measurement noise based on how much the movement exceeds the maximum
+            double excessFactor = distanceToNewLocation / maxPossibleDistance;
+            dynamicMeasurementNoise *= excessFactor * excessFactor; // Square it for more aggressive rejection
+        }
 
         // Measurement matrix maps the state to the measurement
         var H = Matrix<double>.Build.DenseOfArray(new double[,] {
@@ -215,11 +218,11 @@ public class KalmanLocation
     /// <param name="location">The location to reset to</param>
     public void Reset(Point3D location)
     {
-        InitializeKalmanFilter(location);
+        InitializeKalmanFilter(location, DateTime.UtcNow);
         Location = location;
     }
 
-    private void InitializeKalmanFilter(Point3D initialLocation)
+    private void InitializeKalmanFilter(Point3D initialLocation, DateTime now)
     {
         // State vector: [x, y, z, vx, vy, vz]
         _kalmanStateEstimate = Matrix<double>.Build.DenseOfArray(new double[,] {
@@ -230,7 +233,7 @@ public class KalmanLocation
         _kalmanErrorCovariance = Matrix<double>.Build.DenseDiagonal(6, 6, 1.0);
 
         // Store initial update time
-        _lastLocationUpdate = DateTime.UtcNow;
+        _lastLocationUpdate = now;
     }
 
     private Matrix<double> CreateStateTransitionMatrix(double dt)

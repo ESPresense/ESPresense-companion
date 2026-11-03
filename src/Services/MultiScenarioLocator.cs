@@ -103,7 +103,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
         if (kalmanSource != null)
         {
-            device.UpdateLocation(kalmanSource.Location);
+            // The raw fit: the scenario's Location is already Kalman-smoothed, and smoothing it twice doubles the lag
+            device.UpdateLocation(kalmanSource.Fit);
         }
 
         // Predicted location from the updated Kalman filter (x̂ₖ|ₖ⁻¹)
