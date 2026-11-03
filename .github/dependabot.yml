@@ -12,6 +12,20 @@ updates:
     directory: "src/ui/"
     schedule:
       interval: "weekly"
+    groups:
+      # three is 0.x, so its "minor" bumps can break, and @types/three must move with it.
+      # Listed first because a dependency joins the first group that matches it.
+      three:
+        patterns:
+          - "three"
+          - "@types/three"
+      # Majors stay out of this group, so each one gets its own PR.
+      npm-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Maintain dependencies for Composer
   - package-ecosystem: "nuget"
