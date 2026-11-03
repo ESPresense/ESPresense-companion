@@ -92,7 +92,13 @@ public class MultiScenarioLocatorTests
 
         mqttMock.Verify(m => m.TryEnqueueAsync(AreaSwitch.Topic("id"),
             It.Is<string>(p => p.Contains("\"from\":\"kitchen\"") && p.Contains("\"to\":\"not_home\"") && p.Contains("No current fix")), true), Times.Once);
-        mqttMock.Verify(m => m.EnqueueAsync($"homeassistant/sensor/{device.AreaSwitchDiscovery.DiscoveryId}/config", It.IsAny<string>(), true), Times.Once);
+        var discoveryTopic = $"homeassistant/sensor/{device.AreaSwitchDiscovery.DiscoveryId}/config";
+        mqttMock.Verify(m => m.EnqueueAsync(discoveryTopic, It.IsAny<string>(), true), Times.Once);
+
+        // Untracked then tracked again: Delete clears the sensor, so it has to be announced again
+        await device.AreaSwitchDiscovery.Delete(mqttMock.Object);
+        await device.AreaSwitchDiscovery.Send(mqttMock.Object);
+        mqttMock.Verify(m => m.EnqueueAsync(discoveryTopic, It.IsNotNull<string>(), true), Times.Exactly(2));
     }
 
     [Test]

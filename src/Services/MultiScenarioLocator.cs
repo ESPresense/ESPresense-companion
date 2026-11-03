@@ -39,7 +39,16 @@ public class MultiScenarioLocator(DeviceTracker dl,
         if (device.ReportedStateChanged == lastChange || device.PreviousReportedState == null) return;
 
         var change = AreaSwitch.Describe(device, previous);
-        await device.AreaSwitchDiscovery.Send(mqtt);
+        try
+        {
+            await device.AreaSwitchDiscovery.Send(mqtt);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Warning(ex, "Failed to announce the area switch sensor for {DeviceId}", device.Id); // only a diagnostic
+            return;
+        }
+
         var payload = JsonConvert.SerializeObject(new
         {
             from = change.From,
