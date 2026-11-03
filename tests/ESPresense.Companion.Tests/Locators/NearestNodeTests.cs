@@ -16,13 +16,16 @@ public class NearestNodeTests
     private Mock<IMqttCoordinator> _mockMqttCoordinator;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
 
+        // Without a config file the loader installs the example, whose floors would mix with the test's
+        await File.WriteAllTextAsync(Path.Combine(_configDir, "config.yaml"), "floors: []\n");
         _configLoader = new ConfigLoader(_configDir);
+        await _configLoader.LoadAsync(); // the constructor no longer loads
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
     }
@@ -179,5 +182,128 @@ public class NearestNodeTests
         Assert.That(moved, Is.True);
         Assert.That(scenario.Floor, Is.EqualTo(floor));
         Assert.That(scenario.Room, Is.EqualTo(floor.Rooms.Values.First()));
+    }
+
+    [Test]
+    public void Locate_UsesFloorNodeIsOnNotFloorsItIsConfiguredFor()
+    {
+        var points = new[]
+        {
+            new[] { 0.0, 0.0 },
+            new[] { 2.0, 0.0 },
+            new[] { 2.0, 2.0 },
+            new[] { 0.0, 2.0 }
+        };
+        var first = CreateTestFloor("first", new[] { -5.0, -5.0, 0.0 }, new[] { 5.0, 5.0, 3.0 }, CreateRoom("Kitchen", points));
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 }, CreateRoom("Bedroom", points));
+
+        // On the first floor, but only configured to help locate on the second
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1.0, 1.0, 1.0), second);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.EqualTo(first));
+        Assert.That(scenario.Room, Is.EqualTo(first.Rooms.Values.First()));
+    }
+
+    [TestCase(7.0, "second")]
+    [TestCase(-1.0, "first")]
+    public void Locate_SnapsToNearestFloorInZ(double z, string expected)
+    {
+        var first = CreateTestFloor("first", new[] { -5.0, -5.0, 0.0 }, new[] { 5.0, 5.0, 3.0 });
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 });
+
+        // List order would otherwise decide
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1.0, 1.0, z), first, second);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor?.Id, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Locate_UsesFloorByZWhenNodeIsOutsideItsFootprint()
+    {
+        var first = CreateTestFloor("first", new[] { -5.0, -5.0, 0.0 }, new[] { 5.0, 5.0, 3.0 });
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 });
+
+        var node = CreateTestNode("node1", "Node 1", new Point3D(9.0, 1.0, 4.0), first, second);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.EqualTo(second));
+    }
+
+    [Test]
+    public void Locate_LeavesFloorUnsetForDiscoveredNodeWithNoPosition()
+    {
+        CreateTestFloor("main", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 1.0 });
+
+        var node = new Node("node1", NodeSourceType.Discovered);
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.Null);
+        Assert.That(scenario.Room, Is.Null);
+    }
+
+    [Test]
+    public void Locate_UsesConfiguredFloorsForConfiguredNodeWithNoPoint()
+    {
+        CreateTestFloor("first", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 3.0 });
+        var second = CreateTestFloor("second", new[] { -5.0, -5.0, 3.0 }, new[] { 5.0, 5.0, 6.0 });
+
+        var node = new Node("node1", NodeSourceType.Config);
+        node.Update(_configLoader.Config!, new ConfigNode { Id = "node1" }, new[] { second });
+        var device = CreateDeviceWithNode(node, 1.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(node.HasLocation, Is.False);
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Floor, Is.EqualTo(second));
+    }
+
+    [TestCase(9.0, true)]
+    [TestCase(11.0, false)]
+    public async Task Locate_IgnoresNodesBeyondMaxDistance(double distance, bool expected)
+    {
+        (await _configLoader.ConfigAsync()).Locators.NearestNode.MaxDistance = 10;
+        var floor = CreateTestFloor("main", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 1.0 });
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1.0, 1.0, 0.0), floor);
+        var device = CreateDeviceWithNode(node, distance);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.EqualTo(expected));
+    }
+
+    [TestCase(0.0)]
+    [TestCase(-1.0)]
+    public async Task Locate_ZeroOrNegativeMaxDistanceMeansNoLimit(double maxDistance)
+    {
+        (await _configLoader.ConfigAsync()).Locators.NearestNode.MaxDistance = maxDistance;
+        var floor = CreateTestFloor("main", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 1.0 });
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1.0, 1.0, 0.0), floor);
+        var device = CreateDeviceWithNode(node, 50.0);
+
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
     }
 }

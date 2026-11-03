@@ -41,4 +41,20 @@ test.describe('3D view', () => {
 		// Ensure we aren't in the "not found" branch
 		await expect(page.getByText(/not found/i)).toHaveCount(0);
 	});
+
+	for (const flipY of [false, true]) {
+		test(`follows map.flip_y=${flipY} like the 2D map`, async ({ page }) => {
+			await mockApi(page, { stubWebSocket: true, map: { flipY } });
+			await page.goto('/3d');
+
+			// Office is at y 10-45 and Hall at y 55-90: with flip_y off y grows downward, so Office is above Hall.
+			const office = page.locator('.css2d-renderer-map').getByText('Office', { exact: true });
+			const hall = page.locator('.css2d-renderer-map').getByText('Hall', { exact: true });
+			await expect(async () => {
+				const officeY = (await office.boundingBox())!.y;
+				const hallY = (await hall.boundingBox())!.y;
+				expect(officeY < hallY).toBe(!flipY);
+			}).toPass();
+		});
+	}
 });

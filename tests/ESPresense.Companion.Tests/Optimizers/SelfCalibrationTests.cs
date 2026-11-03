@@ -49,7 +49,7 @@ public class SelfCalibrationTests
     };
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         var mqtt = new Mock<IMqttCoordinator>();
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
@@ -57,6 +57,9 @@ public class SelfCalibrationTests
         _configLoader = new ConfigLoader(_configDir);
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
+
+        // The constructor no longer loads; call explicitly.
+        await _configLoader.LoadAsync();
 
         // ConfigLoader loads asynchronously and State takes its copy on the ConfigChanged event. The
         // optimizers read State.Config, so wait for that, not just the loader, or the first test can

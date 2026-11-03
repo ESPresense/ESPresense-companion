@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { gotoMap } from '$lib/urls';
-	import { config } from '$lib/stores';
-	import type { Node } from '$lib/types';
+	import { gotoMap } from '#lib/urls.js';
+	import { config } from '#lib/stores.js';
+	import type { Node } from '#lib/types.js';
 
 	interface Props {
 		nodeName?: string;

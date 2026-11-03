@@ -68,9 +68,9 @@ public class RobotSurveyTests
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
         _configLoader = new ConfigLoader(_configDir);
-        // The example config loads in the background and has a floor "first" too. Finish loading before
-        // State exists, or a late load merges the example's rooms into the survey's floor mid-test.
-        await _configLoader.ConfigAsync();
+        // The constructor no longer loads; the example config has a floor "first" too, and must finish
+        // loading before State exists, or a late load merges the example's rooms into the survey's floor.
+        await _configLoader.LoadAsync();
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
     }

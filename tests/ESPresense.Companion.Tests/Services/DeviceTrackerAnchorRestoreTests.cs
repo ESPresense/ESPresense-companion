@@ -23,7 +23,7 @@ public class DeviceTrackerAnchorRestoreTests
     private GlobalEventDispatcher _eventDispatcher;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
@@ -35,6 +35,9 @@ public class DeviceTrackerAnchorRestoreTests
 
         _nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
         _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, _state);
         _telemetryService = new TelemetryService(_mockMqttCoordinator.Object);
         _eventDispatcher = new GlobalEventDispatcher();

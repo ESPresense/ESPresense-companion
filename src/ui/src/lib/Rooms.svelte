@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
-	import { config } from '$lib/stores';
+	import { config } from '#lib/stores.js';
 	import Room from './Room.svelte';
 
 	interface Props {

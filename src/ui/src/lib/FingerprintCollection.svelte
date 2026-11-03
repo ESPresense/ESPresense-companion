@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { apiFetch } from '$lib/api';
-	import type { DeviceSetting, DeviceSettingsDetails } from '$lib/types';
+	import { apiFetch } from '#lib/api.js';
+	import type { DeviceSetting, DeviceSettingsDetails } from '#lib/types.js';
 
 	let {
 		deviceId,

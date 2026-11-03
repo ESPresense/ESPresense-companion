@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { apiFetch, apiUrl } from '$lib/api';
-	import { devices, nodes, config, wsManager } from '$lib/stores';
-	import Map from '$lib/Map.svelte';
-	import FingerprintCollection from '$lib/FingerprintCollection.svelte';
-	import { getToastStore } from '$lib/toast/toastStore';
-	import type { DeviceSetting, NodeSetting, NodeSettingDetails } from '$lib/types';
-	import type { DeviceMessage } from '$lib/types';
+	import { anchorSpot } from '#lib/calibrationSpot.js';
+	import { apiFetch, apiUrl } from '#lib/api.js';
+	import { devices, nodes, config, wsManager } from '#lib/stores.js';
+	import Map from '#lib/Map.svelte';
+	import FingerprintCollection from '#lib/FingerprintCollection.svelte';
+	import { getToastStore } from '#lib/toast/toastStore.js';
+	import type { DeviceSetting, NodeSetting, NodeSettingDetails } from '#lib/types.js';
+	import type { DeviceMessage } from '#lib/types.js';
 	import { onMount, onDestroy, untrack } from 'svelte';
 
 	const toastStore = getToastStore();
@@ -345,6 +346,19 @@
 		// valid state (e.g. calibrating the first device before anything has been located) that must still
 		// reach the fallback below, or #1730 returns for "zero devices ever".
 		const device = $devices.find((d: any) => d.id === deviceSettings.id);
+
+		// An anchored device's position is known exactly, so open at its saved height, not the default.
+		// Height is relative to a floor, so wait for the config: guessing here would lock in a wrong z.
+		if (isAnchored) {
+			const anchor = anchorSpot(deviceSettings, $config?.floors, device?.floor?.id);
+			if (anchor) {
+				selectedFloorId = anchor.floorId;
+				calibrationSpot = anchor.spot;
+				calibrationSpotHeight = anchor.height;
+			}
+			return;
+		}
+
 		if (device) {
 			if (device.floor !== null) {
 				selectedFloorId = device.floor.id;
@@ -372,7 +386,7 @@
 	});
 	// Update Z coordinate when height changes
 	$effect.pre(() => {
-		if (calibrationSpot && calibrationSpotHeight) {
+		if (calibrationSpot && calibrationSpotHeight != null) {
 			const floorLowerZ = bounds ? bounds[0][2] : 0;
 			calibrationSpot.z = floorLowerZ + calibrationSpotHeight;
 		}

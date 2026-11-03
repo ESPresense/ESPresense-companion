@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mockApi } from './mock-api';
 
 test.describe('Device Calibration Anchoring', () => {
@@ -57,5 +57,76 @@ test.describe('Device Calibration Anchoring', () => {
 		expect(anchorPayloads[1].x).toBeNull();
 		expect(anchorPayloads[1].y).toBeNull();
 		expect(anchorPayloads[1].z).toBeNull();
+	});
+
+	// Height is measured from a floor, and the config and device list both load after the page does
+	test.describe('opens an anchored device at its saved height', () => {
+		const anchored = { settings: { originalId: 'dev-9', id: 'dev-9', name: 'Anchored', 'rssi@1m': -60, x: 2, y: 3, z: 4.7 }, details: [] };
+		const twoFloors = {
+			timeout: 30000,
+			awayTimeout: 300000,
+			floors: [
+				{
+					id: 'ground',
+					name: 'Ground',
+					bounds: [
+						[0, 0, 0],
+						[10, 10, 3]
+					],
+					rooms: []
+				},
+				{
+					id: 'upstairs',
+					name: 'Upstairs',
+					bounds: [
+						[0, 0, 3],
+						[10, 10, 6]
+					],
+					rooms: []
+				}
+			],
+			devices: [],
+			gps: null,
+			map: { flipX: false, flipY: false, wallThickness: 1, wallOpacity: 0.35, wallColor: '#64748b' }
+		};
+
+		async function open(page: Page, delay: { config?: number; devices?: number }) {
+			await mockApi(page, { stubWebSocket: true });
+			const payloads: any[] = [];
+			await page.route('**/api/device/dev-9', async (route) => {
+				if (route.request().method() === 'PUT') {
+					payloads.push(route.request().postDataJSON());
+					return route.fulfill({ json: {} });
+				}
+				return route.fulfill({ json: anchored });
+			});
+			await page.route('**/api/state/config', async (route) => {
+				await new Promise((r) => setTimeout(r, delay.config ?? 0));
+				await route.fulfill({ json: twoFloors });
+			});
+			await page.route('**/api/state/devices**', async (route) => {
+				await new Promise((r) => setTimeout(r, delay.devices ?? 0));
+				await route.fulfill({ json: [] });
+			});
+			await page.goto('/calibration/devices/dev-9');
+			return payloads;
+		}
+
+		for (const [name, delay] of [
+			['when the config arrives last', { config: 1500 }],
+			['when the device list arrives last', { devices: 1500 }]
+		] as const) {
+			test(name, async ({ page }) => {
+				const payloads = await open(page, delay);
+
+				await expect(page.locator('#height-input')).toHaveValue('1.7');
+				await page.waitForTimeout(2000); // past the late arrival: nothing may move it
+
+				await expect(page.locator('#height-input')).toHaveValue('1.7');
+				await page.getByRole('button', { name: 'Anchor here' }).click();
+				await expect.poll(() => payloads.length).toBe(1);
+				expect(payloads[0].z).toBeCloseTo(4.7);
+			});
+		}
 	});
 });

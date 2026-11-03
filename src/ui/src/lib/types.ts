@@ -207,14 +207,28 @@ export interface NodeCalibrationMatrix {
 
 export interface OptimizerState {
 	optimizers: string;
+	phase: string;
+	message: string;
+	snapshotCount: number;
+	measurementCount: number;
+	trainingSamples: number;
 	bestRMSE?: number;
 	bestR?: number;
+	bestLoss?: number;
+	validationSamples: number;
+	lastRunAt?: string;
+	nextRunAt?: string;
+	lastOutcome?: string;
+	leaseHolder?: string;
+	leaseExpiresAt?: string;
 }
 
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
 	rmse?: number;
 	r?: number;
+	bestRMSE?: number;
+	bestR?: number;
 	optimizerState?: OptimizerState;
 	anchored?: string[];
 }
@@ -243,4 +257,92 @@ export interface DeviceHistory {
 	fixes: number;
 	scenario: string | null;
 	best: boolean;
+}
+
+// Mirrors DeviceExplanation in src/Models/DeviceExplanation.cs
+export type ExplainedPoint = { x: number; y: number; z: number };
+export type ExplainedPlace = { id: string | null; name: string | null };
+
+export type ExplainedReading = {
+	id: string | null;
+	name: string | null;
+	current: boolean;
+	rssi: number;
+	rssiVar: number | null;
+	refRssi: number;
+	distance: number;
+	distVar: number | null;
+	lastHit: string | null;
+};
+
+export type ExplainedNode = {
+	id: string | null;
+	name: string | null;
+	used: boolean;
+	reason: string | null;
+	measured: number | null;
+	fitted: number | null;
+	residual: number | null;
+	weight: number | null;
+};
+
+export type ExplainedScenario = {
+	name: string;
+	locator: string;
+	floor: ExplainedPlace | null;
+	room: ExplainedPlace | null;
+	best: boolean;
+	current: boolean;
+	probability: number;
+	confidence: number | null;
+	weightedConfidence: number;
+	outcome: 'Solved' | 'Fallback' | 'NoFix' | null;
+	outcomeReason: string | null;
+	location: ExplainedPoint;
+	fit: ExplainedPoint | null;
+	scale: number | null;
+	error: number | null;
+	pearsonCorrelation: number | null;
+	iterations: number | null;
+	reasonForExit: string;
+	fixes: number | null;
+	nodes: ExplainedNode[];
+};
+
+export type ExplainedFloor = { floor: ExplainedPlace; probability: number; confidence: number | null };
+
+export type ExplainedRoom = {
+	room: ExplainedPlace | null;
+	inside: boolean;
+	distanceToEdge: number | null;
+	nearestOtherRoom: ExplainedPlace | null;
+	nearestOtherDistance: number | null;
+	state: string | null;
+	previousState: string | null;
+	stateChanged: string | null;
+};
+
+export type ExplainedEllipse = { center: ExplainedPoint; semiMajor: number; semiMinor: number; angleDegrees: number };
+
+export type DeviceExplanation = {
+	id: string;
+	name: string | null;
+	anchored: boolean;
+	location: ExplainedPoint | null;
+	confidence: number | null;
+	nodes: ExplainedReading[];
+	scenarios: ExplainedScenario[];
+	floors: ExplainedFloor[];
+	room: ExplainedRoom;
+	uncertainty: ExplainedEllipse | null;
+	hints: string[];
+};
+
+/** Matches the backend SearchResult (GET /api/state/search). */
+export interface SearchResult {
+	kind: 'device' | 'node';
+	id: string;
+	name: string | null;
+	detail: string;
+	badge: string | null;
 }

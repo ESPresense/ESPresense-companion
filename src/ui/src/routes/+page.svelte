@@ -1,8 +1,8 @@
 <script lang="ts">
-	import Map from '$lib/Map.svelte';
-	import FloorTabs from '$lib/FloorTabs.svelte';
-	import BackgroundUpload from '$lib/BackgroundUpload.svelte';
-	import { gotoDetail } from '$lib/urls';
+	import Map from '#lib/Map.svelte';
+	import FloorTabs from '#lib/FloorTabs.svelte';
+	import BackgroundUpload from '#lib/BackgroundUpload.svelte';
+	import { gotoDetail } from '#lib/urls.js';
 
 	// Local state, not a prop: SvelteKit route components only receive `data` and `form`.
 	let floorId: string | null = $state(null);

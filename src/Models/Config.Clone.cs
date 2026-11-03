@@ -13,7 +13,6 @@ namespace ESPresense.Models
             return new Config
             {
                 Mqtt = Mqtt?.Clone(),
-                Bounds = Bounds?.Select(b => b.ToArray()).ToArray(),
                 Timeout = Timeout,
                 AwayTimeout = AwayTimeout,
                 Gps = Gps.Clone(),
@@ -151,10 +150,17 @@ namespace ESPresense.Models
             return new ConfigOptimization
             {
                 Enabled = Enabled,
+                Optimizer = Optimizer,
+                SampleIntervalSecs = SampleIntervalSecs,
+                TrainingWindowMins = TrainingWindowMins,
+                OptimizationIntervalSecs = OptimizationIntervalSecs,
+                ValidationFraction = ValidationFraction,
+                MinimumImprovement = MinimumImprovement,
                 IntervalSecs = IntervalSecs,
                 KeepSnapshotMins = KeepSnapshotMins,
                 MinSamples = MinSamples,
-                Limits = new Dictionary<string, double>(Limits)
+                Limits = new Dictionary<string, double>(Limits),
+                Weights = new Dictionary<string, double>(Weights)
             };
         }
     }
@@ -166,7 +172,7 @@ namespace ESPresense.Models
             return new ConfigHistory
             {
                 Enabled = Enabled,
-                Database = Database,
+                Path = Path,
                 ExpireAfter = ExpireAfter
             };
         }
@@ -212,7 +218,8 @@ namespace ESPresense.Models
                 Username = Username,
                 Password = Password,
                 ClientId = ClientId,
-                DiscoveryTopic = DiscoveryTopic
+                DiscoveryTopic = DiscoveryTopic,
+                ReadOnly = ReadOnly
             };
         }
     }
@@ -267,7 +274,6 @@ namespace ESPresense.Models
                 Id = Id,
                 Point = Point?.ToArray(),
                 Floors = Floors?.ToArray(),
-                Enabled = Enabled,
                 Stationary = Stationary
             };
         }

@@ -15,8 +15,11 @@ ESPresense-companion is a Home Assistant Add-on / Docker container that processe
 
 ### Backend (C#)
 ```bash
-# Start development server with hot reload
-dotnet watch --project src
+# Start development server (backend + UI)
+dotnet run --project src
+
+# Same, with hot reload. Use ./watch, NOT `dotnet watch` -- see below
+./watch
 
 # Run tests
 dotnet test
@@ -61,10 +64,29 @@ pnpm check
 ### Development Setup
 1. Install .NET SDK 8.0 and Node.js 22
 2. Install pnpm globally: `npm install -g pnpm`
-3. Install frontend dependencies: `cd src/ui && pnpm install` (the Debug build no longer does this; `dotnet watch` launches `pnpm start`, which needs `node_modules`)
-4. Run `dotnet watch --project src` (serves backend on port 5279)
-5. During development, Vite dev server proxies `/api` and `/ws` requests to the .NET backend
-6. Browse to http://localhost:5279/
+3. Install frontend dependencies: `cd src/ui && pnpm install` (the Debug build no longer does this; the SPA proxy launches `pnpm start`, which needs `node_modules`)
+4. Run `dotnet run --project src`
+5. Browse to http://localhost:5279/ -- it 302s to the Vite dev server on 44490, which proxies `/api` and `/ws` back to 5279
+
+### Use `./watch`, not bare `dotnet watch`
+
+`launchSettings.json` sets `ASPNETCORE_HOSTINGSTARTUPASSEMBLIES=Microsoft.AspNetCore.SpaProxy`.
+That hosting startup is what launches `pnpm start` and redirects `/` to the Vite dev server.
+Since SDK 9.0.203 (reproduced on 10.0.100), `dotnet watch` replaces that variable with its own
+`Microsoft.AspNetCore.Watch.BrowserRefresh`, so SpaProxy never loads: Vite is never started and
+`http://localhost:5279/` 404s on everything except `/api`. Other launch-profile variables (`ASPNETCORE_URLS`, `ASPNETCORE_ENVIRONMENT`) come through
+fine -- watch composes this one variable from a list it never seeds with the profile's value, so the
+composed value wins. See dotnet/sdk#48480.
+
+`./watch` sets `DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH=1`, which stops watch injecting its hosting
+startup, so SpaProxy survives and hot reload still works. Nothing is lost -- Vite owns the page and
+does its own HMR, so watch's browser refresh was never useful for this SPA.
+
+Check which one is loaded with:
+
+```bash
+ps eww -p $(pgrep -f ESPresense.Companion) | tr ' ' '\n' | grep HOSTINGSTARTUP
+```
 
 ## Architecture Overview
 
@@ -176,7 +198,7 @@ pnpm test:unit
 
 ## Development Tips
 
-1. **Backend Changes**: Use `dotnet watch` for automatic recompilation
+1. **Backend Changes**: `dotnet run --project src` serves both halves; `./watch` does the same with hot reload
 2. **Frontend Changes**: Vite provides hot module reloading
 3. **Database**: SQLite database stored in `~/.espresense/.storage/history.db`
 4. **MQTT**: Use tools like MQTT Explorer to debug MQTT communication

@@ -40,7 +40,7 @@ public class RoomLearningTests
         _mqtt.Setup(m => m.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
             .Callback<string, string?, bool>((t, p, r) => _published.Add((t, p, r))).Returns(Task.CompletedTask);
         var loader = new ConfigLoader(_directory);
-        await loader.ConfigAsync();
+        await loader.LoadAsync();
         _state = new State(loader, new NodeTelemetryStore(_mqtt.Object));
         _state.Config = new Config
         {

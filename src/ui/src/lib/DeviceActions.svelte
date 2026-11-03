@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/api';
-	import { gotoDetail, gotoCalibration } from '$lib/urls';
-	import { getToastStore } from '$lib/toast/toastStore';
-	import { showComponent, showConfirm } from '$lib/modal/modalStore';
-	import type { Device, DeviceSetting, DeviceSettingsDetails } from '$lib/types';
-	import DeviceSettingsModal from '$lib/modals/DeviceSettingsModal.svelte';
+	import { apiFetch } from '#lib/api.js';
+	import { gotoDetail, gotoCalibration } from '#lib/urls.js';
+	import { getToastStore } from '#lib/toast/toastStore.js';
+	import { showComponent, showConfirm } from '#lib/modal/modalStore.js';
+	import type { Device, DeviceSetting, DeviceSettingsDetails } from '#lib/types.js';
+	import DeviceSettingsModal from '#lib/modals/DeviceSettingsModal.svelte';
 
 	interface Props {
 		col: string; // Column identifier from parent table

@@ -151,7 +151,6 @@ public class FingerprintLocatorTests
         {
             foreach (var survey in _surveys)
             {
-                await survey.Loader.ConfigAsync();
                 await survey.Loader.StopAsync(CancellationToken.None);
                 survey.Loader.Dispose();
                 Directory.Delete(survey.Dir, true);

@@ -65,7 +65,7 @@ public class FingerprintCollectionTests
         try
         {
             var loader = new ConfigLoader(directory);
-            await loader.ConfigAsync();
+            await loader.LoadAsync();
             var mqtt = new Mock<IMqttCoordinator>();
             var collection = new FingerprintCollectionService(mqtt.Object, loader);
             Assert.That(collection.Duration, Is.EqualTo(TimeSpan.FromSeconds(15)));

@@ -21,7 +21,7 @@ public class OptimizationRunnerTests
     private string _configDir = null!;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mqtt = new Mock<IMqttCoordinator>();
         _mqtt.Setup(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
@@ -32,6 +32,9 @@ public class OptimizationRunnerTests
 
         _configLoader = new ConfigLoader(_configDir);
         _state = new State(_configLoader, new NodeTelemetryStore(_mqtt.Object));
+
+        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
         _nss = new NodeSettingsStore(_mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
         _runner = new OptimizationRunner(_state, _nss, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>());
     }
@@ -160,6 +163,14 @@ public class OptimizationRunnerTests
     }
 
     [Test]
+    public async Task RunCycle_GainBelowMinimumImprovement_IsNotApplied()
+    {
+        await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5, MinimumImprovement = 2 });
+
+        _mqtt.Verify(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
     public async Task RunCycle_AtLeastMinSamples_IsEvaluatedAndApplied()
     {
         await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5 });
@@ -234,6 +245,87 @@ public class OptimizationRunnerTests
             results.Nodes["rx"] = new ProposedValues { Absorption = absorption };
             return results;
         }
+    }
+
+    private sealed class CountingNodeSettingsStore(IMqttCoordinator mqtt) : NodeSettingsStore(mqtt, Mock.Of<ILogger<NodeSettingsStore>>())
+    {
+        public Dictionary<string, int> Reads { get; } = new();
+
+        public override NodeSettings Get(string id)
+        {
+            Reads[id] = Reads.GetValueOrDefault(id) + 1;
+            return base.Get(id);
+        }
+    }
+
+    [Test]
+    public async Task RunCycle_ScoresAProposalAtTheValueThatWillBeApplied()
+    {
+        await RunCycle(SnapshotWith(5), new ConfigOptimization { Enabled = true, MinSamples = 5 }, new AbsorptionOptimizer(2.9996));
+
+        Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
+    }
+
+    [Test]
+    public async Task RunCycle_ReadsEachNodesSettingsOnceBeforeScoring()
+    {
+        var store = new CountingNodeSettingsStore(_mqtt.Object);
+        var runner = new OptimizationRunner(_state, store, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>());
+        var snapshot = SnapshotWith(5);
+
+        await runner.RunCycleAsync(
+            snapshot,
+            new List<OptimizationSnapshot> { snapshot },
+            new ConfigOptimization { Enabled = true, MinSamples = 5 },
+            new List<IOptimizer> { new FixedAbsorptionOptimizer() });
+
+        // Scoring dozens of measurements must not re-read the live store each time: one frozen read at cycle
+        // start, then only the reads made while applying the winning proposal (rx is read to apply and again by Set).
+        Assert.That(store.Reads["rx"], Is.EqualTo(3));
+        Assert.That(store.Reads["tx0"], Is.EqualTo(1));
+    }
+
+    private static List<OptimizationSnapshot> TimedSnapshots(int count, TimeSpan spacing, int measurementCount = 5)
+    {
+        var start = DateTime.UtcNow - spacing * (count - 1);
+        return Enumerable.Range(0, count)
+            .Select(i => new OptimizationSnapshot { Timestamp = start + spacing * i, Measures = SnapshotWith(measurementCount).Measures })
+            .ToList();
+    }
+
+    [Test]
+    public void HasSufficientHistory_RequiresHalfTheTrainingWindow()
+    {
+        var optimization = new ConfigOptimization { TrainingWindowMins = 30 };
+
+        Assert.That(OptimizationRunner.HasSufficientHistory(TimedSnapshots(4, TimeSpan.FromSeconds(30)), optimization), Is.False, "90 seconds of history");
+        Assert.That(OptimizationRunner.HasSufficientHistory(TimedSnapshots(31, TimeSpan.FromSeconds(30)), optimization), Is.True, "15 minutes of history");
+        Assert.That(OptimizationRunner.HasSufficientHistory(TimedSnapshots(2, TimeSpan.FromMinutes(20)), optimization), Is.False, "too few snapshots to split");
+    }
+
+    [Test]
+    public async Task ScheduledCycle_WithTooLittleHistory_AppliesNothing()
+    {
+        _state.OptimizationSnaphots.AddRange(TimedSnapshots(4, TimeSpan.FromSeconds(30)));
+
+        var ran = await _runner.RunScheduledCycleAsync(new ConfigOptimization { Enabled = true, TrainingWindowMins = 30 }, new List<IOptimizer> { new FixedAbsorptionOptimizer() });
+
+        Assert.That(ran, Is.False);
+        _mqtt.Verify(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Test]
+    public async Task ScheduledCycle_WithEnoughHistory_FitsOlderDataAndValidatesOnNewer()
+    {
+        _state.OptimizationSnaphots.AddRange(TimedSnapshots(31, TimeSpan.FromSeconds(30)));
+
+        var ran = await _runner.RunScheduledCycleAsync(new ConfigOptimization { Enabled = true, TrainingWindowMins = 30 }, new List<IOptimizer> { new FixedAbsorptionOptimizer() });
+
+        Assert.That(ran, Is.True);
+        Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
+        // 31 snapshots of 5 measurements, 20% (7 snapshots) held out
+        Assert.That(_state.OptimizerState.TrainingSamples, Is.EqualTo(24 * 5));
+        Assert.That(_state.OptimizerState.ValidationSamples, Is.EqualTo(7 * 5));
     }
 
     [TestCase(3.0, 3.0, true)]
