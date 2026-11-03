@@ -20,7 +20,7 @@ public class StateControllerAnchorTests
     private string _configDir;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _mockMqttCoordinator = new Mock<IMqttCoordinator>();
         _mockNodeSettingsStore = new Mock<NodeSettingsStore>(_mockMqttCoordinator.Object, Mock.Of<ILogger<NodeSettingsStore>>()) { CallBase = true };
@@ -32,6 +32,9 @@ public class StateControllerAnchorTests
         _configLoader = new ConfigLoader(_configDir);
         var nodeTelemetryStore = new NodeTelemetryStore(_mockMqttCoordinator.Object);
         _state = new State(_configLoader, nodeTelemetryStore);
+
+        // These tests build nodes from Config; the constructor no longer loads, so load explicitly.
+        await _configLoader.LoadAsync();
         _mockDeviceSettingsStore = new Mock<DeviceSettingsStore>(_mockMqttCoordinator.Object, _state);
 
         var mockEventDispatcher = new Mock<GlobalEventDispatcher>();

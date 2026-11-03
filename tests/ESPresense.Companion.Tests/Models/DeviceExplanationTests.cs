@@ -20,13 +20,16 @@ public class DeviceExplanationTests
     private Device _device;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
+        // A floorless config: the embedded example would add its own floors to State alongside the ones built below.
+        File.WriteAllText(Path.Combine(_configDir, "config.yaml"), "timeout: 30\n");
         _configLoader = new ConfigLoader(_configDir);
         _nodeTelemetryStore = new NodeTelemetryStore(new Mock<IMqttCoordinator>().Object);
         _state = new State(_configLoader, _nodeTelemetryStore);
+        await _configLoader.LoadAsync(); // the constructor no longer loads
 
         _ground = CreateFloor("ground", 0, 3,
             Room("Kitchen", 0, 0, 5, 10),
