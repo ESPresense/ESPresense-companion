@@ -786,6 +786,176 @@ public class RobotSurveyTests
         });
     }
 
+    /// <summary>A human teaching dwell: 90 s on the grid/top-up tours (labels "p"/"g"), 30 s elsewhere.</summary>
+    private static double HumanDwellSeconds(SurveyPoint p) => p.Label.StartsWith("p") || p.Label.StartsWith("g") ? 90 : 30;
+
+    private static double GaussianNoise(Random r) => Math.Sqrt(-2 * Math.Log(1 - r.NextDouble())) * Math.Cos(2 * Math.PI * r.NextDouble());
+
+    /// <summary>
+    /// Simulates a <paramref name="seconds"/>-long dwell at <paramref name="spot"/>: each node's raw rssi
+    /// is the mean of however many reports arrive in that window -- Poisson at the node's rate over the
+    /// survey's own (longer) dwell -- with sampling noise on that mean; a node that reports nothing in
+    /// the window is missed entirely, the same way a real receiver would be.
+    /// </summary>
+    private static Dictionary<string, double> SimulateDwell(SurveyPoint spot, double seconds, Random noise, ICollection<string> knownNodes)
+    {
+        var reading = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (node, m) in spot.M)
+        {
+            if (!knownNodes.Contains(node)) continue;
+            var lambda = m.N / HumanDwellSeconds(spot) * seconds;
+            var reports = 0;
+            var l = Math.Exp(-lambda);
+            var p = noise.NextDouble();
+            while (p > l) { reports++; p *= noise.NextDouble(); }
+            if (reports == 0) continue;
+            reading[node] = m.Rssi + GaussianNoise(noise) * Math.Max(m.Sd, 1.0) / Math.Sqrt(reports);
+        }
+        return reading;
+    }
+
+    /// <summary>
+    /// Picks <paramref name="perRoom"/> spots per room (an unlabelled spot counts as its own area),
+    /// spread out by repeatedly choosing the candidate farthest from everything chosen so far -- the
+    /// way a person teaching a handful of spots per room would naturally spread them out.
+    /// </summary>
+    private static List<SurveyPoint> PickSpreadSamples(List<List<SurveyPoint>> spots, int perRoom, Random r) =>
+        spots.GroupBy(s => s[0].FloorRoom ?? "-").SelectMany(room =>
+        {
+            var candidates = room.Select(s => s[0]).OrderBy(_ => r.Next()).ToList();
+            var chosen = new List<SurveyPoint> { candidates[0] };
+            while (chosen.Count < Math.Min(perRoom, candidates.Count))
+                chosen.Add(candidates.Except(chosen).OrderByDescending(c => chosen.Min(x => FloorDist(x, c))).First());
+            return chosen;
+        }).ToList();
+
+    private static double FloorDist(SurveyPoint a, SurveyPoint b) =>
+        Math.Sqrt(Math.Pow(a.FloorX!.Value - b.FloorX!.Value, 2) + Math.Pow(a.FloorY!.Value - b.FloorY!.Value, 2));
+
+    /// <summary>
+    /// Builds a fingerprint map from <paramref name="train"/> (each sampled for a 15 s teaching dwell)
+    /// and scores every other spot from a simulated 10 s live reading: median/p90 error per spot, and
+    /// the right-room rate over every room-labelled visit.
+    /// </summary>
+    private (double Median, double P90, double RightRoom) EvaluateSparseMap(List<SurveyPoint> train, List<List<SurveyPoint>> allSpots,
+        Floor floor, Dictionary<string, Node> allNodes, string mapPath, FingerprintConfig cfg, Random trainNoise, Random queryNoise, ref int reloadToken)
+    {
+        File.WriteAllText(mapPath, JsonSerializer.Serialize(new
+        {
+            fingerprints = train.Select(q => new
+            {
+                floor = "first", x = q.FloorX, y = q.FloorY, z = RobotZ,
+                rssi = SimulateDwell(q, 15, trainNoise, allNodes.Keys)
+            })
+        }));
+        File.SetLastWriteTimeUtc(mapPath, DateTime.UtcNow.AddSeconds(++reloadToken)); // force a reload per map
+        var map = new FingerprintMap(mapPath);
+
+        var spotErrors = new List<double>();
+        int roomHits = 0, roomTotal = 0;
+        foreach (var spot in allSpots)
+        {
+            if (spot.Any(p => train.Any(t => FloorDist(t, p) <= SameSpotM))) continue;
+            var visitErrors = new List<double>();
+            foreach (var p in spot)
+            {
+                var device = new Device($"sparse-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
+                foreach (var (id, rssi) in SimulateDwell(p, 10, queryNoise, allNodes.Keys))
+                    device.Nodes[id] = new DeviceToNode(device, allNodes[id]) { Rssi = rssi, Distance = 1, LastHit = DateTime.UtcNow };
+                var locator = new FingerprintLocator(device, floor, map, cfg);
+                var scenario = new Scenario(_configLoader.Config, locator, "fingerprint");
+                if (locator.Locate(scenario))
+                    visitErrors.Add(Math.Sqrt(Math.Pow(scenario.Location.X - p.FloorX!.Value, 2) + Math.Pow(scenario.Location.Y - p.FloorY!.Value, 2)));
+                if (p.FloorRoom != null)
+                {
+                    roomTotal++;
+                    if (scenario.Room?.Id == p.FloorRoom) roomHits++;
+                }
+            }
+            if (visitErrors.Count > 0) { visitErrors.Sort(); spotErrors.Add(visitErrors[visitErrors.Count / 2]); }
+        }
+        spotErrors.Sort();
+        return spotErrors.Count == 0
+            ? (double.NaN, double.NaN, double.NaN)
+            : (Pct(spotErrors, 0.5), Pct(spotErrors, 0.9), roomTotal == 0 ? double.NaN : (double)roomHits / roomTotal);
+    }
+
+    /// <summary>
+    /// What a short, hand-held teaching walk can get without a robot: pick a few spread-out spots per
+    /// room, simulate the dwell a person would actually hold (15 s to teach, 10 s live), and see how the
+    /// resulting map does against held-out spots. Deterministic seeds (never derived from the clock or
+    /// test order) so this cannot flake.
+    ///
+    /// Asserts the headline claim: 3 spots/room already beats every ranging locator's right-room rate
+    /// (<see cref="Accuracy"/>, full survey, no dwell truncation -- there is no sparse-survey equivalent
+    /// for a trilateration locator, since it has nothing to "teach"). The other map sizes are printed
+    /// for context but not asserted on, since 1-2 spots/room is noisier.
+    /// </summary>
+    [Test]
+    public void Accuracy_Fingerprint_SparseHumanSurvey_BeatsRangingOnRightRoom()
+    {
+        _survey = Load(Spread);
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+        var allNodes = new Dictionary<string, Node>(nodes);
+        foreach (var n in _survey.Nodes.Where(n => !n.Floors.Contains("first")))
+        {
+            var node = new Node(n.Id, NodeSourceType.Config);
+            node.Update(_configLoader.Config!, new ConfigNode { Name = n.Id, Point = new[] { n.X, n.Y, n.Z } }, Array.Empty<Floor>());
+            allNodes[n.Id] = node;
+        }
+        RequireSpatialPoints(MinAccuracyPoints);
+
+        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
+        var spots = Spots(pts);
+        var cfg = new FingerprintConfig { Enabled = true };
+        var path = Path.Combine(_configDir, cfg.File);
+        var reloads = 0;
+        var seeds = Enumerable.Range(1, 9).ToList();
+
+        (double Median, double P90, double Room, int Points) ForPerRoom(int perRoom)
+        {
+            var runs = seeds.Select(seed =>
+            {
+                var r = EvaluateSparseMap(PickSpreadSamples(spots, perRoom, new Random(seed)), spots, floor, allNodes, path, cfg,
+                    new Random(seed + 100), new Random(seed + 200), ref reloads);
+                return r;
+            }).ToList();
+            double MedianOf(Func<(double Median, double P90, double RightRoom), double> pick)
+            {
+                var v = runs.Select(pick).OrderBy(x => x).ToList();
+                return v[v.Count / 2];
+            }
+            var points = PickSpreadSamples(spots, perRoom, new Random(seeds[0])).Count;
+            return (MedianOf(x => x.Median), MedianOf(x => x.P90), MedianOf(x => x.RightRoom), points);
+        }
+
+        TestContext.WriteLine($"{spots.Count} spots; {seeds.Count} seeds per map size\n");
+        TestContext.WriteLine($"{"map",-24}{"points",7}{"median",8}{"p90",7}{"right room",11}   (medians over seeds)");
+        var byPerRoom = new Dictionary<int, (double Median, double P90, double Room, int Points)>();
+        foreach (var k in new[] { 1, 2, 3, 5 })
+        {
+            byPerRoom[k] = ForPerRoom(k);
+            TestContext.WriteLine($"{$"{k} per room",-24}{byPerRoom[k].Points,7}{byPerRoom[k].Median,8:0.00}{byPerRoom[k].P90,7:0.00}{byPerRoom[k].Room,11:P0}");
+        }
+
+        var rangingRoomRate = Locators.ToDictionary(which => which, which =>
+        {
+            var r = Accuracy(which, floor, nodes);
+            return (double)r.RoomHits / r.RoomTotal;
+        });
+        TestContext.WriteLine();
+        foreach (var (which, rate) in rangingRoomRate)
+            TestContext.WriteLine($"{$"ranging locator ({which})",-24}{"",7}{"",8}{"",7}{rate,11:P0}");
+
+        Assert.Multiple(() =>
+        {
+            foreach (var (which, rate) in rangingRoomRate)
+                Assert.That(byPerRoom[3].Room, Is.GreaterThan(rate),
+                    $"3 spread-out spots/room should beat {which}'s right-room rate on the full survey");
+        });
+    }
+
     /// <summary>Fewer positions than this and per-locator medians are noise.</summary>
     private const int MinAccuracyPoints = 10;
 
