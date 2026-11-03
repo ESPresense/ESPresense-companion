@@ -46,6 +46,29 @@ public class AutoDiscovery
         Message = message;
     }
 
+    /// <summary>
+    /// The per-device "Area Switch" diagnostic sensor, on the same HA device as <paramref name="tracker"/>. Off by
+    /// default: it's one extra entity per device, and it's only useful while chasing a room that keeps flipping.
+    /// </summary>
+    public static AutoDiscovery ForAreaSwitch(Device dev, AutoDiscovery tracker)
+    {
+        var topic = AreaSwitch.Topic(dev.Id);
+        return new AutoDiscovery("sensor", $"{tracker.DiscoveryId}_area_switch", new DiscoveryRecord
+        {
+            Name = "Area Switch",
+            UniqueId = $"espresense-companion-{dev.Id}-area-switch",
+            StateTopic = topic,
+            ValueTemplate = "{{ value_json.reason }}",
+            JsonAttributesTopic = topic,
+            EntityStatusTopic = "espresense/companion/status",
+            EntityCategory = "diagnostic",
+            EnabledByDefault = false,
+            Icon = "mdi:swap-horizontal",
+            Device = tracker.Message.Device,
+            Origin = new OriginRecord { Name = "ESPresense Companion" }
+        });
+    }
+
     public async Task Send(IMqttCoordinator mqtt)
     {
         if (_sent) return;
@@ -124,6 +147,14 @@ public class AutoDiscovery
         [JsonProperty("origin")] public OriginRecord? Origin { get; set; }
 
         [JsonProperty("source_type")] public string? SourceType { get; set; }
+
+        [JsonProperty("value_template")] public string? ValueTemplate { get; set; }
+
+        [JsonProperty("entity_category")] public string? EntityCategory { get; set; }
+
+        [JsonProperty("enabled_by_default")] public bool? EnabledByDefault { get; set; }
+
+        [JsonProperty("icon")] public string? Icon { get; set; }
     }
 
     public class DeviceRecord

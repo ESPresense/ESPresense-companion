@@ -318,6 +318,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                     RememberSelfClear(ad.DiscoveryId);
                     await ad.Delete(mqtt);
                 }
+                await device.AreaSwitchDiscovery.Delete(mqtt);
             }
             return true;
         }
