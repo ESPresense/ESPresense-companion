@@ -89,6 +89,12 @@ public static class RealHistoryReplay
                     .Where(c => double.IsFinite(c.Item2))),
                 StringComparer.OrdinalIgnoreCase);
 
+        if (csiQueues.Values.All(q => q.Count == 0))
+        {
+            Console.Error.WriteLine("fusion-replay-real failed: the export has no finite CSI readings for the configured CSI entities up to --end.");
+            return 1;
+        }
+
         var deviceIds = TrackerEntities.ToDictionary(e => e, e => e["device_tracker.".Length..]);
         foreach (var deviceId in deviceIds.Values)
             state.Devices[deviceId] = new Device(deviceId, null, TimeSpan.FromSeconds(30)) { Track = true };

@@ -97,4 +97,47 @@ public class RealHistoryReplayTests
             File.Delete(markdownPath);
         }
     }
+
+    [Test]
+    public void Run_WithNoCsiReadings_FailsInsteadOfWritingAnEmptyReport()
+    {
+        // No sensor.*_csi_variance rows at all: an export that only has occupancy/tracker history (e.g.
+        // pulled before the csi_variance sensors existed, or with the wrong entity ids) would otherwise
+        // produce a report with n/a rates and zero samples that looks like a completed validation run
+        // instead of a tool misuse.
+        var json = """
+        [
+          [
+            { "entity_id": "binary_sensor.office_occupancy", "state": "on", "last_changed": "2026-11-04T07:00:00Z" }
+          ],
+          [
+            { "entity_id": "device_tracker.phone_darrell_15_pro", "state": "office", "last_changed": "2026-11-04T07:59:30Z" }
+          ]
+        ]
+        """;
+
+        var exportPath = Path.GetTempFileName();
+        var outputPath = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(exportPath, json);
+
+            var exit = RealHistoryReplay.Run(new[]
+            {
+                "--ha-export", exportPath,
+                "--start", "2026-11-04T08:00:00Z",
+                "--end", "2026-11-04T08:02:00Z",
+                "--output", outputPath
+            });
+
+            Assert.That(exit, Is.EqualTo(1));
+            Assert.That(File.ReadAllText(outputPath), Is.Empty,
+                "a run with no CSI readings must fail before writing a report, not write one that looks complete");
+        }
+        finally
+        {
+            File.Delete(exportPath);
+            File.Delete(outputPath);
+        }
+    }
 }
