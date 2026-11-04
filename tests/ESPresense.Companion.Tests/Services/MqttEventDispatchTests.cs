@@ -436,6 +436,26 @@ public class MqttEventDispatchTests
         Assert.That(malformed, Is.EqualTo(1));
     }
 
+    [TestCase("NaN")]
+    [TestCase("Infinity")]
+    [TestCase("-Infinity")]
+    public async Task OnMqttMessageReceived_CsiVarianceTopic_NonFinitePayload_RaisesMalformed(string payload)
+    {
+        // NumberStyles.Float parses all three successfully; a NaN or Infinity reaching
+        // CsiMotionTracker poisons that node's baseline, so these must be rejected like
+        // non-numeric text rather than accepted as a value.
+        var coordinator = CreateCoordinator();
+        var malformed = 0;
+        coordinator.MqttMessageMalformed += (_, _) => malformed++;
+        coordinator.NodeCsiVarianceReceivedAsync += _ => Task.CompletedTask;
+
+        Assert.DoesNotThrowAsync(
+            () => coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/csi_variance", payload)));
+
+        await Task.Yield();
+        Assert.That(malformed, Is.EqualTo(1));
+    }
+
     [Test]
     public async Task OnMqttMessageReceived_UnknownTopic_AwaitsNonLastMqttHandler()
     {
