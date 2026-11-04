@@ -103,11 +103,7 @@ namespace ESPresense.Services
                 }
             }
 
-            device.ConfiguredRefRssi = settings.RefRssi;
-            if (!string.IsNullOrWhiteSpace(settings.Name))
-            {
-                device.Name = settings.Name;
-            }
+            DeviceEnricher.ApplySettings(device, settings);
 
             var anchor = BuildAnchor(settings);
             device.SetAnchor(anchor);

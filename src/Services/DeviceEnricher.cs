@@ -9,12 +9,17 @@ namespace ESPresense.Services;
 public class DeviceEnricher(DeviceSettingsStore dss)
 {
     /// <summary>Copies ConfiguredRefRssi and, when set, the friendly name from DeviceSettings onto the device.</summary>
-    public void Enrich(Device device)
+    public void Enrich(Device device) => ApplySettings(device, dss.Get(device.Id));
+
+    /// <summary>
+    /// The settings fields every path copies onto a device: ConfiguredRefRssi always (null clears it), the name
+    /// only when set. Shared with <see cref="DeviceSettingsStore.ApplyToDevice"/>, which adds the anchor.
+    /// </summary>
+    public static void ApplySettings(Device device, DeviceSettings? settings)
     {
-        var deviceSettings = dss.Get(device.Id);
-        device.ConfiguredRefRssi = deviceSettings?.RefRssi;
-        if (!string.IsNullOrWhiteSpace(deviceSettings?.Name))
-            device.Name = deviceSettings.Name;
+        device.ConfiguredRefRssi = settings?.RefRssi;
+        if (!string.IsNullOrWhiteSpace(settings?.Name))
+            device.Name = settings.Name;
     }
 
     /// <summary>Enriches every device in <paramref name="devices"/>.</summary>

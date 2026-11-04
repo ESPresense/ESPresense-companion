@@ -1,7 +1,5 @@
 using ESPresense.Models;
 using ESPresense.Services;
-using ESPresense.Utils;
-using ESPresense.Extensions;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using ModelContextProtocol.Protocol;
