@@ -11,6 +11,13 @@ on:
     workflows: [Code owner review]
     types: [completed]
   workflow_dispatch: # re-checks every open PR
+  schedule:
+    - cron: '*/30 * * * *' # backstop if a review's relay didn't run
+
+# One run at a time per commit, so an older evaluation can't publish over a newer one. A queued
+# run is replaced by a newer one for the same commit, which is fine: each run reads the reviews fresh.
+concurrency:
+  group: code-owner-approval-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || 'all' }}
 
 permissions:
   statuses: write
