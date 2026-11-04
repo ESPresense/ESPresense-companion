@@ -167,4 +167,31 @@ public class CsiMotionTrackerTests
         Assert.That(tracker.GetMotion("node-1", longAfter)!.Value.IsMotion, Is.False,
             "a node that stopped reporting past the inactivity timeout must not keep its room stuck in motion");
     }
+
+    [Test]
+    public void Observe_ResetsTheElevatedCount_AfterAReportingGapPastTheInactivityTimeout()
+    {
+        var tracker = CreateTracker(out _);
+        var start = new DateTime(2026, 11, 3, 9, 0, 0, DateTimeKind.Utc);
+        var t = start;
+
+        for (var i = 0; i < 50; i++)
+        {
+            tracker.Observe("node-1", 24, t);
+            t = t.AddSeconds(5);
+        }
+
+        // Sustained motion, then the node goes quiet long enough for GetMotion to have expired it.
+        tracker.Observe("node-1", 260, t);
+        t = t.AddSeconds(5);
+        tracker.Observe("node-1", 260, t);
+        var gapEnd = t + TimeSpan.FromMinutes(5);
+
+        // It resumes with a single elevated reading. Without resetting the retained count, this would
+        // inherit the pre-gap count of 2 and report motion immediately -- bypassing the two-reading
+        // sustained requirement a node that had never reported before would have to meet.
+        tracker.Observe("node-1", 260, gapEnd);
+        Assert.That(tracker.GetMotion("node-1", gapEnd)!.Value.IsMotion, Is.False,
+            "one elevated reading right after a long gap must not count as already-sustained motion");
+    }
 }

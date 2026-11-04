@@ -69,6 +69,13 @@ public sealed class CsiMotionTracker
             if (!_window.TryGetValue(nodeId, out var q))
                 _window[nodeId] = q = new Queue<(DateTime At, double Value)>();
 
+            // A gap longer than the inactivity timeout means GetMotion already expired any motion this
+            // node was reporting; without this, one elevated reading right after a long silence would
+            // inherit a stale consecutive-elevated count from before the gap and report motion
+            // immediately, bypassing the two-reading sustained requirement.
+            if (q.Count > 0 && at - q.Last().At > MotionInactivityTimeout)
+                _consecutiveElevated[nodeId] = 0;
+
             q.Enqueue((at, value));
             while (q.Count > 0 && at - q.Peek().At > BaselineWindow)
                 q.Dequeue();
