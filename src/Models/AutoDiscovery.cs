@@ -53,7 +53,7 @@ public class AutoDiscovery
 
         Log.Debug($"[+] Discovery {Component} {DiscoveryId}");
         await mqtt.EnqueueAsync(MqttTopics.DiscoveryConfig(mqtt.DiscoveryTopic, Component, DiscoveryId),
-            JsonConvert.SerializeObject(Message, SerializerSettings.NullIgnore), true);
+            MqttPayloads.Discovery(Message), true);
     }
 
     public async Task Delete(IMqttCoordinator mqtt)
