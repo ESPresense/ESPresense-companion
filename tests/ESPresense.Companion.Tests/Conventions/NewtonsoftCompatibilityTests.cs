@@ -41,6 +41,23 @@ public class NewtonsoftCompatibilityTests
         Assert.That(Stj(ds, JsonDefaults.Mqtt), Is.EqualTo(Nsj(ds)));
     }
 
+    [TestCase("\ud800", TestName = "lone high surrogate alone")]
+    [TestCase("a\ud800b", TestName = "lone high surrogate inside")]
+    [TestCase("a\udc00b", TestName = "lone low surrogate inside")]
+    [TestCase("ab\ud83d", TestName = "high surrogate at the end")]
+    [TestCase("\udc00ab", TestName = "low surrogate at the start")]
+    [TestCase("\ud83d\ud83d\ude42", TestName = "stray high before a valid pair")]
+    public void LoneSurrogates_AreWrittenLikeNewtonsoft_AndNothingIsLost(string text)
+    {
+        // A lone surrogate can't survive UTF-8, which is what MQTT carries: both serializers must end up with
+        // U+FFFD there and still write every member that follows.
+        var ds = new DeviceSettings { Id = text, Name = "after", RefRssi = -59 };
+        var expected = Encoding.UTF8.GetBytes(Nsj(ds));
+        var actual = Encoding.UTF8.GetBytes(Stj(ds, JsonDefaults.Mqtt));
+        Assert.That(Encoding.UTF8.GetString(actual), Is.EqualTo(Encoding.UTF8.GetString(expected)));
+        Assert.That(Encoding.UTF8.GetString(actual), Does.Contain("\"name\":\"after\",\"rssi@1m\":-59"));
+    }
+
     [Test]
     public void Doubles_AreFormattedLikeNewtonsoft()
     {

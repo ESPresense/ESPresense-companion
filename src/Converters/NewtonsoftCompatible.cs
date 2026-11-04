@@ -53,10 +53,10 @@ internal static class NewtonsoftCompatible
 
             if (escaped.IsEmpty)
             {
-                // Not ours to escape: write it through (a scalar above the BMP is a surrogate pair).
-                if (!new Rune(unicodeScalar).TryEncodeToUtf16(new Span<char>(buffer, bufferLength), out numberOfCharactersWritten))
-                    return false;
-                return true;
+                // Not ours to escape: write it through (a scalar above the BMP is a surrogate pair). The writer
+                // replaces a lone surrogate with U+FFFD before asking, as UTF-8 would; do the same if one ever arrives.
+                var rune = Rune.IsValid(unicodeScalar) ? new Rune(unicodeScalar) : Rune.ReplacementChar;
+                return rune.TryEncodeToUtf16(new Span<char>(buffer, bufferLength), out numberOfCharactersWritten);
             }
 
             if (escaped.Length > bufferLength)

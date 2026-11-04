@@ -26,25 +26,24 @@ A read-only client still subscribes to everything, but publishes nothing: no `es
 
 Two rules, each enforced by a test under `tests/ESPresense.Companion.Tests/Conventions/` (#1846):
 
-**Logging.** Take an `ILogger<T>` in the constructor. The static `Serilog.Log` is for the `Program.cs` bootstrap only: it can't be asserted in tests, and its entries have no `SourceContext`, so Serilog's per-namespace minimum levels don't apply to them. Tests can assert on what a class logs with `FakeLogger<T>` (`Microsoft.Extensions.Diagnostics.Testing`). Until #1843, #1844 and #1845 merge, `MqttCoordinator`, `State`, `DeviceTracker` and `MultiScenarioLocator` are exempt, and the types they construct (the locators, `AutoDiscovery`) fall back to the transitional `DeferredLoggerFactory` when no logger is passed.
+**Logging.** Take an `ILogger<T>` in the constructor. The static `Serilog.Log` is for the `Program.cs` bootstrap only: it can't be asserted in tests, and its entries have no `SourceContext`, so Serilog's per-namespace minimum levels don't apply to them. Tests can assert on what a class logs with `FakeLogger<T>` (`Microsoft.Extensions.Diagnostics.Testing`). Until #1844 and #1845 merge, `State`, `DeviceTracker` and `MultiScenarioLocator` are exempt, and the types they construct (the locators, `AutoDiscovery`) fall back to the transitional `DeferredLoggerFactory` when no logger is passed. Message templates use named placeholders (`{NodeId}`), never numeric ones: `Microsoft.Extensions.Logging` binds placeholders to arguments by position, so `{1}` takes the first argument, unlike Serilog's `Log.*`, where it is an index.
 
 **JSON.** System.Text.Json for everything the Companion owns, using the shared options in `JsonDefaults` rather than a `new JsonSerializerOptions` per call:
 
 | Options | Boundary |
 | --- | --- |
-| `JsonDefaults.Web` | REST API (applied to ASP.NET's own options in `Program.cs`) |
+| `JsonDefaults.Web` | REST API (applied to ASP.NET's own options in `Program.cs`) and MCP tools and resources, which return exactly the REST JSON (#1849) |
 | `JsonDefaults.WebSocket` | `/ws` events and commands |
-| `JsonDefaults.Mcp` | MCP tools and resources |
 | `JsonDefaults.Mqtt` | what the Companion publishes to MQTT: HA discovery, telemetry, device settings |
 | `JsonDefaults.Verbatim` | the MQTT `last_seen` stamp and firmware-update progress frames |
 | `JsonDefaults.MqttRead` | reading JSON other publishers wrote to MQTT (HA discovery messages) |
 
-They differ on purpose: each reproduces what its boundary has always sent (REST enums are strings, WebSocket enums are numbers, MCP keeps declared member names). The MQTT ones reproduce Newtonsoft's output byte for byte, including its string escaping and its `2.0`-style doubles, through the converters in `Converters/NewtonsoftCompatible.cs`. Changing any of them is a wire-format change.
+They differ on purpose: each reproduces what its boundary has always sent (REST enums are strings, WebSocket enums are numbers). The MQTT ones reproduce Newtonsoft's output byte for byte, including its string escaping and its `2.0`-style doubles, through the converters in `Converters/NewtonsoftCompatible.cs`. Changing any of them is a wire-format change.
 
 Newtonsoft.Json remains only here, and `NewtonsoftConventionTests` fails if it spreads:
 
 - **HA Supervisor API** (`Program.cs`: `FlurlHttp.Clients.UseNewtonsoft()`, used by `SupervisorConfigLoader`). A third-party contract: the Supervisor returns `port` as a number into a string member, which Newtonsoft coerces and System.Text.Json would reject.
-- **MQTT parsing in `MqttCoordinator`** (device messages, node telemetry, device settings, device attributes), and the Newtonsoft attributes on `DeviceMessage`, `NodeTelemetry` and `DeviceSettings` that parse depends on. Deferred until #1843 merges; `JsonDefaults.MqttRead` is the intended replacement.
+- **MQTT parsing in `Services/Mqtt/MqttMessageHandlers.cs`** (device messages, node telemetry, device settings, device attributes), the `JsonSerializationException` it throws that `MqttCoordinator` catches, and the Newtonsoft attributes on `DeviceMessage`, `NodeTelemetry` and `DeviceSettings` that parse depends on. The attributes arrive as `Dictionary<string, object>`, and `DeviceTracker` restores `last_seen` only when Newtonsoft has already turned it into a `DateTime`; an STJ `JsonElement` would be skipped. Deferred until #1844 changes `DeviceTracker`; `JsonDefaults.MqttRead` is the intended replacement, with the parse pinned first.
 - **Device attribute publishing in `MultiScenarioLocator`** with `SerializerSettings.NullIgnore` (`Utils/JsonSerializerSettings.cs`). Deferred until #1845 merges; `JsonDefaults.Mqtt` produces the same bytes.
 
 Join us on discord for development talk: [https://discord.gg/jbqmn7V6n6]
