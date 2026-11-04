@@ -23,9 +23,12 @@ internal class NearestNode : ILocate
         var device = _device;
         var maxDistance = _state.Config?.Locators?.NearestNode?.MaxDistance;
         var limited = maxDistance > 0; // unset, 0 or negative means no limit
-        var nearest = device.Nodes.Values
-            .Where(a => a.Current && (!limited || a.Distance <= maxDistance))
-            .MinBy(a => a.Distance);
+        var current = device.Nodes.Values.Where(a => a.Current && (!limited || a.Distance <= maxDistance)).ToArray();
+        // Prefer a placed receiver: an unplaced one's Location is (0, 0, 0), which this locator would
+        // otherwise report as the device's fix. Fall back to an unplaced receiver only when it's all
+        // there is, so a device heard by nothing else still gets a (floorless) fix.
+        var nearest = current.Where(a => a.Node is { HasLocation: true }).MinBy(a => a.Distance)
+            ?? current.MinBy(a => a.Distance);
         scenario.Trace = new LocatorTrace(
             nearest == null ? LocatorOutcome.NoFix : LocatorOutcome.Fallback,
             null,

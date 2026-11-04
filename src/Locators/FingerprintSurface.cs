@@ -37,7 +37,9 @@ public sealed class FingerprintSurface
         var values = fingerprints.Select(f => _nodes.Select(n => f.Rssi.TryGetValue(n, out var v) ? v : missingRssi).ToArray()).ToArray();
         double x0 = fingerprints.Min(f => f.X) - 1, x1 = fingerprints.Max(f => f.X) + 1;
         double y0 = fingerprints.Min(f => f.Y) - 1, y1 = fingerprints.Max(f => f.Y) + 1;
-        var twoBw2 = 2 * bandwidth * bandwidth;
+        // A non-positive bandwidth makes every kernel weight exp(-d^2/0): NaN on a lattice point that
+        // lands exactly on a spot, 0 everywhere else.
+        var twoBw2 = 2 * Math.Max(bandwidth, 0.01) * Math.Max(bandwidth, 0.01);
 
         var points = new List<Point3D>();
         var predicted = new List<double[]>();
@@ -72,6 +74,10 @@ public sealed class FingerprintSurface
     /// </summary>
     public FingerprintLocator.MatchResult? Match(IReadOnlyDictionary<string, double> reading, int minCommon, int best = 20)
     {
+        // FingerprintLocator always passes an OrdinalIgnoreCase reading, but Match is public and takes
+        // any IReadOnlyDictionary: normalize so a differently-cased caller can't disagree with the
+        // case-insensitive comparisons below (extra, line ~80).
+        reading = new Dictionary<string, double>(reading, StringComparer.OrdinalIgnoreCase);
         var known = _nodes.Select(n => reading.ContainsKey(n)).ToArray();
         var shared = known.Count(k => k);
         if (shared < minCommon || _points.Length == 0) return null;

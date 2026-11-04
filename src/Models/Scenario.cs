@@ -65,7 +65,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
     /// Locator and floor together: <see cref="Name"/> alone is the floor, shared by every locator on
     /// it. Name stays as it is because it's published as best_scenario and stored in history.
     /// </summary>
-    public string Label => Locator is BaseMultilateralizer or NadarayaWatsonMultilateralizer
+    public string Label => Locator is BaseMultilateralizer or NadarayaWatsonMultilateralizer or FingerprintLocator
         ? $"{LocatorName} ({Name})"
         : LocatorName;
 

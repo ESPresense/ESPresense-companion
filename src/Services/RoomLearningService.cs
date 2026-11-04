@@ -241,10 +241,9 @@ public sealed class RoomLearningService : IDisposable
     {
         var publishCleanup = Enabled || _discovery.ContainsKey(device.Id) || _published.ContainsKey(device.Id);
         ClearDevice(device);
-        if (!publishCleanup) return;
-        lock (_gate)
+        if (forgetSamples)
         {
-            if (forgetSamples)
+            lock (_gate)
             {
                 try
                 {
@@ -257,9 +256,16 @@ public sealed class RoomLearningService : IDisposable
                 }
             }
         }
-        await _mqtt.EnqueueAsync(DiscoveryTopic(_mqtt, device.Id), null, true);
+        // Room learning being off (the normal state after a restart) must not skip forgetting a deleted
+        // device's samples above; it only means there is no discovery/published MQTT state to clear.
+        if (!publishCleanup) return;
+        // A broker outage must not throw out of here: RemoveCoreAsync runs on MultiScenarioLocator's
+        // locate loop (via RoomLearningService.UpdateAsync), so an exception drops its lease and stalls
+        // every other device for the retry delay. _discovery/_published are already cleared above, so a
+        // publish that fails here is not retried on the next pass; that gap is tracked separately.
+        await _mqtt.TryEnqueueAsync(DiscoveryTopic(_mqtt, device.Id), null, true);
         foreach (var topic in new[] { StateTopic(device.Id), StateTopic(device.Id) + "/attributes", StateTopic(device.Id) + "/set" })
-            await _mqtt.EnqueueAsync(topic, null, true);
+            await _mqtt.TryEnqueueAsync(topic, null, true);
     }
 
     public void Dispose()

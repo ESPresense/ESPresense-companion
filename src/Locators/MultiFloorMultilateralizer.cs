@@ -31,7 +31,9 @@ public class MultiFloorMultilateralizer : ILocate
         var solver = new NelderMeadSimplex(1e-7, 10000);
 
         double Error(IList<double> x, DeviceToNode dn) => (new Point3D(x[0], x[1], x[2]).DistanceTo(dn.Node!.Location)*x[3]) - dn.Distance;
-        var nodes = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).ToArray();
+        // An unplaced receiver reports Location as (0, 0, 0), which would otherwise enter the solve
+        // as a range constraint against the origin.
+        var nodes = _device.Nodes.Values.Where(a => a.Current && a.Node is { HasLocation: true }).OrderBy(a => a.Distance).ToArray();
         var weights = nodes.Select((dn, i) => _weighting.Get(i, nodes.Length)).ToArray();
         var weightSum = weights.Sum();
         if (weightSum <= 0) weightSum = 1;
@@ -42,7 +44,7 @@ public class MultiFloorMultilateralizer : ILocate
                 .Select((dn, i) => new { err = Error(x, dn), weight = weights[i] })
                 .Sum(a => a.weight * Math.Pow(a.err, 2)) / weightSum;
         });
-        var pos = _device.Nodes.Values.Where(a => a.Current).OrderBy(a => a.Distance).Select(a => a.Node!.Location).ToList();
+        var pos = nodes.Select(a => a.Node!.Location).ToList();
 
         // One node gives a distance but no position; NearestNode owns that case and enforces max_distance
         if (pos.Count <= 1)
