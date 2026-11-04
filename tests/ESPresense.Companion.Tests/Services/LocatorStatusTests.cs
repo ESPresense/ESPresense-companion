@@ -29,7 +29,7 @@ public class LocatorStatusTests
             .ReturnsAsync(() => new LeaseHandle(lease.Object, "locating", NullLogger.Instance));
         lease.Setup(l => l.HasLease("locating")).Returns(true);
 
-        var locator = new MultiScenarioLocator(tracker, fx.State, mqtt.Object, new GlobalEventDispatcher(), history, lease.Object);
+        var locator = new MultiScenarioLocator(tracker, fx.State, new DeviceStatePublisher(mqtt.Object), new DeviceHistoryWriter(history, fx.State), new GlobalEventDispatcher(), lease.Object, NullLogger<MultiScenarioLocator>.Instance);
         await locator.StartAsync(CancellationToken.None);
         try
         {

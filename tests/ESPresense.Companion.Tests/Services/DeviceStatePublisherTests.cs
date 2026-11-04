@@ -175,11 +175,11 @@ public class DeviceHistoryWriterTests
         a.ResetLocation(new Point3D(1, 2, 3));
         foreach (var s in new[] { a, b, c }) device.Scenarios.Add(s);
 
-        state.Config = new Config(); // history off in the running config: nothing is written
+        state.Apply(new Config()); // history off in the running config: nothing is written
         await writer.RecordAsync(device, a);
         Assert.That(await store.List(device.Id), Is.Empty);
 
-        state.Config = config;
+        state.Apply(config);
         await writer.RecordAsync(device, a);
 
         var rows = (await store.List(device.Id))!.OrderBy(r => r.Scenario).ToList();

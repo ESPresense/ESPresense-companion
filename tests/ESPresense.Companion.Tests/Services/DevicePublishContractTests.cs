@@ -57,7 +57,7 @@ public class DevicePublishContractTests
 
             State = new State(configLoader, new NodeTelemetryStore(Mqtt.Object));
             if (gps) Config.Gps = new ConfigGps { Latitude = 40.0, Longitude = -75.0, Elevation = 100.0, Rotation = 30, Report = true };
-            State.Config = Config;
+            State.Apply(Config);
 
             var tele = new TelemetryService(Mqtt.Object);
             var dss = new DeviceSettingsStore(Mqtt.Object, State);
