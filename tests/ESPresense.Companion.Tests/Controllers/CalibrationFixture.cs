@@ -107,7 +107,8 @@ public sealed class CalibrationFixture : IAsyncDisposable
         DeviceSettings,
         NodeTelemetry,
         new NodeStateMapper(NodeTelemetry, Mock.Of<IFirmwareTypeStore>()),
-        new Mock<GlobalEventDispatcher>().Object);
+        new Mock<GlobalEventDispatcher>().Object,
+        new CalibrationService(State, Nsd.Object));
 
     public McpResources CreateMcp() => new(
         State,

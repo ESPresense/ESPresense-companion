@@ -68,6 +68,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTe
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
+builder.Services.AddSingleton<CalibrationService>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
     opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
