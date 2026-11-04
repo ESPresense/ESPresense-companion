@@ -65,6 +65,43 @@ public class MultiScenarioLocatorTests
     }
 
     [Test]
+    public async Task ARoomChangePublishesWhyAndTheFirstReportDoesNot()
+    {
+        var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg-area-switch");
+        Directory.CreateDirectory(workDir);
+
+        var configLoader = new ConfigLoader(workDir);
+        var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
+        var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), supervisor);
+        mqttMock.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string>(), true)).ReturnsAsync(true);
+
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var deviceSettingsStore = new DeviceSettingsStore(mqttMock.Object, state);
+        var tracker = new DeviceTracker(state, mqttMock.Object, new TelemetryService(mqttMock.Object), new GlobalEventDispatcher(), deviceSettingsStore);
+        var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, new Mock<ILeaseService>().Object);
+
+        var firstReport = new Device("first", null, TimeSpan.FromSeconds(1));
+        firstReport.Scenarios.Add(new Scenario(null, new DummyLocator(), "kitchen") { LastHit = DateTime.UtcNow.AddSeconds(-5) });
+        await locator.ProcessDevice(firstReport);
+        mqttMock.Verify(m => m.TryEnqueueAsync(AreaSwitch.Topic("first"), It.IsAny<string>(), true), Times.Never);
+
+        var device = new Device("id", null, TimeSpan.FromSeconds(1)) { ReportedState = "kitchen" };
+        device.Scenarios.Add(new Scenario(null, new DummyLocator(), "kitchen") { LastHit = DateTime.UtcNow.AddDays(-1) });
+        await locator.ProcessDevice(device);
+
+        mqttMock.Verify(m => m.TryEnqueueAsync(AreaSwitch.Topic("id"),
+            It.Is<string>(p => p.Contains("\"from\":\"kitchen\"") && p.Contains("\"to\":\"not_home\"") && p.Contains("No current fix")), true), Times.Once);
+        var discoveryTopic = $"homeassistant/sensor/{device.AreaSwitchDiscovery.DiscoveryId}/config";
+        mqttMock.Verify(m => m.EnqueueAsync(discoveryTopic, It.IsAny<string>(), true), Times.Once);
+
+        // Untracked then tracked again: Delete clears the sensor, so it has to be announced again
+        await device.AreaSwitchDiscovery.Delete(mqttMock.Object);
+        await device.AreaSwitchDiscovery.Send(mqttMock.Object);
+        mqttMock.Verify(m => m.EnqueueAsync(discoveryTopic, It.IsNotNull<string>(), true), Times.Exactly(2));
+    }
+
+    [Test]
     public async Task AnchoredDevicePublishesFixedAttributes()
     {
         var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg-anchor");

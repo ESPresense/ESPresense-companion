@@ -26,7 +26,9 @@ public class Device
     {
         Id = id;
         Timeout = timeout;
-        HassAutoDiscovery.Add(new AutoDiscovery("device_tracker", this, discoveryId, "bluetooth"));
+        var tracker = new AutoDiscovery("device_tracker", this, discoveryId, "bluetooth");
+        HassAutoDiscovery.Add(tracker);
+        AreaSwitchDiscovery = AutoDiscovery.ForAreaSwitch(this, tracker);
     }
 
     public override string ToString()
@@ -90,6 +92,12 @@ public class Device
     [STJ.JsonIgnore] public DateTime? LastCalculated { get; set; }
 
     [STJ.JsonIgnore] public IList<AutoDiscovery> HassAutoDiscovery { get; set; } = new List<AutoDiscovery>();
+
+    /// <summary>
+    /// Sent at the first room change rather than with <see cref="HassAutoDiscovery"/>: a device restored from
+    /// retained discovery never passes through the track transition that sends those.
+    /// </summary>
+    [STJ.JsonIgnore] public AutoDiscovery AreaSwitchDiscovery { get; }
     [STJ.JsonIgnore]
     public string? ReportedState
     {

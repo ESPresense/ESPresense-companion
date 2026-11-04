@@ -152,7 +152,7 @@ public class DeviceService
         try
         {
             // Clean up Home Assistant auto-discovery entries
-            foreach (var ad in device.HassAutoDiscovery)
+            foreach (var ad in device.HassAutoDiscovery.Append(device.AreaSwitchDiscovery))
             {
                 await ad.Delete(_mqtt);
             }
@@ -165,7 +165,8 @@ public class DeviceService
         foreach (var topic in new[]
         {
             $"espresense/companion/{device.Id}",
-            $"espresense/companion/{device.Id}/attributes"
+            $"espresense/companion/{device.Id}/attributes",
+            AreaSwitch.Topic(device.Id)
         })
         {
             try

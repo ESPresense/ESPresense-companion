@@ -69,6 +69,8 @@ public class DeviceCleanupServiceTests
         _mqtt.Verify(m => m.EnqueueAsync($"homeassistant/device_tracker/{discoveryId}/config", null, true), Times.Once);
         _mqtt.Verify(m => m.EnqueueAsync($"espresense/companion/{id}", null, true), Times.Once);
         _mqtt.Verify(m => m.EnqueueAsync($"espresense/companion/{id}/attributes", null, true), Times.Once);
+        _mqtt.Verify(m => m.EnqueueAsync($"homeassistant/sensor/{device.AreaSwitchDiscovery.DiscoveryId}/config", null, true), Times.Once);
+        _mqtt.Verify(m => m.EnqueueAsync(AreaSwitch.Topic(id), null, true), Times.Once);
     }
 
     [Test]

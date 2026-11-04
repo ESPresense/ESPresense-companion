@@ -30,6 +30,40 @@ public class MultiScenarioLocator(DeviceTracker dl,
 {
     private const string LocatingLeaseName = "locating";
 
+    /// <summary>
+    /// Records why the reported room changed. Skips a republish of the same room (a reconnect, or an anchor that
+    /// forgets what it sent) and the first report after a restart, which is a start rather than a switch.
+    /// </summary>
+    private async Task PublishAreaSwitch(Device device, DateTime? lastChange, Scenario? previous)
+    {
+        if (device.ReportedStateChanged == lastChange || device.PreviousReportedState == null) return;
+
+        var change = AreaSwitch.Describe(device, previous);
+        try
+        {
+            await device.AreaSwitchDiscovery.Send(mqtt);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Warning(ex, "Failed to announce the area switch sensor for {DeviceId}", device.Id); // only a diagnostic
+            return;
+        }
+
+        var payload = JsonConvert.SerializeObject(new
+        {
+            from = change.From,
+            to = change.To,
+            reason = change.Reason,
+            scenario = change.Scenario,
+            previous_scenario = change.PreviousScenario,
+            probability = change.Probability,
+            confidence = change.Confidence,
+            fixes = change.Fixes,
+            at = change.At
+        }, SerializerSettings.NullIgnore);
+        await mqtt.TryEnqueueAsync(AreaSwitch.Topic(device.Id), payload, retain: true);
+    }
+
     internal async Task ProcessDevice(Device device)
     {
         if (device.IsAnchored && device.Anchor is { } anchor)
@@ -48,7 +82,11 @@ public class MultiScenarioLocator(DeviceTracker dl,
             if (stateChanged)
             {
                 if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", anchorState, retain: true))
+                {
+                    var lastChange = device.ReportedStateChanged;
                     device.ReportedState = anchorState;
+                    await PublishAreaSwitch(device, lastChange, null);
+                }
             }
 
             var locationChanged = device.ReportedLocation != anchorLocation;
@@ -154,6 +192,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
         // -----------------------------------------------------------------
         // 5. Choose scenario to *report* (was SelectBestScenario)
         // -----------------------------------------------------------------
+        var previousBest = device.BestScenario;
         var bestScenario = device.Scenarios
             .Where(s => s.Current)
             .OrderByDescending(s => s.Probability)
@@ -174,7 +213,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
                 if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", newState, retain: true))
                 {
                     moved += 1;
+                    var lastChange = device.ReportedStateChanged;
                     device.ReportedState = newState;
+                    await PublishAreaSwitch(device, lastChange, previousBest);
                 }
             }
         }
@@ -183,7 +224,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
             if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", retain: true))
             {
                 moved += 1;
+                var lastChange = device.ReportedStateChanged;
                 device.ReportedState = "not_home";
+                await PublishAreaSwitch(device, lastChange, previousBest);
             }
         }
 
