@@ -4,13 +4,15 @@ using ESPresense.Utils;
 using ESPresense.Extensions;
 using ESPresense.Models;
 using MathNet.Spatial.Euclidean;
-using Serilog;
 using ESPresense.Services;
 
 namespace ESPresense.Locators;
 
-public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, NodeTelemetryStore nts) : ILocate
+/// <param name="logger">Defaults to the transitional <see cref="DeferredLoggerFactory"/> while State builds locators without one (#1844).</param>
+public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, NodeTelemetryStore nts, ILogger<NadarayaWatsonMultilateralizer>? logger = null) : ILocate
 {
+    private readonly ILogger _logger = logger ?? DeferredLoggerFactory.CreateLogger<NadarayaWatsonMultilateralizer>();
+
     public bool Locate(Scenario scenario)
     {
         var heard = device.Nodes.Values
@@ -91,7 +93,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             scenario.UpdateLocation(scenario.Location); // revert to last good
             scenario.Confidence = 0;
             scenario.Error = null;
-            Log.Error("Locator error for {Device}: {Message}", device, ex.Message);
+            _logger.LogError("Locator error for {Device}: {Message}", device, ex.Message);
         }
 
         scenario.Trace = LocatorTrace.Finished(floor, heard, solvedWeights, scenario.Fit);

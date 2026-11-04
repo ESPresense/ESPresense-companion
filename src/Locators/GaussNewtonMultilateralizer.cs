@@ -5,14 +5,13 @@ using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra.Double;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
-using Serilog;
 
 namespace ESPresense.Locators;
 
 public class GaussNewtonMultilateralizer : BaseMultilateralizer
 {
-    public GaussNewtonMultilateralizer(Device device, Floor floor, State state)
-        : base(device, floor, state)
+    public GaussNewtonMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null)
+        : base(device, floor, state, logger)
     {
     }
 

@@ -82,6 +82,9 @@ builder.Services.AddMcpServer(options =>
 
 var app = builder.Build();
 
+// TODO(#1843, #1844, #1845): remove once State, DeviceTracker, MqttCoordinator and MultiScenarioLocator pass loggers to what they construct.
+DeferredLoggerFactory.Use(app.Services.GetRequiredService<ILoggerFactory>());
+
 app.UseWebSockets(new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromMinutes(15)

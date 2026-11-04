@@ -31,9 +31,6 @@ public class LoggingConventionTests
     {
         "Controllers/NodeController.cs",
         "Controllers/StateController.cs",
-        "Locators/BaseMultilateralizer.cs",
-        "Locators/MultiFloorMultilateralizer.cs",
-        "Locators/NadarayaWatsonMultilateralizer.cs",
         "Models/AutoDiscovery.cs",
     };
 
@@ -55,5 +52,26 @@ public class LoggingConventionTests
         var stale = NotYetConverted.Concat(Bootstrap).Where(f => !users.Contains(f)).ToList();
 
         Assert.That(stale, Is.Empty, "Remove these from the allow-list; they no longer use Serilog.Log: " + string.Join(", ", stale));
+    }
+
+    private static readonly Regex DeferredFactory = new(@"\bDeferredLoggerFactory\b", RegexOptions.Compiled);
+
+    // Types constructed by the deferred files above, which can't pass them a logger yet.
+    // TODO(#1843, #1844, #1845): empty this list and delete DeferredLoggerFactory once those merge.
+    private static readonly string[] DeferredFactoryUsers =
+    {
+        "Program.cs",
+        "Utils/DeferredLoggerFactory.cs",
+        "Locators/BaseMultilateralizer.cs",          // built by State (#1844)
+        "Locators/MultiFloorMultilateralizer.cs",    // built by State (#1844)
+        "Locators/NadarayaWatsonMultilateralizer.cs", // built by State (#1844)
+    };
+
+    [Test]
+    public void DeferredLoggerFactory_DoesNotSpread()
+    {
+        var users = SourceScan.FilesMatching(DeferredFactory);
+        Assert.That(users, Is.EquivalentTo(DeferredFactoryUsers),
+            "DeferredLoggerFactory is only a bridge for types the deferred files construct; inject ILogger<T> everywhere else.");
     }
 }

@@ -5,7 +5,6 @@ using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
-using Serilog;
 
 namespace ESPresense.Locators;
 
@@ -13,7 +12,7 @@ public class NelderMeadMultilateralizer : BaseMultilateralizer
 {
     private readonly IWeighting _weighting;
 
-    public NelderMeadMultilateralizer(Device device, Floor floor, State state) : base(device, floor, state)
+    public NelderMeadMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null) : base(device, floor, state, logger)
     {
         // Load weighting from NelderMead config, defaulting to Gaussian if not specified
         _weighting = WeightingFactory.Create(state.Config?.Locators?.NelderMead?.Weighting);

@@ -69,3 +69,48 @@ public class InjectedLoggingTests
         Assert.That(scope, Does.Contain(new KeyValuePair<string, object>("Source", "MqttClient")));
     }
 }
+
+[TestFixture]
+[NonParallelizable] // DeferredLoggerFactory is process-wide
+public class DeferredLoggerFactoryTests
+{
+    [TearDown]
+    public void TearDown() => DeferredLoggerFactory.Use(Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+
+    private sealed class FailingLocator(Device device, Floor floor, State state, ILogger? logger = null)
+        : ESPresense.Locators.BaseMultilateralizer(device, floor, state, logger)
+    {
+        public override bool Locate(Scenario scenario) =>
+            HandleLocatorException(new InvalidOperationException("boom"), scenario, new MathNet.Spatial.Euclidean.Point3D()) > 0;
+    }
+
+    [Test]
+    public void Locator_UsesTheInjectedLogger()
+    {
+        var logger = new FakeLogger();
+        var device = new Device("test-device-1", null, TimeSpan.FromSeconds(30));
+        var locator = new FailingLocator(device, new Floor(), null!, logger);
+
+        locator.Locate(new Scenario(null, locator, "test"));
+
+        Assert.That(logger.Collector.LatestRecord.Level, Is.EqualTo(LogLevel.Error));
+        Assert.That(logger.Collector.LatestRecord.Message, Does.StartWith("Error finding location for Id: test-device-1").And.EndWith(": boom"));
+    }
+
+    [Test]
+    public void Locator_WithoutALogger_LogsThroughTheHostFactoryUnderItsOwnType()
+    {
+        var device = new Device("test-device-1", null, TimeSpan.FromSeconds(30));
+        var locator = new FailingLocator(device, new Floor(), null!); // as State.cs builds them today (#1844)
+
+        // The host's factory is set after the locator exists, as at startup.
+        var provider = new FakeLoggerProvider();
+        using var factory = LoggerFactory.Create(b => b.AddProvider(provider));
+        DeferredLoggerFactory.Use(factory);
+        locator.Locate(new Scenario(null, locator, "test"));
+
+        var record = provider.Collector.LatestRecord;
+        Assert.That(record.Category, Is.EqualTo("ESPresense.Companion.Tests.Conventions.DeferredLoggerFactoryTests.FailingLocator"));
+        Assert.That(record.Message, Does.EndWith(": boom"));
+    }
+}
