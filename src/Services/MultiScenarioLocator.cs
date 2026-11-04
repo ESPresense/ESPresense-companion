@@ -87,81 +87,9 @@ public class MultiScenarioLocator(DeviceTracker dl,
             return;
         }
 
-        // -----------------------------------------------------------------
-        // 1. Refresh all scenarios -------------------------------------------------
-        // -----------------------------------------------------------------
-        device.LastCalculated = DateTime.UtcNow;
-        var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
-
-        // -----------------------------------------------------------------
-        // 2. Feed Kalman with the scenario that has the highest raw Confidence
-        // -----------------------------------------------------------------
-        var kalmanSource = device.Scenarios
-            .Where(s => s.Current)
-            .OrderByDescending(s => s.Confidence)
-            .FirstOrDefault();
-
-        if (kalmanSource != null)
-        {
-            device.UpdateLocation(kalmanSource.Location);
-        }
-
-        // Predicted location from the updated Kalman filter (x̂ₖ|ₖ⁻¹)
-        var (predictedLocation, _) = device.KalmanFilter.GetPrediction();
-
-        // -----------------------------------------------------------------
-        // 3. Motion‑consistency weighting for every scenario -------------------
-        // -----------------------------------------------------------------
-        var filtering = state?.Config?.Filtering ?? new ConfigFiltering();
-        foreach (var scenario in device.Scenarios)
-        {
-            if (!scenario.Current)
-            {
-                scenario.WeightedConfidence = 0;
-                continue;
-            }
-
-            double delta = predictedLocation.DistanceTo(scenario.Location);
-            double mcw = Math.Exp(-(delta * delta) / (2 * filtering.MotionSigma * filtering.MotionSigma));
-            scenario.WeightedConfidence = (scenario.Confidence ?? 0) * mcw;
-        }
-
-        // -----------------------------------------------------------------
-        // 4. Inline probability smoothing (was UpdateScenarioProbabilities)
-        // -----------------------------------------------------------------
-        double totalWeightedConfidence = device.Scenarios.Sum(s => s.WeightedConfidence);
-
-        if (totalWeightedConfidence > 0)
-        {
-            var priorWeight = filtering.SmoothingWeight;
-            var newDataWeight = 1.0 - priorWeight;
-
-            foreach (var scenario in device.Scenarios)
-            {
-                double newProb = scenario.WeightedConfidence / totalWeightedConfidence;
-                scenario.Probability = priorWeight * scenario.Probability + newDataWeight * newProb;
-            }
-
-            // normalise
-            double sumProb = device.Scenarios.Sum(s => s.Probability);
-            if (sumProb > 0)
-            {
-                foreach (var scenario in device.Scenarios)
-                    scenario.Probability /= sumProb;
-            }
-        }
-
-        // -----------------------------------------------------------------
-        // 5. Choose scenario to *report* (was SelectBestScenario)
-        // -----------------------------------------------------------------
-        var bestScenario = device.Scenarios
-            .Where(s => s.Current)
-            .OrderByDescending(s => s.Probability)
-            .ThenByDescending(s => s.Confidence)
-            .ThenBy(s => device.Scenarios.IndexOf(s))
-            .FirstOrDefault();
-
-        device.BestScenario = bestScenario;
+        var fusion = ScenarioFusion.Update(device, state?.Config?.Filtering ?? new ConfigFiltering(), DateTime.UtcNow);
+        var bestScenario = fusion.Best;
+        var moved = fusion.Moved;
 
         // -----------------------------------------------------------------
         // 6. Publish state / attributes if anything moved ----------------------
