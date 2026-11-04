@@ -254,11 +254,24 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
         }
     }
 
+    /// <summary>How long <see cref="ClearRetainedAsync"/> listens for retained messages.</summary>
+    internal TimeSpan ClearRetainedWindow { get; init; } = TimeSpan.FromSeconds(1);
+
     /// <summary>
-    /// Clears retained MQTT messages that match a topic filter by subscribing to the filter, collecting the exact topics seen, and republishing each topic with a null payload and retain=true.
+    /// Clears retained MQTT messages that match a topic filter by subscribing to the filter, collecting the exact
+    /// topics seen that match it, and republishing each topic with a null payload and retain=true.
     /// </summary>
     /// <remarks>
-    /// The method temporarily subscribes to <paramref name="topicFilter"/>, waits briefly to receive retained messages (1 second, cancellable), unsubscribes, and then republishes a null retained message for each distinct topic observed to clear the retained state on the broker.
+    /// <para>The method temporarily subscribes to <paramref name="topicFilter"/>, waits briefly to receive retained
+    /// messages (<see cref="ClearRetainedWindow"/>, cancellable), unsubscribes, and then republishes a null retained
+    /// message for each distinct matching topic observed to clear the retained state on the broker.</para>
+    /// <para>Only topics that match <paramref name="topicFilter"/> are collected: the client is shared, so any other
+    /// message that happens to arrive during the window must not be cleared.</para>
+    /// <para>The retained messages delivered by the temporary subscription also go through the normal routing,
+    /// intentionally: they are the same retained state the regular subscriptions delivered at connect (so the
+    /// handlers see a repeat of what they already hold), and the clears published afterwards then flow through
+    /// the same handlers as removals. Filtering them out would need a second client or a racy per-topic
+    /// suppression, and would hide genuine live messages on those topics during the window.</para>
     /// </remarks>
     /// <param name="topicFilter">An MQTT topic filter (may include wildcards) used to discover retained topics to clear.</param>
     /// <param name="cancellationToken">A token to cancel the waiting period for incoming retained messages.</param>
@@ -267,10 +280,13 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
     {
         var client = await _connection.GetClientAsync(cancellationToken);
         var topics = new HashSet<string>();
+        var sync = new object();
 
         Task handler(MqttApplicationMessageReceivedEventArgs arg)
         {
-            topics.Add(arg.ApplicationMessage.Topic);
+            var topic = arg.ApplicationMessage.Topic;
+            if (MqttTopicFilterComparer.Compare(topic, topicFilter) == MqttTopicFilterCompareResult.IsMatch)
+                lock (sync) topics.Add(topic);
             return Task.CompletedTask;
         }
 
@@ -278,18 +294,20 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
         {
             client.ApplicationMessageReceivedAsync += handler;
             await client.SubscribeAsync(topicFilter);
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await Task.Delay(ClearRetainedWindow, cancellationToken);
             await client.UnsubscribeAsync(topicFilter);
-
-            foreach (var topic in topics)
-                await EnqueueAsync(topic, null, true);
-
-            var sanitizedPattern = topicFilter.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", "");
-            _logger.LogDebug("Cleared {Count} retained messages for pattern {Pattern}", topics.Count, sanitizedPattern);
         }
         finally
         {
             client.ApplicationMessageReceivedAsync -= handler;
         }
+
+        List<string> toClear;
+        lock (sync) toClear = [.. topics];
+
+        foreach (var topic in toClear)
+            await EnqueueAsync(topic, null, true);
+
+        _logger.LogDebug("Cleared {Count} retained messages for pattern {Pattern}", toClear.Count, LogSanitizer.Strip(topicFilter));
     }
 }
