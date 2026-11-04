@@ -64,7 +64,12 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
     // The user's own mqtt section as of the last connect. Config changes are compared against this rather
     // than _lastConfig: on the add-on _lastConfig carries the Supervisor host, which the user's (empty)
     // host would never match, so every config.yaml edit would otherwise force a reconnect.
-    private volatile ConfigMqtt? _lastUserConfig;
+    // Written with Interlocked.Exchange and read with Volatile.Read (see OnConfigChanged for why it is not just volatile).
+    private ConfigMqtt? _lastUserConfig;
+    // The user's mqtt section from the most recent config reload, whether or not it changed anything. Lets a
+    // connect that completes check whether a reload landed while it was in flight; without it, a reload during
+    // the *first* connect (no _lastUserConfig yet to compare against) would be lost.
+    private ConfigMqtt? _latestUserConfig;
     private volatile string _discoveryTopic = "homeassistant";
     private volatile TaskCompletionSource _connectionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -114,7 +119,16 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
     /// </summary>
     public void OnConfigChanged(ConfigMqtt? config)
     {
-        if (!HasChanged(_lastUserConfig, config)) return;
+        var latest = (config ?? new ConfigMqtt()).Clone();
+
+        // Publish this reload, then compare against the last connect. InitializeClientAsync does the mirror
+        // image (publish _lastUserConfig, then compare its snapshot against _latestUserConfig). Both writes are
+        // full fences, so whichever side runs second sees the other's write: a reload racing a connect is
+        // always caught by at least one of them. Catching it twice only bumps the counter twice, which still
+        // means a single reconnect.
+        Interlocked.Exchange(ref _latestUserConfig, latest);
+        if (!HasChanged(Volatile.Read(ref _lastUserConfig), latest)) return;
+
         _logger.LogInformation("MQTT configuration changed");
         Interlocked.Increment(ref _configChangesSignalled);
     }
@@ -346,9 +360,21 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
         // does not start a reconnect loop on a client that is about to be disposed above.
         _mqttClient = mqttClient;
         _lastConfig = config.Clone();
-        _lastUserConfig = userConfig.Clone();
+        var userSnapshot = userConfig.Clone();
+        Interlocked.Exchange(ref _lastUserConfig, userSnapshot);
         _discoveryTopic = config.DiscoveryTopic;
         Volatile.Write(ref _configChangesApplied, changesBeforeSnapshot);
+
+        // A reload that landed while this connect was in flight may not have been counted by OnConfigChanged
+        // (on the first connect it had nothing to compare against). If the latest reload differs from the
+        // settings actually used, a reconnect is still due. Compares values, so the reload of an unchanged
+        // config at startup does not cause an extra reconnect.
+        var latestReload = Volatile.Read(ref _latestUserConfig);
+        if (latestReload != null && HasChanged(userSnapshot, latestReload))
+        {
+            _logger.LogInformation("MQTT configuration changed while connecting; reconnecting with the new settings");
+            Interlocked.Increment(ref _configChangesSignalled);
+        }
 
         // Window: a DisconnectedAsync that fired after ConnectedAsync succeeded but before the
         // assignment above failed StartReconnectLoop's ReferenceEquals(_mqttClient, client) guard, so no

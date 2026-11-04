@@ -258,6 +258,67 @@ public class MqttConnectionTests
     }
 
     [Test]
+    public async Task ConfigChangeDuringFirstConnect_IsNotLost()
+    {
+        var h = new Harness();
+        var gate = new TaskCompletionSource();
+        var snapshotTaken = new TaskCompletionSource();
+        h.ConfigGate = () => { snapshotTaken.TrySetResult(); return gate.Task; };
+
+        // The first connect is in flight with the original settings when config.yaml is reloaded.
+        var first = h.Connection.GetClientAsync();
+        await snapshotTaken.Task.WaitAsync(Timeout);
+        var reloaded = new ConfigMqtt { Host = "second.test", ClientId = "companion-test" };
+        h.Connection.OnConfigChanged(reloaded);
+        gate.SetResult();
+        h.ConfigGate = null;
+        await first.WaitAsync(Timeout);
+
+        Assert.That(h.Connection.ReconnectRequired, Is.True, "the first connect used settings older than the reload");
+
+        h.Config = reloaded;
+        await h.Connection.PublishAsync("t", "x", false);
+        Assert.That(h.Clients, Has.Count.EqualTo(2));
+        Assert.That(((MQTTnet.MqttClientTcpOptions)h.Clients[1].Options.ChannelOptions).RemoteEndpoint.ToString(), Does.Contain("second.test"));
+        Assert.That(h.Connection.ReconnectRequired, Is.False);
+    }
+
+    [Test]
+    public async Task UnchangedReloadDuringFirstConnect_DoesNotReconnect()
+    {
+        // ConfigLoader raises ConfigChanged on every successful load, including the first one and saves of
+        // unrelated sections; that must not bounce the connection.
+        var h = new Harness();
+        var gate = new TaskCompletionSource();
+        var snapshotTaken = new TaskCompletionSource();
+        h.ConfigGate = () => { snapshotTaken.TrySetResult(); return gate.Task; };
+
+        var first = h.Connection.GetClientAsync();
+        await snapshotTaken.Task.WaitAsync(Timeout);
+        h.Connection.OnConfigChanged(h.Config.Clone());
+        gate.SetResult();
+        h.ConfigGate = null;
+        await first.WaitAsync(Timeout);
+        await h.Connection.PublishAsync("t", "x", false);
+
+        Assert.That(h.Connection.ReconnectRequired, Is.False);
+        Assert.That(h.Clients, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ReloadBeforeFirstConnect_DoesNotReconnect()
+    {
+        var h = new Harness();
+        h.Config = new ConfigMqtt { Host = "second.test", ClientId = "companion-test" };
+        h.Connection.OnConfigChanged(h.Config);
+
+        await h.Connection.PublishAsync("t", "x", false);
+
+        Assert.That(h.Connection.ReconnectRequired, Is.False, "the first connect already read the reloaded settings");
+        Assert.That(h.Clients, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public async Task PublishDuringDisconnect_ReconnectsOnce()
     {
         var h = new Harness();
