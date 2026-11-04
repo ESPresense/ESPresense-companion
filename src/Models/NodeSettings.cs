@@ -1,13 +1,11 @@
 ﻿﻿using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
-using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
 public class NodeSettings(string? id = null, string? name = null)
 {
     [JsonPropertyName("id")]
-    [JsonProperty("id")]
     [StringLength(64)]
     public string? Id
     {
@@ -16,7 +14,6 @@ public class NodeSettings(string? id = null, string? name = null)
     }
 
     [JsonPropertyName("name")]
-    [JsonProperty("name")]
     [StringLength(64)]
     public string? Name
     {
@@ -25,23 +22,18 @@ public class NodeSettings(string? id = null, string? name = null)
     }
 
     [JsonPropertyName("updating")]
-    [JsonProperty("updating")]
     public UpdatingSettings Updating { get; set; } = new UpdatingSettings();
 
     [JsonPropertyName("scanning")]
-    [JsonProperty("scanning")]
     public ScanningSettings Scanning { get; set; } = new ScanningSettings();
 
     [JsonPropertyName("counting")]
-    [JsonProperty("counting")]
     public CountingSettings Counting { get; set; } = new CountingSettings();
 
     [JsonPropertyName("filtering")]
-    [JsonProperty("filtering")]
     public FilteringSettings Filtering { get; set; } = new FilteringSettings();
 
     [JsonPropertyName("calibration")]
-    [JsonProperty("calibration")]
     public CalibrationSettings Calibration { get; set; } = new CalibrationSettings();
 
     public NodeSettings Clone()
