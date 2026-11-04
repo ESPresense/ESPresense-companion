@@ -23,12 +23,8 @@ public sealed class CalibrationFixture : IAsyncDisposable
     public NodeTelemetryStore NodeTelemetry { get; }
     private readonly string _configDir;
 
-    /// <summary>The options ASP.NET Core uses for REST responses (see Program.cs).</summary>
-    public static readonly JsonSerializerOptions RestJson = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter() },
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
-    };
+    /// <summary>The options REST responses use: the same <see cref="global::ESPresense.Utils.RestJson"/> Program.cs applies.</summary>
+    public static readonly JsonSerializerOptions RestJson = global::ESPresense.Utils.RestJson.Create();
 
     private CalibrationFixture(string configDir)
     {
@@ -122,6 +118,20 @@ public sealed class CalibrationFixture : IAsyncDisposable
         null!,
         new NodeStateMapper(NodeTelemetry, Mock.Of<IFirmwareTypeStore>()),
         new CalibrationService(State, Nsd.Object));
+
+    /// <summary>
+    /// Replaces the anchored device with one named like a node ("Bravo"), so its row and cell collide with
+    /// Bravo's node row. The only current anchor, so the pinned order does not depend on dictionary order.
+    /// </summary>
+    public void UseAnchorNamedLikeNode()
+    {
+        State.Devices.TryRemove("anchor-1", out _);
+        var a = State.Nodes["node-a"];
+        var clash = new Device("anchor-3", null, TimeSpan.FromSeconds(30)) { Name = "Bravo" };
+        clash.SetAnchor(new DeviceAnchor(new Point3D(6, 0, 1), null, null));
+        clash.Nodes["node-a"] = new DeviceToNode(clash, a) { Distance = 5.5, Rssi = -75, LastHit = DateTime.UtcNow };
+        State.Devices[clash.Id] = clash;
+    }
 
     public async ValueTask DisposeAsync()
     {

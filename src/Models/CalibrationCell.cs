@@ -32,10 +32,19 @@ public static class CalibrationCellKeys
 /// </summary>
 [JsonConverter(typeof(CalibrationCellJsonConverter))]
 public sealed record CalibrationCell(
-    double? TxRefRssi, double? RxAdjRssi, double? Absorption,
-    double MapDistance, double Distance, double Rssi, double? Var)
+    // The converter does the writing; these names keep the Swagger schema in step with the wire keys.
+    [property: JsonPropertyName(CalibrationCellKeys.TxRefRssi)] double? TxRefRssi,
+    [property: JsonPropertyName(CalibrationCellKeys.RxAdjRssi)] double? RxAdjRssi,
+    [property: JsonPropertyName(CalibrationCellKeys.Absorption)] double? Absorption,
+    [property: JsonPropertyName(CalibrationCellKeys.MapDistance)] double MapDistance,
+    [property: JsonPropertyName(CalibrationCellKeys.Distance)] double Distance,
+    [property: JsonPropertyName(CalibrationCellKeys.Rssi)] double Rssi,
+    [property: JsonPropertyName(CalibrationCellKeys.Var)] double? Var)
 {
+    [JsonPropertyName(CalibrationCellKeys.Diff)]
     public double Diff => Distance - MapDistance;
+
+    [JsonPropertyName(CalibrationCellKeys.Percent)]
     public double Percent => MapDistance != 0 ? Diff / MapDistance : 0;
 
     /// <summary>The cell's present values as (key, value) pairs, in wire order.</summary>
@@ -52,13 +61,31 @@ public sealed record CalibrationCell(
         if (Var is { } v) yield return new(CalibrationCellKeys.Var, v);
     }
 
+    /// <summary>Reads a value by its wire key; false when the key is unknown or the cell omits it.</summary>
+    public bool TryGet(string key, out double value)
+    {
+        double? v = key switch
+        {
+            CalibrationCellKeys.TxRefRssi => TxRefRssi,
+            CalibrationCellKeys.RxAdjRssi => RxAdjRssi,
+            CalibrationCellKeys.Absorption => Absorption,
+            CalibrationCellKeys.MapDistance => MapDistance,
+            CalibrationCellKeys.Distance => Distance,
+            CalibrationCellKeys.Rssi => Rssi,
+            CalibrationCellKeys.Diff => Diff,
+            CalibrationCellKeys.Percent => Percent,
+            CalibrationCellKeys.Var => Var,
+            _ => null
+        };
+        value = v ?? 0;
+        return v is not null;
+    }
+
     /// <summary>Whether the cell would emit <paramref name="key"/> on the wire.</summary>
-    public bool ContainsKey(string key) => Entries().Any(e => e.Key == key);
+    public bool ContainsKey(string key) => TryGet(key, out _);
 
     /// <summary>Reads a value by its wire key. Throws <see cref="KeyNotFoundException"/> if the cell omits it.</summary>
-    public double this[string key] => Entries().FirstOrDefault(e => e.Key == key) is { Key: not null } e
-        ? e.Value
-        : throw new KeyNotFoundException(key);
+    public double this[string key] => TryGet(key, out var v) ? v : throw new KeyNotFoundException(key);
 
     /// <summary>
     /// Combines this cell with one already stored under the same tx/rx names (a name collision). This cell's

@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using ESPresense.Companion.Tests.Controllers;
 using ESPresense.Models;
+using ESPresense.Utils;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace ESPresense.Companion.Tests.Models;
 
@@ -66,13 +68,56 @@ public class CalibrationCellTests
         Assert.That(dir, Is.Not.Null, "src/ui/src/lib/types.ts not found above the test directory");
         var ts = File.ReadAllText(Path.Combine(dir!.FullName, "src", "ui", "src", "lib", "types.ts"));
 
-        var block = Regex.Match(ts, @"export interface NodeCalibrationMatrix \{.*?\[rxName: string\]: \{(?<cell>[^}]*)\}", RegexOptions.Singleline);
-        Assert.That(block.Success, Is.True, "NodeCalibrationMatrix cell type not found in types.ts");
-        var fields = Regex.Matches(block.Groups["cell"].Value, @"(?<key>\w+)(?<opt>\?)?\s*:")
+        var cellBody = CellTypeBody(ts);
+        var fields = Regex.Matches(cellBody, @"(?<key>\w+)(?<opt>\?)?\s*:")
             .Select(m => (Key: m.Groups["key"].Value, Optional: m.Groups["opt"].Success))
             .ToList();
 
         Assert.That(fields.Select(f => f.Key), Is.EqualTo(CalibrationCellKeys.All));
         Assert.That(fields.Where(f => f.Optional).Select(f => f.Key), Is.EqualTo(CalibrationCellKeys.Optional));
+    }
+
+    /// <summary>
+    /// The body of NodeCalibrationMatrix's innermost <c>[rxName: string]: { ... }</c>, found by brace matching so a
+    /// nested object or a brace in a comment cannot silently cut it short.
+    /// </summary>
+    private static string CellTypeBody(string ts)
+    {
+        const string iface = "export interface NodeCalibrationMatrix {";
+        const string cell = "[rxName: string]: {";
+        var i = ts.IndexOf(iface, StringComparison.Ordinal);
+        Assert.That(i, Is.GreaterThanOrEqualTo(0), $"could not parse types.ts: '{iface}' not found");
+        var start = ts.IndexOf(cell, i, StringComparison.Ordinal);
+        Assert.That(start, Is.GreaterThanOrEqualTo(0), $"could not parse types.ts: '{cell}' not found in NodeCalibrationMatrix");
+        start += cell.Length;
+
+        var depth = 1;
+        for (var j = start; j < ts.Length; j++)
+        {
+            if (ts[j] == '{') depth++;
+            else if (ts[j] == '}' && --depth == 0)
+            {
+                var body = ts[start..j];
+                Assert.That(body, Does.Not.Contain("{"), "could not parse types.ts: the cell type now nests an object; update this test");
+                return body;
+            }
+        }
+        Assert.Fail("could not parse types.ts: unbalanced braces in NodeCalibrationMatrix");
+        return "";
+    }
+
+    /// <summary>Swagger documents the cell under its wire keys, with only the omittable keys optional.</summary>
+    [Test]
+    public void SwaggerSchema_UsesWireKeys()
+    {
+        var generator = new SchemaGenerator(
+            new SchemaGeneratorOptions { SchemaFilters = { new CalibrationCellSchemaFilter() } },
+            new JsonSerializerDataContractResolver(RestJson.Create()));
+        var repo = new SchemaRepository();
+        generator.GenerateSchema(typeof(CalibrationCell), repo);
+
+        var schema = repo.Schemas[nameof(CalibrationCell)];
+        Assert.That(schema.Properties!.Keys, Is.EquivalentTo(CalibrationCellKeys.All));
+        Assert.That(schema.Required, Is.EquivalentTo(CalibrationCellKeys.All.Except(CalibrationCellKeys.Optional)));
     }
 }
