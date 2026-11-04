@@ -73,7 +73,7 @@ public static class FusionValidationCli
         }
     }
 
-    private static string RoomFromOccupancyEntity(string entityId)
+    internal static string RoomFromOccupancyEntity(string entityId)
     {
         const string prefix = "binary_sensor.";
         const string suffix = "_occupancy";

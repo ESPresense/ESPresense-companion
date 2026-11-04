@@ -26,7 +26,7 @@ namespace ESPresense.Simulation.FusionValidation;
 /// </summary>
 public static class SyntheticFixtureBuilder
 {
-    public static (Dictionary<string, List<HaStateChange>> History, List<FusionRoomEvent> Events) Build()
+    public static (Dictionary<string, List<HaStateChange>> History, List<FusionRoomEvent> Events, FlapWindow Flap) Build()
     {
         var baseTime = new DateTimeOffset(2026, 11, 3, 18, 0, 0, TimeSpan.Zero);
         var baseUtc = baseTime.UtcDateTime;
@@ -172,7 +172,12 @@ public static class SyntheticFixtureBuilder
             new("binary_sensor.office_occupancy", "off", realAt2.AddSeconds(10))
         };
 
-        return (history, events);
+        // The flap window the committed report.json/.md score against -- surfaced so fusion-fixtures
+        // can regenerate a self-consistent report instead of requiring a reader to separately guess
+        // the right `fusion-validate --flap` argument for a fixture they didn't author.
+        var flap = new FlapWindow(device.Id, flapStart, flapEnd);
+
+        return (history, events, flap);
     }
 
     private static ConfigRoom Square(string name, double x0, double y0, double x1, double y1) => new()
