@@ -53,6 +53,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
             var locationChanged = device.ReportedLocation != anchorLocation;
             device.BestScenario = null;
+            device.Hold.Reset();
 
             // Force publication when device transitions to anchored state or location changes
             if (locationChanged || stateChanged)
@@ -166,6 +167,12 @@ public class MultiScenarioLocator(DeviceTracker dl,
             .FirstOrDefault();
 
         device.BestScenario = bestScenario;
+
+        // Hold the reported floor and room until a challenger earns the switch; away starts over
+        if (bestScenario != null)
+            device.Hold.Update(bestScenario.Floor, bestScenario.Room, bestScenario.Location, DateTime.UtcNow, filtering);
+        else
+            device.Hold.Reset();
 
         // -----------------------------------------------------------------
         // 6. Publish state / attributes if anything moved ----------------------

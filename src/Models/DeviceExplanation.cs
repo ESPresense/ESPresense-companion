@@ -123,6 +123,9 @@ public sealed record DeviceExplanation(
         if (floors.Length > 1 && floors[0].Probability - floors[1].Probability < CloseFloorRace)
             hints.Add($"The floor race is close: {floors[0].Floor.Name} {floors[0].Probability * 100:F0}%, {floors[1].Floor.Name} {floors[1].Probability * 100:F0}%.");
 
+        if (!device.IsAnchored && device.Hold.Challenger is { } challenger && device.Hold.ChallengerSince is { } since)
+            hints.Add($"Holding {device.Room?.Name ?? device.Floor?.Name ?? "the current place"}: {challenger} has led for {(DateTime.UtcNow - since).TotalSeconds:F1} s, and has to hold before the room switches.");
+
         if (!device.IsAnchored)
         {
             if (room.Room == null && room.NearestOtherRoom is { } nearest && best is { Outcome: not LocatorOutcome.NoFix })

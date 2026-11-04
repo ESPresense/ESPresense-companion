@@ -360,5 +360,17 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "motion_sigma")]
         public double MotionSigma { get; set; } = 2.0;
+
+        /// <summary>Seconds a different room must hold before the reported room switches; 0 switches at once</summary>
+        [YamlMember(Alias = "room_hold")]
+        public double RoomHold { get; set; } = 3.0;
+
+        /// <summary>Metres outside the current room's wall a fix can be and still keep the room; 0 turns it off</summary>
+        [YamlMember(Alias = "room_margin")]
+        public double RoomMargin { get; set; } = 0.5;
+
+        /// <summary>Seconds a different floor must hold before the reported floor switches; 0 switches at once</summary>
+        [YamlMember(Alias = "floor_hold")]
+        public double FloorHold { get; set; } = 5.0;
     }
 }
