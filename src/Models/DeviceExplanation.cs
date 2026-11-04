@@ -1,4 +1,5 @@
 using ESPresense.Extensions;
+using ESPresense.Services;
 using ESPresense.Locators;
 using MathNet.Spatial.Euclidean;
 
@@ -70,7 +71,7 @@ public sealed record DeviceExplanation(
     private const double NearWall = 0.5;
     private const double CloseFloorRace = 0.1;
 
-    public static DeviceExplanation From(Device device, IReadOnlyList<NodeBias>? biases = null)
+    public static DeviceExplanation From(Device device, IReadOnlyList<NodeBias>? biases = null, ReportedDeviceState? reported = null)
     {
         var links = device.Nodes.Values.Where(dn => dn.Node != null).OrderBy(dn => dn.Distance).ToArray();
         var best = device.BestScenario;
@@ -88,7 +89,7 @@ public sealed record DeviceExplanation(
             .ToArray();
 
         var explained = scenarios.Select(s => ExplainScenario(s, s == best, links)).ToArray();
-        var room = RoomDecision(device, best);
+        var room = RoomDecision(device, best, reported);
 
         return new DeviceExplanation(
             device.Id, device.Name, device.IsAnchored,
@@ -224,7 +225,7 @@ public sealed record DeviceExplanation(
         return s.IsNearestNode ? "NotNearest" : "NotUsed";
     }
 
-    private static ExplainedRoom RoomDecision(Device device, Scenario? best)
+    private static ExplainedRoom RoomDecision(Device device, Scenario? best, ReportedDeviceState? reported)
     {
         var room = device.Room;
         var at = device.IsAnchored ? device.Location?.ToPoint2D() : best?.Location.ToPoint2D();
@@ -242,7 +243,7 @@ public sealed record DeviceExplanation(
             Place(room), inside,
             at is { } e && room?.Polygon is not null ? DistanceToEdge(room.Polygon, e) : null,
             Place(nearest?.room), nearest?.distance,
-            device.ReportedState, device.PreviousReportedState, device.ReportedStateChanged);
+            reported?.State, reported?.PreviousState, reported?.StateChanged);
     }
 
     private static double DistanceToEdge(Polygon2D polygon, Point2D point) =>

@@ -53,6 +53,8 @@ builder.Services.AddSingleton<FirmwareUpdateJobService>();
 builder.Services.AddSingleton<FirmwareCatalogService>();
 builder.Services.AddSingleton<DeviceService>();
 builder.Services.AddSingleton<DeviceCaptureService>();
+builder.Services.AddSingleton<IDeviceStatePublisher, DeviceStatePublisher>();
+builder.Services.AddSingleton<IDeviceHistoryWriter, DeviceHistoryWriter>();
 builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
 

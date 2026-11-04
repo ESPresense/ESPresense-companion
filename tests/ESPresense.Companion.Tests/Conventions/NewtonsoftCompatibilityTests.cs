@@ -14,7 +14,15 @@ namespace ESPresense.Companion.Tests.Conventions;
 public class NewtonsoftCompatibilityTests
 {
     private static string Stj(object value, JsonSerializerOptions options) => System.Text.Json.JsonSerializer.Serialize(value, options);
-    private static string Nsj(object value) => JsonConvert.SerializeObject(value, SerializerSettings.NullIgnore);
+    // The Newtonsoft settings the MQTT boundary used before #1846 (formerly SerializerSettings.NullIgnore)
+    private static readonly JsonSerializerSettings NullIgnore = new()
+    {
+        DefaultValueHandling = DefaultValueHandling.Ignore,
+        NullValueHandling = NullValueHandling.Ignore,
+        ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
+    };
+
+    private static string Nsj(object value) => JsonConvert.SerializeObject(value, NullIgnore);
 
     [Test]
     public void EveryBmpCharacter_IsEscapedLikeNewtonsoft()

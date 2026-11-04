@@ -13,9 +13,11 @@ namespace ESPresense.Controllers
         private readonly DeviceService _deviceService;
         private readonly State _state;
         private readonly DeviceCaptureService _captureService;
+        private readonly IDeviceStatePublisher _publisher;
 
-        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, DeviceService deviceService, State state, DeviceCaptureService captureService)
+        public DeviceController(ILogger<DeviceController> logger, DeviceSettingsStore deviceSettingsStore, DeviceService deviceService, State state, DeviceCaptureService captureService, IDeviceStatePublisher publisher)
         {
+            _publisher = publisher;
             _logger = logger;
             _deviceSettingsStore = deviceSettingsStore;
             _deviceService = deviceService;
@@ -37,7 +39,7 @@ namespace ESPresense.Controllers
         public ActionResult<DeviceExplanation> Explain(string id)
         {
             var device = FindDevice(id, _deviceSettingsStore.Get(id));
-            return device == null ? NotFound() : DeviceExplanation.From(device, NodeBias.Find(_state.ReadMeasures()));
+            return device == null ? NotFound() : DeviceExplanation.From(device, NodeBias.Find(_state.ReadMeasures()), _publisher.Reported(device));
         }
 
         private Device? FindDevice(string id, DeviceSettings? settings) =>

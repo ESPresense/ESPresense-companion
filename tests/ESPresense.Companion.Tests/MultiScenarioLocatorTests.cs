@@ -38,13 +38,12 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
+        var publisher = new DeviceStatePublisher(mqttMock.Object);
 
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, publisher, new DeviceHistoryWriter(history, state), new GlobalEventDispatcher(), leaseServiceMock.Object, NullLogger<MultiScenarioLocator>.Instance);
 
-        var device = new Device("id", null, TimeSpan.FromSeconds(1))
-        {
-            ReportedState = "kitchen"
-        };
+        var device = new Device("id", null, TimeSpan.FromSeconds(1));
+        publisher.Remember(device, new ReportedDeviceState(State: "kitchen"));
 
         var scenario = new Scenario(null, new DummyLocator(), "kitchen")
         {
@@ -60,7 +59,7 @@ public class MultiScenarioLocatorTests
         await locator.ProcessDevice(device);
 
         // Assert
-        Assert.That(device.ReportedState, Is.EqualTo("not_home"));
+        Assert.That(publisher.Reported(device).State, Is.EqualTo("not_home"));
         mqttMock.Verify();
     }
 
@@ -85,7 +84,8 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var publisher = new DeviceStatePublisher(mqttMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, publisher, new DeviceHistoryWriter(history, state), new GlobalEventDispatcher(), leaseServiceMock.Object, NullLogger<MultiScenarioLocator>.Instance);
 
         var device = new Device("anchored", null, TimeSpan.FromSeconds(1));
         var anchorLocation = new Point3D(5, 6, 1);
@@ -102,7 +102,7 @@ public class MultiScenarioLocatorTests
 
         await locator.ProcessDevice(device);
 
-        Assert.That(device.ReportedLocation, Is.EqualTo(anchorLocation));
+        Assert.That(publisher.Reported(device).Location, Is.EqualTo(anchorLocation));
         Assert.That(device.BestScenario, Is.Null);
 
         mqttMock.Verify();
@@ -128,7 +128,8 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var publisher = new DeviceStatePublisher(mqttMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, publisher, new DeviceHistoryWriter(history, state), new GlobalEventDispatcher(), leaseServiceMock.Object, NullLogger<MultiScenarioLocator>.Instance);
 
         var config = new Config();
         var floor = new Floor();
@@ -146,7 +147,8 @@ public class MultiScenarioLocatorTests
             Points = new[] { new double[] { 0, 0 }, new double[] { 5, 0 }, new double[] { 5, 5 }, new double[] { 0, 5 } }
         });
 
-        var device = new Device("anchored", null, TimeSpan.FromSeconds(30)) { ReportedState = "not_home" };
+        var device = new Device("anchored", null, TimeSpan.FromSeconds(30));
+        publisher.Remember(device, new ReportedDeviceState(State: "not_home"));
         device.SetAnchor(new DeviceAnchor(new Point3D(1, 1, 1), floor, room));
         HeardBy(device, "node1");
 
@@ -159,7 +161,7 @@ public class MultiScenarioLocatorTests
         await locator.ProcessDevice(device);
         await locator.ProcessDevice(device);
 
-        Assert.That(device.ReportedState, Is.EqualTo("Living Room"));
+        Assert.That(publisher.Reported(device).State, Is.EqualTo("Living Room"));
         mqttMock.Verify(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}", It.IsAny<string>(), true), Times.Once);
         mqttMock.Verify();
     }
@@ -184,7 +186,8 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var publisher = new DeviceStatePublisher(mqttMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, publisher, new DeviceHistoryWriter(history, state), new GlobalEventDispatcher(), leaseServiceMock.Object, NullLogger<MultiScenarioLocator>.Instance);
 
         var config = new Config();
         var floor = new Floor();
@@ -204,7 +207,8 @@ public class MultiScenarioLocatorTests
 
         // Last located report: Living Room at exactly the spot the device is then anchored to.
         var anchorLocation = new Point3D(1, 1, 1);
-        var device = new Device("anchored", null, TimeSpan.FromSeconds(30)) { ReportedState = "Living Room", ReportedLocation = anchorLocation };
+        var device = new Device("anchored", null, TimeSpan.FromSeconds(30));
+        publisher.Remember(device, new ReportedDeviceState(State: "Living Room", Location: anchorLocation, BestScenario: "First Floor"));
         device.SetAnchor(new DeviceAnchor(anchorLocation, floor, room));
         HeardBy(device, "node1");
 
@@ -240,7 +244,8 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var publisher = new DeviceStatePublisher(mqttMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, publisher, new DeviceHistoryWriter(history, state), new GlobalEventDispatcher(), leaseServiceMock.Object, NullLogger<MultiScenarioLocator>.Instance);
 
         var config = new Config();
         var floor = new Floor();
@@ -259,7 +264,8 @@ public class MultiScenarioLocatorTests
         });
 
         // Anchored in the Living Room, but the last hit is older than the timeout: the beacon is gone.
-        var device = new Device("anchored", null, TimeSpan.FromSeconds(30)) { ReportedState = "Living Room" };
+        var device = new Device("anchored", null, TimeSpan.FromSeconds(30));
+        publisher.Remember(device, new ReportedDeviceState(State: "Living Room"));
         device.SetAnchor(new DeviceAnchor(new Point3D(1, 1, 1), floor, room));
         HeardBy(device, "node1", DateTime.UtcNow.AddMinutes(-5));
 
@@ -271,7 +277,7 @@ public class MultiScenarioLocatorTests
 
         await locator.ProcessDevice(device);
 
-        Assert.That(device.ReportedState, Is.EqualTo("not_home"));
+        Assert.That(publisher.Reported(device).State, Is.EqualTo("not_home"));
         mqttMock.Verify();
     }
 
@@ -295,14 +301,14 @@ public class MultiScenarioLocatorTests
         var tracker = new DeviceTracker(state, mqttMock.Object, tele, new GlobalEventDispatcher(), deviceSettingsStore);
         var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
         var leaseServiceMock = new Mock<ILeaseService>();
-        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(), history, leaseServiceMock.Object);
+        var publisher = new DeviceStatePublisher(mqttMock.Object);
+        var locator = new MultiScenarioLocator(tracker, state, publisher, new DeviceHistoryWriter(history, state), new GlobalEventDispatcher(), leaseServiceMock.Object, NullLogger<MultiScenarioLocator>.Instance);
 
         // Already reported at the anchor spot; the beacon then goes quiet, so only the state changes.
         var anchorLocation = new Point3D(1, 1, 1);
         var device = new Device("anchored", null, TimeSpan.FromSeconds(30));
         device.SetAnchor(new DeviceAnchor(anchorLocation, null, null));
-        device.ReportedState = "First Floor";
-        device.ReportedLocation = anchorLocation;
+        publisher.Remember(device, new ReportedDeviceState(State: "First Floor", Location: anchorLocation, BestScenario: "Anchored"));
 
         mqttMock.Setup(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", true))
             .ReturnsAsync(true);
@@ -314,7 +320,7 @@ public class MultiScenarioLocatorTests
         await locator.ProcessDevice(device);
         await locator.ProcessDevice(device);
 
-        Assert.That(device.ReportedState, Is.EqualTo("not_home"));
+        Assert.That(publisher.Reported(device).State, Is.EqualTo("not_home"));
         mqttMock.Verify(m => m.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", It.IsAny<string>(), true), Times.Exactly(2));
     }
 

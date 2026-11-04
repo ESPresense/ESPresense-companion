@@ -25,7 +25,7 @@ public class DeviceServiceTests
     public async Task DeleteAsync_ClearsRetainedStateAndAttributesTopics()
     {
         var (service, state, mqttMock) = CreateService();
-        var device = new Device("kitchen:phone", null, TimeSpan.FromSeconds(30)) { ReportedState = "kitchen" };
+        var device = new Device("kitchen:phone", null, TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
 
         mqttMock.Setup(m => m.EnqueueAsync($"espresense/companion/{device.Id}", null, true))
