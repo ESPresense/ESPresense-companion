@@ -105,7 +105,8 @@ public sealed class CalibrationFixture : IAsyncDisposable
         new NodeStateMapper(NodeTelemetry, Mock.Of<IFirmwareTypeStore>()),
         new Mock<GlobalEventDispatcher>().Object,
         new CalibrationService(State, Nsd.Object),
-        new DeviceEnricher(DeviceSettings));
+        new DeviceEnricher(DeviceSettings),
+        new CsiFusionService(State, new CsiMotionTracker(Mqtt.Object), Mqtt.Object, new GlobalEventDispatcher(), Mock.Of<ILogger<CsiFusionService>>()));
 
     public McpResources CreateMcp() => new(
         State,

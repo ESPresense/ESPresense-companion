@@ -246,7 +246,8 @@ public class AnchoredDeviceIntegrationTests
             new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             Mock.Of<GlobalEventDispatcher>(),
             new CalibrationService(_state, mockNodeSettingsStore.Object),
-            new DeviceEnricher(_deviceSettingsStore)
+            new DeviceEnricher(_deviceSettingsStore),
+            new CsiFusionService(_state, new CsiMotionTracker(_mockMqttCoordinator.Object), _mockMqttCoordinator.Object, new GlobalEventDispatcher(), Mock.Of<ILogger<CsiFusionService>>())
         );
 
         // Act
@@ -310,7 +311,8 @@ public class AnchoredDeviceIntegrationTests
             new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             Mock.Of<GlobalEventDispatcher>(),
             new CalibrationService(_state, mockNodeSettingsStore.Object),
-            new DeviceEnricher(_deviceSettingsStore)
+            new DeviceEnricher(_deviceSettingsStore),
+            new CsiFusionService(_state, new CsiMotionTracker(_mockMqttCoordinator.Object), _mockMqttCoordinator.Object, new GlobalEventDispatcher(), Mock.Of<ILogger<CsiFusionService>>())
         );
 
         // Act

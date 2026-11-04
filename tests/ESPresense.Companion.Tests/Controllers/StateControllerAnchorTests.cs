@@ -49,7 +49,8 @@ public class StateControllerAnchorTests
             new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             mockEventDispatcher.Object,
             new CalibrationService(_state, _mockNodeSettingsStore.Object),
-            new DeviceEnricher(_mockDeviceSettingsStore.Object)
+            new DeviceEnricher(_mockDeviceSettingsStore.Object),
+            new CsiFusionService(_state, new CsiMotionTracker(_mockMqttCoordinator.Object), _mockMqttCoordinator.Object, new GlobalEventDispatcher(), Mock.Of<ILogger<CsiFusionService>>())
         );
     }
 

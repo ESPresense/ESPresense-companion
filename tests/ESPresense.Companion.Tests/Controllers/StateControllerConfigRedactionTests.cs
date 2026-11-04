@@ -54,7 +54,8 @@ public class StateControllerConfigRedactionTests
             new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             new GlobalEventDispatcher(),
             new CalibrationService(state, nodeSettingsStore.Object),
-            new DeviceEnricher(deviceSettingsStore.Object));
+            new DeviceEnricher(deviceSettingsStore.Object),
+            new CsiFusionService(state, new CsiMotionTracker(mqtt.Object), mqtt.Object, new GlobalEventDispatcher(), Mock.Of<ILogger<CsiFusionService>>()));
 
         // Call the real action method.
         var config = controller.GetConfig();
