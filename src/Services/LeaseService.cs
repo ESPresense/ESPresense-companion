@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet;
-using Serilog;
 
 namespace ESPresense.Services;
 
@@ -24,10 +23,12 @@ public class LeaseHandle : IAsyncDisposable
 {
     private readonly ILeaseService _leaseService;
     private readonly string _leaseName;
+    private readonly ILogger _logger;
     private bool _disposed;
 
-    internal LeaseHandle(ILeaseService leaseService, string leaseName)
+    internal LeaseHandle(ILeaseService leaseService, string leaseName, ILogger logger)
     {
+        _logger = logger;
         _leaseService = leaseService;
         _leaseName = leaseName;
     }
@@ -42,7 +43,7 @@ public class LeaseHandle : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Failed to release lease '{LeaseName}' during dispose", _leaseName);
+            _logger.LogWarning(ex, "Failed to release lease '{LeaseName}' during dispose", _leaseName);
         }
     }
 
@@ -213,7 +214,7 @@ public class LeaseService : ILeaseService, IDisposable
                         _log.LogInformation("Acquired lease '{LeaseName}' (expires: {Expiry})",
                             leaseName, proposed.ExpiresAt);
 
-                        return new LeaseHandle(this, leaseName);
+                        return new LeaseHandle(this, leaseName, _log);
                     }
                 }
             }

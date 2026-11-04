@@ -28,23 +28,21 @@ var configDir = Environment.GetEnvironmentVariable("CONFIG_DIR") ?? Path.Combine
 var storageDir = Path.Combine(configDir, ".storage");
 Directory.CreateDirectory(storageDir);
 
-var configLoader = new ConfigLoader(configDir);
-
-builder.Services.AddSingleton(a => configLoader);
-builder.Services.AddHostedService(a => configLoader);
+builder.Services.AddSingleton(a => new ConfigLoader(configDir, a.GetRequiredService<ILogger<ConfigLoader>>()));
+builder.Services.AddHostedService(a => a.GetRequiredService<ConfigLoader>());
 
 builder.Services.AddDataProtection()
     .UseEphemeralDataProtectionProvider();
 
 builder.Services.AddSingleton<HttpClient>();
-builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
+builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger(a.GetRequiredService<ILogger<MqttNetLogger>>()));
 builder.Services.AddSingleton<MqttCoordinator>();
 builder.Services.AddSingleton<IMqttCoordinator>(provider => provider.GetRequiredService<MqttCoordinator>());
 builder.Services.AddSingleton<TelemetryService>();
 builder.Services.AddSingleton<GlobalEventDispatcher>();
 builder.Services.AddSingleton<DeviceTracker>();
 builder.Services.AddSingleton<SupervisorConfigLoader>();
-builder.Services.AddSingleton(a => new DeviceHistoryStore(storageDir, a.GetRequiredService<ConfigLoader>()));
+builder.Services.AddSingleton(a => new DeviceHistoryStore(storageDir, a.GetRequiredService<ConfigLoader>(), a.GetRequiredService<ILogger<DeviceHistoryStore>>()));
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();

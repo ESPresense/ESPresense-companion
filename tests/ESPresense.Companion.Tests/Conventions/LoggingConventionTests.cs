@@ -31,7 +31,6 @@ public class LoggingConventionTests
     {
         "Controllers/NodeController.cs",
         "Controllers/StateController.cs",
-        "Extensions/MqttCoordinatorExtensions.cs",
         "Locators/BaseMultilateralizer.cs",
         "Locators/MultiFloorMultilateralizer.cs",
         "Locators/NadarayaWatsonMultilateralizer.cs",
@@ -42,11 +41,6 @@ public class LoggingConventionTests
         "Optimizers/OptimizationRunner.cs",
         "Optimizers/PerNodeAbsorptionRxTx.cs",
         "Optimizers/RxAdjRssiOptimizer.cs",
-        "Services/ConfigLoader.cs",
-        "Services/DeviceHistoryStore.cs",
-        "Services/LeaseService.cs",
-        "Services/NodeSettingsStore.cs",
-        "Utils/MqttNetLogger.cs",
     };
 
     [Test]

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using ESPresense.Models;
-using Serilog;
 using ESPresense.Utils;
 
 namespace ESPresense.Services
@@ -46,14 +45,14 @@ namespace ESPresense.Services
         {
             var retain = id == "*";
             var old = Get(id).Calibration;
-            await mqtt.UpdateSetting(id, "absorption", "", retain, old.Absorption?.ToString());
+            await mqtt.UpdateSetting(logger, id, "absorption", "", retain, old.Absorption?.ToString());
             // "*" reaches a fleet that can mix firmware, and its own cache entry says nothing about any
             // node's convention, so it resets both topics; a single node gets the one it uses.
             if (id == "*" || !old.UsesRxOffset)
-                await mqtt.UpdateSetting(id, "rx_adj_rssi", "", retain, old.RxAdjRssi?.ToString());
+                await mqtt.UpdateSetting(logger, id, "rx_adj_rssi", "", retain, old.RxAdjRssi?.ToString());
             if (id == "*" || old.UsesRxOffset)
-                await mqtt.UpdateSetting(id, "rx_offset_rssi", "", retain, (-old.RxAdjRssi)?.ToString());
-            await mqtt.UpdateSetting(id, "tx_ref_rssi", "", retain, old.TxRefRssi?.ToString());
+                await mqtt.UpdateSetting(logger, id, "rx_offset_rssi", "", retain, (-old.RxAdjRssi)?.ToString());
+            await mqtt.UpdateSetting(logger, id, "tx_ref_rssi", "", retain, old.TxRefRssi?.ToString());
         }
 
         public async Task Set(string id, NodeSettings ds)
@@ -62,67 +61,67 @@ namespace ESPresense.Services
             var old = Get(id);
 
             if (ds.Name != null && ds.Name != old.Name)
-                await mqtt.UpdateSetting(id, "name", ds.Name, retain, old.Name);
+                await mqtt.UpdateSetting(logger, id, "name", ds.Name, retain, old.Name);
 
             // Updating settings
             if (ds.Updating.AutoUpdate != null && ds.Updating.AutoUpdate != old.Updating.AutoUpdate)
-                await mqtt.UpdateSetting(id, "auto_update", ds.Updating.AutoUpdate, retain, old.Updating.AutoUpdate);
+                await mqtt.UpdateSetting(logger, id, "auto_update", ds.Updating.AutoUpdate, retain, old.Updating.AutoUpdate);
 
             if (ds.Updating.Prerelease != null && ds.Updating.Prerelease != old.Updating.Prerelease)
-                await mqtt.UpdateSetting(id, "prerelease", ds.Updating.Prerelease, retain, old.Updating.Prerelease);
+                await mqtt.UpdateSetting(logger, id, "prerelease", ds.Updating.Prerelease, retain, old.Updating.Prerelease);
 
             // Scanning settings
             if (ds.Scanning.ForgetAfterMs != null && ds.Scanning.ForgetAfterMs != old.Scanning.ForgetAfterMs)
-                await mqtt.UpdateSetting(id, "forget_after_ms", ds.Scanning.ForgetAfterMs, retain, old.Scanning.ForgetAfterMs);
+                await mqtt.UpdateSetting(logger, id, "forget_after_ms", ds.Scanning.ForgetAfterMs, retain, old.Scanning.ForgetAfterMs);
 
             // Counting settings
             if (ds.Counting.IdPrefixes != null && ds.Counting.IdPrefixes != old.Counting.IdPrefixes)
-                await mqtt.UpdateSetting(id, "count_ids", ds.Counting.IdPrefixes, retain, old.Counting.IdPrefixes);
+                await mqtt.UpdateSetting(logger, id, "count_ids", ds.Counting.IdPrefixes, retain, old.Counting.IdPrefixes);
 
             if (ds.Counting.MinDistance != null && ds.Counting.MinDistance != old.Counting.MinDistance)
-                await mqtt.UpdateSetting(id, "count_min_dist", ds.Counting.MinDistance, retain, old.Counting.MinDistance);
+                await mqtt.UpdateSetting(logger, id, "count_min_dist", ds.Counting.MinDistance, retain, old.Counting.MinDistance);
 
             if (ds.Counting.MaxDistance != null && ds.Counting.MaxDistance != old.Counting.MaxDistance)
-                await mqtt.UpdateSetting(id, "count_max_dist", ds.Counting.MaxDistance, retain, old.Counting.MaxDistance);
+                await mqtt.UpdateSetting(logger, id, "count_max_dist", ds.Counting.MaxDistance, retain, old.Counting.MaxDistance);
 
             if (ds.Counting.MinMs != null && ds.Counting.MinMs != old.Counting.MinMs)
-                await mqtt.UpdateSetting(id, "count_ms", ds.Counting.MinMs, retain, old.Counting.MinMs);
+                await mqtt.UpdateSetting(logger, id, "count_ms", ds.Counting.MinMs, retain, old.Counting.MinMs);
 
             // Filtering settings
             if (ds.Filtering.IncludeIds != null && ds.Filtering.IncludeIds != old.Filtering.IncludeIds)
-                await mqtt.UpdateSetting(id, "include", ds.Filtering.IncludeIds, retain, old.Filtering.IncludeIds);
+                await mqtt.UpdateSetting(logger, id, "include", ds.Filtering.IncludeIds, retain, old.Filtering.IncludeIds);
 
             if (ds.Filtering.ExcludeIds != null && ds.Filtering.ExcludeIds != old.Filtering.ExcludeIds)
-                await mqtt.UpdateSetting(id, "exclude", ds.Filtering.ExcludeIds, retain, old.Filtering.ExcludeIds);
+                await mqtt.UpdateSetting(logger, id, "exclude", ds.Filtering.ExcludeIds, retain, old.Filtering.ExcludeIds);
 
             if (ds.Filtering.MaxDistance != null && ds.Filtering.MaxDistance != old.Filtering.MaxDistance)
-                await mqtt.UpdateSetting(id, "max_distance", ds.Filtering.MaxDistance, retain, old.Filtering.MaxDistance);
+                await mqtt.UpdateSetting(logger, id, "max_distance", ds.Filtering.MaxDistance, retain, old.Filtering.MaxDistance);
 
             if (ds.Filtering.SkipDistance != null && ds.Filtering.SkipDistance != old.Filtering.SkipDistance)
-                await mqtt.UpdateSetting(id, "skip_distance", ds.Filtering.SkipDistance, retain, old.Filtering.SkipDistance);
+                await mqtt.UpdateSetting(logger, id, "skip_distance", ds.Filtering.SkipDistance, retain, old.Filtering.SkipDistance);
 
             if (ds.Filtering.SkipMs != null && ds.Filtering.SkipMs != old.Filtering.SkipMs)
-                await mqtt.UpdateSetting(id, "skip_ms", ds.Filtering.SkipMs, retain, old.Filtering.SkipMs);
+                await mqtt.UpdateSetting(logger, id, "skip_ms", ds.Filtering.SkipMs, retain, old.Filtering.SkipMs);
 
             // Calibration settings
             if (ds.Calibration.Absorption != null && ds.Calibration.Absorption != old.Calibration.Absorption)
-                await mqtt.UpdateSetting(id, "absorption", ds.Calibration.Absorption, retain, old.Calibration.Absorption);
+                await mqtt.UpdateSetting(logger, id, "absorption", ds.Calibration.Absorption, retain, old.Calibration.Absorption);
 
             if (ds.Calibration.RxAdjRssi != null && ds.Calibration.RxAdjRssi != old.Calibration.RxAdjRssi)
             {
                 // v5 nodes take the added rx_offset_rssi; older ones the subtracted rx_adj_rssi. "*" can
                 // reach both, so it sends both (old firmware ignores the topic it doesn't know).
                 if (id == "*" || !old.Calibration.UsesRxOffset)
-                    await mqtt.UpdateSetting(id, "rx_adj_rssi", ds.Calibration.RxAdjRssi, retain, old.Calibration.RxAdjRssi);
+                    await mqtt.UpdateSetting(logger, id, "rx_adj_rssi", ds.Calibration.RxAdjRssi, retain, old.Calibration.RxAdjRssi);
                 if (id == "*" || old.Calibration.UsesRxOffset)
-                    await mqtt.UpdateSetting(id, "rx_offset_rssi", -ds.Calibration.RxAdjRssi, retain, -old.Calibration.RxAdjRssi);
+                    await mqtt.UpdateSetting(logger, id, "rx_offset_rssi", -ds.Calibration.RxAdjRssi, retain, -old.Calibration.RxAdjRssi);
             }
 
             if (ds.Calibration.TxRefRssi != null && ds.Calibration.TxRefRssi != old.Calibration.TxRefRssi)
-                await mqtt.UpdateSetting(id, "tx_ref_rssi", ds.Calibration.TxRefRssi, retain, old.Calibration.TxRefRssi);
+                await mqtt.UpdateSetting(logger, id, "tx_ref_rssi", ds.Calibration.TxRefRssi, retain, old.Calibration.TxRefRssi);
 
             if (ds.Calibration.RxRefRssi != null && ds.Calibration.RxRefRssi != old.Calibration.RxRefRssi)
-                await mqtt.UpdateSetting(id, "ref_rssi", ds.Calibration.RxRefRssi, retain, old.Calibration.RxRefRssi);
+                await mqtt.UpdateSetting(logger, id, "ref_rssi", ds.Calibration.RxRefRssi, retain, old.Calibration.RxRefRssi);
 
             // Optimistically apply the requested values to the in-memory cache so a Get() right after
             // Set() reflects them instead of being stale until the broker echoes each setting back.
@@ -181,7 +180,7 @@ namespace ESPresense.Services
         {
             mqtt.NodeSettingReceivedAsync += arg =>
             {
-                Log.Debug("Received {0} for {1}: {2}", arg.Setting, arg.NodeId, arg.Payload);
+                logger.LogDebug("Received {Setting} for {NodeId}: {Payload}", arg.Setting, arg.NodeId, arg.Payload);
                 if (arg.NodeId == null) return Task.CompletedTask;
                 if (string.IsNullOrEmpty(arg.Payload) && !_storeById.ContainsKey(arg.NodeId))
                     return Task.CompletedTask;
