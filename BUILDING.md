@@ -20,6 +20,6 @@ mqtt:
   read_only: true
 ```
 
-A read-only client still subscribes to everything, but publishes nothing: no `espresense/companion/status`, no last will, no discovery, no node settings. Each publish it skips is logged as `ReadOnly, would have sent to <topic>: <payload>`. For backward compatibility a `client_id` containing `read` (any case) also enables read-only mode; the startup log says which of the two turned it on.
+A read-only client still subscribes to everything, but publishes nothing: no `espresense/companion/status`, no last will, no discovery, no node settings. Each publish it skips is logged as `ReadOnly, would have sent to <topic>: <payload>`. For backward compatibility a `client_id` containing `read` (any case) also enables read-only mode, but that heuristic is deprecated: it logs a warning at startup and will be removed, so set `read_only: true` explicitly.
 
 Join us on discord for development talk: [https://discord.gg/jbqmn7V6n6]

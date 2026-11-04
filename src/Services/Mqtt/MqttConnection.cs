@@ -217,9 +217,9 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
                 _logger.LogInformation("MQTT read-only mode is active (mqtt.read_only: true); nothing will be published");
                 break;
             case MqttCoordinator.ReadOnlyReason.ClientIdHeuristic:
-                _logger.LogInformation(
-                    "MQTT read-only mode is active because client_id '{ClientId}' contains \"read\" (legacy heuristic); set mqtt.read_only: true explicitly, or choose a different client_id to publish",
-                    config.ClientId);
+                _logger.LogWarning(
+                    "MQTT read-only mode is active because client_id '{ClientId}' contains \"read\". This client-id heuristic is deprecated and will be removed: set mqtt.read_only: true to stay read-only, or choose a client_id without \"read\" to publish",
+                    LogSanitizer.StripOrNull(config.ClientId));
                 break;
         }
 

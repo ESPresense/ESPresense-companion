@@ -288,6 +288,22 @@ public class MqttConnectionTests
     }
 
     [Test]
+    public async Task ReadOnlyHeuristic_StillWorks_ButWarnsOnStartup()
+    {
+        var h = new Harness();
+        h.Config.ClientId = "bedroom-reader";
+
+        await h.Connection.PublishAsync("t", "x", false);
+
+        Assert.That(h.Connection.IsReadOnly, Is.True);
+        Assert.That(h.Client.Published, Is.Empty);
+        Assert.That(h.Client.Options.WillTopic, Is.Null);
+        var warnings = h.Logger.Entries.Where(e => e.Level == LogLevel.Warning).ToList();
+        Assert.That(warnings, Has.Count.EqualTo(1));
+        Assert.That(warnings[0].Message, Does.Contain("deprecated").And.Contain("read_only: true").And.Contain("bedroom-reader"));
+    }
+
+    [Test]
     public async Task ExplicitFlagFalse_WithNeutralClientId_Publishes()
     {
         var h = new Harness();
