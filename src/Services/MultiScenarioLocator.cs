@@ -32,49 +32,29 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
     internal async Task ProcessDevice(Device device)
     {
+        var gps = state?.Config?.Gps;
+
         if (device.IsAnchored && device.Anchor is { } anchor)
         {
             device.LastCalculated = DateTime.UtcNow;
-            var anchorLocation = anchor.Location;
+            device.BestScenario = null;
+            var anchored = DeviceReport.From(device, null, gps);
 
-            var gps = state?.Config?.Gps;
-            var (lat, lon) = gps?.Report == true ? gps.Add(anchorLocation.X, anchorLocation.Y) : (null, null);
-            var elevation = gps?.Report == true ? anchorLocation.Z + gps?.Elevation : null;
-
-            // The anchor fixes where the device is, not whether it is here: once no node hears it, it's away.
-            var present = device.Nodes.Values.Any(dn => dn.Current);
-            var anchorState = present ? device.Room?.Name ?? device.Floor?.Name ?? "not_home" : "not_home";
-            var stateChanged = device.ReportedState != anchorState;
+            var stateChanged = device.ReportedState != anchored.State;
             if (stateChanged)
             {
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", anchorState, retain: true))
-                    device.ReportedState = anchorState;
+                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", anchored.State, retain: true))
+                    device.ReportedState = anchored.State;
             }
 
-            var locationChanged = device.ReportedLocation != anchorLocation;
-            device.BestScenario = null;
+            var locationChanged = device.ReportedLocation != anchor.Location;
 
             // Force publication when device transitions to anchored state or location changes
             if (locationChanged || stateChanged)
             {
-                var payload = JsonConvert.SerializeObject(new
+                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", anchored.AttributesJson(), retain: true))
                 {
-                    source_type = "espresense",
-                    latitude = lat,
-                    longitude = lon,
-                    elevation,
-                    x = anchorLocation.X,
-                    y = anchorLocation.Y,
-                    z = anchorLocation.Z,
-                    confidence = 100,
-                    fixes = 0,
-                    best_scenario = "Anchored",
-                    last_seen = device.LastSeen
-                }, SerializerSettings.NullIgnore);
-
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
-                {
-                    device.ReportedLocation = anchorLocation;
+                    device.ReportedLocation = anchor.Location;
                     globalEventDispatcher.OnDeviceChanged(device, false);
                 }
                 else
@@ -90,58 +70,22 @@ public class MultiScenarioLocator(DeviceTracker dl,
         var fusion = ScenarioFusion.Update(device, state?.Config?.Filtering ?? new ConfigFiltering(), DateTime.UtcNow);
         var bestScenario = fusion.Best;
         var moved = fusion.Moved;
+        var report = DeviceReport.From(device, bestScenario, gps);
 
-        // -----------------------------------------------------------------
-        // 6. Publish state / attributes if anything moved ----------------------
-        // -----------------------------------------------------------------
-        if (bestScenario != null)
+        if (report.State != device.ReportedState)
         {
-            var newState = device.Room?.Name ?? device.Floor?.Name ?? "not_home";
-            if (newState != device.ReportedState)
-            {
-                if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", newState, retain: true))
-                {
-                    moved += 1;
-                    device.ReportedState = newState;
-                }
-            }
-        }
-        else if (device.ReportedState != "not_home")
-        {
-            if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", "not_home", retain: true))
+            if (await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", report.State, retain: true))
             {
                 moved += 1;
-                device.ReportedState = "not_home";
+                device.ReportedState = report.State;
             }
         }
 
         if (moved > 0 && bestScenario != null)
         {
-            device.ReportedLocation = device.Location ?? new Point3D();
+            device.ReportedLocation = report.Location!.Value;
 
-            var gps = state?.Config?.Gps;
-            var location = device.Location ?? new Point3D();
-
-            // Only include GPS coordinates if reporting is enabled
-            var (lat, lon) = gps?.Report == true ? gps.Add(location.X, location.Y) : (null, null);
-            var elevation = gps?.Report == true ? location.Z + gps?.Elevation : null;
-
-            var payload = JsonConvert.SerializeObject(new
-            {
-                source_type = "espresense",
-                latitude = lat,
-                longitude = lon,
-                elevation = elevation,
-                x = location.X,
-                y = location.Y,
-                z = location.Z,
-                confidence = bestScenario.Confidence,
-                fixes = bestScenario.Fixes,
-                best_scenario = bestScenario.Name,
-                last_seen = device.LastSeen
-            }, SerializerSettings.NullIgnore);
-
-            if (!await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true))
+            if (!await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", report.AttributesJson(), retain: true))
                 return;
 
             globalEventDispatcher.OnDeviceChanged(device, false);
