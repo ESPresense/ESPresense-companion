@@ -39,7 +39,9 @@ public class RobotSurveyTests
     private static readonly string[] Locators = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor", "nadaraya", "nearest" };
 
     /// <summary>Locators that actually solve for a position from ranges, as opposed to picking or blending node positions.</summary>
-    private static readonly string[] Solvers = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor" };
+    /// <summary>The locators that solve a position from the ranges, as opposed to nadaraya and nearest-node,
+    /// which blend or pick node positions. SelfCalibrationTests scores the same set.</summary>
+    internal static readonly string[] Solvers = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor" };
 
     /// <summary>Many headings at one spot: good for orientation sensitivity, poor spatial spread.</summary>
     private const string Headings = "robot-survey-headings.json";

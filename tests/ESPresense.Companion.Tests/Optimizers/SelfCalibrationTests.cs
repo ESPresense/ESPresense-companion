@@ -61,7 +61,7 @@ public class SelfCalibrationTests
 
         // The constructor no longer loads; the optimizers need Config.Optimization.
         await _configLoader.LoadAsync();
-        Assert.That(_configLoader.Config, Is.Not.Null, "config did not load");
+        Assert.That(_state.Config?.Optimization, Is.Not.Null, "config did not load");
     }
 
     [TearDown]
@@ -513,7 +513,11 @@ public class SelfCalibrationTests
             return errs.Count == 0 ? double.NaN : Median(errs);
         }
 
-        var locators = new[] { "gaussnewton", "nelder", "mle", "nadaraya", "nearest" };
+        // Only the locators that solve a position from the ranges are scored. nadaraya blends node
+        // positions by a kernel on distance and nearest just picks the shortest range, so a calibration
+        // that rescales every range moves them little or not at all; both stay in the table for reference.
+        var solvers = RobotSurveyTests.Solvers;
+        var locators = solvers.Concat(new[] { "nadaraya", "nearest" }).ToArray();
         TestContext.WriteLine($"mode {mode}: held-out median XY position error (m) by locator");
         TestContext.WriteLine($"{"locator",-12} {"cold",8} {"calibrated",11} {"reported",9}");
         var ratios = new List<double>();
@@ -523,12 +527,15 @@ public class SelfCalibrationTests
             var k = MedianXyError(which, (id, m) => Ranged(m, nss.Get(id)));
             var r = MedianXyError(which, (_, m) => m.Dist);
             TestContext.WriteLine($"{which,-12} {c,8:0.00} {k,11:0.00} {r,9:0.00}");
-            if (double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
+            if (solvers.Contains(which) && double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
         }
 
-        Assert.That(ratios, Is.Not.Empty, "no locator produced fixes");
-        Assert.That(Median(ratios), Is.LessThan(0.8),
-            $"the applied calibration ({mode}) should cut held-out position error well below cold-start defaults across locators; median ratio {Median(ratios):0.00}");
+        var shown = string.Join(", ", ratios.Select(x => x.ToString("0.00")));
+        Assert.That(ratios, Has.Count.EqualTo(solvers.Length), "a solving locator produced no fixes");
+        // The mean is the 20% requirement; the per-locator ceiling stops one solver regressing while the rest carry it.
+        Assert.That(ratios, Has.All.LessThan(1.0), $"the applied calibration ({mode}) made a solving locator worse; ratios {shown}");
+        Assert.That(ratios.Average(), Is.LessThan(0.8),
+            $"the applied calibration ({mode}) should cut the solving locators' held-out position error by at least 20% on average; ratios {shown}");
     }
 
     private sealed class Survey
