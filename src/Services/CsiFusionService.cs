@@ -52,6 +52,12 @@ public sealed class CsiFusionService(
     // other dictionaries above are tick-thread-only and don't need this.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, RoomOccupancy> _lastOccupancy = new(StringComparer.OrdinalIgnoreCase);
 
+    // Rooms whose disabled-state OFF snapshot has not yet been confirmed published (see RunTickAsync).
+    // Kept separate from _lastOccupancy, which is cleared immediately so CurrentOccupancy/GET reflect
+    // "disabled" right away -- this is the only copy of what still needs to reach HA if MQTT was down
+    // at the moment fusion was disabled.
+    private readonly Dictionary<string, RoomOccupancy> _pendingDisabledPublish = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Current occupancy for every CSI-mapped room, as of the last tick.</summary>
     public IReadOnlyDictionary<string, RoomOccupancy> CurrentOccupancy => _lastOccupancy;
 
@@ -66,23 +72,33 @@ public sealed class CsiFusionService(
             // A config reload updates this already-running service in place rather than restarting it, so
             // disabling fusion at runtime must actively clear state, not just stop updating it: otherwise
             // Device.FusedRoom stays pinned to its last value and CurrentOccupancy/HA keep reporting the
-            // last-known occupancy forever. Returning the cleared snapshots routes them through the normal
-            // RunTickAsync publish path, so HA's retained topic also gets the OFF it's expecting.
+            // last-known occupancy forever.
             foreach (var device in state.Devices.Values)
                 device.FusedRoom = null;
 
-            var cleared = _lastOccupancy.Values
-                .Select(a => new RoomOccupancy(a.RoomId, a.RoomName, false, Array.Empty<string>(), false))
-                .ToList();
+            if (_lastOccupancy.Count > 0)
+            {
+                // First disabled tick since this room was last occupied: snapshot the OFF values to
+                // retry (see RunTickAsync) and clear the public-facing state immediately.
+                foreach (var a in _lastOccupancy.Values)
+                    _pendingDisabledPublish[a.RoomId] = new RoomOccupancy(a.RoomId, a.RoomName, false, Array.Empty<string>(), false);
 
-            _committedRoomId.Clear();
-            _pendingChange.Clear();
-            _roomMotionPrev.Clear();
-            _motionStartedAt.Clear();
-            _who.Clear();
-            _lastOccupancy.Clear();
-            return cleared;
+                _committedRoomId.Clear();
+                _pendingChange.Clear();
+                _roomMotionPrev.Clear();
+                _motionStartedAt.Clear();
+                _who.Clear();
+                _lastOccupancy.Clear();
+            }
+
+            // Keep returning every pending OFF snapshot on every disabled tick -- not just once -- so a
+            // publish that silently failed (RoomOccupancyDiscovery.Publish's TryEnqueueAsync returning
+            // false, e.g. MQTT down) gets retried instead of being lost for good the moment _lastOccupancy
+            // was cleared above. RunTickAsync removes an entry once it confirms that room's publish
+            // actually succeeded.
+            return _pendingDisabledPublish.Values.ToList();
         }
+        _pendingDisabledPublish.Clear(); // re-enabled: any stale OFF retry is no longer relevant
 
         var roomMotion = RoomMotionAggregator.Compute(state, tracker, now, logger);
 
@@ -121,7 +137,8 @@ public sealed class CsiFusionService(
             try
             {
                 dispatcher.OnRoomOccupancyChanged(occupancy);
-                await RoomOccupancyDiscovery.Publish(mqtt, occupancy);
+                if (await RoomOccupancyDiscovery.Publish(mqtt, occupancy))
+                    _pendingDisabledPublish.Remove(occupancy.RoomId);
             }
             catch (Exception ex)
             {

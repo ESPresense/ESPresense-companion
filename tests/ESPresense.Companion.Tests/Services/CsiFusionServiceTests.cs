@@ -359,4 +359,46 @@ public class CsiFusionServiceTests
         Assert.That(_fusion.CurrentOccupancy, Is.Empty, "disabled fusion must not keep serving stale occupancy from CurrentOccupancy/GET /api/state/rooms");
         Assert.That(device.FusedRoom, Is.Null, "disabling fusion must release any tie-break/damping override back to BestScenario");
     }
+
+    [Test]
+    public async Task RunTickAsync_RetriesTheDisabledOffSnapshot_UntilPublishSucceeds()
+    {
+        // If MQTT is down at the moment fusion is disabled, the first OFF publish attempt can fail.
+        // _lastOccupancy is already cleared by then (so CurrentOccupancy/GET reflect "disabled"
+        // immediately), so the only record of what still needs to reach HA is the pending-retry set --
+        // this must keep retrying rather than losing the OFF update for good.
+        var floor = BuildFloor("first", Square("Office", 0, 0, 4, 4));
+        var office = RoomById("first", "office");
+        AddCsiNode("office-node", new Point3D(1, 1, 1), floor);
+
+        var now = DateTime.UtcNow;
+        for (var i = 0; i < 20; i++)
+            _tracker.Observe("office-node", 10, now.AddSeconds(-200 + i * 5));
+
+        var officeScenario = MakeScenario(office, 0.9);
+        AddDevice("dev-1", office, officeScenario);
+
+        _tracker.Observe("office-node", 100, now.AddSeconds(1));
+        _tracker.Observe("office-node", 100, now.AddSeconds(2));
+        _fusion.Tick(now.AddSeconds(2));
+        Assert.That(_fusion.CurrentOccupancy["office"].Occupied, Is.True);
+
+        _state.Config!.CsiFusion.Enabled = false;
+        _mqtt.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(false);
+
+        await _fusion.RunTickAsync();
+        Assert.That(_fusion.CurrentOccupancy, Is.Empty, "CurrentOccupancy clears immediately regardless of whether the publish itself succeeded");
+
+        // MQTT "recovers". A later disabled tick must still carry the pending OFF snapshot -- proving
+        // it was retained, not dropped, after the first attempt failed.
+        _mqtt.Invocations.Clear();
+        _mqtt.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
+        await _fusion.RunTickAsync();
+
+        _mqtt.Verify(m => m.TryEnqueueAsync(RoomOccupancyDiscovery.StateTopic("office"), "OFF", true), Times.Once);
+
+        // Confirmed published: a further disabled tick has nothing left to retry.
+        var thirdTick = _fusion.Tick(now.AddSeconds(10));
+        Assert.That(thirdTick, Is.Empty, "once the OFF snapshot is confirmed published, it must not keep retrying forever");
+    }
 }

@@ -17,7 +17,10 @@ public static class RoomOccupancyDiscovery
 
     public static string AttributesTopic(string roomId) => $"{StateTopic(roomId)}/attributes";
 
-    public static async Task Publish(IMqttCoordinator mqtt, RoomOccupancy occupancy)
+    /// <summary>Publishes discovery/state/attributes for one room and reports whether every enqueue
+    /// succeeded, so a caller that needs delivery guarantees (see <see cref="CsiFusionService"/>'s
+    /// disabled-state retry) knows whether to try again rather than assuming success.</summary>
+    public static async Task<bool> Publish(IMqttCoordinator mqtt, RoomOccupancy occupancy)
     {
         var discoveryPayload = JsonSerializer.Serialize(new
         {
@@ -33,12 +36,13 @@ public static class RoomOccupancyDiscovery
             origin = new { name = "ESPresense Companion" }
         });
 
-        await mqtt.TryEnqueueAsync(DiscoveryTopic(mqtt, occupancy.RoomId), discoveryPayload, true);
-        await mqtt.TryEnqueueAsync(StateTopic(occupancy.RoomId), occupancy.Occupied ? "ON" : "OFF", true);
-        await mqtt.TryEnqueueAsync(AttributesTopic(occupancy.RoomId), JsonSerializer.Serialize(new
+        var ok = await mqtt.TryEnqueueAsync(DiscoveryTopic(mqtt, occupancy.RoomId), discoveryPayload, true);
+        ok &= await mqtt.TryEnqueueAsync(StateTopic(occupancy.RoomId), occupancy.Occupied ? "ON" : "OFF", true);
+        ok &= await mqtt.TryEnqueueAsync(AttributesTopic(occupancy.RoomId), JsonSerializer.Serialize(new
         {
             who = occupancy.Who,
             unknown = occupancy.Unknown
         }), true);
+        return ok;
     }
 }
