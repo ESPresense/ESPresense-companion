@@ -6,6 +6,10 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
 
+// Where the dev server sends /api and /ws. Point it at a running companion (e.g. a Home Assistant
+// add-on) to try a UI branch against real data; see "Companion preview" in CLAUDE.md.
+const companion = process.env.COMPANION_URL ?? 'http://localhost:5279';
+
 export default defineConfig({
 	plugins: [
 		devtoolsJson(),
@@ -37,13 +41,16 @@ export default defineConfig({
 	server: {
 		port: 44490,
 		proxy: {
-			'/api': 'http://localhost:5279',
+			'/api': { target: companion, changeOrigin: true },
 			'/ws': {
-				target: 'ws://localhost:5279',
+				target: companion.replace(/^http/, 'ws'),
+				changeOrigin: true,
 				ws: true
 			}
 		},
-		host: true
+		host: true,
+		// Extra hostnames the dev server answers to, comma-separated, for opening it from another machine
+		allowedHosts: process.env.DEV_ALLOWED_HOSTS?.split(',').map((h) => h.trim())
 	},
 
 	preview: {

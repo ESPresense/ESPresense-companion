@@ -88,6 +88,16 @@ Check which one is loaded with:
 ps eww -p $(pgrep -f ESPresense.Companion) | tr ' ' '\n' | grep HOSTINGSTARTUP
 ```
 
+### Companion preview: a UI branch against a running companion
+To try a UI change on real data without building an image or running the backend, point the Vite dev server at a running companion (for example the Home Assistant add-on on port 8267):
+
+```bash
+cd src/ui
+COMPANION_URL=http://<companion-host>:8267 DEV_ALLOWED_HOSTS=<this-machine's-hostname> pnpm start
+```
+
+Then open `http://<this-machine's-hostname>:44490/`. `DEV_ALLOWED_HOSTS` is only needed when the browser is on another machine. Only the UI comes from the branch; `/api` and `/ws` go to that companion, so read-only views are safe but any button that writes (node settings, calibration reset, restart) acts on the real system. Stop the dev server when done.
+
 ## Architecture Overview
 
 ### Backend Structure
