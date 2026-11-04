@@ -47,6 +47,18 @@ public class ConfigCloneRoundTripTests
     }
 
     [Test]
+    public void NullFilteringSection_ClonesAsNull()
+    {
+        // "filtering: null" in config.yaml leaves the section null; consumers fall back to defaults.
+        var original = YamlIn.Deserialize<Config>("filtering:\n");
+        Assert.That(original.Filtering, Is.Null, "precondition: YAML leaves an empty section null");
+
+        var clone = original.Clone();
+
+        Assert.That(clone.Filtering, Is.Null);
+    }
+
+    [Test]
     public void EverySettableProperty_IsCopied()
     {
         var counter = 0;

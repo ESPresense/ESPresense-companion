@@ -136,6 +136,48 @@ public class TrackingRulesCharacterizationTests
         Assert.That(DeviceTrackingRules.GlobsCompiledOnThisThread - before, Is.EqualTo(4));
     }
 
+    [TestCase("[a-")]
+    [TestCase("[a-]")]
+    public void FromConfig_SkipsOnlyTheInvalidPattern(string bad)
+    {
+        var config = new Config
+        {
+            Devices = [new ConfigDevice { Id = bad }, new ConfigDevice { Id = "good:*" }, new ConfigDevice { Name = bad }, new ConfigDevice { Name = "Good *" }],
+            ExcludeDevices = [new ConfigDevice { Id = bad, Name = "Bad Name" }, new ConfigDevice { Id = "good:x*" }],
+        };
+
+        var rules = DeviceTrackingRules.FromConfig(config);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rules.ShouldTrack("good:1", null).Track, Is.True);
+            Assert.That(rules.ShouldTrack("x:1", "Good One").Track, Is.True);
+            Assert.That(rules.IsExcluded("good:x1", null), Is.True, "later exclude still applies");
+            Assert.That(rules.IsExcluded("x:1", "Bad Name"), Is.True, "the valid half of an entry still applies");
+            Assert.That(rules.ShouldTrack(bad, bad).Track, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task InvalidPattern_DoesNotAbortConfigLoad()
+    {
+        await using var fx = await YamlStateFixture.LoadAsync("""
+            filtering:
+              motion_sigma: 7
+            devices:
+              - id: "[a-"
+              - id: "good:*"
+            exclude_devices:
+              - name: "[a-]"
+            """);
+        var device = new Device("good:1", null, TimeSpan.FromSeconds(30));
+        Assert.Multiple(() =>
+        {
+            Assert.That(fx.State.ShouldTrack(device), Is.True);
+            Assert.That(fx.State.Config!.Filtering.MotionSigma, Is.EqualTo(7));
+        });
+    }
+
     [Test]
     public async Task NoConfiguredDevices_TracksNothingAndExcludesNothing()
     {

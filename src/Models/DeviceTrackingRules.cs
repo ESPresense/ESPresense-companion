@@ -1,5 +1,6 @@
 using DotNet.Globbing;
 using DotNet.Globbing.Token;
+using Serilog;
 
 namespace ESPresense.Models;
 
@@ -47,10 +48,19 @@ public sealed class DeviceTrackingRules
     /// <summary>Globs compiled on the calling thread so far. Lets tests prove matching never compiles.</summary>
     internal static int GlobsCompiledOnThisThread => _globsCompiled;
 
-    private static Glob Compile(string pattern)
+    /// <summary>Compiles one pattern, or returns null (and logs) when DotNet.Glob can't parse it, e.g. "[a-".</summary>
+    private static Glob? Compile(string pattern)
     {
         _globsCompiled++;
-        return Glob.Parse(pattern, GlobOpts);
+        try
+        {
+            return Glob.Parse(pattern, GlobOpts);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Ignoring invalid device pattern {Pattern}", pattern);
+            return null;
+        }
     }
 
     public static DeviceTrackingRules FromConfig(Config? c)
@@ -64,6 +74,7 @@ public sealed class DeviceTrackingRules
             if (!string.IsNullOrWhiteSpace(d.Id))
             {
                 var glob = Compile(d.Id);
+                if (glob == null) continue;
                 if (glob.Tokens.All(t => t is LiteralToken)) byId.TryAdd(d.Id, d);
                 else idGlobs.Add(glob);
             }
@@ -74,6 +85,7 @@ public sealed class DeviceTrackingRules
             if (!string.IsNullOrWhiteSpace(d.Name))
             {
                 var glob = Compile(d.Name);
+                if (glob == null) continue;
                 if (glob.Tokens.All(t => t is LiteralToken)) byName.TryAdd(d.Name, d);
                 else nameGlobs.Add(glob);
             }

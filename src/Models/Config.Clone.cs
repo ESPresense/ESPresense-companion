@@ -24,7 +24,7 @@ namespace ESPresense.Models
                 History = History.Clone(),
                 Locators = Locators.Clone(),
                 Optimization = Optimization.Clone(),
-                Filtering = Filtering.Clone()
+                Filtering = Filtering?.Clone()! // a null section stays null; consumers default it
             };
         }
     }

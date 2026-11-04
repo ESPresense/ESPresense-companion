@@ -37,11 +37,13 @@ public class State
     /// </summary>
     internal void Apply(Config c)
     {
+        // Build anything that can fail before touching state, so a bad config can't half-apply.
+        var trackingRules = DeviceTrackingRules.FromConfig(c);
+
         Config = c;
+        TrackingRules = trackingRules;
         foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
         foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
-
-        TrackingRules = DeviceTrackingRules.FromConfig(c);
 
         // Update Kalman filter settings and propagate to all devices
         var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
