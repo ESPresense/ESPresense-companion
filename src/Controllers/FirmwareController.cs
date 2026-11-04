@@ -1,3 +1,4 @@
+using ESPresense.Utils;
 using System.IO.Compression;
 using System.Net.WebSockets;
 using System.Text;
@@ -117,7 +118,7 @@ public class FirmwareController : Controller
 
     /// <summary>A firmware-update progress frame sent over the update WebSocket.</summary>
     internal static string ProgressMessage(int percent, string message) =>
-        Newtonsoft.Json.JsonConvert.SerializeObject(new { percentComplete = percent, message = message });
+        System.Text.Json.JsonSerializer.Serialize(new { percentComplete = percent, message = message }, JsonDefaults.Verbatim);
 
     private async Task<MemoryStream> GetFirmware(string url)
     {

@@ -1,5 +1,5 @@
+using System.Text.Json;
 using ESPresense.Models;
-using Newtonsoft.Json;
 
 namespace ESPresense.Utils;
 
@@ -9,14 +9,14 @@ namespace ESPresense.Utils;
 internal static class MqttPayloads
 {
     /// <summary><c>{discovery_topic}/{component}/{id}/config</c></summary>
-    public static string Discovery(AutoDiscovery.DiscoveryRecord record) => JsonConvert.SerializeObject(record, SerializerSettings.NullIgnore);
+    public static string Discovery(AutoDiscovery.DiscoveryRecord record) => JsonSerializer.Serialize(record, JsonDefaults.Mqtt);
 
     /// <summary><c>espresense/companion/telemetry</c></summary>
-    public static string Telemetry(Telemetry telemetry) => JsonConvert.SerializeObject(telemetry, SerializerSettings.NullIgnore);
+    public static string Telemetry(Telemetry telemetry) => JsonSerializer.Serialize(telemetry, JsonDefaults.Mqtt);
 
     /// <summary><c>espresense/settings/{id}/config</c></summary>
-    public static string DeviceSettings(DeviceSettings settings) => JsonConvert.SerializeObject(settings, SerializerSettings.NullIgnore);
+    public static string DeviceSettings(DeviceSettings settings) => JsonSerializer.Serialize(settings, JsonDefaults.Mqtt);
 
     /// <summary><c>espresense/companion/{id}/attributes</c> when only the provisional last-seen stamp is known</summary>
-    public static string LastSeen(DateTime lastSeen) => JsonConvert.SerializeObject(new { last_seen = lastSeen });
+    public static string LastSeen(DateTime lastSeen) => JsonSerializer.Serialize(new { last_seen = lastSeen }, JsonDefaults.Verbatim);
 }

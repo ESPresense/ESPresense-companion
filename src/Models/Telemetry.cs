@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ConcurrentCollections;
 
 namespace ESPresense.Models
@@ -12,6 +13,8 @@ namespace ESPresense.Models
         public int Malformed { get; internal set; }
         public int Moved { get; internal set; }
 
+        // A field: only the MQTT telemetry payload (which includes fields) carries it, first, as it always has.
+        [JsonPropertyOrder(-1)]
         public readonly ConcurrentHashSet<string> UnknownNodes = new();
 
         public Telemetry Clone()

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ESPresense.Converters;
 
 namespace ESPresense.Utils;
 
@@ -26,11 +27,50 @@ public static class JsonDefaults
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
     });
 
+    /// <summary>
+    /// What the Companion publishes to MQTT (discovery, telemetry, device settings), byte-for-byte what Newtonsoft
+    /// produced with the old <c>SerializerSettings.NullIgnore</c>: camelCase, null and default values omitted, public
+    /// fields included, Newtonsoft's string escaping and double formatting.
+    /// </summary>
+    public static JsonSerializerOptions Mqtt { get; } = ReadOnly(LikeNewtonsoft(new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+        IncludeFields = true
+    }));
+
+    /// <summary>
+    /// Like <see cref="Mqtt"/> but nothing is omitted and names are as declared: what Newtonsoft's default settings
+    /// produced. For the payloads that used <c>JsonConvert.SerializeObject</c> without settings: the MQTT
+    /// <c>last_seen</c> stamp and the firmware-update progress frames on its WebSocket.
+    /// </summary>
+    public static JsonSerializerOptions Verbatim { get; } = ReadOnly(LikeNewtonsoft(new JsonSerializerOptions()));
+
+    /// <summary>
+    /// Reading JSON other publishers wrote to MQTT, as leniently as Newtonsoft did: names matched case-insensitively,
+    /// comments and trailing commas allowed, numbers and booleans accepted for string members.
+    /// </summary>
+    public static JsonSerializerOptions MqttRead { get; } = ReadOnly(new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true,
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.AllowNamedFloatingPointLiterals,
+        Converters = { new NewtonsoftCompatible.LenientStringConverter() }
+    });
+
     /// <summary>Applies the <see cref="Web"/> settings to an options instance someone else owns (ASP.NET's).</summary>
     public static JsonSerializerOptions ConfigureWeb(JsonSerializerOptions options)
     {
         options.Converters.Add(new JsonStringEnumConverter());
         options.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
+        return options;
+    }
+
+    private static JsonSerializerOptions LikeNewtonsoft(JsonSerializerOptions options)
+    {
+        options.Encoder = NewtonsoftCompatible.Encoder.Instance;
+        options.Converters.Add(new NewtonsoftCompatible.DoubleConverter());
         return options;
     }
 

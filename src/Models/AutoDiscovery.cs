@@ -1,6 +1,7 @@
 ﻿using ESPresense.Services;
 using ESPresense.Utils;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using TextExtensions;
 
 namespace ESPresense.Models;
@@ -87,7 +88,7 @@ public class AutoDiscovery
 
         try
         {
-            var discovery = JsonConvert.DeserializeObject<DiscoveryRecord>(payload);
+            var discovery = JsonSerializer.Deserialize<DiscoveryRecord>(payload, JsonDefaults.MqttRead);
             if (discovery == null)
             {
                 logger.LogWarning("Failed to deserialize discovery message");
@@ -116,38 +117,38 @@ public class AutoDiscovery
 
     public class DiscoveryRecord
     {
-        [JsonProperty("name")] public string? Name { get; set; }
+        [JsonPropertyName("name")] public string? Name { get; set; }
 
-        [JsonProperty("unique_id")] public string? UniqueId { get; set; }
+        [JsonPropertyName("unique_id")] public string? UniqueId { get; set; }
 
-        [JsonProperty("state_topic")] public string? StateTopic { get; set; }
+        [JsonPropertyName("state_topic")] public string? StateTopic { get; set; }
 
-        [JsonProperty("json_attributes_topic")] public string? JsonAttributesTopic { get; set; }
+        [JsonPropertyName("json_attributes_topic")] public string? JsonAttributesTopic { get; set; }
 
-        [JsonProperty("availability_topic")] public string? EntityStatusTopic { get; set; }
+        [JsonPropertyName("availability_topic")] public string? EntityStatusTopic { get; set; }
 
-        [JsonProperty("device")] public DeviceRecord? Device { get; set; }
+        [JsonPropertyName("device")] public DeviceRecord? Device { get; set; }
 
-        [JsonProperty("origin")] public OriginRecord? Origin { get; set; }
+        [JsonPropertyName("origin")] public OriginRecord? Origin { get; set; }
 
-        [JsonProperty("source_type")] public string? SourceType { get; set; }
+        [JsonPropertyName("source_type")] public string? SourceType { get; set; }
     }
 
     public class DeviceRecord
     {
-        [JsonProperty("name")] public string? Name { get; set; }
+        [JsonPropertyName("name")] public string? Name { get; set; }
 
-        [JsonProperty("manufacturer")] public string? Manufacturer { get; set; }
+        [JsonPropertyName("manufacturer")] public string? Manufacturer { get; set; }
 
-        [JsonProperty("model")] public string? Model { get; set; }
+        [JsonPropertyName("model")] public string? Model { get; set; }
 
-        [JsonProperty("sw_version")] public string? SwVersion { get; set; }
+        [JsonPropertyName("sw_version")] public string? SwVersion { get; set; }
 
-        [JsonProperty("identifiers")] public string[]? Identifiers { get; set; }
+        [JsonPropertyName("identifiers")] public string[]? Identifiers { get; set; }
     }
 
     public class OriginRecord
     {
-        [JsonProperty("name")] public string? Name { get; set; }
+        [JsonPropertyName("name")] public string? Name { get; set; }
     }
 }
