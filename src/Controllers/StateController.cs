@@ -27,9 +27,11 @@ public class StateController : ControllerBase
     private readonly NodeStateMapper _mapper;
     private readonly GlobalEventDispatcher _eventDispatcher;
     private readonly CalibrationService _calibration;
+    private readonly DeviceEnricher _enricher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, NodeStateMapper mapper, GlobalEventDispatcher eventDispatcher, CalibrationService calibration)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, NodeStateMapper mapper, GlobalEventDispatcher eventDispatcher, CalibrationService calibration, DeviceEnricher enricher)
     {
+        _enricher = enricher;
         _calibration = calibration;
         _logger = logger;
         _state = state;
@@ -38,32 +40,6 @@ public class StateController : ControllerBase
         _dss = dss;
         _mapper = mapper;
         _eventDispatcher = eventDispatcher;
-    }
-
-    /// <summary>
-    /// Enriches a single device with persisted settings like configured RSSI and friendly name.
-    /// </summary>
-    /// <param name="device">The device to enrich</param>
-    private void EnrichConfiguredRefRssi(Device device)
-    {
-        var deviceSettings = _dss.Get(device.Id);
-        device.ConfiguredRefRssi = deviceSettings?.RefRssi;
-        if (!string.IsNullOrWhiteSpace(deviceSettings?.Name))
-        {
-            device.Name = deviceSettings.Name;
-        }
-    }
-
-    /// <summary>
-    /// Enriches multiple devices with ConfiguredRefRssi from DeviceSettings.
-    /// </summary>
-    /// <param name="devices">The devices to enrich</param>
-    private void EnrichDevices(IEnumerable<Device> devices)
-    {
-        foreach (var device in devices)
-        {
-            EnrichConfiguredRefRssi(device);
-        }
     }
 
     // GET: api/rooms
@@ -82,7 +58,7 @@ public class StateController : ControllerBase
         if (!showAll) d = d.Where(a => a.Track || IsIncluded(a.Id, include));
 
         // Populate configured RefRssi from DeviceSettings
-        EnrichDevices(d);
+        _enricher.Enrich(d);
 
         return d;
     }
@@ -175,7 +151,7 @@ public class StateController : ControllerBase
             {
                 // Enrich device with ConfiguredRefRssi before sending
                 if (e.Device != null)
-                    EnrichConfiguredRefRssi(e.Device);
+                    _enricher.Enrich(e.Device);
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
             }
         }

@@ -19,12 +19,12 @@ public class McpResources
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
     private readonly NodeTelemetryStore _nts;
-    private readonly DeviceSettingsStore _dss;
     private readonly TelemetryService _telemetryService;
     private readonly FirmwareUpdateJobService _firmwareUpdateJobs;
     private readonly FirmwareCatalogService _firmwareCatalog;
     private readonly NodeStateMapper _mapper;
     private readonly CalibrationService _calibration;
+    private readonly DeviceEnricher _enricher;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public McpResources(
@@ -32,19 +32,19 @@ public class McpResources
         ConfigLoader config,
         NodeSettingsStore nsd,
         NodeTelemetryStore nts,
-        DeviceSettingsStore dss,
+        DeviceEnricher enricher,
         TelemetryService telemetryService,
         FirmwareUpdateJobService firmwareUpdateJobs,
         FirmwareCatalogService firmwareCatalog,
         NodeStateMapper mapper,
         CalibrationService calibration)
     {
+        _enricher = enricher;
         _calibration = calibration;
         _state = state;
         _config = config;
         _nsd = nsd;
         _nts = nts;
-        _dss = dss;
         _telemetryService = telemetryService;
         _firmwareUpdateJobs = firmwareUpdateJobs;
         _firmwareCatalog = firmwareCatalog;
@@ -92,7 +92,7 @@ public class McpResources
     public Task<string> GetDevicesResource()
     {
         var devices = _state.Devices.Values.ToList();
-        EnrichDevices(devices);
+        _enricher.Enrich(devices);
         return Task.FromResult(JsonSerializer.Serialize(devices, _jsonOptions));
     }
 
@@ -101,7 +101,7 @@ public class McpResources
     public Task<string> GetDevicesTool()
     {
         var devices = _state.Devices.Values.ToList();
-        EnrichDevices(devices);
+        _enricher.Enrich(devices);
         return Task.FromResult(JsonSerializer.Serialize(devices, _jsonOptions));
     }
 
@@ -292,23 +292,5 @@ public class McpResources
     {
         var (cancelled, error) = _firmwareUpdateJobs.Cancel(jobId);
         return Task.FromResult(JsonSerializer.Serialize(new { ok = cancelled, error }, _jsonOptions));
-    }
-
-    private void EnrichConfiguredRefRssi(Device device)
-    {
-        var deviceSettings = _dss.Get(device.Id);
-        device.ConfiguredRefRssi = deviceSettings?.RefRssi;
-        if (!string.IsNullOrWhiteSpace(deviceSettings?.Name))
-        {
-            device.Name = deviceSettings.Name;
-        }
-    }
-
-    private void EnrichDevices(IEnumerable<Device> devices)
-    {
-        foreach (var device in devices)
-        {
-            EnrichConfiguredRefRssi(device);
-        }
     }
 }

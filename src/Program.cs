@@ -69,6 +69,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Teleme
 builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
 builder.Services.AddSingleton<CalibrationService>();
+builder.Services.AddSingleton<DeviceEnricher>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
 {
     opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());

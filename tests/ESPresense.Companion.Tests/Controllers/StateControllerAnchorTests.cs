@@ -48,7 +48,8 @@ public class StateControllerAnchorTests
             nodeTelemetryStore,
             new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             mockEventDispatcher.Object,
-            new CalibrationService(_state, _mockNodeSettingsStore.Object)
+            new CalibrationService(_state, _mockNodeSettingsStore.Object),
+            new DeviceEnricher(_mockDeviceSettingsStore.Object)
         );
     }
 

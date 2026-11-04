@@ -241,7 +241,8 @@ public class AnchorEdgeCaseTests
             _nodeTelemetryStore,
             new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
             Mock.Of<GlobalEventDispatcher>(),
-            new CalibrationService(_state, mockNodeSettingsStore.Object)
+            new CalibrationService(_state, mockNodeSettingsStore.Object),
+            new DeviceEnricher(_deviceSettingsStore)
         );
 
         // Act

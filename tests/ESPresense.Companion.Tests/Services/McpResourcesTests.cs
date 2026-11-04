@@ -26,7 +26,7 @@ public class McpResourcesTests
             new Mock<ConfigLoader>("test-config-dir").Object,
             nodeSettingsStore,
             nodeTelemetryStore,
-            new DeviceSettingsStore(mqtt.Object, state),
+            new DeviceEnricher(new DeviceSettingsStore(mqtt.Object, state)),
             telemetryService,
             firmwareUpdateJobs,
             new FirmwareCatalogService(new HttpClient(), Mock.Of<IFirmwareTypeStore>(), nodeTelemetryStore),
