@@ -1,5 +1,6 @@
 using ESPresense.Models;
 using ESPresense.Services;
+using ESPresense.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ESPresense.Controllers;
@@ -35,7 +36,9 @@ public class NodeController(
     public Task Set(string id, [FromBody] NodeSettings ds)
     {
         ds.Id = id;
-        logger.LogInformation("Set {id} {@ds}", id, ds);
+        // {@ds} is Serilog destructuring: the settings become a structured object in the log event rather than
+        // NodeSettings.ToString(). Under a provider without destructuring the @ is a no-op; keep it.
+        logger.LogInformation("Set {id} {@ds}", LogSanitizer.Strip(id), ds);
         return nodeSettingsStore.Set(id, ds);
     }
 

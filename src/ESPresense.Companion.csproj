@@ -14,6 +14,8 @@
     <RootNamespace>ESPresense</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);CS8618</NoWarn>
+    <!-- Logging templates: CA2017 argument count must match the template, CA2254 the template must be a constant (#1846) -->
+    <WarningsAsErrors>$(WarningsAsErrors);CA2017;CA2254</WarningsAsErrors>
     <!-- Converters/NewtonsoftCompatible.cs overrides JavaScriptEncoder's pointer-based members -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

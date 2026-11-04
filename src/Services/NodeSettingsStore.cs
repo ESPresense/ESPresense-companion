@@ -276,7 +276,7 @@ namespace ESPresense.Services
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Error parsing {0} for {1}", arg.Setting, arg.NodeId);
+                    logger.LogWarning(ex, "Error parsing {Setting} for {NodeId}", arg.Setting, arg.NodeId);
                 }
                 return Task.CompletedTask;
             };

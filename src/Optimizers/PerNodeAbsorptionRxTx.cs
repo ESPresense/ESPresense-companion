@@ -183,7 +183,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         }
         catch (Exception ex)
         {
-            _logger.LogError("Error optimizing all nodes: {0}", ex.Message);
+            _logger.LogError("Error optimizing all nodes: {Message}", ex.Message);
         }
 
         return or;

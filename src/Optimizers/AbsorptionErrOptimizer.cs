@@ -67,7 +67,7 @@ public class AbsorptionErrOptimizer : IOptimizer
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error optimizing {0}: {1}", g.Key.Id, ex.Message);
+                _logger.LogError("Error optimizing {NodeId}: {Message}", g.Key.Id, ex.Message);
             }
         }
 

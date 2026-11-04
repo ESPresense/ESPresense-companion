@@ -343,7 +343,7 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
         }
         catch (Exception ex)
         {
-            _logger.LogError("Error optimizing: {0}", ex.Message);
+            _logger.LogError("Error optimizing: {Message}", ex.Message);
         }
 
         return or;

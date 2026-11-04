@@ -22,7 +22,6 @@ public class LoggingConventionTests
     {
         "Models/State.cs",                // #1844
         "Services/DeviceTracker.cs",      // #1844
-        "Services/MqttCoordinator.cs",    // #1843 (no static Log calls today, but listed so #1843 can't add them unnoticed)
         "Services/MultiScenarioLocator.cs", // #1845
     };
 
@@ -41,6 +40,26 @@ public class LoggingConventionTests
     {
         // Guards the guard: Program.cs really does use Log.Logger, so a scan that finds nothing there is broken.
         Assert.That(SourceScan.FilesMatching(StaticSerilog), Does.Contain("Program.cs"));
+    }
+
+    // The first string literal after a Microsoft.Extensions.Logging call (optionally preceded by an exception argument).
+    private static readonly Regex MelTemplate = new(
+        @"\.Log(Trace|Debug|Information|Warning|Error|Critical)\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)?""(?<template>(?:[^""\\]|\\.)*)""",
+        RegexOptions.Compiled);
+
+    [Test]
+    public void MelTemplates_UseNamedPlaceholders()
+    {
+        // Microsoft.Extensions.Logging binds placeholders to arguments by position, so "{1} {0}" takes the first
+        // argument for {1}; Serilog's Log.* bound {N} by index. Named placeholders can't be misread either way,
+        // and are what the Serilog sink stores as properties.
+        var offenders = SourceScan.BackendFiles()
+            .SelectMany(f => MelTemplate.Matches(f.Text).Select(m => (f.Path, Template: m.Groups["template"].Value)))
+            .Where(t => Regex.IsMatch(t.Template, @"\{\d"))
+            .Select(t => $"{t.Path}: \"{t.Template}\"")
+            .ToList();
+
+        Assert.That(offenders, Is.Empty, "Use named placeholders ({NodeId}) in logging templates: " + string.Join("; ", offenders));
     }
 
     private static readonly Regex DeferredFactory = new(@"\bDeferredLoggerFactory\b", RegexOptions.Compiled);
