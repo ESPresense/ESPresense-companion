@@ -1,7 +1,6 @@
 using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
-using Serilog;
 using ESPresense.Extensions;
 
 namespace ESPresense.Optimizers;
@@ -27,6 +26,7 @@ namespace ESPresense.Optimizers;
 public class PerNodeAbsorptionRxTx : IOptimizer
 {
     private readonly State _state;
+    private readonly ILogger<PerNodeAbsorptionRxTx> _logger;
 
     /// <summary>Residuals beyond this many dB count linearly rather than quadratically.</summary>
     private const double HuberDb = 6;
@@ -37,9 +37,10 @@ public class PerNodeAbsorptionRxTx : IOptimizer
     /// <summary>Prior weight on txRef: a 2 dB departure from the advertised reference costs as much as a ~1.4 dB residual.</summary>
     private const double TxRefPrior = 0.5;
 
-    public PerNodeAbsorptionRxTx(State state)
+    public PerNodeAbsorptionRxTx(State state, ILogger<PerNodeAbsorptionRxTx> logger)
     {
         _state = state;
+        _logger = logger;
     }
 
     public string Name => "Per Node Absorption Rx Tx Adj";
@@ -58,7 +59,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
 
         if (measures.Count < 3)
         {
-            Log.Warning("Not enough valid measurements for optimization. Found {Count} measurements, need at least 3. Add more BLE beacons or ESPresense nodes.", measures.Count);
+            _logger.LogWarning("Not enough valid measurements for optimization. Found {Count} measurements, need at least 3. Add more BLE beacons or ESPresense nodes.", measures.Count);
             return or;
         }
 
@@ -182,7 +183,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         }
         catch (Exception ex)
         {
-            Log.Error("Error optimizing all nodes: {0}", ex.Message);
+            _logger.LogError("Error optimizing all nodes: {0}", ex.Message);
         }
 
         return or;

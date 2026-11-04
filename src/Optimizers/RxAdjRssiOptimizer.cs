@@ -1,17 +1,18 @@
 ﻿using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
-using Serilog;
 
 namespace ESPresense.Optimizers;
 
 public class RxAdjRssiOptimizer : IOptimizer
 {
     private readonly State _state;
+    private readonly ILogger<RxAdjRssiOptimizer> _logger;
 
-    public RxAdjRssiOptimizer(State state)
+    public RxAdjRssiOptimizer(State state, ILogger<RxAdjRssiOptimizer> logger)
     {
         _state = state;
+        _logger = logger;
     }
 
     public string Name => "Rx Adj Rssi";
@@ -67,7 +68,7 @@ public class RxAdjRssiOptimizer : IOptimizer
             }
             catch (Exception ex)
             {
-                Log.Error("Error optimizing {0}: {1}", g.Key.Id, ex.Message);
+                _logger.LogError("Error optimizing {0}: {1}", g.Key.Id, ex.Message);
             }
         }
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using ESPresense.Models;
 using ESPresense.Optimizers;
 using ESPresense.Services;
@@ -50,8 +51,8 @@ public class PerNodeErrorTests
 
     private IOptimizer Create(string mode) => mode switch
     {
-        "per_node_absorption" => new PerNodeAbsorptionRxTx(_state),
-        "global_absorption" => new GlobalAbsorptionRxTxOptimizer(_state),
+        "per_node_absorption" => new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance),
+        "global_absorption" => new GlobalAbsorptionRxTxOptimizer(_state, NullLogger<GlobalAbsorptionRxTxOptimizer>.Instance),
         _ => throw new ArgumentOutOfRangeException(nameof(mode))
     };
 

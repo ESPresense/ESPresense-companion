@@ -35,12 +35,6 @@ public class LoggingConventionTests
         "Locators/MultiFloorMultilateralizer.cs",
         "Locators/NadarayaWatsonMultilateralizer.cs",
         "Models/AutoDiscovery.cs",
-        "Optimizers/AbsorptionErrOptimizer.cs",
-        "Optimizers/GlobalAbsorptionRxTxOptimizer.cs",
-        "Optimizers/IsotonicRegressionOptimizer.cs",
-        "Optimizers/OptimizationRunner.cs",
-        "Optimizers/PerNodeAbsorptionRxTx.cs",
-        "Optimizers/RxAdjRssiOptimizer.cs",
     };
 
     [Test]

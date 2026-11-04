@@ -1,17 +1,18 @@
 ﻿using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
-using Serilog;
 
 namespace ESPresense.Optimizers;
 
 public class AbsorptionErrOptimizer : IOptimizer
 {
     private readonly State _state;
+    private readonly ILogger<AbsorptionErrOptimizer> _logger;
 
-    public AbsorptionErrOptimizer(State state)
+    public AbsorptionErrOptimizer(State state, ILogger<AbsorptionErrOptimizer> logger)
     {
         _state = state;
+        _logger = logger;
     }
 
     public string Name => "Absorption NelderMead";
@@ -66,7 +67,7 @@ public class AbsorptionErrOptimizer : IOptimizer
             }
             catch (Exception ex)
             {
-                Log.Error("Error optimizing {0}: {1}", g.Key.Id, ex.Message);
+                _logger.LogError("Error optimizing {0}: {1}", g.Key.Id, ex.Message);
             }
         }
 
