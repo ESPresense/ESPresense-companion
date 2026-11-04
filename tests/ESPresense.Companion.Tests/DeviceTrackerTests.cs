@@ -252,6 +252,27 @@ public class DeviceTrackerTests
         var nearestPlacedOnly = new Scenario(new Config(), new NearestNode(placedOnlyDevice, _state), "nearestnode");
         nearestPlacedOnly.Locate();
         Assert.That(nearestScenario.Location, Is.EqualTo(nearestPlacedOnly.Location), "the unplaced receiver must not win nearest-node and report its (0,0,0) location");
+
+        // A device heard only by receivers that are all unplaced: fingerprinting needs no node
+        // coordinates, so it can still use them, but MultiFloor and NearestNode -- which do need a
+        // location -- must report no fix at all rather than something anchored at the origin.
+        var unplacedOnlyDevice = new Device("phone-unplaced-only", null, TimeSpan.FromSeconds(30));
+        foreach (var nodeId in new[] { "spare1", "spare2" })
+            unplacedOnlyDevice.Nodes[nodeId] = new DeviceToNode(unplacedOnlyDevice, new Node(nodeId, NodeSourceType.Discovered)) { Distance = 2.0, Rssi = -65, LastHit = DateTime.UtcNow };
+
+        var unplacedMapPath = Path.Combine(_configDir, "fingerprints-unplaced.json");
+        await File.WriteAllTextAsync(unplacedMapPath, "{\"fingerprints\": [{\"floor\": \"first\", \"x\": 1, \"y\": 0, \"z\": 0, \"rssi\": {\"spare1\": -60, \"spare2\": -70}}]}");
+        var unplacedMap = new FingerprintMap(unplacedMapPath);
+        var unplacedFingerprintConfig = new FingerprintConfig { Enabled = true, Mode = "knn", K = 1, MinCommon = 2 };
+        var unplacedFingerprintScenario = new Scenario(new Config(), new FingerprintLocator(unplacedOnlyDevice, floor, unplacedMap, unplacedFingerprintConfig), "fingerprint");
+        Assert.That(unplacedFingerprintScenario.Locate(), Is.True, "fingerprinting needs no node coordinates, so receivers that are all unplaced are still usable");
+        Assert.That(unplacedFingerprintScenario.Fixes, Is.EqualTo(2));
+
+        var unplacedMultiFloor = new Scenario(new Config(), new MultiFloorMultilateralizer(unplacedOnlyDevice, _state), "multifloor");
+        Assert.That(unplacedMultiFloor.Locate(), Is.False, "MultiFloor has no placed receiver to solve against");
+
+        var unplacedNearest = new Scenario(new Config(), new NearestNode(unplacedOnlyDevice, _state), "nearestnode");
+        Assert.That(unplacedNearest.Locate(), Is.False, "NearestNode must not report an unplaced receiver's (0,0,0) location");
     }
 
     // ---------------------------------------------------------------------
