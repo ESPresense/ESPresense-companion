@@ -26,4 +26,14 @@ public class CalibrationWireFormatTests
         var json = JsonSerializer.Serialize(_f.CreateController().GetCalibration(), CalibrationFixture.RestJson);
         Assert.That(json, Is.EqualTo(ExpectedRestJson));
     }
+
+    [Test]
+    public void Calculate_LooksUpEachNodesSettingsOnce()
+    {
+        _f.CreateController().GetCalibration();
+
+        // Three nodes in a full mesh plus an anchored device: 8 pairs, but only 3 distinct nodes.
+        foreach (var id in new[] { "node-a", "node-b", "node-c" })
+            _f.Nsd.Verify(x => x.Get(id), Moq.Times.Once(), id);
+    }
 }

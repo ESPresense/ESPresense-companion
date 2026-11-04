@@ -25,14 +25,18 @@ public class CalibrationService(State state, NodeSettingsStore nsd)
         var mapDistances = new List<double>();
         var actualDistances = new List<double>();
 
+        // One settings lookup per node per call, not one per pair.
+        var settings = new Dictionary<string, NodeSettings>();
+        NodeSettings Settings(string id) => settings.TryGetValue(id, out var ns) ? ns : settings[id] = nsd.Get(id);
+
         // Process traditional Node-to-Node relationships
         foreach (var (txId, tx) in state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
         {
-            var txNs = nsd.Get(txId);
+            var txNs = Settings(txId);
             var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
             foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
             {
-                var rxNs = nsd.Get(rxId);
+                var rxNs = Settings(rxId);
                 Put(txM, rx.Rx?.Name ?? rxId, new CalibrationCell(
                     txNs.Calibration.TxRefRssi, rxNs.Calibration.RxAdjRssi, rxNs.Calibration.Absorption,
                     rx.MapDistance, rx.Distance, rx.Rssi, rx.DistVar));
@@ -55,7 +59,7 @@ public class CalibrationService(State state, NodeSettingsStore nsd)
             foreach (var (rxId, deviceNode) in device.Nodes.Where(dn => dn.Value.Current && dn.Value.Node?.HasLocation == true))
             {
                 var rxNode = deviceNode.Node!;
-                var rxNs = nsd.Get(rxNode.Id);
+                var rxNs = Settings(rxNode.Id);
                 var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);
 
                 // Anchored devices don't have tx calibration settings, but receivers still have their settings
