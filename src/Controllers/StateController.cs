@@ -8,7 +8,6 @@ using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
-using Serilog;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
 using ESPresense.Events;
@@ -329,7 +328,7 @@ public class StateController : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to save auto-optimize setting");
+            _logger.LogError(ex, "Failed to save auto-optimize setting");
             return StatusCode(500, new { error = "Failed to save auto-optimize setting" });
         }
     }

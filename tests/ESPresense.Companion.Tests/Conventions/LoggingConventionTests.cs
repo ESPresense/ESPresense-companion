@@ -26,18 +26,10 @@ public class LoggingConventionTests
         "Services/MultiScenarioLocator.cs", // #1845
     };
 
-    // Not yet converted. Each conversion commit removes its files from this list.
-    private static readonly string[] NotYetConverted =
-    {
-        "Controllers/NodeController.cs",
-        "Controllers/StateController.cs",
-        "Models/AutoDiscovery.cs",
-    };
-
     [Test]
     public void StaticSerilogLog_IsOnlyUsedByBootstrapAndDeferredFiles()
     {
-        var allowed = new HashSet<string>(Bootstrap.Concat(Deferred).Concat(NotYetConverted), StringComparer.Ordinal);
+        var allowed = new HashSet<string>(Bootstrap.Concat(Deferred), StringComparer.Ordinal);
         var offenders = SourceScan.FilesMatching(StaticSerilog).Where(f => !allowed.Contains(f)).ToList();
 
         Assert.That(offenders, Is.Empty,
@@ -45,13 +37,10 @@ public class LoggingConventionTests
     }
 
     [Test]
-    public void AllowList_HasNoStaleEntries()
+    public void Scan_RecognisesTheBootstrapUse()
     {
-        // A file that no longer uses Serilog.Log must come off the list, so it can't quietly regress.
-        var users = SourceScan.FilesMatching(StaticSerilog);
-        var stale = NotYetConverted.Concat(Bootstrap).Where(f => !users.Contains(f)).ToList();
-
-        Assert.That(stale, Is.Empty, "Remove these from the allow-list; they no longer use Serilog.Log: " + string.Join(", ", stale));
+        // Guards the guard: Program.cs really does use Log.Logger, so a scan that finds nothing there is broken.
+        Assert.That(SourceScan.FilesMatching(StaticSerilog), Does.Contain("Program.cs"));
     }
 
     private static readonly Regex DeferredFactory = new(@"\bDeferredLoggerFactory\b", RegexOptions.Compiled);
@@ -65,6 +54,7 @@ public class LoggingConventionTests
         "Locators/BaseMultilateralizer.cs",          // built by State (#1844)
         "Locators/MultiFloorMultilateralizer.cs",    // built by State (#1844)
         "Locators/NadarayaWatsonMultilateralizer.cs", // built by State (#1844)
+        "Models/AutoDiscovery.cs",                   // built via Device by DeviceTracker/MqttCoordinator (#1843, #1844)
     };
 
     [Test]

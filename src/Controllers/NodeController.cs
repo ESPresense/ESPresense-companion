@@ -1,7 +1,6 @@
 using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
 
 namespace ESPresense.Controllers;
 
@@ -11,7 +10,8 @@ public class NodeController(
     NodeSettingsStore nodeSettingsStore,
     NodeTelemetryStore nodeTelemetryStore,
     State state,
-    FirmwareUpdateJobService firmwareUpdateJobs) : ControllerBase
+    FirmwareUpdateJobService firmwareUpdateJobs,
+    ILogger<NodeController> logger) : ControllerBase
 {
     /// <summary>
     /// Retrieve the saved settings for a node and any runtime details available from in-memory state.
@@ -35,7 +35,7 @@ public class NodeController(
     public Task Set(string id, [FromBody] NodeSettings ds)
     {
         ds.Id = id;
-        Log.Information("Set {id} {@ds}", id, ds);
+        logger.LogInformation("Set {id} {@ds}", id, ds);
         return nodeSettingsStore.Set(id, ds);
     }
 

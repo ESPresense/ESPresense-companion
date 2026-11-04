@@ -1,21 +1,26 @@
 ﻿using ESPresense.Services;
 using ESPresense.Utils;
 using Newtonsoft.Json;
-using Serilog;
 using TextExtensions;
 
 namespace ESPresense.Models;
 
 public class AutoDiscovery
 {
+    // Devices (and so their discovery records) are still built by DeviceTracker and MqttCoordinator,
+    // which can't pass a logger until #1843/#1844 merge.
+    private static readonly ILogger<AutoDiscovery> DeferredLogger = DeferredLoggerFactory.CreateLogger<AutoDiscovery>();
+
+    private readonly ILogger _logger;
     private bool _sent;
 
     public DiscoveryRecord Message { get; set; }
     public string DiscoveryId { get; internal set; }
     public string Component { get; internal set; }
 
-    public AutoDiscovery(string component, Device dev, string? discoveryId = null, string? sourceType = null)
+    public AutoDiscovery(string component, Device dev, string? discoveryId = null, string? sourceType = null, ILogger<AutoDiscovery>? logger = null)
     {
+        _logger = logger ?? DeferredLogger;
         DiscoveryId = discoveryId ?? $"espresense-{dev.Id}".ToSnakeCase();
         Component = component;
 
@@ -39,8 +44,9 @@ public class AutoDiscovery
         };
     }
 
-    public AutoDiscovery(string component, string discoveryId, DiscoveryRecord message)
+    public AutoDiscovery(string component, string discoveryId, DiscoveryRecord message, ILogger<AutoDiscovery>? logger = null)
     {
+        _logger = logger ?? DeferredLogger;
         DiscoveryId = discoveryId;
         Component = component;
         Message = message;
@@ -51,23 +57,24 @@ public class AutoDiscovery
         if (_sent) return;
         _sent = true;
 
-        Log.Debug($"[+] Discovery {Component} {DiscoveryId}");
+        _logger.LogDebug("[+] Discovery {Component} {DiscoveryId}", Component, DiscoveryId);
         await mqtt.EnqueueAsync(MqttTopics.DiscoveryConfig(mqtt.DiscoveryTopic, Component, DiscoveryId),
             MqttPayloads.Discovery(Message), true);
     }
 
     public async Task Delete(IMqttCoordinator mqtt)
     {
-        Log.Debug($"[-] Discovery {Component} {DiscoveryId}");
+        _logger.LogDebug("[-] Discovery {Component} {DiscoveryId}", Component, DiscoveryId);
         await mqtt.EnqueueAsync(MqttTopics.DiscoveryConfig(mqtt.DiscoveryTopic, Component, DiscoveryId), null, true);
     }
 
-    internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant")
+    internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant", ILogger<AutoDiscovery>? logger = null)
     {
+        logger ??= DeferredLogger;
         var parts = topic.Split("/");
         if (parts.Length != 4 || parts[0] != discoveryTopic || parts[3] != "config")
         {
-            Log.Debug("Invalid topic structure");
+            logger.LogDebug("Invalid topic structure");
             msg = null;
             return false;
         }
@@ -83,7 +90,7 @@ public class AutoDiscovery
             var discovery = JsonConvert.DeserializeObject<DiscoveryRecord>(payload);
             if (discovery == null)
             {
-                Log.Warning("Failed to deserialize discovery message");
+                logger.LogWarning("Failed to deserialize discovery message");
                 msg = null;
                 return false;
             }
@@ -91,17 +98,17 @@ public class AutoDiscovery
             if (discovery?.Origin?.Name != "ESPresense Companion")
             {
                 var origin = discovery?.Origin?.Name;
-                if (origin != null) Log.Debug($"Ignoring discovery message from origin: {origin}");
+                if (origin != null) logger.LogDebug("Ignoring discovery message from origin: {Origin}", origin);
                 msg = null;
                 return false;
             }
 
-            msg = new AutoDiscovery(parts[1], parts[2], discovery);
+            msg = new AutoDiscovery(parts[1], parts[2], discovery, logger);
             return true;
         }
         catch (JsonException ex)
         {
-            Log.Warning("Failed to deserialize discovery message: {0}", ex.Message);
+            logger.LogWarning("Failed to deserialize discovery message: {Message}", ex.Message);
             msg = null;
             return false;
         }
