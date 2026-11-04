@@ -146,7 +146,8 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
                !string.Equals(last.CaCertPath, config.CaCertPath) ||
                !string.Equals(last.ClientId, config.ClientId) ||
                last.ReadOnly != config.ReadOnly ||
-               !string.Equals(last.DiscoveryTopic, config.DiscoveryTopic, StringComparison.OrdinalIgnoreCase);
+               // Ordinal: MQTT topics are case-sensitive (unlike the DNS host above), so a case-only edit is a new prefix.
+               !string.Equals(last.DiscoveryTopic, config.DiscoveryTopic, StringComparison.Ordinal);
     }
 
     public async Task<IMqttClient> GetClientAsync(CancellationToken ct = default)

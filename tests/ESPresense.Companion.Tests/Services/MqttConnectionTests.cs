@@ -213,6 +213,30 @@ public class MqttConnectionTests
     }
 
     [Test]
+    public async Task DiscoveryTopicCaseChange_Reconnects_HostCaseChangeDoesNot()
+    {
+        var h = new Harness();
+        h.Config.DiscoveryTopic = "HomeAssistant";
+        await h.Connection.GetClientAsync();
+
+        // DNS names are case-insensitive: not a change.
+        var hostCase = h.Config.Clone();
+        hostCase.Host = "BROKER.TEST";
+        h.Connection.OnConfigChanged(hostCase);
+        Assert.That(h.Connection.ReconnectRequired, Is.False);
+
+        // MQTT topics are case-sensitive: a new discovery prefix.
+        h.Config.DiscoveryTopic = "homeassistant";
+        h.Connection.OnConfigChanged(h.Config);
+        Assert.That(h.Connection.ReconnectRequired, Is.True);
+
+        await h.Connection.PublishAsync("t", "x", false);
+        Assert.That(h.Clients, Has.Count.EqualTo(2));
+        Assert.That(h.Clients[1].Subscribed, Does.Contain("homeassistant/device_tracker/+/config"));
+        Assert.That(h.Connection.DiscoveryTopic, Is.EqualTo("homeassistant"));
+    }
+
+    [Test]
     public async Task IrrelevantConfigChange_DoesNotReconnect()
     {
         var h = new Harness();
