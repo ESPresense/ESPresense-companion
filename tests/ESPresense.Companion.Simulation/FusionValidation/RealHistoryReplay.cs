@@ -72,9 +72,19 @@ public static class RealHistoryReplay
 
         var (state, tracker, fusion) = BuildHarness();
 
+        // Unlike the tracker-state queue below, this feeds every reading up to opts.End (not just
+        // in-window ones): CsiMotionTracker.Observe prunes anything older than its own 4h baseline
+        // window, so pre-window history only sharpens the baseline it starts with. Seeding just the
+        // single last pre-window value (as WindowWithSeed does for discrete tracker state) would instead
+        // leave the tracker to build its baseline cold from however few readings happen to fall in-window,
+        // which can mistake early motion for baseline and miss real motion (CodeRabbit caught this with a
+        // concrete example: a lone pre-window 10 followed by in-window 90, 90 averages to a baseline that
+        // never crosses MotionRatio).
         var csiQueues = CsiEntityToNode.Keys
             .ToDictionary(e => e, e => new Queue<(DateTimeOffset At, double Value)>(
-                WindowWithSeed(history.GetValueOrDefault(e) ?? new List<HaStateChange>(), opts.Start, opts.End)
+                (history.GetValueOrDefault(e) ?? new List<HaStateChange>())
+                    .OrderBy(c => c.LastChanged)
+                    .Where(c => c.LastChanged <= opts.End)
                     .Select(c => (c.LastChanged, ParseOrNaN(c.State)))
                     .Where(c => double.IsFinite(c.Item2))),
                 StringComparer.OrdinalIgnoreCase);
@@ -153,7 +163,33 @@ public static class RealHistoryReplay
         var groundTruth = GroundTruthBuilder.Build(windowedHistory, excluded, RoomFromOccupancyEntity, RoomFromTrackerState);
         var flapWindows = DetectFlapWindows(history, "device_tracker.phone_darrell_15_pro", opts.Start, opts.End);
 
-        var report = ValidationMetrics.Compute(events, groundTruth, flapWindows, opts.LatencyWindow);
+        // WindowWithSeed clamps a pre-window "on" row to opts.Start, so GroundTruthBuilder opens an
+        // occupancy interval exactly there even though no transition actually happened at that instant
+        // (the room was already occupied coming into the window). FalseUnknownRate only needs "was the
+        // room occupied then", which the clamped interval still answers correctly, but Latency measures
+        // transition timing specifically -- scoring that synthetic boundary as a transition would bias
+        // it toward a spurious zero-latency match or a spurious miss. Score latency against a copy with
+        // those window-start continuations removed, instead of changing ValidationMetrics/GroundTruthBuilder
+        // (shared by the synthetic harness and fusion-validate) just for this replay-only wrinkle.
+        var (flapRate, flapSamples) = ValidationMetrics.FlapResolutionRate(events, groundTruth, flapWindows);
+        var (attribAcc, attribSamples) = ValidationMetrics.AttributionAccuracy(events, groundTruth);
+        var (falseUnknownRate, unknownEvents) = ValidationMetrics.FalseUnknownRate(events, groundTruth);
+
+        var latencyGroundTruth = new GroundTruth();
+        latencyGroundTruth.DeviceRooms.AddRange(groundTruth.DeviceRooms);
+        latencyGroundTruth.RoomOccupancy.AddRange(groundTruth.RoomOccupancy.Where(i => i.Start != opts.Start));
+        var latencies = ValidationMetrics.Latency(events, latencyGroundTruth, opts.LatencyWindow);
+
+        var report = new ValidationReport
+        {
+            FlapResolutionRate = flapRate,
+            FlapSamples = flapSamples,
+            AttributionAccuracy = attribAcc,
+            AttributionSamples = attribSamples,
+            FalseUnknownRate = falseUnknownRate,
+            UnknownEvents = unknownEvents,
+            Latencies = latencies
+        };
         var json = FusionValidationReportWriter.ToJson(report);
         var md = FusionValidationReportWriter.ToMarkdown(report);
 
