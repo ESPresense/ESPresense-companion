@@ -57,9 +57,12 @@ builder.Services.AddSingleton<DeviceService>();
 builder.Services.AddSingleton<DeviceCaptureService>();
 builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
+builder.Services.AddSingleton<CsiMotionTracker>();
+builder.Services.AddSingleton<CsiFusionService>();
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
 builder.Services.AddHostedService<OptimizationRunner>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<CsiFusionService>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceTracker>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());

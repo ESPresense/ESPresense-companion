@@ -52,6 +52,26 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "exclude_devices")]
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
+
+        [YamlMember(Alias = "csi_fusion")]
+        public ConfigCsiFusion CsiFusion { get; set; } = new();
+    }
+
+    /// <summary>Fuses passive-WiFi CSI motion with BLE room resolution (room flap resolution,
+    /// "who entered" attribution, unknown-occupant flagging). See config.example.yaml for defaults.</summary>
+    public partial class ConfigCsiFusion
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>
+        /// How far from a room's motion-started edge (in either direction) a tracked device's room can be
+        /// to get attributed as "who entered". Default of 20s is a few node/device report cycles (both
+        /// report every ~4-6s): tight enough that unrelated movement elsewhere doesn't get swept in, loose
+        /// enough to tolerate the lag between a device's BLE room settling and CSI picking up the motion.
+        /// </summary>
+        [YamlMember(Alias = "attribution_window_secs")]
+        public double AttributionWindowSecs { get; set; } = 20;
     }
 
     public partial class ConfigLocators
