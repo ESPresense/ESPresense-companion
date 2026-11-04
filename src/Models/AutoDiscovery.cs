@@ -23,9 +23,9 @@ public class AutoDiscovery
         {
             Name = dev.Name,
             UniqueId = $"espresense-companion-{dev.Id}",
-            StateTopic = $"espresense/companion/{dev.Id}",
-            JsonAttributesTopic = $"espresense/companion/{dev.Id}/attributes",
-            EntityStatusTopic = "espresense/companion/status",
+            StateTopic = MqttTopics.CompanionDeviceState(dev.Id),
+            JsonAttributesTopic = MqttTopics.DeviceAttributes(dev.Id),
+            EntityStatusTopic = MqttTopics.CompanionStatus,
             Device = new DeviceRecord()
             {
                 Name = dev.Name ?? dev.Id,
@@ -52,14 +52,14 @@ public class AutoDiscovery
         _sent = true;
 
         Log.Debug($"[+] Discovery {Component} {DiscoveryId}");
-        await mqtt.EnqueueAsync($"{mqtt.DiscoveryTopic}/{Component}/{DiscoveryId}/config",
+        await mqtt.EnqueueAsync(MqttTopics.DiscoveryConfig(mqtt.DiscoveryTopic, Component, DiscoveryId),
             JsonConvert.SerializeObject(Message, SerializerSettings.NullIgnore), true);
     }
 
     public async Task Delete(IMqttCoordinator mqtt)
     {
         Log.Debug($"[-] Discovery {Component} {DiscoveryId}");
-        await mqtt.EnqueueAsync($"{mqtt.DiscoveryTopic}/{Component}/{DiscoveryId}/config", null, true);
+        await mqtt.EnqueueAsync(MqttTopics.DiscoveryConfig(mqtt.DiscoveryTopic, Component, DiscoveryId), null, true);
     }
 
     internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant")

@@ -211,16 +211,11 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
             {
                 if (readOnlyReason == ReadOnlyReason.None)
                 {
-                    await mqttClient.PublishStringAsync("espresense/companion/status", "online", retain: true).ConfigureAwait(false);
+                    await mqttClient.PublishStringAsync(MqttTopics.CompanionStatus, MqttTopics.Online, retain: true).ConfigureAwait(false);
                 }
 
-                await mqttClient.SubscribeAsync("espresense/devices/+/+").ConfigureAwait(false);
-                await mqttClient.SubscribeAsync("espresense/settings/+/config").ConfigureAwait(false);
-                await mqttClient.SubscribeAsync("espresense/rooms/+/+").ConfigureAwait(false);
-                await mqttClient.SubscribeAsync("espresense/rooms/*/+/set").ConfigureAwait(false);
-                await mqttClient.SubscribeAsync($"{config.DiscoveryTopic}/device_tracker/+/config").ConfigureAwait(false);
-                await mqttClient.SubscribeAsync("espresense/companion/+/attributes").ConfigureAwait(false);
-                await mqttClient.SubscribeAsync("espresense/companion/lease/+").ConfigureAwait(false);
+                foreach (var filter in MqttTopics.Subscriptions(config.DiscoveryTopic))
+                    await mqttClient.SubscribeAsync(filter).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -296,9 +291,9 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         if (readOnlyReason == ReadOnlyReason.None)
         {
             optionsBuilder = optionsBuilder
-                .WithWillTopic("espresense/companion/status")
+                .WithWillTopic(MqttTopics.CompanionStatus)
                 .WithWillRetain()
-                .WithWillPayload("offline");
+                .WithWillPayload(MqttTopics.Offline);
         }
 
         var mqttClientOptions = optionsBuilder.Build();
@@ -799,7 +794,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
             if (telemetry == null)
                 throw new MqttMessageProcessingException(
                     "Telemetry data was null after deserialization",
-                    $"espresense/rooms/{nodeId}/telemetry",
+                    MqttTopics.NodeTelemetry(nodeId),
                     payload,
                     "Telemetry");
 
@@ -813,7 +808,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         {
             throw new MqttMessageProcessingException(
                 "Failed to parse telemetry data",
-                $"espresense/rooms/{nodeId}/telemetry",
+                MqttTopics.NodeTelemetry(nodeId),
                 payload,
                 "Telemetry",
                 ex);
@@ -899,7 +894,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         {
             var deviceMessage = JsonConvert.DeserializeObject<DeviceMessage>(payload ?? "");
             if (deviceMessage == null)
-                throw new MqttMessageProcessingException("Device message was null after deserialization", $"espresense/devices/{deviceId}/{nodeId}", payload, "DeviceMessage");
+                throw new MqttMessageProcessingException("Device message was null after deserialization", MqttTopics.DeviceMessage(deviceId, nodeId), payload, "DeviceMessage");
 
             await InvokeAllAsync(DeviceMessageReceivedAsync, new DeviceMessageEventArgs
             {
@@ -910,7 +905,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         }
         catch (JsonException ex)
         {
-            throw new MqttMessageProcessingException("Failed to parse device message", $"espresense/devices/{deviceId}/{nodeId}", payload, "DeviceMessage", ex);
+            throw new MqttMessageProcessingException("Failed to parse device message", MqttTopics.DeviceMessage(deviceId, nodeId), payload, "DeviceMessage", ex);
         }
     }
 
@@ -921,7 +916,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         {
             var deviceSettings = JsonConvert.DeserializeObject<DeviceSettings>(payload ?? "");
             if (deviceSettings == null)
-                throw new MqttMessageProcessingException("Device settings were null after deserialization", $"espresense/settings/{deviceId}/config", payload, "DeviceConfig");
+                throw new MqttMessageProcessingException("Device settings were null after deserialization", MqttTopics.DeviceSettings(deviceId), payload, "DeviceConfig");
 
             deviceSettings.OriginalId = deviceId;
             if (DeviceConfigReceivedAsync != null)
@@ -935,7 +930,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         {
             throw new MqttMessageProcessingException(
                 "Failed to parse device settings",
-                $"espresense/settings/{deviceId}/config",
+                MqttTopics.DeviceSettings(deviceId),
                 payload,
                 "DeviceConfig",
                 ex);
@@ -1006,7 +1001,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
             if (attributes == null)
                 throw new MqttMessageProcessingException(
                     "Device attributes were null after deserialization",
-                    $"espresense/companion/{deviceId}/attributes",
+                    MqttTopics.DeviceAttributes(deviceId),
                     payload,
                     "DeviceAttributes");
 
@@ -1020,7 +1015,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         {
             throw new MqttMessageProcessingException(
                 "Failed to parse device attributes",
-                $"espresense/companion/{deviceId}/attributes",
+                MqttTopics.DeviceAttributes(deviceId),
                 payload,
                 "DeviceAttributes", ex);
         }

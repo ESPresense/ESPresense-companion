@@ -107,9 +107,9 @@ public class NodeTelemetryStore : BackgroundService
     /// <returns>A task that completes when both purge messages have been enqueued.</returns>
     public virtual async Task Delete(string id)
     {
-        await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/telemetry", null, true);
-        await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/status", null, true);
-        await _mqttCoordinator.EnqueueAsync($"espresense/rooms/{id}/update_error", null, true);
+        await _mqttCoordinator.EnqueueAsync(MqttTopics.NodeTelemetry(id), null, true);
+        await _mqttCoordinator.EnqueueAsync(MqttTopics.NodeStatus(id), null, true);
+        await _mqttCoordinator.EnqueueAsync(MqttTopics.NodeUpdateError(id), null, true);
         _updateErrorById.TryRemove(id, out _);
     }
 }
