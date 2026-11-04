@@ -26,7 +26,7 @@ public class MqttMessageProcessingException : Exception
     }
 }
 
-public class MqttCoordinator : IMqttCoordinator, IDisposable
+public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
 {
     private readonly ConfigLoader _cfg;
     private readonly ILogger<MqttCoordinator> _logger;
@@ -51,6 +51,9 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
     private string _discoveryTopic = "homeassistant";
     private volatile TaskCompletionSource _connectionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private readonly MqttMessageHandlers _handlers;
+    private volatile MqttTopicRouter _router = new("homeassistant");
+
     public string DiscoveryTopic => _discoveryTopic;
 
     public MqttCoordinator(
@@ -63,6 +66,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         _logger = logger;
         _mqttNetLogger = mqttNetLogger;
         _supervisorConfigLoader = supervisorConfigLoader;
+        _handlers = new MqttMessageHandlers(this, () => DiscoveryTopic, logger);
         _cfg.ConfigChanged += (s, c) =>
         {
             var configChanged = ConfigChanged(c.Mqtt);
@@ -498,95 +502,52 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
     public event EventHandler<PreviousDeviceDiscoveredEventArgs>? PreviousDeviceDiscovered;
     public event Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceivedAsync;
 
-    /// <summary>
-    /// Awaits every subscriber of an async multicast event.
-    /// </summary>
-    /// <remarks>
-    /// <c>await SomeEvent(args)</c> only awaits the <em>last</em> subscriber's task; earlier
-    /// handlers run but their tasks (and exceptions) are unobserved. This helper awaits each
-    /// handler so all subscribers complete and any failure surfaces. Handlers are invoked on
-    /// the captured invocation list, so a subscriber that unsubscribes mid-dispatch does not
-    /// skew the iteration, and exceptions from one handler do not stop the others.
-    /// </remarks>
-    internal Task InvokeAllAsync<T>(Func<T, Task>? handlers, T args, string eventName)
+    // The handlers raise the events above through this view, so the events stay declared on the facade.
+    Func<DeviceSettingsEventArgs, Task>? IMqttEventSink.DeviceConfigReceived => DeviceConfigReceivedAsync;
+    Func<DeviceMessageEventArgs, Task>? IMqttEventSink.DeviceMessageReceived => DeviceMessageReceivedAsync;
+    Func<MqttApplicationMessageReceivedEventArgs, Task>? IMqttEventSink.MqttMessageReceived => MqttMessageReceivedAsync;
+    Func<NodeSettingReceivedEventArgs, Task>? IMqttEventSink.NodeSettingReceived => NodeSettingReceivedAsync;
+    Func<NodeTelemetryReceivedEventArgs, Task>? IMqttEventSink.NodeTelemetryReceived => NodeTelemetryReceivedAsync;
+    Func<NodeTelemetryRemovedEventArgs, Task>? IMqttEventSink.NodeTelemetryRemoved => NodeTelemetryRemovedAsync;
+    Func<NodeStatusReceivedEventArgs, Task>? IMqttEventSink.NodeStatusReceived => NodeStatusReceivedAsync;
+    Func<NodeStatusRemovedEventArgs, Task>? IMqttEventSink.NodeStatusRemoved => NodeStatusRemovedAsync;
+    Func<NodeUpdateErrorEventArgs, Task>? IMqttEventSink.NodeUpdateError => NodeUpdateErrorAsync;
+    Func<DeviceAttributesEventArgs, Task>? IMqttEventSink.DeviceAttributesReceived => DeviceAttributesReceivedAsync;
+    void IMqttEventSink.RaisePreviousDeviceDiscovered(PreviousDeviceDiscoveredEventArgs args) => PreviousDeviceDiscovered?.Invoke(this, args);
+
+    /// <summary>Awaits every subscriber of an async multicast event; see <see cref="AsyncEvent.InvokeAllAsync{T}"/>.</summary>
+    internal Task InvokeAllAsync<T>(Func<T, Task>? handlers, T args, string eventName) =>
+        AsyncEvent.InvokeAllAsync(handlers, args, eventName);
+
+    /// <summary>The router for the current discovery prefix; rebuilt when a reconnect changes the prefix.</summary>
+    private MqttTopicRouter Router
     {
-        if (handlers == null)
-            return Task.CompletedTask;
-
-        var invocations = handlers.GetInvocationList();
-        return AwaitAll(invocations, args, eventName);
-
-        async Task AwaitAll(Delegate[] list, T arg, string name)
+        get
         {
-            List<Exception>? errors = null;
-            foreach (var invocation in list)
-            {
-                try
-                {
-                    await ((Func<T, Task>)invocation)(arg).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    (errors ??= new()).Add(ex);
-                }
-            }
-
-            if (errors is { Count: 1 })
-                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
-            else if (errors is { Count: > 1 })
-                throw new AggregateException($"One or more handlers for {name} failed", errors);
+            var router = _router;
+            var discoveryTopic = DiscoveryTopic;
+            if (router.DiscoveryTopic == discoveryTopic) return router;
+            return _router = new MqttTopicRouter(discoveryTopic);
         }
     }
 
+    /// <summary>Route, dispatch, catch: a bad message is logged and reported, never thrown into the receive loop.</summary>
     internal async Task OnMqttMessageReceived(MqttApplicationMessageReceivedEventArgs arg)
     {
-        var parts = arg.ApplicationMessage.Topic.Split('/');
+        var topic = arg.ApplicationMessage.Topic;
         var payload = arg.ApplicationMessage.ConvertPayloadToString();
 
         try
         {
-            // Check for Home Assistant discovery messages with configurable topic
-            if (parts.Length == 4 && parts[0] == _discoveryTopic && parts[1] == "device_tracker" && parts[3] == "config")
-            {
-                await ProcessDiscoveryMessage(arg.ApplicationMessage.Topic, payload);
-                return;
-            }
-
-            switch (parts)
-            {
-                case ["espresense", "rooms", _, "telemetry"]:
-                    await ProcessTelemetryMessage(parts[2], payload);
-                    break;
-                case ["espresense", "rooms", _, "status"]:
-                    await ProcessStatusMessage(parts[2], payload);
-                    break;
-                case ["espresense", "rooms", _, "update_error"]:
-                    await ProcessUpdateErrorMessage(parts[2], payload);
-                    break;
-                case ["espresense", "rooms", "*", _, "set"]:
-                    await ProcessNodeSettingMessage(parts[2], parts[3], payload);
-                    break;
-                case ["espresense", "rooms", _, _]:
-                    await ProcessNodeSettingMessage(parts[2], parts[3], payload);
-                    break;
-                case ["espresense", "devices", _, _]:
-                    await ProcessDeviceMessage(parts[2], parts[3], payload);
-                    break;
-                case ["espresense", "settings", _, "config"]:
-                    await ProcessDeviceConfigMessage(parts[2], payload);
-                    break;
-                case ["espresense", "companion", _, "attributes"]:
-                    await ProcessDeviceAttributesMessage(parts[2], payload);
-                    break;
-                default:
-                    if (MqttMessageReceivedAsync != null)
-                        await InvokeAllAsync(MqttMessageReceivedAsync, arg, nameof(MqttMessageReceivedAsync));
-                    break;
-            }
+            var route = Router.Match(topic);
+            if (route == null)
+                await InvokeAllAsync(MqttMessageReceivedAsync, arg, nameof(MqttMessageReceivedAsync));
+            else
+                await _handlers.DispatchAsync(route, payload);
         }
         catch (JsonSerializationException ex)
         {
-            _logger.LogError(ex, "JSON deserialization error for topic {Topic}. Payload: {Payload}", arg.ApplicationMessage.Topic, payload);
+            _logger.LogError(ex, "JSON deserialization error for topic {Topic}. Payload: {Payload}", topic, payload);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
         catch (MqttMessageProcessingException ex)
@@ -596,10 +557,13 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error processing message for topic {Topic}. Payload: {Payload}", arg.ApplicationMessage.Topic, payload);
+            _logger.LogError(ex, "Unexpected error processing message for topic {Topic}. Payload: {Payload}", topic, payload);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
     }
+
+    /// <summary>Handles a Home Assistant discovery message (also used directly by tests).</summary>
+    internal Task ProcessDiscoveryMessage(string topic, string? payload) => _handlers.Discovery.HandleAsync(topic, payload);
 
     /// <summary>Why the coordinator is (or is not) in read-only mode.</summary>
     internal enum ReadOnlyReason
@@ -758,266 +722,4 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
         }
     }
 
-    /// <summary>
-    /// Process a telemetry MQTT message for a given node.
-    /// </summary>
-    /// <remarks>
-    /// If <paramref name="payload"/> is null or empty, raises <see cref="NodeTelemetryRemovedAsync"/> (if subscribed) and returns.
-    /// Otherwise deserializes the JSON payload into a <see cref="NodeTelemetry"/> and invokes <see cref="NodeTelemetryReceivedAsync"/> (if subscribed).
-    /// </remarks>
-    /// <param name="nodeId">The identifier of the node the telemetry came from.</param>
-    /// <param name="payload">The telemetry JSON payload; may be null or empty to indicate removal.</param>
-    /// <returns>A task that completes when processing is finished.</returns>
-    /// <exception cref="MqttMessageProcessingException">
-    /// Thrown when deserialization produces null or when JSON parsing fails; includes topic, payload, and message type context.
-    /// </exception>
-    private async Task ProcessTelemetryMessage(string nodeId, string? payload)
-    {
-        if (string.IsNullOrEmpty(payload))
-        {
-            if (NodeTelemetryRemovedAsync != null)
-            {
-                await InvokeAllAsync(NodeTelemetryRemovedAsync, new NodeTelemetryRemovedEventArgs
-                {
-                    NodeId = nodeId
-                }, nameof(NodeTelemetryRemovedAsync));
-            }
-            return;
-        }
-
-        if (NodeTelemetryReceivedAsync == null)
-            return;
-
-        try
-        {
-            var telemetry = JsonConvert.DeserializeObject<NodeTelemetry>(payload);
-            if (telemetry == null)
-                throw new MqttMessageProcessingException(
-                    "Telemetry data was null after deserialization",
-                    MqttTopics.NodeTelemetry(nodeId),
-                    payload,
-                    "Telemetry");
-
-            await InvokeAllAsync(NodeTelemetryReceivedAsync, new NodeTelemetryReceivedEventArgs
-            {
-                NodeId = nodeId,
-                Payload = telemetry
-            }, nameof(NodeTelemetryReceivedAsync));
-        }
-        catch (JsonException ex)
-        {
-            throw new MqttMessageProcessingException(
-                "Failed to parse telemetry data",
-                MqttTopics.NodeTelemetry(nodeId),
-                payload,
-                "Telemetry",
-                ex);
-        }
-    }
-
-    /// <summary>
-    /// Handles a node's retained <c>update_error</c> message; an empty payload means the error was cleared.
-    /// </summary>
-    private async Task ProcessUpdateErrorMessage(string nodeId, string? payload)
-    {
-        if (NodeUpdateErrorAsync == null)
-            return;
-
-        await InvokeAllAsync(NodeUpdateErrorAsync, new NodeUpdateErrorEventArgs
-        {
-            NodeId = nodeId,
-            Error = string.IsNullOrEmpty(payload) ? null : payload
-        }, nameof(NodeUpdateErrorAsync));
-    }
-
-    /// <summary>
-    /// Handles an incoming node status MQTT message by raising the appropriate event.
-    /// </summary>
-    /// <remarks>
-    /// If <paramref name="payload"/> is null or empty the method treats this as a cleared retained message and invokes
-    /// <see cref="NodeStatusRemovedAsync"/> (if any handlers are attached) with the node identifier. Otherwise it interprets
-    /// the payload value "online" as an online state and invokes <see cref="NodeStatusReceivedAsync"/> with the resulting state.
-    /// </remarks>
-    /// <param name="nodeId">The identifier of the node the status message pertains to.</param>
-    /// <param name="payload">
-    /// The message payload; null or empty means the retained status was cleared (node removed). A non-empty value is
-    /// interpreted as the node's status (the string "online" maps to true).
-    /// </param>
-    /// <returns>A task representing the asynchronous event dispatch operations.</returns>
-    private async Task ProcessStatusMessage(string nodeId, string? payload)
-    {
-        if (string.IsNullOrEmpty(payload))
-        {
-            // Retained message cleared - node removed
-            if (NodeStatusRemovedAsync != null)
-            {
-                await InvokeAllAsync(NodeStatusRemovedAsync, new NodeStatusRemovedEventArgs
-                {
-                    NodeId = nodeId
-                }, nameof(NodeStatusRemovedAsync));
-            }
-        }
-        else
-        {
-            // Normal status update
-            if (NodeStatusReceivedAsync != null)
-            {
-                var online = payload == "online";
-                await InvokeAllAsync(NodeStatusReceivedAsync, new NodeStatusReceivedEventArgs
-                {
-                    NodeId = nodeId,
-                    Online = online
-                }, nameof(NodeStatusReceivedAsync));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Processes an incoming device message payload and invokes the DeviceMessageReceivedAsync handler.
-    /// </summary>
-    /// <remarks>
-    /// If <paramref name="payload"/> is null or empty, or there is no subscriber to <see cref="DeviceMessageReceivedAsync"/>, the method returns without action.
-    /// On successful JSON deserialization the <see cref="DeviceMessageReceivedAsync"/> event is invoked with a <see cref="DeviceMessageEventArgs"/> containing the device and node IDs and the parsed payload.
-    /// </remarks>
-    /// <param name="deviceId">MQTT device identifier from the topic (e.g. the {device} segment).</param>
-    /// <param name="nodeId">MQTT node identifier from the topic (e.g. the {node} segment).</param>
-    /// <param name="payload">JSON payload to deserialize into a <see cref="DeviceMessage"/>; may be null.</param>
-    /// <exception cref="MqttMessageProcessingException">
-    /// Thrown when JSON deserialization fails or results in a null <see cref="DeviceMessage"/>; the exception includes topic, payload and message type context.
-    /// </exception>
-    private async Task ProcessDeviceMessage(string deviceId, string nodeId, string? payload)
-    {
-        if (DeviceMessageReceivedAsync == null || string.IsNullOrEmpty(payload))
-            return;
-
-        try
-        {
-            var deviceMessage = JsonConvert.DeserializeObject<DeviceMessage>(payload ?? "");
-            if (deviceMessage == null)
-                throw new MqttMessageProcessingException("Device message was null after deserialization", MqttTopics.DeviceMessage(deviceId, nodeId), payload, "DeviceMessage");
-
-            await InvokeAllAsync(DeviceMessageReceivedAsync, new DeviceMessageEventArgs
-            {
-                DeviceId = deviceId,
-                NodeId = nodeId,
-                Payload = deviceMessage
-            }, nameof(DeviceMessageReceivedAsync));
-        }
-        catch (JsonException ex)
-        {
-            throw new MqttMessageProcessingException("Failed to parse device message", MqttTopics.DeviceMessage(deviceId, nodeId), payload, "DeviceMessage", ex);
-        }
-    }
-
-
-    private async Task ProcessDeviceConfigMessage(string deviceId, string? payload)
-    {
-        try
-        {
-            var deviceSettings = JsonConvert.DeserializeObject<DeviceSettings>(payload ?? "");
-            if (deviceSettings == null)
-                throw new MqttMessageProcessingException("Device settings were null after deserialization", MqttTopics.DeviceSettings(deviceId), payload, "DeviceConfig");
-
-            deviceSettings.OriginalId = deviceId;
-            if (DeviceConfigReceivedAsync != null)
-                await InvokeAllAsync(DeviceConfigReceivedAsync, new DeviceSettingsEventArgs
-                {
-                    DeviceId = deviceId,
-                    Payload = deviceSettings
-                }, nameof(DeviceConfigReceivedAsync));
-        }
-        catch (JsonException ex)
-        {
-            throw new MqttMessageProcessingException(
-                "Failed to parse device settings",
-                MqttTopics.DeviceSettings(deviceId),
-                payload,
-                "DeviceConfig",
-                ex);
-        }
-    }
-
-    private async Task ProcessNodeSettingMessage(string nodeId, string setting, string? payload)
-    {
-        if (NodeSettingReceivedAsync == null) return;
-        await InvokeAllAsync(NodeSettingReceivedAsync, new NodeSettingReceivedEventArgs
-        {
-            NodeId = nodeId,
-            Setting = setting,
-            Payload = payload
-        }, nameof(NodeSettingReceivedAsync));
-    }
-
-    internal async Task ProcessDiscoveryMessage(string topic, string? payload)
-    {
-        try
-        {
-            _logger.LogTrace($"Received discovery message on topic: {topic}");
-
-            // <discovery prefix>/<component>/<discovery id>/config
-            var parts = topic.Split('/');
-            var discoveryId = parts.Length == 4 ? parts[2] : topic;
-
-            if (string.IsNullOrWhiteSpace(payload))
-            {
-                // A retained discovery message is cleared by publishing an empty payload (delivered as "" or null)
-                PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs
-                {
-                    Topic = topic,
-                    DiscoveryId = discoveryId,
-                    DeviceId = null,
-                    AutoDiscover = null
-                });
-                return;
-            }
-
-            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, _discoveryTopic) || msg == null)
-                throw new MqttMessageProcessingException("Failed to deserialize discovery message", topic, payload, "Discovery");
-
-            PreviousDeviceDiscovered?.Invoke(this, new PreviousDeviceDiscoveredEventArgs
-            {
-                Topic = topic,
-                DiscoveryId = msg.DiscoveryId,
-                DeviceId = msg.Message?.StateTopic?.Split('/').Last(),
-                AutoDiscover = msg
-            });
-        }
-        catch (Exception ex) when (ex is not MqttMessageProcessingException)
-        {
-            throw new MqttMessageProcessingException("Error processing discovery message", topic, payload, "Discovery", ex);
-        }
-    }
-
-    private async Task ProcessDeviceAttributesMessage(string deviceId, string? payload)
-    {
-        if (DeviceAttributesReceivedAsync == null) return;
-
-        try
-        {
-            if (string.IsNullOrEmpty(payload))
-                return;
-
-            var attributes = JsonConvert.DeserializeObject<Dictionary<string, object>>(payload);
-            if (attributes == null)
-                throw new MqttMessageProcessingException(
-                    "Device attributes were null after deserialization",
-                    MqttTopics.DeviceAttributes(deviceId),
-                    payload,
-                    "DeviceAttributes");
-
-            await InvokeAllAsync(DeviceAttributesReceivedAsync, new DeviceAttributesEventArgs
-            {
-                DeviceId = deviceId,
-                Attributes = attributes
-            }, nameof(DeviceAttributesReceivedAsync));
-        }
-        catch (JsonException ex)
-        {
-            throw new MqttMessageProcessingException(
-                "Failed to parse device attributes",
-                MqttTopics.DeviceAttributes(deviceId),
-                payload,
-                "DeviceAttributes", ex);
-        }
-    }
 }
