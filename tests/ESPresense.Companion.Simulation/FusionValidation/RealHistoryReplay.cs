@@ -51,16 +51,30 @@ public static class RealHistoryReplay
 
     public static int Run(string[] args)
     {
-        var opts = ParseOpts(args);
-        var history = HaHistoryClient.LoadFromFile(opts.HaExportPath);
+        Opts opts;
+        Dictionary<string, List<HaStateChange>> history;
+        try
+        {
+            opts = ParseOpts(args);
+            history = HaHistoryClient.LoadFromFile(opts.HaExportPath);
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            Console.Error.WriteLine("Usage: dotnet run -- fusion-replay-real --ha-export FILE [--start ISO] [--end ISO] [--output FILE] [--markdown FILE] [--exclude-entity ID]");
+            return 2;
+        }
+        catch (Exception ex) when (ex is IOException or FormatException or System.Text.Json.JsonException)
+        {
+            Console.Error.WriteLine($"fusion-replay-real failed: {ex.Message}");
+            return 1;
+        }
 
         var (state, tracker, fusion) = BuildHarness();
 
         var csiQueues = CsiEntityToNode.Keys
             .ToDictionary(e => e, e => new Queue<(DateTimeOffset At, double Value)>(
-                (history.GetValueOrDefault(e) ?? new List<HaStateChange>())
-                    .Where(c => c.LastChanged >= opts.Start && c.LastChanged <= opts.End)
-                    .OrderBy(c => c.LastChanged)
+                WindowWithSeed(history.GetValueOrDefault(e) ?? new List<HaStateChange>(), opts.Start, opts.End)
                     .Select(c => (c.LastChanged, ParseOrNaN(c.State)))
                     .Where(c => double.IsFinite(c.Item2))),
                 StringComparer.OrdinalIgnoreCase);
@@ -71,9 +85,7 @@ public static class RealHistoryReplay
 
         var trackerQueues = TrackerEntities
             .ToDictionary(e => e, e => new Queue<(DateTimeOffset At, string State)>(
-                (history.GetValueOrDefault(e) ?? new List<HaStateChange>())
-                    .Where(c => c.LastChanged >= opts.Start && c.LastChanged <= opts.End)
-                    .OrderBy(c => c.LastChanged)
+                WindowWithSeed(history.GetValueOrDefault(e) ?? new List<HaStateChange>(), opts.Start, opts.End)
                     .Select(c => (c.LastChanged, c.State))),
                 StringComparer.OrdinalIgnoreCase);
 
@@ -123,7 +135,7 @@ public static class RealHistoryReplay
         // dilute false-unknown/latency with trivially-unmatched samples rather than real misses.
         var windowedHistory = history.ToDictionary(
             kv => kv.Key,
-            kv => kv.Value.Where(c => c.LastChanged >= opts.Start && c.LastChanged <= opts.End).ToList());
+            kv => WindowWithSeed(kv.Value, opts.Start, opts.End).ToList());
 
         // Score only the rooms that actually have a CSI node (plus the stuck family_occupancy DT
         // flagged): the export has occupancy ground truth for every room in the house, but Latency and
@@ -193,6 +205,23 @@ public static class RealHistoryReplay
         }
         if (windowStart is not null) windows.Add(new FlapWindow(deviceId, windowStart.Value, windowEnd!.Value));
         return windows;
+    }
+
+    /// <summary>
+    /// Home Assistant only writes a history row when a state changes, so an entity's state already in
+    /// effect at <paramref name="start"/> is usually set by a row before it. A plain <c>&gt;= start</c>
+    /// filter drops that row -- the replay then has no BLE room for a device that hasn't changed state
+    /// since before the window, and GroundTruthBuilder has no interval for a room already occupied
+    /// coming in, scoring every early Unknown event there as a false alarm. Seed the window with that
+    /// last pre-window row, clamped to <paramref name="start"/> so the resulting interval stays inside it.
+    /// </summary>
+    private static IEnumerable<HaStateChange> WindowWithSeed(List<HaStateChange> changes, DateTimeOffset start, DateTimeOffset end)
+    {
+        var ordered = changes.OrderBy(c => c.LastChanged).ToList();
+        var seed = ordered.LastOrDefault(c => c.LastChanged < start);
+        if (seed is not null) yield return seed with { LastChanged = start };
+        foreach (var c in ordered.Where(c => c.LastChanged >= start && c.LastChanged <= end))
+            yield return c;
     }
 
     private static double ParseOrNaN(string s) =>
