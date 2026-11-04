@@ -24,6 +24,7 @@ public class McpResources
     private readonly FirmwareUpdateJobService _firmwareUpdateJobs;
     private readonly FirmwareCatalogService _firmwareCatalog;
     private readonly NodeStateMapper _mapper;
+    private readonly CalibrationService _calibration;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public McpResources(
@@ -35,8 +36,10 @@ public class McpResources
         TelemetryService telemetryService,
         FirmwareUpdateJobService firmwareUpdateJobs,
         FirmwareCatalogService firmwareCatalog,
-        NodeStateMapper mapper)
+        NodeStateMapper mapper,
+        CalibrationService calibration)
     {
+        _calibration = calibration;
         _state = state;
         _config = config;
         _nsd = nsd;
@@ -120,7 +123,7 @@ public class McpResources
     [Description("Get the current calibration data and accuracy metrics")]
     public Task<string> GetCalibrationResource()
     {
-        var c = CalculateCalibration();
+        var c = _calibration.Calculate();
         return Task.FromResult(JsonSerializer.Serialize(c, _jsonOptions));
     }
 
@@ -128,7 +131,7 @@ public class McpResources
     [Description("Get the calibration data")]
     public Task<string> GetCalibrationTool()
     {
-        var c = CalculateCalibration();
+        var c = _calibration.Calculate();
         return Task.FromResult(JsonSerializer.Serialize(c, _jsonOptions));
     }
 
@@ -289,45 +292,6 @@ public class McpResources
     {
         var (cancelled, error) = _firmwareUpdateJobs.Cancel(jobId);
         return Task.FromResult(JsonSerializer.Serialize(new { ok = cancelled, error }, _jsonOptions));
-    }
-
-    private Calibration CalculateCalibration()
-    {
-        var c = new Calibration();
-        c.OptimizerState = _state.OptimizerState;
-
-        var mapDistances = new List<double>();
-        var actualDistances = new List<double>();
-
-        foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
-        {
-            var txNs = _nsd.Get(txId);
-            var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
-            foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
-            {
-                var rxNs = _nsd.Get(rxId);
-                var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
-                if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
-                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
-                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
-                rxM["mapDistance"] = rx.MapDistance;
-                rxM["distance"] = rx.Distance;
-                rxM["rssi"] = rx.Rssi;
-                rxM["diff"] = rx.Distance - rx.MapDistance;
-                rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
-                if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
-
-                if (rx.MapDistance > 0 && rx.Distance > 0)
-                {
-                    mapDistances.Add(rx.MapDistance);
-                    actualDistances.Add(rx.Distance);
-                }
-            }
-        }
-
-        c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
-        c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
-        return c;
     }
 
     private void EnrichConfiguredRefRssi(Device device)

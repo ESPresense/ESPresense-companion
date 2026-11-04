@@ -119,7 +119,8 @@ public sealed class CalibrationFixture : IAsyncDisposable
         new TelemetryService(null!),
         null!,
         null!,
-        new NodeStateMapper(NodeTelemetry, Mock.Of<IFirmwareTypeStore>()));
+        new NodeStateMapper(NodeTelemetry, Mock.Of<IFirmwareTypeStore>()),
+        new CalibrationService(State, Nsd.Object));
 
     public async ValueTask DisposeAsync()
     {

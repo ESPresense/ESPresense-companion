@@ -30,7 +30,8 @@ public class McpResourcesTests
             telemetryService,
             firmwareUpdateJobs,
             new FirmwareCatalogService(new HttpClient(), Mock.Of<IFirmwareTypeStore>(), nodeTelemetryStore),
-            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()));
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
+            new CalibrationService(state, nodeSettingsStore));
 
         var result = await sut.RequestNodeUpdateTool("node-1", "https://example.com/firmware.bin");
         using var json = JsonDocument.Parse(result);
