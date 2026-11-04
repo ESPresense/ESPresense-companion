@@ -85,6 +85,19 @@ public class FingerprintLocatorTests
     }
 
     [Test]
+    public void ContinuousSurfaceTopZeroOrNegativeStillReturnsAFix()
+    {
+        // top selects how many best-matching lattice points to average; 0 or negative must not empty
+        // the selection (Take(best) on an empty sequence used to make top[0] throw).
+        var line = Enumerable.Range(0, 7).Select(i => F(i, 0, ("a", -50 - 5 * i), ("b", -80 + 5 * i), ("c", -70))).ToList();
+        var surface = new FingerprintSurface(line, bandwidth: 0.6, missingRssi: -100);
+
+        var reading = new Dictionary<string, double> { ["a"] = -60, ["b"] = -70, ["c"] = -70 };
+        Assert.That(surface.Match(reading, minCommon: 3, best: 0), Is.Not.Null);
+        Assert.That(surface.Match(reading, minCommon: 3, best: -5), Is.Not.Null);
+    }
+
+    [Test]
     public void MapFileIsReadCaseInsensitivelyAndReloadedWhenChanged()
     {
         var path = Path.Combine(Path.GetTempPath(), $"fp-{Guid.NewGuid()}.json");

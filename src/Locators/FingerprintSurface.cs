@@ -102,7 +102,7 @@ public sealed class FingerprintSurface
             scored[i] = (Math.Sqrt(ss / Math.Max(1, n - 1)), i);
         }
 
-        var top = scored.OrderBy(s => s.D).Take(best).ToArray();
+        var top = scored.OrderBy(s => s.D).Take(Math.Max(1, best)).ToArray();
         var w = top.Select(t => 1 / (t.D + 0.5)).ToArray();
         var ws = w.Sum();
         var loc = new Point3D(
