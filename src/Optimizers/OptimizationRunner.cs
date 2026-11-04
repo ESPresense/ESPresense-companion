@@ -23,6 +23,9 @@ internal class OptimizationRunner : BackgroundService
     private double _previousBestCorr = double.NaN;
     private double _previousBestRmse = double.NaN;
 
+    /// <summary>The measurement history the optimizers train and validate on.</summary>
+    internal OptimizationSnapshotStore Snapshots { get; } = new();
+
     public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger, ConfigLoader cfg, ILeaseService leaseService, ILoggerFactory loggerFactory)
     {
         _loggerFactory = loggerFactory;
@@ -115,7 +118,7 @@ internal class OptimizationRunner : BackgroundService
                 {
                     optimization = _state.Config?.Optimization;
                     if (optimization is not { Enabled: true }) break;
-                    _state.TakeOptimizationSnapshot();
+                    Snapshots.Take(_state);
                     UpdateSampleCounts();
 
                     var now = DateTime.UtcNow;
@@ -179,7 +182,7 @@ internal class OptimizationRunner : BackgroundService
     /// </summary>
     internal async Task<bool> RunScheduledCycleAsync(ConfigOptimization optimization, IList<IOptimizer> currentOptimizers)
     {
-        var snapshots = _state.OptimizationSnaphots.ToArray();
+        var snapshots = Snapshots.ToArray();
         if (!HasSufficientHistory(snapshots, optimization))
         {
             SetStatus("Collecting", $"Collected {snapshots.Length} snapshots; waiting until they span {MinimumHistoryFraction:P0} of the {optimization.EffectiveTrainingWindowMins}-minute training window before the first validation.");
@@ -217,8 +220,8 @@ internal class OptimizationRunner : BackgroundService
 
     private void UpdateSampleCounts()
     {
-        _state.OptimizerState.SnapshotCount = _state.OptimizationSnaphots.Count;
-        _state.OptimizerState.MeasurementCount = _state.OptimizationSnaphots.Sum(snapshot => snapshot.Measures.Count);
+        _state.OptimizerState.SnapshotCount = Snapshots.Count;
+        _state.OptimizerState.MeasurementCount = Snapshots.MeasurementCount;
         _state.OptimizerState.LeaseExpiresAt = _leaseService.GetStatus(OptimizationLeaseName)?.ExpiresAt;
     }
 

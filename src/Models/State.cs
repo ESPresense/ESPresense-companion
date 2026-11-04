@@ -18,40 +18,44 @@ public class State
     /// Initializes a new State, wiring telemetry and configuration handling.
     /// </summary>
     /// <remarks>
-    /// Subscribes to the provided ConfigLoader's ConfigChanged event and loads the current configuration if present.
-    /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
-    /// selects the locators' weighting strategy, and marks existing Devices for checking.
+    /// Subscribes to the provided ConfigLoader's ConfigChanged event and applies the current configuration if present;
+    /// see <see cref="Apply"/>.
     /// </remarks>
     public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
         ScenarioFactory = new ScenarioFactory(this, nts);
-        void LoadConfig(Config c)
-        {
-            Config = c;
-            foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
-            foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
-
-            TrackingRules = DeviceTrackingRules.FromConfig(c);
-
-            // Update Kalman filter settings and propagate to all devices
-            var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
-            if (!newKalmanSettings.Equals(KalmanSettings))
-            {
-                KalmanSettings = newKalmanSettings;
-                foreach (var device in Devices.Values)
-                {
-                    device.KalmanFilter.Settings = KalmanSettings;
-                }
-            }
-
-            foreach (var device in Devices.Values) device.Check = true;
-        }
-
-        cl.ConfigChanged += (_, args) => { LoadConfig(args); };
-        if (cl.Config != null) LoadConfig(cl.Config);
+        cl.ConfigChanged += (_, args) => Apply(args);
+        if (cl.Config != null) Apply(cl.Config);
     }
 
-    public Config? Config;
+    /// <summary>The current config. Replaced only through <see cref="Apply"/>.</summary>
+    public Config? Config { get; private set; }
+
+    /// <summary>
+    /// Makes <paramref name="c"/> the current config: updates floors and nodes, rebuilds the tracking rules,
+    /// republishes Kalman settings to every device, and marks every device to be re-checked.
+    /// </summary>
+    internal void Apply(Config c)
+    {
+        Config = c;
+        foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
+        foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
+
+        TrackingRules = DeviceTrackingRules.FromConfig(c);
+
+        // Update Kalman filter settings and propagate to all devices
+        var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
+        if (!newKalmanSettings.Equals(KalmanSettings))
+        {
+            KalmanSettings = newKalmanSettings;
+            foreach (var device in Devices.Values)
+            {
+                device.KalmanFilter.Settings = KalmanSettings;
+            }
+        }
+
+        foreach (var device in Devices.Values) device.Check = true;
+    }
 
     /// <summary>
     /// Shared Kalman filter settings used by all devices
@@ -64,7 +68,7 @@ public class State
 
     /// <summary>The devices / exclude_devices rules from the current config, compiled once per load.</summary>
     public DeviceTrackingRules TrackingRules { get; private set; } = DeviceTrackingRules.Empty;
-    public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
+
     public OptimizerState OptimizerState { get; set; } = new();
     public LocatorState LocatorState { get; } = new();
 
@@ -91,28 +95,6 @@ public class State
             _bestCalibrationRMSE = null;
             _bestCalibrationR = null;
         }
-    }
-
-    /// <summary>
-    /// Creates an optimization snapshot from current node measurements and purges expired snapshots.
-    /// </summary>
-    /// <remarks>
-    /// Iterates through all nodes and their receiver measurements, recording only those marked as current into a new snapshot
-    /// timestamped with the current UTC time. It then removes any snapshots older than the configured expiration threshold
-    /// (the training window, 30 minutes by default) before adding the new snapshot to the collection.
-    /// </remarks>
-    /// <returns>The newly created optimization snapshot containing active measurements.</returns>
-    public OptimizationSnapshot TakeOptimizationSnapshot()
-    {
-        var os = ReadMeasures();
-
-        // Remove expired snapshots by time
-        var expiryMinutes = Config?.Optimization?.EffectiveTrainingWindowMins ?? 30;
-        var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
-        OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
-        OptimizationSnaphots.Add(os);
-
-        return os;
     }
 
     /// <summary>
