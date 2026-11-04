@@ -40,12 +40,15 @@ public class TrackingRulesCharacterizationTests
     [OneTimeTearDown]
     public async Task TearDown() => await _fx.DisposeAsync();
 
-    /// <summary>Runs the tracking decision the way DeviceTracker does and reports what the device looks like after.</summary>
+    /// <summary>Runs the tracking decision the way DeviceTracker.CheckDeviceAsync does and reports what the device looks like after.</summary>
     private (bool Track, string? Name) Decide(string id, string? name)
     {
         var device = new Device(id, null, TimeSpan.FromSeconds(30)) { Name = name };
-        var track = _fx.State.ShouldTrack(device);
-        return (track, device.Name);
+        var decision = _fx.State.TrackingRules.ShouldTrack(device.Id, device.Name);
+        if (decision.ConfiguredName != null) device.Name = decision.ConfiguredName;
+        Assert.That(_fx.State.ShouldTrack(new Device(id, null, TimeSpan.FromSeconds(30)) { Name = name }), Is.EqualTo(decision.Track),
+            "State.ShouldTrack must agree with the rules");
+        return (decision.Track, device.Name);
     }
 
     [TestCase("literal:one", null, true, "Configured One", TestName = "Literal id is tracked and takes its configured name")]
@@ -89,6 +92,48 @@ public class TrackingRulesCharacterizationTests
     public void IsExcluded(string? id, string? name, bool expected)
     {
         Assert.That(_fx.State.IsExcluded(id, name), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void ShouldTrack_HasNoSideEffects()
+    {
+        var device = new Device("literal:one", null, TimeSpan.FromSeconds(30)) { Name = "Advertised" };
+        Assert.Multiple(() =>
+        {
+            Assert.That(_fx.State.ShouldTrack(device), Is.True);
+            Assert.That(device.Name, Is.EqualTo("Advertised"), "the configured name is the caller's to apply");
+            Assert.That(_fx.State.TrackingRules.ShouldTrack(device.Id, device.Name), Is.EqualTo(new TrackDecision(true, "Configured One")));
+        });
+    }
+
+    [Test]
+    public void Matching_NeverCompilesAGlob()
+    {
+        // Globs are compiled once per config load; IsExcluded used to Glob.Parse every exclude entry on every call.
+        var rules = _fx.State.TrackingRules;
+        var before = DeviceTrackingRules.GlobsCompiledOnThisThread;
+        for (var i = 0; i < 1000; i++)
+        {
+            rules.IsExcluded($"glob:bad{i}", $"Wild Guest {i}");
+            rules.IsExcluded($"x:{i}", "nobody");
+            rules.ShouldTrack($"glob:{i}", $"Wild {i}");
+            _fx.State.IsExcluded($"x:{i}", null);
+            _fx.State.ShouldTrack(new Device($"x:{i}", null, TimeSpan.FromSeconds(30)));
+        }
+        Assert.That(DeviceTrackingRules.GlobsCompiledOnThisThread, Is.EqualTo(before));
+    }
+
+    [Test]
+    public void FromConfig_CompilesEachPatternOnce()
+    {
+        var config = new Config
+        {
+            Devices = [new ConfigDevice { Id = "a:*", Name = "A *" }, new ConfigDevice { Id = "b" }],
+            ExcludeDevices = [new ConfigDevice { Id = "a:x*" }, new ConfigDevice { Name = "  " }],
+        };
+        var before = DeviceTrackingRules.GlobsCompiledOnThisThread;
+        DeviceTrackingRules.FromConfig(config);
+        Assert.That(DeviceTrackingRules.GlobsCompiledOnThisThread - before, Is.EqualTo(4));
     }
 
     [Test]

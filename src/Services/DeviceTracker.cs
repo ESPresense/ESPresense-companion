@@ -298,7 +298,9 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         if (device.Check)
         {
             Log.Debug("Checking {Device}", device);
-            device.Track = state.ShouldTrack(device);
+            var decision = state.TrackingRules.ShouldTrack(device.Id, device.Name);
+            if (decision.ConfiguredName != null) device.Name = decision.ConfiguredName;
+            device.Track = decision.Track;
             device.Check = false;
         }
         if (device.Track != wasTracked)

@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using DotNet.Globbing;
-using DotNet.Globbing.Token;
 using ESPresense.Extensions;
 using ESPresense.Locators;
 using ESPresense.Services;
@@ -25,9 +23,6 @@ public class State
     /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
     /// selects the locators' weighting strategy, and marks existing Devices for checking.
     /// </remarks>
-    // ponytail: device ids/names are matched case-insensitively everywhere else (all the dictionaries are OrdinalIgnoreCase), globs must agree
-    private static readonly GlobOptions GlobOpts = new() { Evaluation = { CaseInsensitive = true } };
-
     public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
         _nts = nts;
@@ -37,34 +32,7 @@ public class State
             foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
             foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
 
-            var idsToTrack = new List<Glob>();
-            var configDeviceById = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);
-            foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
-                if (!string.IsNullOrWhiteSpace(d.Id))
-                {
-                    var glob = Glob.Parse(d.Id, GlobOpts);
-                    if (glob.Tokens.All(a => a is LiteralToken))
-                        configDeviceById.GetOrAdd(d.Id, a => d);
-                    else
-                        idsToTrack.Add(glob);
-                }
-
-            var namesToTrack = new List<Glob>();
-            var configDeviceByName = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);
-            foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
-                if (!string.IsNullOrWhiteSpace(d.Name))
-                {
-                    var glob = Glob.Parse(d.Name, GlobOpts);
-                    if (glob.Tokens.All(a => a is LiteralToken))
-                        configDeviceByName.GetOrAdd(d.Name, a => d);
-                    else
-                        namesToTrack.Add(glob);
-                }
-
-            IdsToTrack = idsToTrack;
-            ConfigDeviceById = configDeviceById;
-            NamesToTrack = namesToTrack;
-            ConfigDeviceByName = configDeviceByName;
+            TrackingRules = DeviceTrackingRules.FromConfig(c);
 
             // Update Kalman filter settings and propagate to all devices
             var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
@@ -94,10 +62,9 @@ public class State
     public ConcurrentDictionary<string, Node> Nodes { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Device> Devices { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Floor> Floors { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceByName { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceById { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    public List<Glob> IdsToTrack { get; private set; } = new();
-    public List<Glob> NamesToTrack { get; private set; } = new();
+
+    /// <summary>The devices / exclude_devices rules from the current config, compiled once per load.</summary>
+    public DeviceTrackingRules TrackingRules { get; private set; } = DeviceTrackingRules.Empty;
     public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
     public OptimizerState OptimizerState { get; set; } = new();
     public LocatorState LocatorState { get; } = new();
@@ -287,38 +254,9 @@ public class State
         }
     }
 
-    public bool ShouldTrack(Device device)
-    {
-        if (IsExcluded(device))
-            return false;
+    /// <summary>Whether <paramref name="device"/> should be tracked. Pure: the configured name is not applied.</summary>
+    public bool ShouldTrack(Device device) => TrackingRules.ShouldTrack(device.Id, device.Name).Track;
 
-        if (ConfigDeviceById.TryGetValue(device.Id, out var cdById))
-        {
-            if (!string.IsNullOrWhiteSpace(cdById.Name))
-                device.Name = cdById.Name;
-            return true;
-        }
-        if (!string.IsNullOrWhiteSpace(device.Name) && ConfigDeviceByName.TryGetValue(device.Name, out _))
-            return true;
-        if (!string.IsNullOrWhiteSpace(device.Id) && IdsToTrack.Any(a => a.IsMatch(device.Id)))
-            return true;
-        if (!string.IsNullOrWhiteSpace(device.Name) && NamesToTrack.Any(a => a.IsMatch(device.Name)))
-            return true;
-        return false;
-    }
-
-    private bool IsExcluded(Device device) => IsExcluded(device.Id, device.Name);
-
-    /// <summary>
-    /// Whether exclude_devices matches this id or name. Takes the raw pair rather than a Device so
-    /// callers can decide before constructing one -- autodiscovery needs that, or it resurrects an
-    /// excluded device from its own leftover discovery message.
-    /// </summary>
-    public bool IsExcluded(string? id, string? name)
-    {
-        return Config?.ExcludeDevices.Any(d =>
-            (!string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(id) && Glob.Parse(d.Id, GlobOpts).IsMatch(id)) ||
-            (!string.IsNullOrWhiteSpace(d.Name) && !string.IsNullOrWhiteSpace(name) && Glob.Parse(d.Name, GlobOpts).IsMatch(name))
-        ) ?? false;
-    }
+    /// <inheritdoc cref="DeviceTrackingRules.IsExcluded"/>
+    public bool IsExcluded(string? id, string? name) => TrackingRules.IsExcluded(id, name);
 }
