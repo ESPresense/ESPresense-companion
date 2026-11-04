@@ -1,4 +1,8 @@
-﻿namespace ESPresense.Models;
+﻿using ESPresense.Extensions;
+using ESPresense.Services;
+using ESPresense.Utils;
+
+namespace ESPresense.Models;
 
 public class Calibration
 {
@@ -9,4 +13,91 @@ public class Calibration
     public Dictionary<string, Dictionary<string, Dictionary<string, double>>> Matrix { get; } = new();
     public OptimizerState OptimizerState { get; set; } = new();
     public HashSet<string> Anchored { get; } = new();
+
+    private const int MinPairsForBestMetrics = 5;
+
+    /// <summary>
+    /// Builds the calibration matrix: a row per transmitting node and per anchored device, with the
+    /// mapped and measured distance to each receiver, plus R and RMSE over all pairs.
+    /// The UI (/api/state/calibration) and the MCP both call this, so they always agree.
+    /// </summary>
+    public static Calibration Build(State state, NodeSettingsStore nsd)
+    {
+        var c = new Calibration();
+        c.OptimizerState = state.OptimizerState;
+
+        // Lists to track all distance measurements for statistical calculations
+        var mapDistances = new List<double>();
+        var actualDistances = new List<double>();
+
+        // Process traditional Node-to-Node relationships
+        foreach (var (txId, tx) in state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
+        {
+            var txNs = nsd.Get(txId);
+            var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
+            foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
+            {
+                var rxNs = nsd.Get(rxId);
+                var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
+                if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
+                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
+                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
+                rxM["mapDistance"] = rx.MapDistance;
+                rxM["distance"] = rx.Distance;
+                rxM["rssi"] = rx.Rssi;
+                rxM["diff"] = rx.Distance - rx.MapDistance;
+                rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
+                if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
+
+                if (rx.MapDistance > 0 && rx.Distance > 0)
+                {
+                    mapDistances.Add(rx.MapDistance);
+                    actualDistances.Add(rx.Distance);
+                }
+            }
+        }
+
+        // Process Anchored Devices as Transmitters
+        foreach (var device in state.Devices.Values.Where(d => d.IsAnchored && d.Anchor != null && d.Nodes.Values.Any(dn => dn.Current)))
+        {
+            var anchorName = device.Name ?? device.Id;
+            c.Anchored.Add(anchorName);
+            var txM = c.Matrix.GetOrAdd($"{anchorName}");
+
+            foreach (var (rxId, deviceNode) in device.Nodes.Where(dn => dn.Value.Current && dn.Value.Node?.HasLocation == true))
+            {
+                var rxNode = deviceNode.Node!;
+                var rxNs = nsd.Get(rxNode.Id);
+                var rxM = txM.GetOrAdd(rxNode.Name ?? rxNode.Id);
+
+                // Anchored devices don't have tx calibration settings, but receivers still have their settings
+                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
+                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
+
+                // Calculate map distance from anchor to receiver
+                var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);
+                rxM["mapDistance"] = mapDistance;
+                rxM["distance"] = deviceNode.Distance;
+                rxM["rssi"] = deviceNode.Rssi;
+                rxM["diff"] = deviceNode.Distance - mapDistance;
+                rxM["percent"] = mapDistance != 0 ? ((deviceNode.Distance - mapDistance) / mapDistance) : 0;
+                if (deviceNode.DistVar is not null) rxM["var"] = deviceNode.DistVar.Value;
+
+                if (mapDistance > 0 && deviceNode.Distance > 0)
+                {
+                    mapDistances.Add(mapDistance);
+                    actualDistances.Add(deviceNode.Distance);
+                }
+            }
+        }
+
+        c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
+        c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
+        // A handful of pairs can fit almost perfectly by chance, and a best-seen value sticks until reset.
+        (c.BestRMSE, c.BestR) = mapDistances.Count >= MinPairsForBestMetrics
+            ? state.RecordCalibrationMetrics(c.RMSE, c.R)
+            : state.RecordCalibrationMetrics(null, null);
+        return c;
+    }
 }
+
