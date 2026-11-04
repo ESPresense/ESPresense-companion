@@ -129,8 +129,7 @@ public abstract class BaseMultilateralizer : ILocate
     /// </summary>
     protected void AssignRoom(Scenario scenario)
     {
-        scenario.Room = Floor.Rooms.Values.FirstOrDefault(a =>
-            a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
+        scenario.Room = SpatialUtils.FindRoomNearest(scenario.Location, Floor.Rooms.Values, Floor.RoomSnapDistance);
     }
 
     /// <summary>

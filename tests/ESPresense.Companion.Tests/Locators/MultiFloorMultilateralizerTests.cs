@@ -183,10 +183,21 @@ public class MultiFloorMultilateralizerTests
     {
         var (ground, upstairs) = CreateTwoFloors();
 
-        var (_, scenario) = LocateAt(new Point3D(-0.5, -0.5, 1.0), ground, upstairs);
+        var (_, scenario) = LocateAt(new Point3D(-2, -2, 1.0), ground, upstairs);
 
         Assert.That(scenario.Floor, Is.EqualTo(ground));
         Assert.That(scenario.Room, Is.Null);
+    }
+
+    [Test]
+    public void Locate_JustOutsideARoom_GetsThatRoom()
+    {
+        var (ground, upstairs) = CreateTwoFloors();
+
+        var (_, scenario) = LocateAt(new Point3D(-0.5, -0.5, 1.0), ground, upstairs);
+
+        Assert.That(scenario.Floor, Is.EqualTo(ground));
+        Assert.That(scenario.Room?.Name, Is.EqualTo("Kitchen"));
     }
 
     [Test]

@@ -88,7 +88,7 @@
 
 		<section>
 			<h4 class="font-semibold">{explanation.anchored ? '2.' : '4.'} Room</h4>
-			<p>{place(explanation.room.room)}{explanation.room.room && !explanation.room.inside ? ' (position has drifted outside)' : ''}</p>
+			<p>{place(explanation.room.room)}{explanation.room.room && !explanation.room.inside ? (explanation.room.snapped ? ' (nearest room: the position is in no room)' : ' (position has drifted outside)') : ''}</p>
 			{#if explanation.room.distanceToEdge != null}
 				<p>{metres(explanation.room.distanceToEdge)} from the wall</p>
 			{/if}

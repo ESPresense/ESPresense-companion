@@ -45,6 +45,7 @@ const explanation = {
 		room: place('Kitchen'),
 		inside: true,
 		distanceToEdge: 0.4,
+		snapped: false,
 		nearestOtherRoom: place('Hall'),
 		nearestOtherDistance: 0.6,
 		state: 'Kitchen',

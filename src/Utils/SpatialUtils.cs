@@ -59,6 +59,58 @@ public static class SpatialUtils
     }
 
     /// <summary>
+    /// Finds the room for a located device: the room containing the point, otherwise the nearest
+    /// room whose boundary is within <paramref name="maxDistance"/> metres.
+    ///
+    /// A multilateration fix is metres uncertain, but room polygons leave gaps at walls and
+    /// doorways and stop at the outside wall, so a fix for someone indoors often lands in no room
+    /// at all. The location stays as solved; only the room label falls back, so neither the Kalman
+    /// filter nor motion weighting is biased towards room boundaries.
+    /// </summary>
+    public static Room? FindRoomNearest(Point3D location, IEnumerable<Room> rooms, double maxDistance)
+    {
+        var point = location.ToPoint2D();
+        Room? nearest = null;
+        var nearestDistance = maxDistance;
+
+        foreach (var room in rooms)
+        {
+            var polygon = room.Polygon;
+            if (polygon == null) continue;
+            if (polygon.EnclosesPoint(point)) return room;
+            if (maxDistance <= 0) continue;
+
+            var distance = DistanceToEdge(polygon, point);
+            if (!(distance <= nearestDistance)) continue; // written so a NaN fix never gets a room
+            nearestDistance = distance;
+            nearest = room;
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
+    /// Distance from a point to the nearest wall of a polygon. Works from the vertices because
+    /// Polygon2D.Edges throws on a repeated vertex, which a hand-drawn room can easily have.
+    /// </summary>
+    public static double DistanceToEdge(Polygon2D polygon, Point2D point)
+    {
+        var vertices = polygon.Vertices.ToArray();
+        var nearest = double.PositiveInfinity;
+
+        for (var i = 0; i < vertices.Length; i++)
+        {
+            var start = vertices[i];
+            var along = vertices[(i + 1) % vertices.Length] - start;
+            var lengthSquared = along.DotProduct(along);
+            var t = lengthSquared > 0 ? Math.Clamp((point - start).DotProduct(along) / lengthSquared, 0, 1) : 0;
+            nearest = Math.Min(nearest, (start + t * along).DistanceTo(point));
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
     /// Finds both floor and room containing the given location
     /// </summary>
     public static (Floor? floor, Room? room) FindFloorAndRoom(Point3D location, IEnumerable<Floor> floors)

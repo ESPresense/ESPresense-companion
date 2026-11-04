@@ -115,7 +115,8 @@ public class MultiFloorMultilateralizer : ILocate
         // The solve is unbounded in z, so it can land below the lowest floor or between floors;
         // fall back to the floor nearest in z so the device still gets a floor (and room) for the map and HA.
         var floors = SpatialUtils.FindFloorsAt(scenario.Location.Z, _state.Floors.Values);
-        var room = floors.SelectMany(a => a.Rooms.Values).FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
+        var snapDistance = floors.FirstOrDefault()?.RoomSnapDistance ?? 0;
+        var room = SpatialUtils.FindRoomNearest(scenario.Location, floors.SelectMany(a => a.Rooms.Values), snapDistance);
         if (scenario.Room != room) scenario.Room = room;
         scenario.Floor = room?.Floor ?? floors.FirstOrDefault();
         Log.Debug("New location {0} {1}@{2}", _device, _device.Room?.Name ?? "Unknown", scenario.Location);

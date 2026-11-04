@@ -43,6 +43,18 @@ optimization:
     }
 
     [Test]
+    public void RoomSnapDistance_DefaultsOn_ReadsFromYaml_AndSurvivesClone()
+    {
+        var deserializer = new DeserializerBuilder().IgnoreUnmatchedProperties().Build();
+
+        Assert.That(deserializer.Deserialize<Config>("timeout: 30").Locators.RoomSnapDistance, Is.EqualTo(1.0));
+
+        var config = deserializer.Deserialize<Config>("locators:\n  room_snap_distance: 2.5\n");
+        Assert.That(config.Locators.RoomSnapDistance, Is.EqualTo(2.5));
+        Assert.That(config.Clone().Locators.RoomSnapDistance, Is.EqualTo(2.5));
+    }
+
+    [Test]
     public void TestLocatorsDeserialization()
     {
         string yaml = @"

@@ -73,6 +73,13 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
+
+        /// <summary>
+        /// A fix outside every room gets the nearest room within this many metres, instead of only
+        /// the floor. 0 turns it off.
+        /// </summary>
+        [YamlMember(Alias = "room_snap_distance")]
+        public double RoomSnapDistance { get; set; } = 1.0;
     }
 
     public partial class NadarayaWatsonConfig

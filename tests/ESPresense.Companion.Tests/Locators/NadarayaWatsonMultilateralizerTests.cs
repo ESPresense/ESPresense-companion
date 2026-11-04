@@ -491,4 +491,39 @@ public class NadarayaWatsonMultilateralizerTests
         Assert.That(result, Is.True);
         Assert.That(scenario.Room, Is.EqualTo(room));
     }
+
+    [Test]
+    public void Locate_FixJustOutsideARoom_GetsThatRoomButKeepsItsLocation()
+    {
+        // The nodes are placed so the fix lands about 0.5 m east of the only room.
+        var floor = new Floor();
+        floor.Update(new Config(), new ConfigFloor
+        {
+            Id = "snap_floor",
+            Name = "Snap Floor",
+            Bounds = new[] { new double[] { -10, -10, -10 }, new double[] { 10, 10, 10 } },
+            Rooms = new[]
+            {
+                new ConfigRoom
+                {
+                    Name = "West",
+                    Points = new[] { new[] { -4.0, -2.0 }, new[] { 0.0, -2.0 }, new[] { 0.0, 2.0 }, new[] { -4.0, 2.0 } }
+                }
+            }
+        });
+        _state.Floors[floor.Id] = floor;
+
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+        foreach (var (id, x, y) in new[] { ("n1", 0.5, -1.0), ("n2", 0.5, 1.0), ("n3", 0.5, 0.0) })
+            device.Nodes[id] = new DeviceToNode(device, CreateTestNode(id, x, y, 0, floor)) { Distance = 1.0, LastHit = DateTime.UtcNow };
+
+        var multilateralizer = new NadarayaWatsonMultilateralizer(device, floor, _state, _mockNodeTelemetryStore.Object);
+        var scenario = new Scenario(_configLoader.Config, multilateralizer, "NadarayaWatson");
+
+        var result = multilateralizer.Locate(scenario);
+
+        Assert.That(result, Is.True);
+        Assert.That(scenario.Room?.Name, Is.EqualTo("West"));
+        Assert.That(scenario.Location.X, Is.EqualTo(0.5).Within(1e-9), "only the room label may change, not the fix");
+    }
 }

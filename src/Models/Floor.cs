@@ -15,6 +15,9 @@ public class Floor
 
     public ConcurrentDictionary<string, Room> Rooms { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>How far outside every room a fix may land and still be given the nearest room, in metres.</summary>
+    public double RoomSnapDistance => Config?.Locators?.RoomSnapDistance ?? 0;
+
     public void Update(Config c, ConfigFloor cf)
     {
         Point3D Point3DConvert(double[] b)

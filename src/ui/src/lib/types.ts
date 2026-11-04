@@ -315,6 +315,7 @@ export type ExplainedRoom = {
 	room: ExplainedPlace | null;
 	inside: boolean;
 	distanceToEdge: number | null;
+	snapped: boolean;
 	nearestOtherRoom: ExplainedPlace | null;
 	nearestOtherDistance: number | null;
 	state: string | null;
