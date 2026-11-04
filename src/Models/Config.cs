@@ -250,6 +250,7 @@ namespace ESPresense.Models
         // Never serialize the broker password to API responses or MCP clients. Config only leaves through
         // System.Text.Json (Newtonsoft is confined to the files NewtonsoftConventionTests allows, none of
         // which serialize Config). YamlDotNet has its own attributes, so YAML round-tripping is unaffected.
+        // Logging is not covered: Serilog's {@} destructuring ignores JSON attributes, so never {@}-log a Config.
         [System.Text.Json.Serialization.JsonIgnore]
         public string? Password { get; set; }
 
