@@ -257,6 +257,58 @@ public class CsiFusionServiceTests
     }
 
     [Test]
+    public void ReferenceFixture_RoomOscillatingEvery5To30Seconds_ResolvesToTheRoomWithSustainedMotion()
+    {
+        // Reproduces the documented real-world case: a device's BLE room bounces between two adjacent
+        // rooms every 5-30s while one room (Laundry) shows sustained CSI motion and the other (Family)
+        // never does.
+        var floor = BuildFloor("first", Square("Laundry", 0, 0, 4, 4), Square("Family", 5, 5, 9, 9));
+        var laundry = RoomById("first", "laundry");
+        var family = RoomById("first", "family");
+
+        AddCsiNode("laundry-node", new Point3D(1, 1, 1), floor);
+        AddCsiNode("family-node", new Point3D(6, 6, 1), floor);
+
+        var start = DateTime.UtcNow.AddMinutes(-10);
+        for (var i = 0; i < 20; i++)
+        {
+            _tracker.Observe("laundry-node", 10, start.AddSeconds(i * 5));
+            _tracker.Observe("family-node", 10, start.AddSeconds(i * 5));
+        }
+        var baselineEnd = start.AddSeconds(20 * 5);
+
+        // Laundry goes, and stays, elevated for the whole flapping episode that follows.
+        _tracker.Observe("laundry-node", 90, baselineEnd.AddSeconds(5));
+        _tracker.Observe("laundry-node", 90, baselineEnd.AddSeconds(10));
+
+        var laundryScenario = MakeScenario(laundry, 0.5);
+        var familyScenario = MakeScenario(family, 0.5);
+        var device = AddDevice("dev-1", laundry, laundryScenario, familyScenario);
+
+        // 5-30s flap pattern between the two rooms, each with near-tied probability (ponytail: real
+        // scenario probabilities hover close during a flap rather than snapping to exactly 0.5/0.5).
+        var flapOffsets = new[] { 15, 20, 35, 55, 65, 90, 95, 120 };
+        var toLaundry = true;
+        foreach (var offsetSeconds in flapOffsets)
+        {
+            var at = baselineEnd.AddSeconds(offsetSeconds);
+            laundryScenario.Probability = toLaundry ? 0.52 : 0.48;
+            familyScenario.Probability = toLaundry ? 0.48 : 0.52;
+            device.BestScenario = toLaundry ? laundryScenario : familyScenario;
+            // Keep laundry's motion sustained across the whole flapping window.
+            _tracker.Observe("laundry-node", 90, at);
+            _tracker.Observe("family-node", 10, at);
+
+            _fusion.Tick(at);
+
+            Assert.That(device.Room?.Id, Is.EqualTo("laundry"),
+                $"flap at +{offsetSeconds}s toward {(toLaundry ? "laundry" : "family")} must still resolve to laundry");
+
+            toLaundry = !toLaundry;
+        }
+    }
+
+    [Test]
     public void Tick_DoesNotReportTheSameUnchangedOccupancyEveryTick()
     {
         var floor = BuildFloor("first", Square("Office", 0, 0, 4, 4));
