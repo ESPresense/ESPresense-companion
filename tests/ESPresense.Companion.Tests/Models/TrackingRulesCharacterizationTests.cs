@@ -1,4 +1,5 @@
 using ESPresense.Models;
+using Microsoft.Extensions.Logging;
 
 namespace ESPresense.Companion.Tests.Models;
 
@@ -156,6 +157,24 @@ public class TrackingRulesCharacterizationTests
             Assert.That(rules.IsExcluded("x:1", "Bad Name"), Is.True, "the valid half of an entry still applies");
             Assert.That(rules.ShouldTrack(bad, bad).Track, Is.False);
         });
+    }
+
+    [Test]
+    public void FromConfig_LogsTheInvalidPattern()
+    {
+        var logger = new ListLogger();
+        DeviceTrackingRules.FromConfig(new Config { ExcludeDevices = [new ConfigDevice { Id = "[a-" }] }, logger);
+        Assert.That(logger.Entries, Has.One.Matches<(LogLevel Level, string Message)>(e =>
+            e.Level == LogLevel.Warning && e.Message.Contains("[a-")));
+    }
+
+    private sealed class ListLogger : ILogger
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
     }
 
     [Test]

@@ -3,27 +3,34 @@ using ESPresense.Extensions;
 using ESPresense.Locators;
 using ESPresense.Services;
 using ESPresense.Weighting;
-using Serilog;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Linq;
 
 namespace ESPresense.Models;
 
 public class State
 {
+    private readonly ILoggerFactory _loggerFactory;
     private readonly object _calibrationMetricsLock = new();
     private double? _bestCalibrationRMSE;
     private double? _bestCalibrationR;
 
+    /// <summary>For tests and tools that build a State by hand: its loggers discard everything.</summary>
+    public State(ConfigLoader cl, NodeTelemetryStore nts) : this(cl, nts, NullLoggerFactory.Instance)
+    {
+    }
+
     /// <summary>
-    /// Initializes a new State, wiring telemetry and configuration handling.
+    /// Initializes a new State, wiring telemetry and configuration handling. DI picks this constructor.
     /// </summary>
     /// <remarks>
     /// Subscribes to the provided ConfigLoader's ConfigChanged event and applies the current configuration if present;
     /// see <see cref="Apply"/>.
     /// </remarks>
-    public State(ConfigLoader cl, NodeTelemetryStore nts)
+    public State(ConfigLoader cl, NodeTelemetryStore nts, ILoggerFactory loggerFactory)
     {
-        ScenarioFactory = new ScenarioFactory(this, nts);
+        _loggerFactory = loggerFactory;
+        ScenarioFactory = new ScenarioFactory(this, nts, _loggerFactory.CreateLogger<ScenarioFactory>());
         cl.ConfigChanged += (_, args) => Apply(args);
         if (cl.Config != null) Apply(cl.Config);
     }
@@ -38,7 +45,7 @@ public class State
     internal void Apply(Config c)
     {
         // Build anything that can fail before touching state, so a bad config can't half-apply.
-        var trackingRules = DeviceTrackingRules.FromConfig(c);
+        var trackingRules = DeviceTrackingRules.FromConfig(c, _loggerFactory.CreateLogger<DeviceTrackingRules>());
 
         Config = c;
         TrackingRules = trackingRules;

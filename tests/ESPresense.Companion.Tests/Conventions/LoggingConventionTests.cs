@@ -20,7 +20,6 @@ public class LoggingConventionTests
     // TODO(#1843, #1844): these files are being rewritten on other branches; convert them once those merge.
     private static readonly string[] Deferred =
     {
-        "Models/State.cs",                // #1844
         "Services/DeviceTracker.cs",      // #1844
     };
 

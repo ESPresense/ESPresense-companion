@@ -1,6 +1,6 @@
 using DotNet.Globbing;
 using DotNet.Globbing.Token;
-using Serilog;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ESPresense.Models;
 
@@ -24,7 +24,7 @@ public sealed class DeviceTrackingRules
     // ponytail: device ids/names are matched case-insensitively everywhere else (all the dictionaries are OrdinalIgnoreCase), globs must agree
     private static readonly GlobOptions GlobOpts = new() { Evaluation = { CaseInsensitive = true } };
 
-    public static DeviceTrackingRules Empty { get; } = FromConfig(null);
+    public static DeviceTrackingRules Empty { get; } = FromConfig(null, NullLogger.Instance);
 
     private readonly IReadOnlyDictionary<string, ConfigDevice> _byId;
     private readonly IReadOnlyDictionary<string, ConfigDevice> _byName;
@@ -49,7 +49,7 @@ public sealed class DeviceTrackingRules
     internal static int GlobsCompiledOnThisThread => _globsCompiled;
 
     /// <summary>Compiles one pattern, or returns null (and logs) when DotNet.Glob can't parse it, e.g. "[a-".</summary>
-    private static Glob? Compile(string pattern)
+    private static Glob? Compile(string pattern, ILogger logger)
     {
         _globsCompiled++;
         try
@@ -58,13 +58,14 @@ public sealed class DeviceTrackingRules
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Ignoring invalid device pattern {Pattern}", pattern);
+            logger.LogWarning(ex, "Ignoring invalid device pattern {Pattern}", pattern);
             return null;
         }
     }
 
-    public static DeviceTrackingRules FromConfig(Config? c)
+    public static DeviceTrackingRules FromConfig(Config? c, ILogger? logger = null)
     {
+        logger ??= NullLogger.Instance;
         var devices = c?.Devices ?? [];
 
         // Patterns without wildcards are dictionary lookups; first entry for a given id/name wins.
@@ -73,7 +74,7 @@ public sealed class DeviceTrackingRules
         foreach (var d in devices)
             if (!string.IsNullOrWhiteSpace(d.Id))
             {
-                var glob = Compile(d.Id);
+                var glob = Compile(d.Id, logger);
                 if (glob == null) continue;
                 if (glob.Tokens.All(t => t is LiteralToken)) byId.TryAdd(d.Id, d);
                 else idGlobs.Add(glob);
@@ -84,7 +85,7 @@ public sealed class DeviceTrackingRules
         foreach (var d in devices)
             if (!string.IsNullOrWhiteSpace(d.Name))
             {
-                var glob = Compile(d.Name);
+                var glob = Compile(d.Name, logger);
                 if (glob == null) continue;
                 if (glob.Tokens.All(t => t is LiteralToken)) byName.TryAdd(d.Name, d);
                 else nameGlobs.Add(glob);
@@ -92,8 +93,8 @@ public sealed class DeviceTrackingRules
 
         var excludes = (c?.ExcludeDevices ?? [])
             .Select(d => (
-                Id: string.IsNullOrWhiteSpace(d.Id) ? null : Compile(d.Id),
-                Name: string.IsNullOrWhiteSpace(d.Name) ? null : Compile(d.Name)))
+                Id: string.IsNullOrWhiteSpace(d.Id) ? null : Compile(d.Id, logger),
+                Name: string.IsNullOrWhiteSpace(d.Name) ? null : Compile(d.Name, logger)))
             .Where(e => e.Id != null || e.Name != null)
             .ToArray();
 

@@ -1,6 +1,5 @@
 using ESPresense.Locators;
 using ESPresense.Services;
-using Serilog;
 
 namespace ESPresense.Models;
 
@@ -17,7 +16,7 @@ public sealed record LocatorDescriptor(string Name, bool Enabled, bool PerFloor,
 /// <summary>
 /// The single source of truth for which locators exist, which the config enables, and the scenarios a device gets.
 /// </summary>
-public sealed class ScenarioFactory(State state, NodeTelemetryStore nts)
+public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger<ScenarioFactory> logger)
 {
     private const string NelderMeadName = "NelderMead";
     private const string NearestNodeName = "NearestNode";
@@ -62,7 +61,7 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts)
         IReadOnlyList<LocatorDescriptor> enabled = all.Where(d => d.Enabled).ToList();
         if (enabled.Count == 0)
         {
-            Log.Warning("No locators enabled, using default NelderMead");
+            logger.LogWarning("No locators enabled, using default NelderMead");
             enabled = state.Floors.Values.Any()
                 ? [all.Single(d => d.Name == NelderMeadName) with { Floors = null }]
                 : [all.Single(d => d.Name == NearestNodeName)];

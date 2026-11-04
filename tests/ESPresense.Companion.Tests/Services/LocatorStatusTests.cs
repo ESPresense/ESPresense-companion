@@ -26,7 +26,7 @@ public class LocatorStatusTests
 
         var lease = new Mock<ILeaseService>();
         lease.Setup(l => l.AcquireAsync("locating", It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => new LeaseHandle(lease.Object, "locating"));
+            .ReturnsAsync(() => new LeaseHandle(lease.Object, "locating", NullLogger.Instance));
         lease.Setup(l => l.HasLease("locating")).Returns(true);
 
         var locator = new MultiScenarioLocator(tracker, fx.State, mqtt.Object, new GlobalEventDispatcher(), history, lease.Object);
