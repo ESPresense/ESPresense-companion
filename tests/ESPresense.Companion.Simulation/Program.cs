@@ -127,6 +127,13 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "fusion-replay-real")
+        {
+            int exit = ESPresense.Simulation.FusionValidation.RealHistoryReplay.Run(args.Skip(1).ToArray());
+            Environment.Exit(exit);
+            return;
+        }
+
         if (args.Length > 0 && args[0] == "fusion-fixtures")
         {
             var outDir = args.Length > 1 ? args[1] : "FusionValidation/Fixtures";
@@ -166,7 +173,8 @@ class Program
         Console.WriteLine("  Pipe a JSON request to 'dotnet run locate' to call ILocate as a CLI");
         Console.WriteLine("  Run 'dotnet run accuracy baseline' for the public accuracy baseline (real ILocate)");
         Console.WriteLine("  Run 'dotnet run fusion-validate --ha-history FILE --fusion-events FILE' to score CSI+BLE fusion output against HA history (ESPA-463)");
-        Console.WriteLine("  Run 'dotnet run fusion-fixtures [outDir]' to generate a synthetic ha-history/fusion-events pair from the real CsiFusionService\n");
+        Console.WriteLine("  Run 'dotnet run fusion-fixtures [outDir]' to generate a synthetic ha-history/fusion-events pair from the real CsiFusionService");
+        Console.WriteLine("  Run 'dotnet run fusion-replay-real --ha-export FILE [--start ISO] [--end ISO]' to score real HA history (ESPA-466)\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]
