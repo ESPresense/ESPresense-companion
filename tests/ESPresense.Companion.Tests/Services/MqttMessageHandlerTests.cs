@@ -1,6 +1,5 @@
 using ESPresense.Events;
 using ESPresense.Services;
-using MQTTnet;
 
 namespace ESPresense.Companion.Tests.Services;
 
@@ -11,7 +10,6 @@ public class MqttMessageHandlerTests
     {
         public Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceived { get; set; }
         public Func<DeviceMessageEventArgs, Task>? DeviceMessageReceived { get; set; }
-        public Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceived { get; set; }
         public Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceived { get; set; }
         public Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceived { get; set; }
         public Func<NodeTelemetryRemovedEventArgs, Task>? NodeTelemetryRemoved { get; set; }

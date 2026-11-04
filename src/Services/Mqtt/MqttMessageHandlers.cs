@@ -1,7 +1,6 @@
 using ESPresense.Events;
 using ESPresense.Models;
 using Microsoft.Extensions.Logging.Abstractions;
-using MQTTnet;
 using Newtonsoft.Json;
 
 namespace ESPresense.Services;
@@ -15,7 +14,6 @@ internal interface IMqttEventSink
 {
     Func<DeviceSettingsEventArgs, Task>? DeviceConfigReceived { get; }
     Func<DeviceMessageEventArgs, Task>? DeviceMessageReceived { get; }
-    Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceived { get; }
     Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceived { get; }
     Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceived { get; }
     Func<NodeTelemetryRemovedEventArgs, Task>? NodeTelemetryRemoved { get; }
@@ -205,18 +203,12 @@ internal sealed class DiscoveryHandler(IMqttEventSink sink, Func<string> discove
 {
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
 
-    public Task HandleAsync(DiscoveryRoute route, string? payload) => HandleAsync(route.Topic, payload);
-
-    /// <summary>Also reachable without a route, for any topic: a non-four-segment topic is its own discovery id.</summary>
-    public Task HandleAsync(string topic, string? payload)
+    public Task HandleAsync(DiscoveryRoute route, string? payload)
     {
+        var topic = route.Topic;
         try
         {
             _logger.LogTrace("Received discovery message on topic: {Topic}", topic);
-
-            // <discovery prefix>/<component>/<discovery id>/config
-            var parts = topic.Split('/');
-            var discoveryId = parts.Length == 4 ? parts[2] : topic;
 
             if (string.IsNullOrWhiteSpace(payload))
             {
@@ -224,7 +216,7 @@ internal sealed class DiscoveryHandler(IMqttEventSink sink, Func<string> discove
                 sink.RaisePreviousDeviceDiscovered(new PreviousDeviceDiscoveredEventArgs
                 {
                     Topic = topic,
-                    DiscoveryId = discoveryId,
+                    DiscoveryId = route.DiscoveryId,
                     DeviceId = null,
                     AutoDiscover = null
                 });
@@ -261,7 +253,7 @@ internal sealed class MqttMessageHandlers(IMqttEventSink sink, Func<string> disc
     private readonly DeviceSettingsHandler _deviceSettings = new(sink);
     private readonly DeviceAttributesHandler _deviceAttributes = new(sink);
 
-    public DiscoveryHandler Discovery { get; } = new(sink, discoveryTopic, logger);
+    private readonly DiscoveryHandler _discovery = new(sink, discoveryTopic, logger);
 
     public Task DispatchAsync(MqttRoute route, string? payload) => route switch
     {
@@ -272,7 +264,7 @@ internal sealed class MqttMessageHandlers(IMqttEventSink sink, Func<string> disc
         DeviceMessageRoute r => _deviceMessage.HandleAsync(r, payload),
         DeviceSettingsRoute r => _deviceSettings.HandleAsync(r, payload),
         DeviceAttributesRoute r => _deviceAttributes.HandleAsync(r, payload),
-        DiscoveryRoute r => Discovery.HandleAsync(r, payload),
+        DiscoveryRoute r => _discovery.HandleAsync(r, payload),
         _ => throw new ArgumentOutOfRangeException(nameof(route), route, "No handler for route")
     };
 }

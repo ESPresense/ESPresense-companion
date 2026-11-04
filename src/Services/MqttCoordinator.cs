@@ -121,7 +121,6 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
     // The handlers raise the events above through this view, so the events stay declared on the facade.
     Func<DeviceSettingsEventArgs, Task>? IMqttEventSink.DeviceConfigReceived => DeviceConfigReceivedAsync;
     Func<DeviceMessageEventArgs, Task>? IMqttEventSink.DeviceMessageReceived => DeviceMessageReceivedAsync;
-    Func<MqttApplicationMessageReceivedEventArgs, Task>? IMqttEventSink.MqttMessageReceived => MqttMessageReceivedAsync;
     Func<NodeSettingReceivedEventArgs, Task>? IMqttEventSink.NodeSettingReceived => NodeSettingReceivedAsync;
     Func<NodeTelemetryReceivedEventArgs, Task>? IMqttEventSink.NodeTelemetryReceived => NodeTelemetryReceivedAsync;
     Func<NodeTelemetryRemovedEventArgs, Task>? IMqttEventSink.NodeTelemetryRemoved => NodeTelemetryRemovedAsync;
@@ -176,40 +175,6 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
             _logger.LogError(ex, "Unexpected error processing message for topic {Topic}. Payload: {Payload}", topic, payload);
             MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
-    }
-
-    /// <summary>Handles a Home Assistant discovery message (also used directly by tests).</summary>
-    internal Task ProcessDiscoveryMessage(string topic, string? payload) => _handlers.Discovery.HandleAsync(topic, payload);
-
-    /// <summary>Why the coordinator is (or is not) in read-only mode.</summary>
-    internal enum ReadOnlyReason
-    {
-        None,
-        /// <summary><c>mqtt.read_only: true</c> in config.</summary>
-        ConfigFlag,
-        /// <summary>Deprecated heuristic: the client id contains "read".</summary>
-        ClientIdHeuristic
-    }
-
-    /// <summary>
-    /// Decides read-only mode for a config: the explicit <see cref="ConfigMqtt.ReadOnly"/> flag wins;
-    /// otherwise the deprecated client-id heuristic is applied for backward compatibility (and
-    /// <see cref="MqttConnection"/> logs a deprecation warning whenever it decides the outcome).
-    /// </summary>
-    internal static ReadOnlyReason GetReadOnlyReason(ConfigMqtt config)
-    {
-        if (config.ReadOnly) return ReadOnlyReason.ConfigFlag;
-        if (IsReadOnlyClient(config.ClientId)) return ReadOnlyReason.ClientIdHeuristic;
-        return ReadOnlyReason.None;
-    }
-
-    /// <summary>
-    /// Deprecated heuristic kept for backward compatibility: a client id containing "read"
-    /// (case-insensitive) puts the coordinator in read-only mode. Use <see cref="ConfigMqtt.ReadOnly"/>.
-    /// </summary>
-    internal static bool IsReadOnlyClient(string? clientId)
-    {
-        return clientId?.Contains("read", StringComparison.OrdinalIgnoreCase) ?? false;
     }
 
     /// <summary>

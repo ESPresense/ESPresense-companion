@@ -9,7 +9,7 @@ namespace ESPresense.Services;
 /// <summary>Owns the MQTTnet client: connect, reconnect, config-change reconnect, publish.</summary>
 internal interface IMqttConnection
 {
-    /// <summary>True when nothing may be published (see <see cref="MqttCoordinator.GetReadOnlyReason"/>).</summary>
+    /// <summary>True when nothing may be published (see <see cref="MqttReadOnly.GetReason"/>).</summary>
     bool IsReadOnly { get; }
 
     /// <summary>The Home Assistant discovery prefix of the current connection (<c>homeassistant</c> until the first connect).</summary>
@@ -106,10 +106,10 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
         {
             var config = _lastConfig;
             if (config != null)
-                return MqttCoordinator.GetReadOnlyReason(config) != MqttCoordinator.ReadOnlyReason.None;
+                return MqttReadOnly.IsReadOnly(config);
 
             // No successful connect yet (e.g. mocked coordinator): fall back to the client options.
-            return MqttCoordinator.IsReadOnlyClient(_mqttClient?.Options?.ClientId);
+            return MqttReadOnly.IsReadOnlyClientId(_mqttClient?.Options?.ClientId);
         }
     }
 
@@ -224,13 +224,13 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
         var mqttClient = _createClient();
         mqttClient.ApplicationMessageReceivedAsync += OnApplicationMessageReceived;
 
-        var readOnlyReason = MqttCoordinator.GetReadOnlyReason(config);
+        var readOnlyReason = MqttReadOnly.GetReason(config);
         switch (readOnlyReason)
         {
-            case MqttCoordinator.ReadOnlyReason.ConfigFlag:
+            case MqttReadOnly.Reason.ConfigFlag:
                 _logger.LogInformation("MQTT read-only mode is active (mqtt.read_only: true); nothing will be published");
                 break;
-            case MqttCoordinator.ReadOnlyReason.ClientIdHeuristic:
+            case MqttReadOnly.Reason.ClientIdHeuristic:
                 _logger.LogWarning(
                     "MQTT read-only mode is active because client_id '{ClientId}' contains \"read\". This client-id heuristic is deprecated and will be removed: set mqtt.read_only: true to stay read-only, or choose a client_id without \"read\" to publish",
                     LogSanitizer.StripOrNull(config.ClientId));
@@ -243,7 +243,7 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
 
             try
             {
-                if (readOnlyReason == MqttCoordinator.ReadOnlyReason.None)
+                if (readOnlyReason == MqttReadOnly.Reason.None)
                     await mqttClient.PublishStringAsync(MqttTopics.CompanionStatus, MqttTopics.Online, retain: true).ConfigureAwait(false);
 
                 foreach (var filter in MqttTopics.Subscriptions(config.DiscoveryTopic))
@@ -317,7 +317,7 @@ internal sealed class MqttConnection : IMqttConnection, IDisposable
 
         // A read-only session never publishes "online", so it must not register a retained "offline"
         // will either: an unclean drop would otherwise mark a real, publishing companion as offline.
-        if (readOnlyReason == MqttCoordinator.ReadOnlyReason.None)
+        if (readOnlyReason == MqttReadOnly.Reason.None)
         {
             optionsBuilder = optionsBuilder
                 .WithWillTopic(MqttTopics.CompanionStatus)
