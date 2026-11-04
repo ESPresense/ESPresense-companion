@@ -99,6 +99,9 @@ public sealed class FingerprintSurface
 
         double x0 = fingerprints.Min(f => f.X) - 1, x1 = fingerprints.Max(f => f.X) + 1;
         double y0 = fingerprints.Min(f => f.Y) - 1, y1 = fingerprints.Max(f => f.Y) + 1;
+        // A non-positive bandwidth makes every kernel weight exp(-d^2/0): NaN on a lattice point that
+        // lands exactly on a spot, 0 everywhere else.
+        bandwidth = Math.Max(bandwidth, 0.01);
         var twoBw2 = 2 * bandwidth * bandwidth;
         var cutoff = 3 * bandwidth;
 
@@ -341,6 +344,10 @@ public sealed class FingerprintSurface
     /// </summary>
     public FingerprintLocator.MatchResult? Match(IReadOnlyDictionary<string, double> reading, int minCommon, int best = 20)
     {
+        // FingerprintLocator always passes an OrdinalIgnoreCase reading, but Match is public and takes
+        // any IReadOnlyDictionary: normalize so a differently-cased caller can't disagree with the
+        // case-insensitive node lookups.
+        reading = new Dictionary<string, double>(reading, StringComparer.OrdinalIgnoreCase);
         var r = Prepare(reading);
         if (r.Shared < minCommon || _points.Length == 0) return null;
 

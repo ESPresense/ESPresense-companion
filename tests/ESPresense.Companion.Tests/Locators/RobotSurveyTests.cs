@@ -634,7 +634,7 @@ public class RobotSurveyTests
             }
             if (e.Count == 0) continue;
             e.Sort();
-            errs.Add(e[e.Count / 2]);
+            errs.Add(e.Count % 2 == 1 ? e[e.Count / 2] : (e[e.Count / 2 - 1] + e[e.Count / 2]) / 2);
             if (spot[0].FloorRoom == null) continue;
             total++;
             if (2 * h > e.Count) hits++;
