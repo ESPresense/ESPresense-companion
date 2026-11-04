@@ -1,10 +1,10 @@
 using ESPresense.Models;
 using ESPresense.Services;
+using ESPresense.Utils;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using ModelContextProtocol.Protocol;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.ComponentModel;
 
 namespace ESPresense.Services;
@@ -47,12 +47,8 @@ public class McpResources
         _firmwareUpdateJobs = firmwareUpdateJobs;
         _firmwareCatalog = firmwareCatalog;
         _mapper = mapper;
-        _jsonOptions = new JsonSerializerOptions
-        {
-            Converters = { new JsonStringEnumConverter() },
-            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
+        // Exactly the REST settings, so a tool returns the same JSON as the matching /api endpoint.
+        _jsonOptions = RestJson.Create();
     }
 
     [McpServerResource(UriTemplate = "state://config", Name = "Application Configuration", MimeType = "application/json")]

@@ -20,15 +20,12 @@ public class McpCalibrationTests
     [Test]
     public async Task GetCalibrationTool_MatchesRestPayload()
     {
-        var rest = JsonDocument.Parse(JsonSerializer.Serialize(_f.CreateController().GetCalibration(), CalibrationFixture.RestJson)).RootElement;
-        var mcpJson = await _f.CreateMcp().GetCalibrationTool();
-        var mcp = JsonDocument.Parse(mcpJson).RootElement;
+        var rest = JsonSerializer.Serialize(_f.CreateController().GetCalibration(), CalibrationFixture.RestJson);
+        var mcp = await _f.CreateMcp().GetCalibrationTool();
 
-        // MCP keeps its own (PascalCase) property names; the matrix is keyed by names and cell keys, so it is byte-identical.
-        Assert.That(mcp.GetProperty("Matrix").GetRawText(), Is.EqualTo(rest.GetProperty("matrix").GetRawText()));
-        Assert.That(mcp.GetProperty("Anchored").GetRawText(), Is.EqualTo(rest.GetProperty("anchored").GetRawText()));
-        foreach (var (mcpName, restName) in new[] { ("RMSE", "rmse"), ("R", "r"), ("BestRMSE", "bestRMSE"), ("BestR", "bestR") })
-            Assert.That(mcp.GetProperty(mcpName).GetDouble(), Is.EqualTo(rest.GetProperty(restName).GetDouble()), mcpName);
+        // Same settings as REST, so the whole payload is byte-identical, not just the matrix.
+        Assert.That(mcp, Is.EqualTo(rest));
+        Assert.That(mcp, Is.EqualTo(CalibrationWireFormatTests.ExpectedRestJson));
     }
 
     [Test]
@@ -36,8 +33,8 @@ public class McpCalibrationTests
     {
         var mcp = JsonDocument.Parse(await _f.CreateMcp().GetCalibrationTool()).RootElement;
 
-        Assert.That(mcp.GetProperty("Anchored").EnumerateArray().Select(e => e.GetString()), Is.EqualTo(new[] { "Anchor One" }));
-        var cell = mcp.GetProperty("Matrix").GetProperty("Anchor One").GetProperty("Alpha");
+        Assert.That(mcp.GetProperty("anchored").EnumerateArray().Select(e => e.GetString()), Is.EqualTo(new[] { "Anchor One" }));
+        var cell = mcp.GetProperty("matrix").GetProperty("Anchor One").GetProperty("Alpha");
         Assert.That(cell.GetProperty("mapDistance").GetDouble(), Is.EqualTo(2));
         Assert.That(cell.GetProperty("distance").GetDouble(), Is.EqualTo(2.25));
         Assert.That(cell.GetProperty("diff").GetDouble(), Is.EqualTo(0.25));
