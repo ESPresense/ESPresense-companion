@@ -59,7 +59,9 @@ public class SelfCalibrationTests
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
 
-        // The constructor no longer loads; the optimizers need Config.Optimization.
+        // The constructor no longer loads; the optimizers need Config.Optimization. State copies the
+        // config in its ConfigChanged handler, so a failure here after a load-path change means that
+        // event stopped firing during LoadAsync, not that the file failed to load.
         await _configLoader.LoadAsync();
         Assert.That(_state.Config?.Optimization, Is.Not.Null, "config did not load");
     }
@@ -517,24 +519,27 @@ public class SelfCalibrationTests
         // positions by a kernel on distance and nearest just picks the shortest range, so a calibration
         // that rescales every range moves them little or not at all; both stay in the table for reference.
         var solvers = RobotSurveyTests.Solvers;
-        var locators = solvers.Concat(new[] { "nadaraya", "nearest" }).ToArray();
+        var locators = RobotSurveyTests.Locators;
         TestContext.WriteLine($"mode {mode}: held-out median XY position error (m) by locator");
         TestContext.WriteLine($"{"locator",-12} {"cold",8} {"calibrated",11} {"reported",9}");
-        var ratios = new List<double>();
+        var ratios = new Dictionary<string, double>();
         foreach (var which in locators)
         {
             var c = MedianXyError(which, (_, m) => Ranged(m, cold.Get("none")));
             var k = MedianXyError(which, (id, m) => Ranged(m, nss.Get(id)));
             var r = MedianXyError(which, (_, m) => m.Dist);
             TestContext.WriteLine($"{which,-12} {c,8:0.00} {k,11:0.00} {r,9:0.00}");
-            if (solvers.Contains(which) && double.IsFinite(c) && double.IsFinite(k)) ratios.Add(k / c);
+            if (solvers.Contains(which) && double.IsFinite(c) && double.IsFinite(k)) ratios[which] = k / c;
         }
 
-        var shown = string.Join(", ", ratios.Select(x => x.ToString("0.00")));
-        Assert.That(ratios, Has.Count.EqualTo(solvers.Length), "a solving locator produced no fixes");
-        // The mean is the 20% requirement; the per-locator ceiling stops one solver regressing while the rest carry it.
-        Assert.That(ratios, Has.All.LessThan(1.0), $"the applied calibration ({mode}) made a solving locator worse; ratios {shown}");
-        Assert.That(ratios.Average(), Is.LessThan(0.8),
+        var shown = string.Join(", ", ratios.Select(kv => $"{kv.Key} {kv.Value:0.00}"));
+        Assert.That(ratios.Keys, Is.EquivalentTo(solvers), $"a solving locator produced no fixes; ratios {shown}");
+        // The 20% requirement applies to the mean only. Each solver just has to not get worse, so a weak
+        // solver can sit near 1.0 while the others carry the mean. Worst single solver on the bundled
+        // fixture is bfgs in per_node_absorption at 0.85, so this ceiling has about 15% headroom; the
+        // ratios are correlated (same ranges, same calibration), so the mean is not much steadier than one.
+        Assert.That(ratios.Values, Has.All.LessThan(1.0), $"the applied calibration ({mode}) made a solving locator worse; ratios {shown}");
+        Assert.That(ratios.Values.Average(), Is.LessThan(0.8),
             $"the applied calibration ({mode}) should cut the solving locators' held-out position error by at least 20% on average; ratios {shown}");
     }
 

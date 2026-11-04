@@ -36,12 +36,13 @@ public class RobotSurveyTests
     private Survey _survey = null!;
     private NodeTelemetryStore _nts = null!;
 
-    private static readonly string[] Locators = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor", "nadaraya", "nearest" };
-
-    /// <summary>Locators that actually solve for a position from ranges, as opposed to picking or blending node positions.</summary>
     /// <summary>The locators that solve a position from the ranges, as opposed to nadaraya and nearest-node,
     /// which blend or pick node positions. SelfCalibrationTests scores the same set.</summary>
-    internal static readonly string[] Solvers = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor" };
+    internal static readonly IReadOnlyList<string> Solvers = new[] { "nelder", "mle", "gaussnewton", "bfgs", "multifloor" };
+
+    /// <summary>The solvers plus the locators that pick or blend node positions. Declared after Solvers,
+    /// which static initialisation order requires.</summary>
+    internal static readonly IReadOnlyList<string> Locators = Solvers.Concat(new[] { "nadaraya", "nearest" }).ToArray();
 
     /// <summary>Many headings at one spot: good for orientation sensitivity, poor spatial spread.</summary>
     private const string Headings = "robot-survey-headings.json";
