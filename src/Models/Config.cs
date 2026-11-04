@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using TextExtensions;
+﻿using TextExtensions;
 using YamlDotNet.Serialization;
 using ESPresense.Extensions;
 
@@ -234,47 +233,38 @@ namespace ESPresense.Models
 
     public partial class ConfigMqtt
     {
-        [JsonProperty("host")]
         public string? Host { get; set; }
 
-        [JsonProperty("port")]
         public int? Port { get; set; }
 
-        [JsonProperty("ssl")]
         public bool? Ssl { get; set; }
 
-        [JsonProperty("insecure")]
         [YamlMember(Alias = "insecure")]
         public bool Insecure { get; set; }
 
-        [JsonProperty("ca_cert_path")]
         [YamlMember(Alias = "ca_cert_path")]
         public string? CaCertPath { get; set; }
 
-        [JsonProperty("username")]
         public string? Username { get; set; }
 
-        // Never serialize the broker password to API responses, MCP clients, or logs.
-        // Both JSON stacks are ignored because Config is returned by StateController
-        // (System.Text.Json) and McpResources, while Newtonsoft is used elsewhere.
-        // YamlDotNet has its own attributes, so YAML round-tripping is unaffected.
-        [JsonIgnore]
+        // Never serialize the broker password to API responses or MCP clients. Config only leaves through
+        // System.Text.Json (Newtonsoft is confined to the files NewtonsoftConventionTests allows, none of
+        // which serialize Config). YamlDotNet has its own attributes, so YAML round-tripping is unaffected.
+        // Logging is not covered: Serilog's {@} destructuring ignores JSON attributes, so never {@}-log a Config.
         [System.Text.Json.Serialization.JsonIgnore]
         public string? Password { get; set; }
 
-        [JsonProperty("client_id")]
         [YamlMember(Alias = "client_id")]
         public string ClientId { get; set; } = "espresense-companion";
 
-        [JsonProperty("discovery_topic")]
         [YamlMember(Alias = "discovery_topic")]
         public string DiscoveryTopic { get; set; } = "homeassistant";
 
         /// <summary>
         /// When true the companion subscribes and processes messages but never publishes; each publish
-        /// is logged at Information level instead. Defaults to false.
+        /// is logged at Information level instead. Defaults to false. Replaces the deprecated heuristic
+        /// of a <see cref="ClientId"/> containing "read", which still enables read-only mode but logs a warning.
         /// </summary>
-        [JsonProperty("read_only")]
         [YamlMember(Alias = "read_only")]
         public bool ReadOnly { get; set; }
     }

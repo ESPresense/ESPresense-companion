@@ -4,7 +4,6 @@ using ESPresense.Services;
 using MQTTnet.Diagnostics.Logger;
 using Serilog;
 using Serilog.Events;
-using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
 using ESPresense.Controllers;
 using ESPresense.Utils;
@@ -29,23 +28,21 @@ var configDir = Environment.GetEnvironmentVariable("CONFIG_DIR") ?? Path.Combine
 var storageDir = Path.Combine(configDir, ".storage");
 Directory.CreateDirectory(storageDir);
 
-var configLoader = new ConfigLoader(configDir);
-
-builder.Services.AddSingleton(a => configLoader);
-builder.Services.AddHostedService(a => configLoader);
+builder.Services.AddSingleton(a => new ConfigLoader(configDir, a.GetRequiredService<ILogger<ConfigLoader>>()));
+builder.Services.AddHostedService(a => a.GetRequiredService<ConfigLoader>());
 
 builder.Services.AddDataProtection()
     .UseEphemeralDataProtectionProvider();
 
 builder.Services.AddSingleton<HttpClient>();
-builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger());
+builder.Services.AddSingleton<IMqttNetLogger>(a => new MqttNetLogger(a.GetRequiredService<ILogger<MqttNetLogger>>()));
 builder.Services.AddSingleton<MqttCoordinator>();
 builder.Services.AddSingleton<IMqttCoordinator>(provider => provider.GetRequiredService<MqttCoordinator>());
 builder.Services.AddSingleton<TelemetryService>();
 builder.Services.AddSingleton<GlobalEventDispatcher>();
 builder.Services.AddSingleton<DeviceTracker>();
 builder.Services.AddSingleton<SupervisorConfigLoader>();
-builder.Services.AddSingleton(a => new DeviceHistoryStore(storageDir, a.GetRequiredService<ConfigLoader>()));
+builder.Services.AddSingleton(a => new DeviceHistoryStore(storageDir, a.GetRequiredService<ConfigLoader>(), a.GetRequiredService<ILogger<DeviceHistoryStore>>()));
 builder.Services.AddSingleton<DeviceSettingsStore>();
 builder.Services.AddSingleton<NodeSettingsStore>();
 builder.Services.AddSingleton<NodeTelemetryStore>();
@@ -70,13 +67,11 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTe
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
-builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
-{
-    opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    opt.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
-});
+builder.Services.AddSingleton<CalibrationService>();
+builder.Services.AddSingleton<DeviceEnricher>();
+builder.Services.AddControllersWithViews().AddJsonOptions(opt => JsonDefaults.ConfigureWeb(opt.JsonSerializerOptions));
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(o => o.SchemaFilter<CalibrationCellSchemaFilter>());
 builder.Services.AddHealthChecks();
 
 builder.Services.AddMcpServer(options =>
@@ -88,6 +83,9 @@ builder.Services.AddMcpServer(options =>
     .WithHttpTransport();
 
 var app = builder.Build();
+
+// TODO(#1843, #1844, #1845): remove once State, DeviceTracker, MqttCoordinator and MultiScenarioLocator pass loggers to what they construct.
+DeferredLoggerFactory.Use(app.Services.GetRequiredService<ILoggerFactory>());
 
 app.UseWebSockets(new WebSocketOptions
 {

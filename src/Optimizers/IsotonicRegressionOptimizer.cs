@@ -1,16 +1,17 @@
 using ESPresense.Models;
 using ESPresense.Utils;
-using Serilog;
 
 namespace ESPresense.Optimizers;
 
 public class IsotonicRegressionOptimizer : IOptimizer
 {
     private readonly State _state;
+    private readonly ILogger<IsotonicRegressionOptimizer> _logger;
 
-    public IsotonicRegressionOptimizer(State state)
+    public IsotonicRegressionOptimizer(State state, ILogger<IsotonicRegressionOptimizer> logger)
     {
         _state = state;
+        _logger = logger;
     }
 
     public string Name => "Isotonic Regression";
@@ -35,7 +36,7 @@ public class IsotonicRegressionOptimizer : IOptimizer
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Isotonic regression optimizer failed for node {NodeId}", rxGroup.Key.Id);
+                _logger.LogError(ex, "Isotonic regression optimizer failed for node {NodeId}", rxGroup.Key.Id);
             }
         }
 

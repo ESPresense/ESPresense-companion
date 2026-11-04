@@ -1,7 +1,7 @@
 using ESPresense.Models;
 using ESPresense.Services;
+using ESPresense.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
 
 namespace ESPresense.Controllers;
 
@@ -11,7 +11,8 @@ public class NodeController(
     NodeSettingsStore nodeSettingsStore,
     NodeTelemetryStore nodeTelemetryStore,
     State state,
-    FirmwareUpdateJobService firmwareUpdateJobs) : ControllerBase
+    FirmwareUpdateJobService firmwareUpdateJobs,
+    ILogger<NodeController> logger) : ControllerBase
 {
     /// <summary>
     /// Retrieve the saved settings for a node and any runtime details available from in-memory state.
@@ -35,7 +36,9 @@ public class NodeController(
     public Task Set(string id, [FromBody] NodeSettings ds)
     {
         ds.Id = id;
-        Log.Information("Set {id} {@ds}", id, ds);
+        // {@ds} is Serilog destructuring: the settings become a structured object in the log event rather than
+        // NodeSettings.ToString(). Under a provider without destructuring the @ is a no-op; keep it.
+        logger.LogInformation("Set {id} {@ds}", LogSanitizer.Strip(id), ds);
         return nodeSettingsStore.Set(id, ds);
     }
 

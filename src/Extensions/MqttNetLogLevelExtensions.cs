@@ -1,18 +1,19 @@
-﻿using MQTTnet.Diagnostics.Logger;
+using Microsoft.Extensions.Logging;
+using MQTTnet.Diagnostics.Logger;
 
 namespace ESPresense.Extensions
 {
     public static class MqttNetLogLevelExtensions
     {
-        public static  Serilog.Events.LogEventLevel ToSerilog(this MqttNetLogLevel level)
+        public static LogLevel ToLogLevel(this MqttNetLogLevel level)
         {
             return level switch
             {
-                MqttNetLogLevel.Error => Serilog.Events.LogEventLevel.Error,
-                MqttNetLogLevel.Warning => Serilog.Events.LogEventLevel.Warning,
-                MqttNetLogLevel.Info => Serilog.Events.LogEventLevel.Information,
-                MqttNetLogLevel.Verbose => Serilog.Events.LogEventLevel.Verbose,
-                _ => Serilog.Events.LogEventLevel.Debug
+                MqttNetLogLevel.Error => LogLevel.Error,
+                MqttNetLogLevel.Warning => LogLevel.Warning,
+                MqttNetLogLevel.Info => LogLevel.Information,
+                MqttNetLogLevel.Verbose => LogLevel.Trace,
+                _ => LogLevel.Debug
             };
         }
     }

@@ -1,7 +1,6 @@
 ﻿using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
-using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -17,14 +16,16 @@ internal class OptimizationRunner : BackgroundService
     private readonly ILogger<OptimizationRunner> _logger;
     private readonly ConfigLoader _cfg;
     private readonly ILeaseService _leaseService;
+    private readonly ILoggerFactory _loggerFactory;
     private IList<IOptimizer> _optimizers;
     private readonly object _optimizersLock = new();
     private string? _lastOptimizerMode;
     private double _previousBestCorr = double.NaN;
     private double _previousBestRmse = double.NaN;
 
-    public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger, ConfigLoader cfg, ILeaseService leaseService)
+    public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger, ConfigLoader cfg, ILeaseService leaseService, ILoggerFactory loggerFactory)
     {
+        _loggerFactory = loggerFactory;
         _state = state;
         _nsd = nsd;
         _logger = logger;
@@ -41,7 +42,7 @@ internal class OptimizationRunner : BackgroundService
                     return;
                 _optimizers = BuildOptimizers(optimizerMode);
                 _lastOptimizerMode = optimizerMode;
-                Log.Information("Optimizer mode changed to {0}", optimizerMode);
+                _logger.LogInformation("Optimizer mode changed to {Mode}", optimizerMode);
             }
         };
 
@@ -55,14 +56,14 @@ internal class OptimizationRunner : BackgroundService
         mode = mode?.ToLowerInvariant() ?? "legacy";
         return mode switch
         {
-            "global_absorption" => new List<IOptimizer> { new GlobalAbsorptionRxTxOptimizer(_state) },
-            "per_node_absorption" => new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state) },
+            "global_absorption" => new List<IOptimizer> { new GlobalAbsorptionRxTxOptimizer(_state, _loggerFactory.CreateLogger<GlobalAbsorptionRxTxOptimizer>()) },
+            "per_node_absorption" => new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, _loggerFactory.CreateLogger<PerNodeAbsorptionRxTx>()) },
             _ => new List<IOptimizer>
             {
-                new RxAdjRssiOptimizer(_state),
+                new RxAdjRssiOptimizer(_state, _loggerFactory.CreateLogger<RxAdjRssiOptimizer>()),
                 new AbsorptionAvgOptimizer(_state),
-                new AbsorptionErrOptimizer(_state),
-                new IsotonicRegressionOptimizer(_state)
+                new AbsorptionErrOptimizer(_state, _loggerFactory.CreateLogger<AbsorptionErrOptimizer>()),
+                new IsotonicRegressionOptimizer(_state, _loggerFactory.CreateLogger<IsotonicRegressionOptimizer>())
             }
         };
     }
@@ -75,7 +76,7 @@ internal class OptimizationRunner : BackgroundService
                 var optimization = _state.Config?.Optimization;
                 while (optimization is not { Enabled: true })
                 {
-                    Log.Information("Optimization disabled");
+                    _logger.LogInformation("Optimization disabled");
                     SetStatus("Disabled", "Auto optimization is disabled.", optimizers: string.Empty);
                     _state.OptimizerState.NextRunAt = null;
                     _state.OptimizerState.LeaseHolder = null;
@@ -100,7 +101,7 @@ internal class OptimizationRunner : BackgroundService
                 await using var lease = await leaseTask
                     ?? throw new InvalidOperationException("Optimization lease acquisition returned null unexpectedly.");
 
-                Log.Information("Optimization enabled");
+                _logger.LogInformation("Optimization enabled");
                 SetStatus("Collecting", "Collecting snapshots for the initial training and validation split.", optimizers: GetOptimizerNames());
                 _state.OptimizerState.LeaseHolder = "This instance";
                 _state.OptimizerState.LeaseExpiresAt = _leaseService.GetStatus(OptimizationLeaseName)?.ExpiresAt;
@@ -149,7 +150,7 @@ internal class OptimizationRunner : BackgroundService
             {
                 SetStatus("Error", ex.Message, optimizers: "Error: " + ex.Message);
                 _state.OptimizerState.NextRunAt = null;
-                Log.Error(ex, "Error in OptimizationRunner");
+                _logger.LogError(ex, "Error in OptimizationRunner");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
@@ -188,7 +189,7 @@ internal class OptimizationRunner : BackgroundService
         if (!OptimizationDataSplit.TryCreate(snapshots, optimization.EffectiveValidationFraction, out var split) || split == null)
         {
             SetStatus("Collecting", $"Collected {snapshots.Length} of {OptimizationDataSplit.MinimumSnapshots} required snapshots.");
-            Log.Information("Optimization deferred: only {SnapshotCount} snapshots are available", snapshots.Length);
+            _logger.LogInformation("Optimization deferred: only {SnapshotCount} snapshots are available", snapshots.Length);
             return false;
         }
 
@@ -285,7 +286,7 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.ValidationSamples = baselineSamples;
         if (baselineSamples < optimization.MinSamples)
         {
-            Log.Debug("Optimization skipped: baseline evaluated on {0} measurements, need at least {1} (min_samples)", baselineSamples, optimization.MinSamples);
+            _logger.LogDebug("Optimization skipped: baseline evaluated on {Samples} measurements, need at least {MinSamples} (min_samples)", baselineSamples, optimization.MinSamples);
             _state.OptimizerState.LastOutcome = $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).";
             return;
         }
@@ -297,7 +298,7 @@ internal class OptimizationRunner : BackgroundService
 
         if (double.IsNaN(_previousBestCorr) || double.IsNaN(_previousBestRmse) || Math.Abs(bestCorr - _previousBestCorr) > 0.001 || Math.Abs(bestRmse - _previousBestRmse) > 0.001)
         {
-            Log.Information("Baseline metrics: Composite={2:0.000} (R={0:0.000}, RMSE={1:0.000})", bestCorr, bestRmse, bestScore);
+            _logger.LogInformation("Baseline metrics: Composite={Composite:0.000} (R={R:0.000}, RMSE={RMSE:0.000})", bestScore, bestCorr, bestRmse);
             _previousBestCorr = bestCorr;
             _previousBestRmse = bestRmse;
         }
@@ -319,7 +320,7 @@ internal class OptimizationRunner : BackgroundService
             var (corr, rmse, samples) = results.Evaluate(evalSet, Frozen);
             if (samples < optimization.MinSamples)
             {
-                Log.Debug("Optimizer {0,-24} rejected: evaluated on {1} measurements, need at least {2} (min_samples)",
+                _logger.LogDebug("Optimizer {Optimizer,-24} rejected: evaluated on {Samples} measurements, need at least {MinSamples} (min_samples)",
                     optimizer.Name, samples, optimization.MinSamples);
                 continue;
             }
@@ -329,11 +330,11 @@ internal class OptimizationRunner : BackgroundService
 
             if (double.IsNaN(composite) || double.IsInfinity(composite) || composite <= bestScore + optimization.MinimumImprovement)
             {
-                Log.Information("Optimizer {0,-24} found worse results: Composite={1:0.000} <= Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
+                _logger.LogInformation("Optimizer {Optimizer,-24} found worse results: Composite={Composite:0.000} <= Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
                     optimizer.Name, composite, bestScore, corr, rmse);
 
                 foreach (var (id, result) in results.Nodes)
-                    Log.Debug("Rejected {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
+                    _logger.LogDebug("Rejected {NodeId,-20}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}, Error={Error}",
                         id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
                 continue;
             }
@@ -347,7 +348,7 @@ internal class OptimizationRunner : BackgroundService
                 var deviceComposite = (dCorr * correlationWeight) + ((1 - dRmse / (1 + dRmse)) * rmseWeight);
                 if (double.IsNaN(deviceComposite) || double.IsInfinity(deviceComposite) || deviceComposite <= bestScore)
                 {
-                    Log.Information("Optimizer {0,-24} rejected: better node-to-node (Composite={1:0.000}) but not with txRef held (Composite={2:0.000} <= Best={3:0.000}); the gain is a txRef/rxAdj shift devices would see as range bias",
+                    _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better node-to-node (Composite={Composite:0.000}) but not with txRef held (Composite={DeviceComposite:0.000} <= Best={Best:0.000}); the gain is a txRef/rxAdj shift devices would see as range bias",
                         optimizer.Name, composite, deviceComposite, bestScore);
                     continue;
                 }
@@ -372,13 +373,13 @@ internal class OptimizationRunner : BackgroundService
                 }).Count();
                 if (losesOn > 0)
                 {
-                    Log.Information("Optimizer {0,-24} rejected: better on the aggregate (Composite={1:0.000} > Best={2:0.000}) but not on {3} of {4} snapshots on their own; treating the gain as noise",
+                    _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better on the aggregate (Composite={Composite:0.000} > Best={Best:0.000}) but not on {LosesOn} of {Snapshots} snapshots on their own; treating the gain as noise",
                         optimizer.Name, composite, bestScore, losesOn, evalSet.Count);
                     continue;
                 }
             }
 
-            Log.Information("Optimizer {0,-24} found better results: Composite={1:0.000} > Best={2:0.000} (R={3:0.000}, RMSE={4:0.000})",
+            _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
                 optimizer.Name, composite, bestScore, corr, rmse);
             if (best == null || composite > best.Value.Composite)
                 best = (optimizer, results, composite, corr, rmse);
@@ -391,14 +392,14 @@ internal class OptimizationRunner : BackgroundService
         }
 
         var (chosen, chosenResults, chosenComposite, chosenCorr, chosenRmse) = best.Value;
-        Log.Information("Applying {0} (Composite={1:0.000}, R={2:0.000}, RMSE={3:0.000})", chosen.Name, chosenComposite, chosenCorr, chosenRmse);
+        _logger.LogInformation("Applying {Optimizer} (Composite={Composite:0.000}, R={R:0.000}, RMSE={RMSE:0.000})", chosen.Name, chosenComposite, chosenCorr, chosenRmse);
         _state.OptimizerState.BestR = chosenCorr;
         _state.OptimizerState.BestRMSE = chosenRmse;
         _state.OptimizerState.LastOutcome = $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenCorr:0.000}, RMSE={chosenRmse:0.000}).";
 
         foreach (var (id, result) in chosenResults.Nodes)
         {
-            Log.Information("Applied {0,-20}: Absorption={1:0.00}, RxAdj={2:00}, TxAdj={3:00}, Error={4}",
+            _logger.LogInformation("Applied {NodeId,-20}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}, Error={Error}",
                 id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
 
             var nodeSettings = _nsd.Get(id);
@@ -412,7 +413,7 @@ internal class OptimizationRunner : BackgroundService
                 result.TxRefRssi != null ? nodeSettings.Calibration.TxRefRssi : null,
                 optimization);
             if (atLimit.Count > 0)
-                Log.Warning("Applied {0,-20}: at the configured limit: {1}. The fit wanted to go further, so these are the limits rather than fitted values; check the node's placement or the optimization limits",
+                _logger.LogWarning("Applied {NodeId,-20}: at the configured limit: {Limits}. The fit wanted to go further, so these are the limits rather than fitted values; check the node's placement or the optimization limits",
                     id, string.Join(", ", atLimit));
 
             await _nsd.Set(id, nodeSettings);

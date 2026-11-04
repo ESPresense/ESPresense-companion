@@ -2,7 +2,6 @@
 using ESPresense.Extensions;
 using ESPresense.Models;
 using ESPresense.Utils;
-using Newtonsoft.Json;
 
 namespace ESPresense.Services
 {
@@ -51,7 +50,7 @@ namespace ESPresense.Services
             }
 
             ds.OriginalId = null; // Clear OriginalId before storing/publishing
-            await mqtt.EnqueueAsync($"espresense/settings/{id}/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), true);
+            await mqtt.EnqueueAsync(MqttTopics.DeviceSettings(id), MqttPayloads.DeviceSettings(ds), true);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -103,11 +102,7 @@ namespace ESPresense.Services
                 }
             }
 
-            device.ConfiguredRefRssi = settings.RefRssi;
-            if (!string.IsNullOrWhiteSpace(settings.Name))
-            {
-                device.Name = settings.Name;
-            }
+            DeviceEnricher.ApplySettings(device, settings);
 
             var anchor = BuildAnchor(settings);
             device.SetAnchor(anchor);

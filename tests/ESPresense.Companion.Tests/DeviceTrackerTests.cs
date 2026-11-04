@@ -207,8 +207,12 @@ public class DeviceTrackerTests
 
     private const string DiscoveryTopic = "homeassistant/device_tracker/espresense_test_device/config";
 
+    /// <summary>Delivers a discovery message through the coordinator's real inbound routing.</summary>
+    private Task DeliverDiscoveryAsync(string topic, string? payload) =>
+        _mockMqttCoordinator.Object.OnMqttMessageReceived(ESPresense.Companion.Tests.Services.MqttRoutingCharacterizationTests.Message(topic, payload));
+
     [Test]
-    public async Task ProcessDiscoveryMessage_WithPayloadCreatesTrackedDevice()
+    public async Task DiscoveryMessage_WithPayloadCreatesTrackedDevice()
     {
         PreviousDeviceDiscoveredEventArgs? received = null;
         _mockMqttCoordinator.Object.PreviousDeviceDiscovered += (_, arg) => received = arg;
@@ -221,7 +225,7 @@ public class DeviceTrackerTests
             origin = new { name = "ESPresense Companion" }
         });
 
-        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(DiscoveryTopic, payload);
+        await DeliverDiscoveryAsync(DiscoveryTopic, payload);
 
         Assert.That(received, Is.Not.Null);
         Assert.That(received!.Topic, Is.EqualTo(DiscoveryTopic));
@@ -238,7 +242,7 @@ public class DeviceTrackerTests
     [TestCase("")]
     [TestCase("   ")]
     [TestCase(null)]
-    public async Task ProcessDiscoveryMessage_EmptyPayloadRemovesDevice(string? payload)
+    public async Task DiscoveryMessage_EmptyPayloadRemovesDevice(string? payload)
     {
         PreviousDeviceDiscoveredEventArgs? received = null;
         _mockMqttCoordinator.Object.PreviousDeviceDiscovered += (_, arg) => received = arg;
@@ -247,7 +251,7 @@ public class DeviceTrackerTests
         var device = new Device("test-device", "espresense_test_device", TimeSpan.FromSeconds(30)) { Track = true };
         _state.Devices[device.Id] = device;
 
-        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(DiscoveryTopic, payload);
+        await DeliverDiscoveryAsync(DiscoveryTopic, payload);
 
         Assert.That(received, Is.Not.Null, "an empty payload is a retained-message clear, not a malformed message");
         Assert.That(received!.AutoDiscover, Is.Null);
@@ -258,7 +262,7 @@ public class DeviceTrackerTests
     }
 
     [Test]
-    public async Task ProcessDiscoveryMessage_EmptyPayloadRemovesDeviceCreatedFromMessages()
+    public async Task DiscoveryMessage_EmptyPayloadRemovesDeviceCreatedFromMessages()
     {
         // Devices created from node messages get the default discovery id, which is what the companion publishes
         // to the discovery topic, so a clear of that topic must find them too.
@@ -266,18 +270,18 @@ public class DeviceTrackerTests
         _state.Devices[device.Id] = device;
         var topic = $"homeassistant/device_tracker/{device.HassAutoDiscovery.Single().DiscoveryId}/config";
 
-        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(topic, "");
+        await DeliverDiscoveryAsync(topic, "");
 
         Assert.That(_state.Devices.ContainsKey("test-device"), Is.False);
     }
 
     [Test]
-    public async Task ProcessDiscoveryMessage_EmptyPayloadForUnknownDeviceIsIgnored()
+    public async Task DiscoveryMessage_EmptyPayloadForUnknownDeviceIsIgnored()
     {
         var other = new Device("other", null, TimeSpan.FromSeconds(30));
         _state.Devices[other.Id] = other;
 
-        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage("homeassistant/device_tracker/espresense_nobody/config", "");
+        await DeliverDiscoveryAsync("homeassistant/device_tracker/espresense_nobody/config", "");
 
         Assert.That(_state.Devices.Count, Is.EqualTo(1));
         Assert.That(_state.Devices.ContainsKey("other"), Is.True);
@@ -305,12 +309,12 @@ public class DeviceTrackerTests
         _mockMqttCoordinator.Verify(m => m.EnqueueAsync(topic, null, true), Times.Once, "untrack publishes the discovery clear");
 
         // (a) the echo of our own clear must not evict the device
-        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(topic, "");
+        await DeliverDiscoveryAsync(topic, "");
         Assert.That(_state.Devices.ContainsKey("test-device"), Is.True, "self-published clear keeps the device");
         Assert.That(_removedDeviceIds, Is.Empty);
 
         // (b) a later clear with no registry entry is external and removes it
-        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(topic, "");
+        await DeliverDiscoveryAsync(topic, "");
         Assert.That(_state.Devices.ContainsKey("test-device"), Is.False, "external clear removes the device");
         Assert.That(_removedDeviceIds, Is.EqualTo(new[] { "test-device" }));
     }
@@ -322,7 +326,7 @@ public class DeviceTrackerTests
         _state.Devices[device.Id] = device;
         var topic = $"homeassistant/device_tracker/{device.HassAutoDiscovery.Single().DiscoveryId}/config";
 
-        await _mockMqttCoordinator.Object.ProcessDiscoveryMessage(topic, "");
+        await DeliverDiscoveryAsync(topic, "");
 
         Assert.That(_state.Devices.ContainsKey("test-device"), Is.False);
         Assert.That(_removedDeviceIds, Is.EqualTo(new[] { "test-device" }));

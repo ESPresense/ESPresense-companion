@@ -5,7 +5,6 @@ using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
-using Serilog;
 
 namespace ESPresense.Locators;
 
@@ -14,10 +13,13 @@ public class MultiFloorMultilateralizer : ILocate
     private readonly Device _device;
     private readonly State _state;
     private readonly IWeighting _weighting;
+    private readonly ILogger _logger;
 
-    public MultiFloorMultilateralizer(Device device, State state)
+    /// <param name="logger">Defaults to the transitional <see cref="DeferredLoggerFactory"/> while State builds locators without one (#1844).</param>
+    public MultiFloorMultilateralizer(Device device, State state, ILogger<MultiFloorMultilateralizer>? logger = null)
     {
         _device = device;
+        _logger = logger ?? DeferredLoggerFactory.CreateLogger<MultiFloorMultilateralizer>();
         _state = state;
 
         // Load weighting from MultiFloor config, defaulting to Gaussian if not specified
@@ -100,7 +102,7 @@ public class MultiFloorMultilateralizer : ILocate
                 confidence = 1;
                 scenario.Scale = 1;
                 scenario.UpdateLocation(guess);
-                Log.Error("Error finding location for {0}: {1}", _device, ex.Message);
+                _logger.LogError("Error finding location for {Device}: {Message}", _device, ex.Message);
             }
         }
 
@@ -118,7 +120,7 @@ public class MultiFloorMultilateralizer : ILocate
         var room = floors.SelectMany(a => a.Rooms.Values).FirstOrDefault(a => a.Polygon?.EnclosesPoint(scenario.Location.ToPoint2D()) ?? false);
         if (scenario.Room != room) scenario.Room = room;
         scenario.Floor = room?.Floor ?? floors.FirstOrDefault();
-        Log.Debug("New location {0} {1}@{2}", _device, _device.Room?.Name ?? "Unknown", scenario.Location);
+        _logger.LogDebug("New location {Device} {Room}@{Location}", _device, _device.Room?.Name ?? "Unknown", scenario.Location);
         return true;
     }
 }

@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using ESPresense.Models;
-using Serilog;
+using Microsoft.Extensions.Logging.Abstractions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -10,6 +10,7 @@ namespace ESPresense.Services;
 public class ConfigLoader : BackgroundService
 {
     private readonly IDeserializer _deserializer;
+    private readonly ILogger<ConfigLoader> _logger;
     private readonly string _configPath;
     private readonly SemaphoreSlim _loadLock = new(1, 1);
     private readonly TaskCompletionSource<Config> _firstLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -32,13 +33,19 @@ public class ConfigLoader : BackgroundService
     /// resolve a ConfigLoader from DI can subscribe to <see cref="ConfigChanged"/> before the first load.
     /// The initial load happens in <see cref="StartAsync"/> (or <see cref="LoadAsync"/> when called directly).
     /// </summary>
-    public ConfigLoader(string configDir)
+    public ConfigLoader(string configDir, ILogger<ConfigLoader> logger)
     {
+        _logger = logger;
         _configPath = Path.Combine(configDir, "config.yaml");
         _deserializer = new DeserializerBuilder()
             .IgnoreUnmatchedProperties()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .Build();
+    }
+
+    /// <summary>Without a logger; for tests (Moq can't proxy a constructor's optional parameters).</summary>
+    public ConfigLoader(string configDir) : this(configDir, NullLogger<ConfigLoader>.Instance)
+    {
     }
 
     /// <summary>
@@ -95,7 +102,7 @@ public class ConfigLoader : BackgroundService
             // not re-parsed every poll, and a throwing subscriber does not trigger a reload.
             _lastModified = lastModified;
 
-            Log.Information("Loading " + _configPath);
+            _logger.LogInformation("Loading {ConfigPath:l}", _configPath);
 
             var text = await File.ReadAllTextAsync(_configPath);
             // An empty file deserialises to null and would otherwise be accepted as a blank Config. Our own
@@ -108,7 +115,7 @@ public class ConfigLoader : BackgroundService
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Error reading {ConfigPath}; keeping the previous config until the file changes", _configPath);
+            _logger.LogError(ex, "Error reading {ConfigPath}; keeping the previous config until the file changes", _configPath);
             return;
         }
 
@@ -133,7 +140,7 @@ public class ConfigLoader : BackgroundService
             catch (Exception ex)
             {
                 var target = handler.Target?.GetType().FullName ?? handler.Method.DeclaringType?.FullName ?? "<static>";
-                Log.Error(ex, "ConfigChanged handler {Handler}.{Method} threw; continuing with remaining handlers", target, handler.Method.Name);
+                _logger.LogError(ex, "ConfigChanged handler {Handler}.{Method} threw; continuing with remaining handlers", target, handler.Method.Name);
             }
         }
     }

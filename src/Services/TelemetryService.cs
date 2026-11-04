@@ -1,6 +1,5 @@
 ﻿using ESPresense.Models;
 using ESPresense.Utils;
-using Newtonsoft.Json;
 
 namespace ESPresense.Services;
 
@@ -49,7 +48,7 @@ public class TelemetryService(MqttCoordinator mqtt) : BackgroundService
         {
             // Use TryEnqueueAsync for best-effort telemetry publishing
             // Telemetry should never crash the host on MQTT failures (DNS, network, broker down)
-            await mqtt.TryEnqueueAsync("espresense/companion/telemetry", JsonConvert.SerializeObject(Telemetry, SerializerSettings.NullIgnore));
+            await mqtt.TryEnqueueAsync(MqttTopics.CompanionTelemetry, MqttPayloads.Telemetry(Telemetry));
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
         }
     }

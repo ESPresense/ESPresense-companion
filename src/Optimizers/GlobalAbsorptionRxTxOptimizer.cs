@@ -1,7 +1,6 @@
 using ESPresense.Models;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
-using Serilog;
 using ESPresense.Extensions;
 
 namespace ESPresense.Optimizers;
@@ -9,6 +8,7 @@ namespace ESPresense.Optimizers;
 public class GlobalAbsorptionRxTxOptimizer : IOptimizer
 {
     private readonly State _state;
+    private readonly ILogger<GlobalAbsorptionRxTxOptimizer> _logger;
 
     // Parameter to control asymmetric error weighting
     // Higher value means we penalize "impossible" cases more strongly
@@ -16,9 +16,10 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
     // Capped error value to prevent extreme outliers from skewing results
     private const double CappedError = 2560;
 
-    public GlobalAbsorptionRxTxOptimizer(State state)
+    public GlobalAbsorptionRxTxOptimizer(State state, ILogger<GlobalAbsorptionRxTxOptimizer> logger)
     {
         _state = state;
+        _logger = logger;
     }
 
     public string Name => "Global Absorption Rx Tx Adj";
@@ -35,7 +36,7 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
 
         if (allRxNodes.Count < 3)
         {
-            Log.Warning("Not enough valid measurements for optimization. Found {Count} measurements, need at least 3. Add more BLE beacons or ESPresense nodes.", allRxNodes.Count);
+            _logger.LogWarning("Not enough valid measurements for optimization. Found {Count} measurements, need at least 3. Add more BLE beacons or ESPresense nodes.", allRxNodes.Count);
             return or;
         }
 
@@ -337,12 +338,12 @@ public class GlobalAbsorptionRxTxOptimizer : IOptimizer
             }
 
             // Log the optimization results
-            Log.Debug(Name + " completed with error: {0}, global absorption: {1}",
-                result.FunctionInfoAtMinimum.Value, globalAbsorptionValue);
+            _logger.LogDebug("{Optimizer:l} completed with error: {Error}, global absorption: {Absorption}",
+                Name, result.FunctionInfoAtMinimum.Value, globalAbsorptionValue);
         }
         catch (Exception ex)
         {
-            Log.Error("Error optimizing: {0}", ex.Message);
+            _logger.LogError("Error optimizing: {Message}", ex.Message);
         }
 
         return or;

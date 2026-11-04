@@ -10,7 +10,8 @@ mqtt:
   password:
   client_id: espresense-companion  # MQTT client id (default: espresense-companion)
   read_only: false  # true = subscribe only, never publish; every publish is logged instead (default: false).
-                    # Legacy: a client_id containing "read" also enables read-only mode; prefer this flag.
+                    # Deprecated: a client_id containing "read" also enables read-only mode (with a startup
+                    # warning); set this flag instead, the client_id heuristic will be removed.
   discovery_topic: homeassistant  # Home Assistant MQTT discovery topic prefix (default: homeassistant)
 
 # This gets added to the x,y,z to derive a gps location

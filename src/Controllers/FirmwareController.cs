@@ -1,9 +1,11 @@
+using ESPresense.Utils;
 using System.IO.Compression;
 using System.Net.WebSockets;
 using System.Text;
 using ESPresense.Extensions;
 using ESPresense.Network;
 using ESPresense.Services;
+using ESPresense.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ESPresense.Controllers;
@@ -47,7 +49,7 @@ public class FirmwareController : Controller
     {
         if (!_firmwareUpdateJobs.IsTrustedFirmwareUrl(url))
         {
-            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", LogSanitizer.Strip(url));
             return StatusCode(StatusCodes.Status400BadRequest, "Only ESPresense GitHub URLs are allowed");
         }
         try
@@ -58,12 +60,12 @@ public class FirmwareController : Controller
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Error downloading firmware from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            _logger.LogError(ex, "Error downloading firmware from {url}", LogSanitizer.Strip(url));
             return StatusCode(StatusCodes.Status502BadGateway, $"Failed to download firmware: {ex.Message}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing firmware download from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            _logger.LogError(ex, "Error processing firmware download from {url}", LogSanitizer.Strip(url));
             return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing firmware: {ex.Message}");
         }
     }
@@ -108,11 +110,15 @@ public class FirmwareController : Controller
         async Task Log(string message, int percent)
         {
             _logger.LogInformation("[{per}] {msg}", percent, message);
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { percentComplete = percent, message = message });
+            var json = ProgressMessage(percent, message);
             var buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(json));
             await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
         }
     }
+
+    /// <summary>A firmware-update progress frame sent over the update WebSocket.</summary>
+    internal static string ProgressMessage(int percent, string message) =>
+        System.Text.Json.JsonSerializer.Serialize(new { percentComplete = percent, message = message }, JsonDefaults.Verbatim);
 
     private async Task<MemoryStream> GetFirmware(string url)
     {

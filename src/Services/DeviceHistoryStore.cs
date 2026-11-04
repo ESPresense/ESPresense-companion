@@ -1,5 +1,5 @@
 using ESPresense.Services;
-using Serilog;
+using Microsoft.Extensions.Logging.Abstractions;
 using SQLite;
 
 namespace ESPresense.Models;
@@ -12,16 +12,19 @@ public class DeviceHistoryStore
     private string? _openedPath;
     private volatile Task _initialized = Task.CompletedTask;
     private volatile bool _enabled;
+    private readonly ILogger<DeviceHistoryStore> _logger;
 
     /// <summary>Opens <c>history.path</c> (relative to <paramref name="storageDir"/>) the first time history is enabled.</summary>
-    public DeviceHistoryStore(string storageDir, ConfigLoader cfg)
+    public DeviceHistoryStore(string storageDir, ConfigLoader cfg, ILogger<DeviceHistoryStore>? logger = null)
     {
+        _logger = logger ?? NullLogger<DeviceHistoryStore>.Instance;
         _storageDir = storageDir;
         Subscribe(cfg);
     }
 
-    public DeviceHistoryStore(SQLiteAsyncConnection sqliteConnection, ConfigLoader cfg)
+    public DeviceHistoryStore(SQLiteAsyncConnection sqliteConnection, ConfigLoader cfg, ILogger<DeviceHistoryStore>? logger = null)
     {
+        _logger = logger ?? NullLogger<DeviceHistoryStore>.Instance;
         _sqliteConnection = sqliteConnection;
         Subscribe(cfg);
     }
@@ -45,12 +48,12 @@ public class DeviceHistoryStore
             {
                 SQLitePCL.Batteries.Init();
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                Log.Information("Device history stored in {Path}", path);
-                _sqliteConnection = new SQLiteAsyncConnection(path) { Trace = true, Tracer = Log.Debug };
+                _logger.LogInformation("Device history stored in {Path}", path);
+                _sqliteConnection = new SQLiteAsyncConnection(path) { Trace = true, Tracer = sql => _logger.LogDebug("{Sql:l}", sql) };
                 _openedPath = path;
             }
             else if (path != _openedPath)
-                Log.Warning("history.path is now {Path}, but history keeps using {OpenedPath} until restart", path, _openedPath);
+                _logger.LogWarning("history.path is now {Path}, but history keeps using {OpenedPath} until restart", path, _openedPath);
             return _sqliteConnection;
         }
     }
@@ -87,7 +90,7 @@ public class DeviceHistoryStore
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to initialize device history storage");
+            _logger.LogError(ex, "Failed to initialize device history storage");
             throw;
         }
     }

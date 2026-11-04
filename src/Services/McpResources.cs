@@ -1,12 +1,10 @@
 using ESPresense.Models;
 using ESPresense.Services;
 using ESPresense.Utils;
-using ESPresense.Extensions;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using ModelContextProtocol.Protocol;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.ComponentModel;
 
 namespace ESPresense.Services;
@@ -19,11 +17,12 @@ public class McpResources
     private readonly ConfigLoader _config;
     private readonly NodeSettingsStore _nsd;
     private readonly NodeTelemetryStore _nts;
-    private readonly DeviceSettingsStore _dss;
     private readonly TelemetryService _telemetryService;
     private readonly FirmwareUpdateJobService _firmwareUpdateJobs;
     private readonly FirmwareCatalogService _firmwareCatalog;
     private readonly NodeStateMapper _mapper;
+    private readonly CalibrationService _calibration;
+    private readonly DeviceEnricher _enricher;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public McpResources(
@@ -31,27 +30,25 @@ public class McpResources
         ConfigLoader config,
         NodeSettingsStore nsd,
         NodeTelemetryStore nts,
-        DeviceSettingsStore dss,
+        DeviceEnricher enricher,
         TelemetryService telemetryService,
         FirmwareUpdateJobService firmwareUpdateJobs,
         FirmwareCatalogService firmwareCatalog,
-        NodeStateMapper mapper)
+        NodeStateMapper mapper,
+        CalibrationService calibration)
     {
+        _enricher = enricher;
+        _calibration = calibration;
         _state = state;
         _config = config;
         _nsd = nsd;
         _nts = nts;
-        _dss = dss;
         _telemetryService = telemetryService;
         _firmwareUpdateJobs = firmwareUpdateJobs;
         _firmwareCatalog = firmwareCatalog;
         _mapper = mapper;
-        _jsonOptions = new JsonSerializerOptions
-        {
-            Converters = { new JsonStringEnumConverter() },
-            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
+        // Exactly the REST settings, so a tool returns the same JSON as the matching /api endpoint.
+        _jsonOptions = JsonDefaults.Web;
     }
 
     [McpServerResource(UriTemplate = "state://config", Name = "Application Configuration", MimeType = "application/json")]
@@ -89,7 +86,7 @@ public class McpResources
     public Task<string> GetDevicesResource()
     {
         var devices = _state.Devices.Values.ToList();
-        EnrichDevices(devices);
+        _enricher.Enrich(devices);
         return Task.FromResult(JsonSerializer.Serialize(devices, _jsonOptions));
     }
 
@@ -98,7 +95,7 @@ public class McpResources
     public Task<string> GetDevicesTool()
     {
         var devices = _state.Devices.Values.ToList();
-        EnrichDevices(devices);
+        _enricher.Enrich(devices);
         return Task.FromResult(JsonSerializer.Serialize(devices, _jsonOptions));
     }
 
@@ -120,7 +117,7 @@ public class McpResources
     [Description("Get the current calibration data and accuracy metrics")]
     public Task<string> GetCalibrationResource()
     {
-        var c = CalculateCalibration();
+        var c = _calibration.Calculate();
         return Task.FromResult(JsonSerializer.Serialize(c, _jsonOptions));
     }
 
@@ -128,7 +125,7 @@ public class McpResources
     [Description("Get the calibration data")]
     public Task<string> GetCalibrationTool()
     {
-        var c = CalculateCalibration();
+        var c = _calibration.Calculate();
         return Task.FromResult(JsonSerializer.Serialize(c, _jsonOptions));
     }
 
@@ -289,62 +286,5 @@ public class McpResources
     {
         var (cancelled, error) = _firmwareUpdateJobs.Cancel(jobId);
         return Task.FromResult(JsonSerializer.Serialize(new { ok = cancelled, error }, _jsonOptions));
-    }
-
-    private Calibration CalculateCalibration()
-    {
-        var c = new Calibration();
-        c.OptimizerState = _state.OptimizerState;
-
-        var mapDistances = new List<double>();
-        var actualDistances = new List<double>();
-
-        foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
-        {
-            var txNs = _nsd.Get(txId);
-            var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
-            foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
-            {
-                var rxNs = _nsd.Get(rxId);
-                var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
-                if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
-                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
-                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
-                rxM["mapDistance"] = rx.MapDistance;
-                rxM["distance"] = rx.Distance;
-                rxM["rssi"] = rx.Rssi;
-                rxM["diff"] = rx.Distance - rx.MapDistance;
-                rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
-                if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
-
-                if (rx.MapDistance > 0 && rx.Distance > 0)
-                {
-                    mapDistances.Add(rx.MapDistance);
-                    actualDistances.Add(rx.Distance);
-                }
-            }
-        }
-
-        c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
-        c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
-        return c;
-    }
-
-    private void EnrichConfiguredRefRssi(Device device)
-    {
-        var deviceSettings = _dss.Get(device.Id);
-        device.ConfiguredRefRssi = deviceSettings?.RefRssi;
-        if (!string.IsNullOrWhiteSpace(deviceSettings?.Name))
-        {
-            device.Name = deviceSettings.Name;
-        }
-    }
-
-    private void EnrichDevices(IEnumerable<Device> devices)
-    {
-        foreach (var device in devices)
-        {
-            EnrichConfiguredRefRssi(device);
-        }
     }
 }

@@ -120,7 +120,7 @@ public class DevicePublishContractTests
     [Test]
     public async Task Located_ZeroValuesAreOmitted()
     {
-        // NullIgnore also drops defaults: a zero coordinate disappears, but a located zero confidence/fixes (int?) stays.
+        // The MQTT JSON options (formerly Newtonsoft NullIgnore) also drop defaults: a zero coordinate disappears, but a located zero confidence/fixes (int?) stays.
         // (The anchored payload's fixes = 0 is a plain int, so it is dropped; see Anchored_NoGps_AttributesJson.)
         var h = new Harness("located-zero");
         var device = h.Located(new Point3D(0, 3, 0), h.Floor, null, confidence: 0, fixes: 0);
@@ -277,7 +277,7 @@ public class MultiScenarioLocatorLeaseTests
         lease.Setup(l => l.AcquireAsync("locating", It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
             .Returns<string, TimeSpan?, CancellationToken>(async (_, _, ct) =>
             {
-                if (Interlocked.Increment(ref acquired) == 1) return new LeaseHandle(lease.Object, "locating");
+                if (Interlocked.Increment(ref acquired) == 1) return new LeaseHandle(lease.Object, "locating", NullLogger.Instance);
                 await Task.Delay(Timeout.Infinite, ct); // someone else holds it now
                 return null;
             });

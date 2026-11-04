@@ -8,7 +8,6 @@ using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
-using Serilog;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
 using ESPresense.Events;
@@ -19,8 +18,6 @@ namespace ESPresense.Controllers;
 [ApiController]
 public class StateController : ControllerBase
 {
-    private const int MinPairsForBestMetrics = 5;
-
     private readonly ILogger<StateController> _logger;
     private readonly State _state;
     private readonly ConfigLoader _config;
@@ -28,9 +25,13 @@ public class StateController : ControllerBase
     private readonly DeviceSettingsStore _dss;
     private readonly NodeStateMapper _mapper;
     private readonly GlobalEventDispatcher _eventDispatcher;
+    private readonly CalibrationService _calibration;
+    private readonly DeviceEnricher _enricher;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, NodeStateMapper mapper, GlobalEventDispatcher eventDispatcher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, NodeStateMapper mapper, GlobalEventDispatcher eventDispatcher, CalibrationService calibration, DeviceEnricher enricher)
     {
+        _enricher = enricher;
+        _calibration = calibration;
         _logger = logger;
         _state = state;
         _config = config;
@@ -38,32 +39,6 @@ public class StateController : ControllerBase
         _dss = dss;
         _mapper = mapper;
         _eventDispatcher = eventDispatcher;
-    }
-
-    /// <summary>
-    /// Enriches a single device with persisted settings like configured RSSI and friendly name.
-    /// </summary>
-    /// <param name="device">The device to enrich</param>
-    private void EnrichConfiguredRefRssi(Device device)
-    {
-        var deviceSettings = _dss.Get(device.Id);
-        device.ConfiguredRefRssi = deviceSettings?.RefRssi;
-        if (!string.IsNullOrWhiteSpace(deviceSettings?.Name))
-        {
-            device.Name = deviceSettings.Name;
-        }
-    }
-
-    /// <summary>
-    /// Enriches multiple devices with ConfiguredRefRssi from DeviceSettings.
-    /// </summary>
-    /// <param name="devices">The devices to enrich</param>
-    private void EnrichDevices(IEnumerable<Device> devices)
-    {
-        foreach (var device in devices)
-        {
-            EnrichConfiguredRefRssi(device);
-        }
     }
 
     // GET: api/rooms
@@ -82,7 +57,7 @@ public class StateController : ControllerBase
         if (!showAll) d = d.Where(a => a.Track || IsIncluded(a.Id, include));
 
         // Populate configured RefRssi from DeviceSettings
-        EnrichDevices(d);
+        _enricher.Enrich(d);
 
         return d;
     }
@@ -122,96 +97,11 @@ public class StateController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves calibration data and computes statistical measures based on active node distance measurements.
+    /// The calibration matrix (node pairs and anchored devices) with R and RMSE. Built by <see cref="CalibrationService"/>,
+    /// which also backs the MCP <c>get_calibration</c> tool.
     /// </summary>
-    /// <remarks>
-    /// Iterates through active transmitter and receiver node pairs to populate a calibration matrix with various parameters,
-    /// while collecting valid mapped and actual distance measurements. It then calculates the Pearson correlation coefficient (R)
-    /// between mapped and actual distances and the root mean square error (RMSE) to quantify deviations. The results are returned
-    /// in a Calibration object.
-    /// </remarks>
-    /// <returns>
-    /// A Calibration object containing the calibration matrix along with computed values for R and RMSE.
-    /// </returns>
     [HttpGet("api/state/calibration")]
-    public Calibration GetCalibration()
-    {
-        var c = new Calibration();
-        c.OptimizerState = _state.OptimizerState;
-
-        // Lists to track all distance measurements for statistical calculations
-        var mapDistances = new List<double>();
-        var actualDistances = new List<double>();
-
-        // Process traditional Node-to-Node relationships
-        foreach (var (txId, tx) in _state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
-        {
-            var txNs = _nsd.Get(txId);
-            var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
-            foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
-            {
-                var rxNs = _nsd.Get(rxId);
-                var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
-                if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
-                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
-                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
-                rxM["mapDistance"] = rx.MapDistance;
-                rxM["distance"] = rx.Distance;
-                rxM["rssi"] = rx.Rssi;
-                rxM["diff"] = rx.Distance - rx.MapDistance;
-                rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
-                if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
-
-                if (rx.MapDistance > 0 && rx.Distance > 0)
-                {
-                    mapDistances.Add(rx.MapDistance);
-                    actualDistances.Add(rx.Distance);
-                }
-            }
-        }
-
-        // Process Anchored Devices as Transmitters
-        foreach (var device in _state.Devices.Values.Where(d => d.IsAnchored && d.Anchor != null && d.Nodes.Values.Any(dn => dn.Current)))
-        {
-            var anchorName = device.Name ?? device.Id;
-            c.Anchored.Add(anchorName);
-            var txM = c.Matrix.GetOrAdd($"{anchorName}");
-
-            foreach (var (rxId, deviceNode) in device.Nodes.Where(dn => dn.Value.Current && dn.Value.Node?.HasLocation == true))
-            {
-                var rxNode = deviceNode.Node!;
-                var rxNs = _nsd.Get(rxNode.Id);
-                var rxM = txM.GetOrAdd(rxNode.Name ?? rxNode.Id);
-
-                // Anchored devices don't have tx calibration settings, but receivers still have their settings
-                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
-                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
-
-                // Calculate map distance from anchor to receiver
-                var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);
-                rxM["mapDistance"] = mapDistance;
-                rxM["distance"] = deviceNode.Distance;
-                rxM["rssi"] = deviceNode.Rssi;
-                rxM["diff"] = deviceNode.Distance - mapDistance;
-                rxM["percent"] = mapDistance != 0 ? ((deviceNode.Distance - mapDistance) / mapDistance) : 0;
-                if (deviceNode.DistVar is not null) rxM["var"] = deviceNode.DistVar.Value;
-
-                if (mapDistance > 0 && deviceNode.Distance > 0)
-                {
-                    mapDistances.Add(mapDistance);
-                    actualDistances.Add(deviceNode.Distance);
-                }
-            }
-        }
-
-        c.R = MathUtils.CalculatePearsonCorrelation(mapDistances, actualDistances);
-        c.RMSE = MathUtils.CalculateRMSE(mapDistances, actualDistances);
-        // A handful of pairs can fit almost perfectly by chance, and a best-seen value sticks until reset.
-        (c.BestRMSE, c.BestR) = mapDistances.Count >= MinPairsForBestMetrics
-            ? _state.RecordCalibrationMetrics(c.RMSE, c.R)
-            : _state.RecordCalibrationMetrics(null, null);
-        return c;
-    }
+    public Calibration GetCalibration() => _calibration.Calculate();
 
     /// <summary>
     /// Opens a WebSocket connection to stream real-time state updates.
@@ -242,11 +132,7 @@ public class StateController : ControllerBase
         ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
-            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-            {
-                NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
-            };
-            changes.Enqueue(JsonSerializer.Serialize(value, options));
+            changes.Enqueue(JsonSerializer.Serialize(value, JsonDefaults.WebSocket));
             newMessage.Set();
         }
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
@@ -260,7 +146,7 @@ public class StateController : ControllerBase
             {
                 // Enrich device with ConfiguredRefRssi before sending
                 if (e.Device != null)
-                    EnrichConfiguredRefRssi(e.Device);
+                    _enricher.Enrich(e.Device);
                 EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
             }
         }
@@ -319,7 +205,7 @@ public class StateController : ControllerBase
                     {
                         using var reader = new StreamReader(ms, Encoding.UTF8);
                         var message = await reader.ReadToEndAsync();
-                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, JsonDefaults.WebSocket);
 
                         if (command != null)
                         {
@@ -438,7 +324,7 @@ public class StateController : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to save auto-optimize setting");
+            _logger.LogError(ex, "Failed to save auto-optimize setting");
             return StatusCode(500, new { error = "Failed to save auto-optimize setting" });
         }
     }

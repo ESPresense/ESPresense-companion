@@ -1,6 +1,5 @@
 using System.Text.Json;
 using ESPresense.Models;
-using Newtonsoft.Json;
 using NUnit.Framework;
 using StjJsonSerializer = System.Text.Json.JsonSerializer;
 using YamlDotNet.Serialization;
@@ -41,15 +40,6 @@ public class ConfigCredentialRedactionTests
     }
 
     [Test]
-    public void Password_IsNotSerialized_ByNewtonsoft()
-    {
-        var json = JsonConvert.SerializeObject(BuildConfig());
-
-        Assert.That(json, Does.Not.Contain("super-secret"), "Newtonsoft serialization leaked the password");
-        Assert.That(json, Does.Not.Contain("password"), "Newtonsoft serialization emitted a password property");
-    }
-
-    [Test]
     public void NonSecretMqttFields_AreStillSerialized()
     {
         // The redaction must be surgical: clients still need host/port/username.
@@ -64,8 +54,6 @@ public class ConfigCredentialRedactionTests
     {
         // Guards against a future naming-convention change re-introducing the key.
         Assert.That(StjJsonSerializer.Serialize(BuildConfig()),
-            Does.Not.Contain("password").IgnoreCase);
-        Assert.That(JsonConvert.SerializeObject(BuildConfig()),
             Does.Not.Contain("password").IgnoreCase);
     }
 
@@ -116,18 +104,25 @@ public class ConfigCredentialRedactionTests
             "YAML deserialization must still populate the password for the broker connection");
     }
 
-    [Test]
-    public void Password_IsNotSerialized_ByNewtonsoft_WithAppSerializerSettings()
+    [TestCaseSource(nameof(EveryJsonBoundary))]
+    public void Password_IsNotSerialized_ByAnyBoundaryOptions(string boundary, JsonSerializerOptions options)
     {
-        // Other parts of the app serialize via ESPresense.Utils.SerializerSettings.NullIgnore
-        // (a camelCase contract resolver). Pipe Config through that exact settings object
-        // to prove [JsonIgnore] wins over the contract resolver too.
-        var json = JsonConvert.SerializeObject(BuildConfig(), ESPresense.Utils.SerializerSettings.NullIgnore);
+        // Newtonsoft no longer serializes Config anywhere (NewtonsoftConventionTests keeps it that way),
+        // so the System.Text.Json [JsonIgnore] is the guard; prove it holds for every boundary's options.
+        var json = StjJsonSerializer.Serialize(BuildConfig(), options);
 
-        Assert.That(json, Does.Not.Contain("super-secret"), "NullIgnore settings leaked the password");
-        Assert.That(json, Does.Not.Contain("password").IgnoreCase);
+        Assert.That(json, Does.Not.Contain("super-secret"), boundary + " leaked the password");
+        Assert.That(json, Does.Not.Contain("password").IgnoreCase, boundary + " emitted a password key");
         Assert.That(json, Does.Contain("broker.local"));
     }
+
+    private static IEnumerable<object[]> EveryJsonBoundary() => new[]
+    {
+        new object[] { "Web", ESPresense.Utils.JsonDefaults.Web },
+        new object[] { "WebSocket", ESPresense.Utils.JsonDefaults.WebSocket },
+        new object[] { "Mqtt", ESPresense.Utils.JsonDefaults.Mqtt },
+        new object[] { "Verbatim", ESPresense.Utils.JsonDefaults.Verbatim },
+    };
 
     [Test]
     public void Password_SurvivesFullConfigYamlRoundTrip()

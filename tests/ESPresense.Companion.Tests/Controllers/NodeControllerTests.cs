@@ -22,7 +22,7 @@ public class NodeControllerTests
             new HttpClient(),
             Mock.Of<ILogger<FirmwareUpdateJobService>>());
 
-        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state, firmwareUpdateJobs);
+        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state, firmwareUpdateJobs, Microsoft.Extensions.Logging.Abstractions.NullLogger<NodeController>.Instance);
 
         var result = await sut.Update("node-1", new NodeController.NodeUpdate { Url = "https://example.com/firmware.bin" });
 
@@ -46,7 +46,7 @@ public class NodeControllerTests
             new HttpClient(),
             Mock.Of<ILogger<FirmwareUpdateJobService>>());
 
-        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state, firmwareUpdateJobs);
+        var sut = new NodeController(nodeSettingsStore, nodeTelemetryStore, state, firmwareUpdateJobs, Microsoft.Extensions.Logging.Abstractions.NullLogger<NodeController>.Instance);
 
         var result = await sut.Update("node-1", new NodeController.NodeUpdate
         {

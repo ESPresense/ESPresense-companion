@@ -49,11 +49,12 @@ public class McpConfigRedactionTests
             configLoader,
             nodeSettingsStore,
             nodeTelemetryStore,
-            new DeviceSettingsStore(mqtt, state),
+            new DeviceEnricher(new DeviceSettingsStore(mqtt, state)),
             new TelemetryService(CreateCoordinator()),
             firmwareUpdateJobs,
             new FirmwareCatalogService(new HttpClient(), Mock.Of<IFirmwareTypeStore>(), nodeTelemetryStore),
-            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()));
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
+            new CalibrationService(state, nodeSettingsStore));
 
         var result = await sut.GetConfigTool();
 
@@ -90,11 +91,12 @@ public class McpConfigRedactionTests
             configLoader,
             nodeSettingsStore,
             nodeTelemetryStore,
-            new DeviceSettingsStore(mqtt, state),
+            new DeviceEnricher(new DeviceSettingsStore(mqtt, state)),
             new TelemetryService(CreateCoordinator()),
             firmwareUpdateJobs,
             new FirmwareCatalogService(new HttpClient(), Mock.Of<IFirmwareTypeStore>(), nodeTelemetryStore),
-            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()));
+            new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
+            new CalibrationService(state, nodeSettingsStore));
 
         var result = await sut.GetConfigResource();
 

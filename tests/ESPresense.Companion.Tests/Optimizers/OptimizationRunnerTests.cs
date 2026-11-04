@@ -4,6 +4,7 @@ using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Testing;
 using Moq;
 
 namespace ESPresense.Companion.Tests.Optimizers;
@@ -18,6 +19,7 @@ public class OptimizationRunnerTests
     private ConfigLoader _configLoader = null!;
     private NodeSettingsStore _nss = null!;
     private OptimizationRunner _runner = null!;
+    private FakeLogger<OptimizationRunner> _log = null!;
     private string _configDir = null!;
 
     [SetUp]
@@ -36,7 +38,8 @@ public class OptimizationRunnerTests
         // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
         await _configLoader.LoadAsync();
         _nss = new NodeSettingsStore(_mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>());
-        _runner = new OptimizationRunner(_state, _nss, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>());
+        _log = new FakeLogger<OptimizationRunner>();
+        _runner = new OptimizationRunner(_state, _nss, _log, _configLoader, Mock.Of<ILeaseService>(), NullLoggerFactory.Instance);
     }
 
     [TearDown]
@@ -229,11 +232,6 @@ public class OptimizationRunnerTests
         Assert.That(reached, Is.Empty);
     }
 
-    private sealed class CapturingSink : Serilog.Core.ILogEventSink
-    {
-        public List<Serilog.Events.LogEvent> Events { get; } = new();
-        public void Emit(Serilog.Events.LogEvent logEvent) => Events.Add(logEvent);
-    }
 
     private sealed class AbsorptionOptimizer(double absorption) : IOptimizer
     {
@@ -270,7 +268,7 @@ public class OptimizationRunnerTests
     public async Task RunCycle_ReadsEachNodesSettingsOnceBeforeScoring()
     {
         var store = new CountingNodeSettingsStore(_mqtt.Object);
-        var runner = new OptimizationRunner(_state, store, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>());
+        var runner = new OptimizationRunner(_state, store, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>(), NullLoggerFactory.Instance);
         var snapshot = SnapshotWith(5);
 
         await runner.RunCycleAsync(
@@ -333,21 +331,11 @@ public class OptimizationRunnerTests
     [TestCase(3.0, 4.0, false)]
     public async Task RunCycle_AppliedValueAtLimit_LogsWarning(double proposed, double absorptionMax, bool expectWarning)
     {
-        var sink = new CapturingSink();
-        var previous = Serilog.Log.Logger;
-        Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Verbose().WriteTo.Sink(sink).CreateLogger();
-        try
-        {
-            var optimization = new ConfigOptimization { Enabled = true, MinSamples = 5, Limits = { ["absorption_max"] = absorptionMax } };
-            await RunCycle(SnapshotWith(5), optimization, new AbsorptionOptimizer(proposed));
-        }
-        finally
-        {
-            Serilog.Log.Logger = previous;
-        }
+        var optimization = new ConfigOptimization { Enabled = true, MinSamples = 5, Limits = { ["absorption_max"] = absorptionMax } };
+        await RunCycle(SnapshotWith(5), optimization, new AbsorptionOptimizer(proposed));
 
         _mqtt.Verify(x => x.EnqueueAsync(AbsorptionTopic, It.IsAny<string?>(), false), Times.Once, "the proposal should have been applied");
-        var warnings = sink.Events.Where(e => e.Level == Serilog.Events.LogEventLevel.Warning).Select(e => e.RenderMessage()).ToList();
+        var warnings = _log.Collector.GetSnapshot().Where(e => e.Level == LogLevel.Warning).Select(e => e.Message).ToList();
         if (expectWarning)
             Assert.That(warnings, Has.One.Contains("absorption=3.00 (absorption_max)"));
         else
