@@ -10,7 +10,6 @@ namespace ESPresense.Models;
 
 public class State
 {
-    private readonly NodeTelemetryStore _nts;
     private readonly object _calibrationMetricsLock = new();
     private double? _bestCalibrationRMSE;
     private double? _bestCalibrationR;
@@ -25,7 +24,7 @@ public class State
     /// </remarks>
     public State(ConfigLoader cl, NodeTelemetryStore nts)
     {
-        _nts = nts;
+        ScenarioFactory = new ScenarioFactory(this, nts);
         void LoadConfig(Config c)
         {
             Config = c;
@@ -181,7 +180,7 @@ public class State
         return os;
     }
 
-    IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
+    internal IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
     {
         if (floorIds == null)
         {
@@ -194,65 +193,10 @@ public class State
                     yield return floor;
     }
 
-    public IEnumerable<Scenario> GetScenarios(Device device)
-    {
-        // Check if device is anchored first - if so, only return the anchor scenario
-        if (device.IsAnchored && device.Anchor != null)
-        {
-            var anchor = device.Anchor;
-            var scenario = new Scenario(Config, new AnchorLocator(anchor.Location, anchor.Floor, anchor.Room, Floors.Values), "Anchored")
-            {
-                Confidence = 100
-            };
-            yield return scenario;
-            yield break;
-        }
+    /// <summary>Builds the scenarios a device is located with. Locators, their order and the fallback live in <see cref="ScenarioFactory"/>.</summary>
+    public ScenarioFactory ScenarioFactory { get; }
 
-        var nelderMead = Config?.Locators?.NelderMead;
-        var bfgs = Config?.Locators?.Bfgs;
-        var mle = Config?.Locators?.Mle;
-        var multiFloor = Config?.Locators?.MultiFloor;
-        var nadarayaWatson = Config?.Locators?.NadarayaWatson;
-        var nearestNode = Config?.Locators?.NearestNode;
-
-        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (multiFloor?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
-        {
-            if (nelderMead?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
-                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
-
-            if (bfgs?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(bfgs?.Floors))
-                    yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this), floor.Name);
-
-            if (mle?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(mle?.Floors))
-                    yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this), floor.Name);
-
-            if (multiFloor?.Enabled ?? false)
-                yield return new Scenario(Config, new MultiFloorMultilateralizer(device, this), "MultiFloor");
-
-            if (nadarayaWatson?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
-                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this, _nts), floor.Name);
-
-            if (nearestNode?.Enabled ?? false)
-                yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
-        }
-        else
-        {
-            Log.Warning("No locators enabled, using default NelderMead");
-            if (Floors.Values.Any())
-            {
-                foreach (var floor in Floors.Values)
-                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
-            }
-            else
-            {
-                yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
-            }
-        }
-    }
+    public IEnumerable<Scenario> GetScenarios(Device device) => ScenarioFactory.Create(device);
 
     /// <summary>Whether <paramref name="device"/> should be tracked. Pure: the configured name is not applied.</summary>
     public bool ShouldTrack(Device device) => TrackingRules.ShouldTrack(device.Id, device.Name).Track;

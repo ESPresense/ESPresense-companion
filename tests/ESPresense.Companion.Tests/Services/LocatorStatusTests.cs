@@ -51,6 +51,17 @@ public class LocatorStatusTests
     }
 
     [Test]
+    public async Task NadarayaWatsonAndNearestNode_FollowScenarioOrder()
+    {
+        var status = await StatusFor("""
+            locators:
+              nadaraya_watson: { enabled: true }
+              nearest_node: { enabled: true }
+            """);
+        Assert.That(status, Is.EqualTo("NadarayaWatson, NearestNode"));
+    }
+
+    [Test]
     public async Task SingleLocator_ReportsItsName()
     {
         Assert.That(await StatusFor("locators:\n  multi_floor:\n    enabled: true\n"), Is.EqualTo("MultiFloor"));
@@ -68,6 +79,8 @@ public class LocatorStatusTests
               multi_floor: { enabled: true }
               nearest_node: { enabled: true }
             """);
-        Assert.That(status, Is.EqualTo("NadarayaWatson, NelderMead, Bfgs, Mle, MultiFloor, NearestNode"));
+        // #1844: the status is built from the same locator list as the scenarios, so it follows scenario order.
+        // Before, a separate hand-written list put NadarayaWatson first.
+        Assert.That(status, Is.EqualTo("NelderMead, Bfgs, Mle, MultiFloor, NadarayaWatson, NearestNode"));
     }
 }
