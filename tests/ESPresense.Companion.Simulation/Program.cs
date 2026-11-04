@@ -127,6 +127,19 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "fusion-fixtures")
+        {
+            var outDir = args.Length > 1 ? args[1] : "FusionValidation/Fixtures";
+            System.IO.Directory.CreateDirectory(outDir);
+            var (history, events) = ESPresense.Simulation.FusionValidation.SyntheticFixtureBuilder.Build();
+            var haHistoryPath = System.IO.Path.Combine(outDir, "ha-history.json");
+            var fusionEventsPath = System.IO.Path.Combine(outDir, "fusion-events.json");
+            ESPresense.Simulation.FusionValidation.HaHistoryClient.SaveToFile(haHistoryPath, history);
+            ESPresense.Simulation.FusionValidation.FusionEventLog.SaveToFile(fusionEventsPath, events);
+            Console.WriteLine($"Wrote {haHistoryPath} and {fusionEventsPath} ({events.Count} fusion events, synthetic fixture -- not live HA history)");
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
@@ -136,7 +149,8 @@ class Program
         Console.WriteLine("  Run 'dotnet run multifloor' to test multi-floor confidence");
         Console.WriteLine("  Pipe a JSON request to 'dotnet run locate' to call ILocate as a CLI");
         Console.WriteLine("  Run 'dotnet run accuracy baseline' for the public accuracy baseline (real ILocate)");
-        Console.WriteLine("  Run 'dotnet run fusion-validate --ha-history FILE --fusion-events FILE' to score CSI+BLE fusion output against HA history (ESPA-463)\n");
+        Console.WriteLine("  Run 'dotnet run fusion-validate --ha-history FILE --fusion-events FILE' to score CSI+BLE fusion output against HA history (ESPA-463)");
+        Console.WriteLine("  Run 'dotnet run fusion-fixtures [outDir]' to generate a synthetic ha-history/fusion-events pair from the real CsiFusionService\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]

@@ -1,0 +1,45 @@
+[
+  [
+    {
+      "entity_id": "device_tracker.phone:darrell-15-pro",
+      "state": "laundry",
+      "last_changed": "2026-11-03T17:59:55.0000000\u002B00:00"
+    }
+  ],
+  [
+    {
+      "entity_id": "binary_sensor.laundry_occupancy",
+      "state": "on",
+      "last_changed": "2026-11-03T18:01:05.0000000\u002B00:00"
+    },
+    {
+      "entity_id": "binary_sensor.laundry_occupancy",
+      "state": "off",
+      "last_changed": "2026-11-03T18:16:00.0000000\u002B00:00"
+    }
+  ],
+  [
+    {
+      "entity_id": "binary_sensor.family_occupancy",
+      "state": "on",
+      "last_changed": "2026-11-03T09:00:00.0000000\u002B00:00"
+    }
+  ],
+  [
+    {
+      "entity_id": "binary_sensor.office_occupancy",
+      "state": "off",
+      "last_changed": "2026-11-03T18:19:00.0000000\u002B00:00"
+    },
+    {
+      "entity_id": "binary_sensor.office_occupancy",
+      "state": "on",
+      "last_changed": "2026-11-03T18:19:58.0000000\u002B00:00"
+    },
+    {
+      "entity_id": "binary_sensor.office_occupancy",
+      "state": "off",
+      "last_changed": "2026-11-03T18:20:15.0000000\u002B00:00"
+    }
+  ]
+]

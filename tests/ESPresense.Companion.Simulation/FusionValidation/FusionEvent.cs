@@ -7,17 +7,19 @@ using System.Text.Json.Nodes;
 namespace ESPresense.Simulation.FusionValidation;
 
 /// <summary>
-/// One fused per-room occupancy event, as proposed in the public design doc
-/// (ESPresense/ESPresense-companion#1832, "Output" section): "occupied", "who: [ids]",
-/// "unknown: bool" per room, over the existing WebSocket/REST paths.
+/// One fused per-room occupancy event: "occupied", "who: [ids]", "unknown: bool" per room, as emitted
+/// by <see cref="ESPresense.Services.CsiFusionService"/> and published over the existing WebSocket/REST
+/// paths (<c>roomOccupancyChanged</c> / <c>GET /api/state/rooms</c>) plus HA MQTT discovery.
 ///
-/// PROVISIONAL: ESPA-462 (output: WebSocket event / REST / HA discovery entities) is
-/// still `todo` as of this harness's first cut, so this shape has not been confirmed
-/// against real code. Treat this record as the contract this harness expects; update
-/// it — and the file-based LoadFromFile parser below — once ESPA-462 lands and defines
-/// the actual wire format.
+/// This record's shape matches <see cref="ESPresense.Models.RoomOccupancy"/> field-for-field (see
+/// <see cref="FromRoomOccupancy"/>) now that the real fusion output exists; it was provisional when this
+/// harness was first written, ahead of the fusion engine itself.
 /// </summary>
-public sealed record FusionRoomEvent(DateTimeOffset Timestamp, string Room, bool Occupied, IReadOnlyList<string> Who, bool Unknown);
+public sealed record FusionRoomEvent(DateTimeOffset Timestamp, string Room, bool Occupied, IReadOnlyList<string> Who, bool Unknown)
+{
+    public static FusionRoomEvent FromRoomOccupancy(DateTimeOffset timestamp, ESPresense.Models.RoomOccupancy occupancy) =>
+        new(timestamp, occupancy.RoomId, occupancy.Occupied, occupancy.Who, occupancy.Unknown);
+}
 
 public static class FusionEventLog
 {
@@ -38,5 +40,24 @@ public static class FusionEventLog
             events.Add(new FusionRoomEvent(ts, room, occupied, who, unknown));
         }
         return events.OrderBy(e => e.Timestamp).ToList();
+    }
+
+    public static void SaveToFile(string path, IEnumerable<FusionRoomEvent> events)
+    {
+        var root = new JsonArray();
+        foreach (var e in events.OrderBy(e => e.Timestamp))
+        {
+            var who = new JsonArray();
+            foreach (var id in e.Who) who.Add(id);
+            root.Add(new JsonObject
+            {
+                ["timestamp"] = e.Timestamp.ToString("O"),
+                ["room"] = e.Room,
+                ["occupied"] = e.Occupied,
+                ["who"] = who,
+                ["unknown"] = e.Unknown
+            });
+        }
+        File.WriteAllText(path, root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
     }
 }
