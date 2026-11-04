@@ -1,6 +1,6 @@
-using ESPresense.Utils;
 using ESPresense.Controllers;
 using ESPresense.Models;
+using ESPresense.Utils;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
