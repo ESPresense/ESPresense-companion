@@ -1,6 +1,14 @@
-import type { Node, NodeCalibrationMatrix } from './types';
+import type { Device, Node, NodeCalibrationMatrix } from './types';
 
-type Located = Pick<Node, 'id' | 'name' | 'floors'> & { location: { x: number; y: number; z: number } };
+/** One end of a link: a placed node, or an anchored device (fixed at a known position, transmit only). */
+export interface LinkEnd {
+	/** Node id, or `anchor:` + device id so the two can't collide. */
+	id: string;
+	name: string;
+	location: { x: number; y: number; z: number };
+	floors?: string[] | null;
+	anchor?: boolean;
+}
 
 /** One direction of a node-to-node link: `rx` measured `tx` at `measured` metres; the map says `map`. */
 export interface LinkReading {
@@ -15,8 +23,8 @@ export interface LinkReading {
 export interface NodeLink {
 	/** Stable key for the pair, whatever the direction. */
 	key: string;
-	a: Located;
-	b: Located;
+	a: LinkEnd;
+	b: LinkEnd;
 	/** The direction that is further off. A node that only transmits badly can't average itself green. */
 	worst: LinkReading;
 	readings: LinkReading[];
@@ -29,17 +37,22 @@ export function linkError(r: Pick<LinkReading, 'measured' | 'map'>): number {
 	return Math.abs(Math.log(r.measured / r.map));
 }
 
-function hasLocation(n: Node | undefined): n is Node & Located {
-	return !!n?.location;
+/** The anchored devices the calibration matrix lists, as link ends. */
+export function anchorEnds(devices: Device[] | undefined, anchored: string[] | undefined): LinkEnd[] {
+	const names = new Set(anchored ?? []);
+	return (devices ?? []).filter((d) => d.isAnchored && d.location && names.has(d.name ?? d.id)).map((d) => ({ id: `anchor:${d.id}`, name: d.name ?? d.id, location: d.location, floors: d.floor?.id ? [d.floor.id] : null, anchor: true }));
 }
 
 /**
- * Pairs every two placed nodes that hear each other, one entry per pair. The calibration matrix is
- * keyed by node name (falling back to id), transmitter first; anchored devices in it are skipped.
+ * Pairs every two placed nodes that hear each other, one entry per pair, plus each anchored device
+ * with the nodes that hear it. The calibration matrix is keyed by name (falling back to id),
+ * transmitter first; rows for anything not passed in are skipped.
  */
-export function nodeLinks(nodes: Node[] | undefined, matrix: NodeCalibrationMatrix | undefined, floorId: string | null = null): NodeLink[] {
-	const placed = (nodes ?? []).filter(hasLocation).filter((n) => !floorId || n.floors?.includes(floorId));
-	const byName = new Map(placed.map((n) => [n.name ?? n.id, n]));
+export function nodeLinks(nodes: Node[] | undefined, matrix: NodeCalibrationMatrix | undefined, floorId: string | null = null, anchors: LinkEnd[] = []): NodeLink[] {
+	const placed: LinkEnd[] = (nodes ?? []).flatMap((n) => (n?.location ? [{ id: n.id, name: n.name ?? n.id, location: n.location, floors: n.floors }] : []));
+	// Nodes win a name clash, as they did before anchors were drawn
+	const ends = [...anchors, ...placed].filter((e) => !floorId || e.floors?.includes(floorId));
+	const byName = new Map(ends.map((e) => [e.name, e]));
 	const links = new Map<string, NodeLink>();
 
 	for (const [txName, row] of Object.entries(matrix ?? {})) {
@@ -47,7 +60,7 @@ export function nodeLinks(nodes: Node[] | undefined, matrix: NodeCalibrationMatr
 		if (!tx) continue;
 		for (const [rxName, cell] of Object.entries(row)) {
 			const rx = byName.get(rxName);
-			if (!rx || rx.id === tx.id) continue;
+			if (!rx || rx.anchor || rx.id === tx.id) continue;
 			if (!(cell?.distance > 0) || !(cell?.mapDistance > 0)) continue;
 			const reading: LinkReading = { tx: tx.id, rx: rx.id, measured: cell.distance, map: cell.mapDistance, percent: (cell.distance - cell.mapDistance) / cell.mapDistance };
 			const [a, b] = tx.id < rx.id ? [tx, rx] : [rx, tx];
@@ -63,15 +76,18 @@ export function nodeLinks(nodes: Node[] | undefined, matrix: NodeCalibrationMatr
 	return [...links.values()];
 }
 
-function distance(a: Located, b: Located): number {
+function distance(a: LinkEnd, b: LinkEnd): number {
 	return Math.hypot(a.location.x - b.location.x, a.location.y - b.location.y, a.location.z - b.location.z);
 }
 
-/** Keeps a link when either end has the other among its `n` nearest linked neighbours. */
+/**
+ * Keeps a link when either end has the other among its `n` nearest linked neighbours. An anchor's
+ * links count only toward the anchor's `n`, so anchors don't crowd out links between nodes.
+ */
 export function nearestLinks(links: NodeLink[], n: number): NodeLink[] {
 	const neighbours = new Map<string, NodeLink[]>();
 	for (const l of links) {
-		for (const id of [l.a.id, l.b.id]) {
+		for (const id of l.a.anchor ? [l.a.id] : l.b.anchor ? [l.b.id] : [l.a.id, l.b.id]) {
 			const list = neighbours.get(id) ?? [];
 			list.push(l);
 			neighbours.set(id, list);

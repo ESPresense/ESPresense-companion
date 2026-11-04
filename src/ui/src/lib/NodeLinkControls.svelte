@@ -40,6 +40,6 @@
 			<span class="h-1.5 w-16 rounded" style="background: linear-gradient(to right, {errorColor(-1)}, {errorColor(0)}, {errorColor(1)})"></span>
 			<span style="color: {errorColor(1)}">long</span>
 		</div>
-		<p class="max-w-48 text-xs opacity-70">Measured (real) metres, worse direction. Hover a node to see only its links.</p>
+		<p class="max-w-48 text-xs opacity-70">Measured (real) metres, worse direction. Dashed: an anchored device. Hover a node to see only its links.</p>
 	{/if}
 </div>

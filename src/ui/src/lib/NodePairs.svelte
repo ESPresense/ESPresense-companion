@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { zoomIdentity } from 'd3-zoom';
 	import { getLayerCakeContext } from 'layercake';
-	import { calibration, nodes } from '#lib/stores.js';
+	import { calibration, devices, nodes } from '#lib/stores.js';
 	import { errorColor } from '#lib/explain.js';
-	import { filterLinks, linkLabel, nodeLinks, type LinkDirection, type NodeLink } from '#lib/nodeLinks.js';
+	import { anchorEnds, filterLinks, linkLabel, nodeLinks, type LinkDirection, type NodeLink } from '#lib/nodeLinks.js';
 	import type { MapScales } from '#lib/types.js';
 
 	const chart = getLayerCakeContext<MapScales>();
@@ -21,9 +21,10 @@
 
 	let hovered: string | null = $state(null);
 
-	let all = $derived(nodeLinks($nodes, $calibration?.matrix, floorId));
+	let anchors = $derived(anchorEnds($devices, $calibration?.anchored));
+	let all = $derived(nodeLinks($nodes, $calibration?.matrix, floorId, anchors));
 	let links = $derived(filterLinks(all, { nodeId, nearest, direction }));
-	let names = $derived(new Map(($nodes ?? []).map((n) => [n.id, n.name ?? n.id])));
+	let names = $derived(new Map([...anchors.map((a) => [a.id, a.name] as const), ...($nodes ?? []).map((n) => [n.id, n.name ?? n.id] as const)]));
 
 	function title(l: NodeLink) {
 		return l.readings.map((r) => `${names.get(r.tx)} → ${names.get(r.rx)}: ${linkLabel(r)} m`).join('\n');
@@ -37,7 +38,7 @@
 		{@const dim = hovered != null && hovered !== l.key}
 		<g role="img" aria-label={title(l)} onmouseenter={() => (hovered = l.key)} onmouseleave={() => (hovered = null)} data-testid="node-link">
 			<title>{title(l)}</title>
-			<line {x1} {y1} {x2} {y2} stroke={errorColor(l.worst.percent)} stroke-width="2" stroke-opacity={dim ? 0.15 : 0.8} />
+			<line {x1} {y1} {x2} {y2} stroke={errorColor(l.worst.percent)} stroke-width="2" stroke-opacity={dim ? 0.15 : 0.8} stroke-dasharray={l.a.anchor || l.b.anchor ? '6 3' : undefined} />
 			<!-- A wider invisible line, so a 2px link is easy to hover -->
 			<line {x1} {y1} {x2} {y2} stroke="transparent" stroke-width="10" />
 			{#if nodeId || hovered === l.key}
