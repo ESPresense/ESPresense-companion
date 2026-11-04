@@ -120,6 +120,49 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "fusion-validate")
+        {
+            int exit = ESPresense.Simulation.FusionValidation.FusionValidationCli.Run(args.Skip(1).ToArray());
+            Environment.Exit(exit);
+            return;
+        }
+
+        if (args.Length > 0 && args[0] == "fusion-replay-real")
+        {
+            int exit = ESPresense.Simulation.FusionValidation.RealHistoryReplay.Run(args.Skip(1).ToArray());
+            Environment.Exit(exit);
+            return;
+        }
+
+        if (args.Length > 0 && args[0] == "fusion-fixtures")
+        {
+            var outDir = args.Length > 1 ? args[1] : "FusionValidation/Fixtures";
+            System.IO.Directory.CreateDirectory(outDir);
+            var (history, events, flap) = ESPresense.Simulation.FusionValidation.SyntheticFixtureBuilder.Build();
+            var haHistoryPath = System.IO.Path.Combine(outDir, "ha-history.json");
+            var fusionEventsPath = System.IO.Path.Combine(outDir, "fusion-events.json");
+            ESPresense.Simulation.FusionValidation.HaHistoryClient.SaveToFile(haHistoryPath, history);
+            ESPresense.Simulation.FusionValidation.FusionEventLog.SaveToFile(fusionEventsPath, events);
+
+            // Score it immediately against the flap window the builder itself knows about, rather than
+            // leaving `fusion-validate --flap ...` as a step a reader has to reverse-engineer: the
+            // committed report.json/.md are reproducible verbatim with just `fusion-fixtures`.
+            var excluded = new HashSet<string> { "binary_sensor.family_occupancy" };
+            var groundTruth = ESPresense.Simulation.FusionValidation.GroundTruthBuilder.Build(
+                history, excluded, ESPresense.Simulation.FusionValidation.FusionValidationCli.RoomFromOccupancyEntity, state => state);
+            var report = ESPresense.Simulation.FusionValidation.ValidationMetrics.Compute(
+                events, groundTruth, new[] { flap }, TimeSpan.FromMinutes(10));
+
+            var reportJsonPath = System.IO.Path.Combine(outDir, "report.json");
+            var reportMdPath = System.IO.Path.Combine(outDir, "report.md");
+            System.IO.File.WriteAllText(reportJsonPath, ESPresense.Simulation.FusionValidation.FusionValidationReportWriter.ToJson(report));
+            System.IO.File.WriteAllText(reportMdPath, ESPresense.Simulation.FusionValidation.FusionValidationReportWriter.ToMarkdown(report));
+
+            Console.WriteLine($"Wrote {haHistoryPath}, {fusionEventsPath}, {reportJsonPath}, {reportMdPath}");
+            Console.WriteLine($"({events.Count} fusion events; synthetic fixture -- not live HA history. Flap window scored: {flap.DeviceId} {flap.Start:O}..{flap.End:O})");
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
@@ -128,7 +171,10 @@ class Program
         Console.WriteLine("  Run 'dotnet run weightings' to compare weighting schemes");
         Console.WriteLine("  Run 'dotnet run multifloor' to test multi-floor confidence");
         Console.WriteLine("  Pipe a JSON request to 'dotnet run locate' to call ILocate as a CLI");
-        Console.WriteLine("  Run 'dotnet run accuracy baseline' for the public accuracy baseline (real ILocate)\n");
+        Console.WriteLine("  Run 'dotnet run accuracy baseline' for the public accuracy baseline (real ILocate)");
+        Console.WriteLine("  Run 'dotnet run fusion-validate --ha-history FILE --fusion-events FILE' to score CSI+BLE fusion output against HA history (ESPA-463)");
+        Console.WriteLine("  Run 'dotnet run fusion-fixtures [outDir]' to generate a synthetic ha-history/fusion-events pair from the real CsiFusionService");
+        Console.WriteLine("  Run 'dotnet run fusion-replay-real --ha-export FILE [--start ISO] [--end ISO]' to score real HA history (ESPA-466)\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]

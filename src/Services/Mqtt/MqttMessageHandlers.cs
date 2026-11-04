@@ -20,6 +20,7 @@ internal interface IMqttEventSink
     Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceived { get; }
     Func<NodeStatusRemovedEventArgs, Task>? NodeStatusRemoved { get; }
     Func<NodeUpdateErrorEventArgs, Task>? NodeUpdateError { get; }
+    Func<NodeCsiVarianceReceivedEventArgs, Task>? NodeCsiVarianceReceived { get; }
     Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceived { get; }
 
     void RaisePreviousDeviceDiscovered(PreviousDeviceDiscoveredEventArgs args);
@@ -143,6 +144,31 @@ internal sealed class NodeUpdateErrorHandler(IMqttEventSink sink) : IMqttMessage
         }, nameof(IMqttCoordinator.NodeUpdateErrorAsync));
 }
 
+/// <summary>
+/// A node's passive-WiFi-motion scalar. <see cref="double.TryParse"/> with <see cref="System.Globalization.NumberStyles.Float"/>
+/// accepts "NaN"/"Infinity"/"-Infinity" too, so a parsed-but-non-finite value is rejected the same as a
+/// non-numeric one: NaN would poison CsiMotionTracker's rolling baseline for as long as it sits in the
+/// window, and Infinity would produce a false motion edge and an infinite baseline.
+/// </summary>
+internal sealed class NodeCsiVarianceHandler(IMqttEventSink sink) : IMqttMessageHandler<NodeCsiVarianceRoute>
+{
+    public Task HandleAsync(NodeCsiVarianceRoute route, string? payload)
+    {
+        if (sink.NodeCsiVarianceReceived == null || string.IsNullOrEmpty(payload))
+            return Task.CompletedTask;
+
+        if (!double.TryParse(payload, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            || !double.IsFinite(value))
+            throw new MqttMessageProcessingException("Failed to parse csi_variance value", route.Topic, payload, "CsiVariance");
+
+        return AsyncEvent.InvokeAllAsync(sink.NodeCsiVarianceReceived, new NodeCsiVarianceReceivedEventArgs
+        {
+            NodeId = route.NodeId,
+            Value = value
+        }, nameof(IMqttCoordinator.NodeCsiVarianceReceivedAsync));
+    }
+}
+
 /// <summary>A node setting; the payload is passed through untouched (null included).</summary>
 internal sealed class NodeSettingHandler(IMqttEventSink sink) : IMqttMessageHandler<NodeSettingRoute>
 {
@@ -248,6 +274,7 @@ internal sealed class MqttMessageHandlers(IMqttEventSink sink, Func<string> disc
     private readonly NodeTelemetryHandler _telemetry = new(sink);
     private readonly NodeStatusHandler _status = new(sink);
     private readonly NodeUpdateErrorHandler _updateError = new(sink);
+    private readonly NodeCsiVarianceHandler _csiVariance = new(sink);
     private readonly NodeSettingHandler _nodeSetting = new(sink);
     private readonly DeviceMessageHandler _deviceMessage = new(sink);
     private readonly DeviceSettingsHandler _deviceSettings = new(sink);
@@ -260,6 +287,7 @@ internal sealed class MqttMessageHandlers(IMqttEventSink sink, Func<string> disc
         NodeTelemetryRoute r => _telemetry.HandleAsync(r, payload),
         NodeStatusRoute r => _status.HandleAsync(r, payload),
         NodeUpdateErrorRoute r => _updateError.HandleAsync(r, payload),
+        NodeCsiVarianceRoute r => _csiVariance.HandleAsync(r, payload),
         NodeSettingRoute r => _nodeSetting.HandleAsync(r, payload),
         DeviceMessageRoute r => _deviceMessage.HandleAsync(r, payload),
         DeviceSettingsRoute r => _deviceSettings.HandleAsync(r, payload),

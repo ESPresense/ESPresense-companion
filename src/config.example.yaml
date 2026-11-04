@@ -128,6 +128,16 @@ filtering:
   smoothing_weight: 0.7    # Weight given to previous state (0.0-1.0). Higher = more stable/repeatable.
   motion_sigma: 2.0        # Motion consistency sensitivity. Controls how much distant scenarios are penalized.
 
+# Fuses passive-WiFi motion (nodes publishing espresense/rooms/<id>/csi_variance) with BLE room
+# resolution: resolves room "flapping" between two neighbouring rooms, and flags who entered a
+# room (including an untagged/"unknown" occupant). A room with no CSI-mapped node is unaffected --
+# this is a pure addition on top of the existing BLE-only room resolution.
+csi_fusion:
+  enabled: true
+  # How far from a room's motion-started edge (seconds, either direction) a tracked device's room
+  # can be to get credited as "who entered" that room (default: 20)
+  attribution_window_secs: 20
+
 history:
   enabled: false # Enable to log history to db (Beta)
   expire_after: 24h # Expire after 24 hours

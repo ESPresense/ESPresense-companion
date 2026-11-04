@@ -23,7 +23,20 @@ namespace ESPresense.Models
                 ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
                 History = History.Clone(),
                 Locators = Locators.Clone(),
-                Optimization = Optimization.Clone()
+                Optimization = Optimization.Clone(),
+                CsiFusion = CsiFusion.Clone()
+            };
+        }
+    }
+
+    public partial class ConfigCsiFusion
+    {
+        public ConfigCsiFusion Clone()
+        {
+            return new ConfigCsiFusion
+            {
+                Enabled = Enabled,
+                AttributionWindowSecs = AttributionWindowSecs
             };
         }
     }

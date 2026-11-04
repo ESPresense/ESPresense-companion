@@ -400,6 +400,63 @@ public class MqttEventDispatchTests
     }
 
     [Test]
+    public async Task OnMqttMessageReceived_CsiVarianceTopic_ParsesAndAwaitsNonLastHandler()
+    {
+        var coordinator = CreateCoordinator();
+        var slowFinished = false;
+        NodeCsiVarianceReceivedEventArgs? seen = null;
+
+        coordinator.NodeCsiVarianceReceivedAsync += async e =>
+        {
+            seen = e;
+            await Task.Delay(50);
+            slowFinished = true;
+        };
+        coordinator.NodeCsiVarianceReceivedAsync += _ => Task.CompletedTask;
+
+        await coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/csi_variance", "23.5"));
+
+        Assert.That(slowFinished, Is.True, "csi_variance dispatch must await the non-last handler");
+        Assert.That(seen?.NodeId, Is.EqualTo("node-1"));
+        Assert.That(seen?.Value, Is.EqualTo(23.5).Within(1e-9));
+    }
+
+    [Test]
+    public async Task OnMqttMessageReceived_CsiVarianceTopic_MalformedPayload_RaisesMalformed()
+    {
+        var coordinator = CreateCoordinator();
+        var malformed = 0;
+        coordinator.MqttMessageMalformed += (_, _) => malformed++;
+        coordinator.NodeCsiVarianceReceivedAsync += _ => Task.CompletedTask;
+
+        Assert.DoesNotThrowAsync(
+            () => coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/csi_variance", "not-a-number")));
+
+        await Task.Yield();
+        Assert.That(malformed, Is.EqualTo(1));
+    }
+
+    [TestCase("NaN")]
+    [TestCase("Infinity")]
+    [TestCase("-Infinity")]
+    public async Task OnMqttMessageReceived_CsiVarianceTopic_NonFinitePayload_RaisesMalformed(string payload)
+    {
+        // NumberStyles.Float parses all three successfully; a NaN or Infinity reaching
+        // CsiMotionTracker poisons that node's baseline, so these must be rejected like
+        // non-numeric text rather than accepted as a value.
+        var coordinator = CreateCoordinator();
+        var malformed = 0;
+        coordinator.MqttMessageMalformed += (_, _) => malformed++;
+        coordinator.NodeCsiVarianceReceivedAsync += _ => Task.CompletedTask;
+
+        Assert.DoesNotThrowAsync(
+            () => coordinator.OnMqttMessageReceived(Message("espresense/rooms/node-1/csi_variance", payload)));
+
+        await Task.Yield();
+        Assert.That(malformed, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task OnMqttMessageReceived_UnknownTopic_AwaitsNonLastMqttHandler()
     {
         var coordinator = CreateCoordinator();

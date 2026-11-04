@@ -14,6 +14,7 @@ public interface IMqttCoordinator
     event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
     event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
     event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
+    event Func<NodeCsiVarianceReceivedEventArgs, Task>? NodeCsiVarianceReceivedAsync;
     event Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceivedAsync;
     event Func<NodeTelemetryRemovedEventArgs, Task>? NodeTelemetryRemovedAsync;
     event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;

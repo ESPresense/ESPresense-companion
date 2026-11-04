@@ -12,6 +12,11 @@ internal sealed record NodeStatusRoute(string Topic, string NodeId) : MqttRoute(
 /// <summary><c>espresense/rooms/{node}/update_error</c></summary>
 internal sealed record NodeUpdateErrorRoute(string Topic, string NodeId) : MqttRoute(Topic);
 
+/// <summary><c>espresense/rooms/{node}/csi_variance</c>: a passive-WiFi motion scalar, published roughly
+/// every 5s. Routed separately from the generic node setting below (not <see cref="NodeSettingRoute"/>)
+/// because every consumer needs the parsed numeric value, not the raw string.</summary>
+internal sealed record NodeCsiVarianceRoute(string Topic, string NodeId) : MqttRoute(Topic);
+
 /// <summary><c>espresense/rooms/{node}/{setting}</c>, or the broadcast <c>espresense/rooms/*/{setting}/set</c>.</summary>
 internal sealed record NodeSettingRoute(string Topic, string NodeId, string Setting) : MqttRoute(Topic);
 
@@ -54,6 +59,7 @@ internal sealed class MqttTopicRouter
             [MqttTopics.Root, MqttTopics.RoomsSegment, var node, MqttTopics.TelemetrySegment] => new NodeTelemetryRoute(topic, node),
             [MqttTopics.Root, MqttTopics.RoomsSegment, var node, MqttTopics.StatusSegment] => new NodeStatusRoute(topic, node),
             [MqttTopics.Root, MqttTopics.RoomsSegment, var node, MqttTopics.UpdateErrorSegment] => new NodeUpdateErrorRoute(topic, node),
+            [MqttTopics.Root, MqttTopics.RoomsSegment, var node, MqttTopics.CsiVarianceSegment] => new NodeCsiVarianceRoute(topic, node),
             [MqttTopics.Root, MqttTopics.RoomsSegment, MqttTopics.AllNodes, var setting, MqttTopics.SetSegment] => new NodeSettingRoute(topic, MqttTopics.AllNodes, setting),
             [MqttTopics.Root, MqttTopics.RoomsSegment, var node, var setting] => new NodeSettingRoute(topic, node, setting),
             [MqttTopics.Root, MqttTopics.DevicesSegment, var device, var node] => new DeviceMessageRoute(topic, device, node),

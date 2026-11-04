@@ -28,8 +28,9 @@ public class StateController : ControllerBase
     private readonly GlobalEventDispatcher _eventDispatcher;
     private readonly CalibrationService _calibration;
     private readonly DeviceEnricher _enricher;
+    private readonly CsiFusionService _csiFusion;
 
-    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, NodeStateMapper mapper, GlobalEventDispatcher eventDispatcher, CalibrationService calibration, DeviceEnricher enricher)
+    public StateController(ILogger<StateController> logger, State state, ConfigLoader config, NodeSettingsStore nsd, DeviceSettingsStore dss, NodeTelemetryStore nts, NodeStateMapper mapper, GlobalEventDispatcher eventDispatcher, CalibrationService calibration, DeviceEnricher enricher, CsiFusionService csiFusion)
     {
         _enricher = enricher;
         _calibration = calibration;
@@ -40,6 +41,7 @@ public class StateController : ControllerBase
         _dss = dss;
         _mapper = mapper;
         _eventDispatcher = eventDispatcher;
+        _csiFusion = csiFusion;
     }
 
     // GET: api/rooms
@@ -65,6 +67,13 @@ public class StateController : ControllerBase
 
     /// <summary>An untracked device the client has open, which it wants despite the showAll filter.</summary>
     private static bool IsIncluded(string? id, string? include) => !string.IsNullOrEmpty(include) && string.Equals(id, include, StringComparison.OrdinalIgnoreCase);
+
+    // GET: api/state/rooms
+    [HttpGet("api/state/rooms")]
+    public IEnumerable<RoomOccupancy> GetRooms()
+    {
+        return _csiFusion.CurrentOccupancy.Values;
+    }
 
     /// <summary>
     /// Searches everything known (nodes and devices, tracked or not) by id, name, room or floor. Terms are
@@ -145,6 +154,7 @@ public class StateController : ControllerBase
         void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => EnqueueAndSignal(new { type = "nodeStateChanged", data = e.NodeState });
         void OnDeviceRemoved(object? sender, DeviceRemovedEventArgs e) => EnqueueAndSignal(new { type = "deviceRemoved", deviceId = e.DeviceId });
         void OnLocatorStateChanged(object? sender, LocatorStateEventArgs e) => EnqueueAndSignal(new { type = "locatorStateChanged", data = e.LocatorState });
+        void OnRoomOccupancyChanged(object? sender, RoomOccupancyEventArgs e) => EnqueueAndSignal(new { type = "roomOccupancyChanged", data = e.Occupancy });
         void OnDeviceChanged(object? sender, DeviceEventArgs e)
         {
             if (showAll || (e.Device?.Track ?? false) || e.TrackChanged || IsIncluded(e.Device?.Id, include))
@@ -177,6 +187,7 @@ public class StateController : ControllerBase
         _eventDispatcher.DeviceMessageReceived += OnDeviceMessageReceived;
         _eventDispatcher.DeviceRemoved += OnDeviceRemoved;
         _eventDispatcher.LocatorStateChanged += OnLocatorStateChanged;
+        _eventDispatcher.RoomOccupancyChanged += OnRoomOccupancyChanged;
 
         try
         {
@@ -279,6 +290,7 @@ public class StateController : ControllerBase
             _eventDispatcher.DeviceMessageReceived -= OnDeviceMessageReceived;
             _eventDispatcher.DeviceRemoved -= OnDeviceRemoved;
             _eventDispatcher.LocatorStateChanged -= OnLocatorStateChanged;
+            _eventDispatcher.RoomOccupancyChanged -= OnRoomOccupancyChanged;
         }
     }
 

@@ -16,6 +16,7 @@ public class MqttMessageHandlerTests
         public Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceived { get; set; }
         public Func<NodeStatusRemovedEventArgs, Task>? NodeStatusRemoved { get; set; }
         public Func<NodeUpdateErrorEventArgs, Task>? NodeUpdateError { get; set; }
+        public Func<NodeCsiVarianceReceivedEventArgs, Task>? NodeCsiVarianceReceived { get; set; }
         public Func<DeviceAttributesEventArgs, Task>? DeviceAttributesReceived { get; set; }
         public List<PreviousDeviceDiscoveredEventArgs> Discovered { get; } = new();
         public void RaisePreviousDeviceDiscovered(PreviousDeviceDiscoveredEventArgs args) => Discovered.Add(args);
@@ -118,6 +119,32 @@ public class MqttMessageHandlerTests
         await new NodeStatusHandler(sink).HandleAsync(new NodeStatusRoute("espresense/rooms/n/status", "n"), payload);
 
         Assert.That(got!.Online, Is.EqualTo(online));
+    }
+
+    [TestCase("23.5", 23.5)]
+    [TestCase("1143", 1143.0)]
+    public async Task CsiVariance_ParsesPayload(string payload, double expected)
+    {
+        var sink = new FakeSink();
+        NodeCsiVarianceReceivedEventArgs? got = null;
+        sink.NodeCsiVarianceReceived = a => { got = a; return Task.CompletedTask; };
+
+        await new NodeCsiVarianceHandler(sink).HandleAsync(new NodeCsiVarianceRoute("t", "office"), payload);
+
+        Assert.That(got!.NodeId, Is.EqualTo("office"));
+        Assert.That(got.Value, Is.EqualTo(expected).Within(1e-9));
+    }
+
+    [TestCase("not-a-number")]
+    [TestCase("NaN")]
+    [TestCase("Infinity")]
+    [TestCase("-Infinity")]
+    public void CsiVariance_RejectsNonFiniteOrUnparseablePayload(string payload)
+    {
+        var sink = new FakeSink { NodeCsiVarianceReceived = _ => Task.CompletedTask };
+
+        Assert.ThrowsAsync<MqttMessageProcessingException>(
+            () => new NodeCsiVarianceHandler(sink).HandleAsync(new NodeCsiVarianceRoute("t", "office"), payload));
     }
 
     [Test]

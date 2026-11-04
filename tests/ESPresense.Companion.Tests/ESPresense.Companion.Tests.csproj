@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ESPresense.Companion.csproj" />
+    <ProjectReference Include="..\ESPresense.Companion.Simulation\ESPresense.Simulation.csproj" />
   </ItemGroup>
 
 </Project>

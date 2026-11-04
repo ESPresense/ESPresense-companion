@@ -52,8 +52,17 @@ public class Device
     [STJ.JsonConverter(typeof(DeviceToNodeConverter))]
     public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// CSI-fusion override of the BLE-derived room (tie-break between close candidates, or damping a
+    /// change into a room with no corroborating motion). Null means "defer to BestScenario", which is
+    /// also what every device stays at when CSI fusion is disabled or has no coverage for this device's
+    /// rooms -- so a room with no CSI data resolves exactly as it did before fusion existed.
+    /// </summary>
+    [STJ.JsonIgnore]
+    public Room? FusedRoom { get; set; }
+
     [STJ.JsonConverter(typeof(RoomConverter))]
-    public Room? Room => Anchor?.Room ?? BestScenario?.Room;
+    public Room? Room => Anchor?.Room ?? FusedRoom ?? BestScenario?.Room;
 
     [STJ.JsonConverter(typeof(FloorConverter))]
     public Floor? Floor => Anchor?.Floor ?? BestScenario?.Floor;

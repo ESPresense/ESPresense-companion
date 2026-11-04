@@ -11,6 +11,7 @@ public class GlobalEventDispatcher()
     public event EventHandler<CalibrationEventArgs>? CalibrationChanged;
     public event EventHandler<DeviceRemovedEventArgs>? DeviceRemoved;
     public event EventHandler<LocatorStateEventArgs>? LocatorStateChanged;
+    public event EventHandler<RoomOccupancyEventArgs>? RoomOccupancyChanged;
 
     public void OnNodeStateChanged(NodeState state)
     {
@@ -41,6 +42,11 @@ public class GlobalEventDispatcher()
     {
         LocatorStateChanged?.Invoke(this, new LocatorStateEventArgs(state));
     }
+
+    public void OnRoomOccupancyChanged(RoomOccupancy occupancy)
+    {
+        RoomOccupancyChanged?.Invoke(this, new RoomOccupancyEventArgs(occupancy));
+    }
 }
 
 public class NodeStateEventArgs(NodeState state) : EventArgs
@@ -67,4 +73,9 @@ public class DeviceRemovedEventArgs(string deviceId) : EventArgs
 public class LocatorStateEventArgs(LocatorState state) : EventArgs
 {
     public LocatorState LocatorState { get; } = state;
+}
+
+public class RoomOccupancyEventArgs(RoomOccupancy occupancy) : EventArgs
+{
+    public RoomOccupancy Occupancy { get; } = occupancy;
 }

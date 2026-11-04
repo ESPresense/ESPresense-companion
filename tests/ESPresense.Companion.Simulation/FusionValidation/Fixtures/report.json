@@ -1,0 +1,22 @@
+{
+  "flap_resolution_rate": 1,
+  "flap_samples": 1,
+  "attribution_accuracy": 1,
+  "attribution_samples": 1,
+  "false_unknown_rate": 0.5,
+  "unknown_events": 2,
+  "latency": [
+    {
+      "room": "laundry",
+      "ha_transition_at": "2026-11-03T18:01:05.0000000\u002B00:00",
+      "fusion_transition_at": "2026-11-03T18:00:05.0000000\u002B00:00",
+      "latency_seconds": -60
+    },
+    {
+      "room": "office",
+      "ha_transition_at": "2026-11-03T18:19:58.0000000\u002B00:00",
+      "fusion_transition_at": "2026-11-03T18:20:05.0000000\u002B00:00",
+      "latency_seconds": 7
+    }
+  ]
+}

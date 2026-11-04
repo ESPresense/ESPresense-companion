@@ -109,6 +109,7 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
     public event Func<DeviceMessageEventArgs, Task>? DeviceMessageReceivedAsync;
     public event Func<MqttApplicationMessageReceivedEventArgs, Task>? MqttMessageReceivedAsync;
     public event Func<NodeSettingReceivedEventArgs, Task>? NodeSettingReceivedAsync;
+    public event Func<NodeCsiVarianceReceivedEventArgs, Task>? NodeCsiVarianceReceivedAsync;
     public event Func<NodeTelemetryReceivedEventArgs, Task>? NodeTelemetryReceivedAsync;
     public event Func<NodeTelemetryRemovedEventArgs, Task>? NodeTelemetryRemovedAsync;
     public event Func<NodeStatusReceivedEventArgs, Task>? NodeStatusReceivedAsync;
@@ -127,6 +128,7 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
     Func<NodeStatusReceivedEventArgs, Task>? IMqttEventSink.NodeStatusReceived => NodeStatusReceivedAsync;
     Func<NodeStatusRemovedEventArgs, Task>? IMqttEventSink.NodeStatusRemoved => NodeStatusRemovedAsync;
     Func<NodeUpdateErrorEventArgs, Task>? IMqttEventSink.NodeUpdateError => NodeUpdateErrorAsync;
+    Func<NodeCsiVarianceReceivedEventArgs, Task>? IMqttEventSink.NodeCsiVarianceReceived => NodeCsiVarianceReceivedAsync;
     Func<DeviceAttributesEventArgs, Task>? IMqttEventSink.DeviceAttributesReceived => DeviceAttributesReceivedAsync;
     void IMqttEventSink.RaisePreviousDeviceDiscovered(PreviousDeviceDiscoveredEventArgs args) => PreviousDeviceDiscovered?.Invoke(this, args);
 
