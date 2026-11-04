@@ -19,10 +19,6 @@ public sealed record ReportedDeviceState(
     DateTime? StateChanged = null,
     bool AttributesPending = false);
 
-/// <param name="StateChanged">The report's state differed from the last accepted one (a publish was attempted).</param>
-/// <param name="AttributesPublished">The attributes went out.</param>
-public readonly record struct PublishOutcome(bool StateChanged, bool AttributesPublished);
-
 public interface IDeviceStatePublisher
 {
     /// <summary>
@@ -35,7 +31,8 @@ public interface IDeviceStatePublisher
     /// </list>
     /// </summary>
     /// <param name="locationChanged">The caller's view that the position moved since it was last reported.</param>
-    Task<PublishOutcome> PublishAsync(Device device, DeviceReport report, bool locationChanged, CancellationToken ct = default);
+    /// <returns>True when the attributes went out (the caller then raises OnDeviceChanged and records history).</returns>
+    Task<bool> PublishAsync(Device device, DeviceReport report, bool locationChanged, CancellationToken ct = default);
 
     /// <summary>What was last published for <paramref name="device"/>; empty if nothing yet.</summary>
     ReportedDeviceState Reported(Device device);
@@ -53,27 +50,31 @@ public class DeviceStatePublisher(IMqttCoordinator mqtt) : IDeviceStatePublisher
 
     public ReportedDeviceState Reported(Device device) => _reported.TryGetValue(device, out var r) ? r : Nothing;
 
-    public async Task<PublishOutcome> PublishAsync(Device device, DeviceReport report, bool locationChanged, CancellationToken ct = default)
+    public async Task<bool> PublishAsync(Device device, DeviceReport report, bool locationChanged, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var last = Reported(device);
 
+        // Decided by the comparison, not by whether the publish below succeeds: a failed state publish still
+        // lets the attributes out ahead of it. That matches the old moved counter, which counted locator moves
+        // regardless of the state publish, and the state retries next pass because `last` only advances on success.
         var stateChanged = report.State != last.State;
-        if (stateChanged && await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}", report.State, retain: true))
+        if (stateChanged && await mqtt.TryEnqueueAsync(MqttTopics.CompanionDeviceState(device.Id), report.State, retain: true))
             last = Remember(device, last with { State = report.State, PreviousState = last.State, StateChanged = DateTime.UtcNow });
 
         var attributes = report.AttributesJson();
         if (attributes == null || !(locationChanged || stateChanged || last.AttributesPending))
-            return new PublishOutcome(stateChanged, false);
+            return false;
 
-        var sent = await mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", attributes, retain: true);
+        var sent = await mqtt.TryEnqueueAsync(MqttTopics.DeviceAttributes(device.Id), attributes, retain: true);
         Remember(device, sent
             ? last with { Location = report.Location, BestScenario = report.BestScenario, AttributesPending = false }
             : last with { AttributesPending = true });
-        return new PublishOutcome(stateChanged, sent);
+        return sent;
     }
 
-    /// <summary>Records <paramref name="state"/> as published; tests use it to seed a prior report.</summary>
+    /// <summary>Records <paramref name="state"/> as published.</summary>
+    /// <remarks>Internal rather than private only so tests can seed a prior report; production code goes through PublishAsync.</remarks>
     internal ReportedDeviceState Remember(Device device, ReportedDeviceState state)
     {
         _reported.AddOrUpdate(device, state);

@@ -39,9 +39,9 @@ public class DeviceStatePublisherTests
     [Test]
     public async Task FirstReport_SendsStateThenAttributes()
     {
-        var outcome = await _publisher.PublishAsync(_device, Located("Room One"), locationChanged: false);
+        var published = await _publisher.PublishAsync(_device, Located("Room One"), locationChanged: false);
 
-        Assert.That(outcome, Is.EqualTo(new PublishOutcome(StateChanged: true, AttributesPublished: true)));
+        Assert.That(published, Is.True);
         Assert.That(_sent, Is.EqualTo(new (string, string?)[]
         {
             (StateTopic, "Room One"),
@@ -57,9 +57,9 @@ public class DeviceStatePublisherTests
         await _publisher.PublishAsync(_device, Located("Room One"), locationChanged: true);
         _sent.Clear();
 
-        var outcome = await _publisher.PublishAsync(_device, Located("Room One", x: 3), locationChanged: false);
+        var published = await _publisher.PublishAsync(_device, Located("Room One", x: 3), locationChanged: false);
 
-        Assert.That(outcome, Is.EqualTo(new PublishOutcome(false, false)));
+        Assert.That(published, Is.False);
         Assert.That(_sent, Is.Empty);
     }
 
@@ -69,9 +69,9 @@ public class DeviceStatePublisherTests
         await _publisher.PublishAsync(_device, Located("Room One"), locationChanged: true);
         _sent.Clear();
 
-        var outcome = await _publisher.PublishAsync(_device, Located("Room One", x: 3), locationChanged: true);
+        var published = await _publisher.PublishAsync(_device, Located("Room One", x: 3), locationChanged: true);
 
-        Assert.That(outcome, Is.EqualTo(new PublishOutcome(false, true)));
+        Assert.That(published, Is.True);
         Assert.That(Topics(), Is.EqualTo(new[] { AttributesTopic }));
         Assert.That(_publisher.Reported(_device).Location, Is.EqualTo(new Point3D(3, 2, 0.5)));
     }
@@ -79,9 +79,9 @@ public class DeviceStatePublisherTests
     [Test]
     public async Task NoLocation_SendsStateButNeverAttributes()
     {
-        var outcome = await _publisher.PublishAsync(_device, Away(), locationChanged: true);
+        var published = await _publisher.PublishAsync(_device, Away(), locationChanged: true);
 
-        Assert.That(outcome, Is.EqualTo(new PublishOutcome(true, false)));
+        Assert.That(published, Is.False);
         Assert.That(Topics(), Is.EqualTo(new[] { StateTopic }));
         Assert.That(_sent[0].Payload, Is.EqualTo("not_home"));
     }
@@ -107,12 +107,12 @@ public class DeviceStatePublisherTests
         _results.Enqueue(true);  // state
         _results.Enqueue(false); // attributes
         var first = await _publisher.PublishAsync(_device, Located("Room One"), locationChanged: false);
-        Assert.That(first.AttributesPublished, Is.False);
+        Assert.That(first, Is.False);
         Assert.That(_publisher.Reported(_device).AttributesPending, Is.True);
         _sent.Clear();
 
         var second = await _publisher.PublishAsync(_device, Located("Room One"), locationChanged: false);
-        Assert.That(second.AttributesPublished, Is.True);
+        Assert.That(second, Is.True);
         Assert.That(Topics(), Is.EqualTo(new[] { AttributesTopic }));
         _sent.Clear();
 

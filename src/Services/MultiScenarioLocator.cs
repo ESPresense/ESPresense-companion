@@ -45,8 +45,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
         }
 
         var report = DeviceReport.From(device, best, config?.Gps);
-        var outcome = await publisher.PublishAsync(device, report, locationChanged, ct);
-        if (!outcome.AttributesPublished) return;
+        if (!await publisher.PublishAsync(device, report, locationChanged, ct)) return;
 
         globalEventDispatcher.OnDeviceChanged(device, false);
         if (!device.IsAnchored)
