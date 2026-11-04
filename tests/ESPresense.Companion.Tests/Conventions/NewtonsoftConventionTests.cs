@@ -26,10 +26,6 @@ public class NewtonsoftConventionTests
         "Models/DeviceMessage.cs",
         "Models/NodeTelemetry.cs",
         "Models/DeviceSettings.cs",
-
-        // TODO(#1845): MultiScenarioLocator publishes device attributes with Newtonsoft's NullIgnore settings.
-        "Services/MultiScenarioLocator.cs",
-        "Utils/JsonSerializerSettings.cs",
     };
 
     [Test]

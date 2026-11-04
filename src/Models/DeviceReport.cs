@@ -1,7 +1,7 @@
 using ESPresense.Extensions;
+using System.Text.Json;
 using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
-using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
@@ -62,8 +62,9 @@ public sealed record DeviceReport(
     {
         if (Location is not { } location) return null;
 
-        // Property names, order and types are the wire format; NullIgnore also drops zero doubles.
-        return JsonConvert.SerializeObject(new
+        // Property names, order and types are the wire format. JsonDefaults.Mqtt reproduces the Newtonsoft
+        // NullIgnore bytes this payload always had, including dropping zero doubles.
+        return JsonSerializer.Serialize(new
         {
             source_type = "espresense",
             latitude = Latitude,
@@ -76,6 +77,6 @@ public sealed record DeviceReport(
             fixes = Fixes,
             best_scenario = BestScenario,
             last_seen = LastSeen
-        }, SerializerSettings.NullIgnore);
+        }, JsonDefaults.Mqtt);
     }
 }
