@@ -33,16 +33,9 @@ public class CalibrationService(State state, NodeSettingsStore nsd)
             foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
             {
                 var rxNs = nsd.Get(rxId);
-                var rxM = txM.GetOrAdd(rx.Rx?.Name ?? rxId);
-                if (txNs.Calibration.TxRefRssi is not null) rxM["tx_ref_rssi"] = txNs.Calibration.TxRefRssi.Value;
-                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
-                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
-                rxM["mapDistance"] = rx.MapDistance;
-                rxM["distance"] = rx.Distance;
-                rxM["rssi"] = rx.Rssi;
-                rxM["diff"] = rx.Distance - rx.MapDistance;
-                rxM["percent"] = rx.MapDistance != 0 ? ((rx.Distance - rx.MapDistance) / rx.MapDistance) : 0;
-                if (rx.DistVar is not null) rxM["var"] = rx.DistVar.Value;
+                Put(txM, rx.Rx?.Name ?? rxId, new CalibrationCell(
+                    txNs.Calibration.TxRefRssi, rxNs.Calibration.RxAdjRssi, rxNs.Calibration.Absorption,
+                    rx.MapDistance, rx.Distance, rx.Rssi, rx.DistVar));
 
                 if (rx.MapDistance > 0 && rx.Distance > 0)
                 {
@@ -63,20 +56,12 @@ public class CalibrationService(State state, NodeSettingsStore nsd)
             {
                 var rxNode = deviceNode.Node!;
                 var rxNs = nsd.Get(rxNode.Id);
-                var rxM = txM.GetOrAdd(rxNode.Name ?? rxNode.Id);
+                var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);
 
                 // Anchored devices don't have tx calibration settings, but receivers still have their settings
-                if (rxNs.Calibration.RxAdjRssi is not null) rxM["rx_adj_rssi"] = rxNs.Calibration.RxAdjRssi.Value;
-                if (rxNs.Calibration.Absorption is not null) rxM["absorption"] = rxNs.Calibration.Absorption.Value;
-
-                // Calculate map distance from anchor to receiver
-                var mapDistance = device.Anchor!.Location.DistanceTo(rxNode.Location);
-                rxM["mapDistance"] = mapDistance;
-                rxM["distance"] = deviceNode.Distance;
-                rxM["rssi"] = deviceNode.Rssi;
-                rxM["diff"] = deviceNode.Distance - mapDistance;
-                rxM["percent"] = mapDistance != 0 ? ((deviceNode.Distance - mapDistance) / mapDistance) : 0;
-                if (deviceNode.DistVar is not null) rxM["var"] = deviceNode.DistVar.Value;
+                Put(txM, rxNode.Name ?? rxNode.Id, new CalibrationCell(
+                    null, rxNs.Calibration.RxAdjRssi, rxNs.Calibration.Absorption,
+                    mapDistance, deviceNode.Distance, deviceNode.Rssi, deviceNode.DistVar));
 
                 if (mapDistance > 0 && deviceNode.Distance > 0)
                 {
@@ -94,4 +79,8 @@ public class CalibrationService(State state, NodeSettingsStore nsd)
             : state.RecordCalibrationMetrics(null, null);
         return c;
     }
+
+    /// <summary>Stores a cell; two receivers with the same name share one cell, as they always have.</summary>
+    private static void Put(Dictionary<string, CalibrationCell> row, string rxName, CalibrationCell cell)
+        => row[rxName] = cell.MergeOver(row.GetValueOrDefault(rxName));
 }
