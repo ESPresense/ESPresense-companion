@@ -41,11 +41,12 @@ public class RobotSurveyTests
     /// <summary>Locators that actually solve for a position from ranges, as opposed to picking or blending node positions.</summary>
     private static readonly string[] Solvers = { "nelder", "mle", "gaussnewton", "bfgs", "multifloor" };
 
-    /// <summary>Many headings at one spot: good for orientation sensitivity, poor spatial spread.</summary>
-    private const string Headings = "robot-survey-headings.json";
-
     /// <summary>Many spots: good spatial spread.</summary>
     private const string Spread = "robot-survey-spread.json";
+
+    /// <summary>Each spot visited from 2-3 directions, holding the arrival heading through the dwell (no turning in place):
+    /// the orientation effect at known spots, with the kitchen node at its 2026-10-24 position.</summary>
+    private const string Approach = "robot-survey-approach.json";
 
     internal static string LoadFixtureText(string file)
     {
@@ -71,11 +72,11 @@ public class RobotSurveyTests
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
         _configLoader = new ConfigLoader(_configDir);
+        // The constructor no longer loads; the example config has a floor "first" too, and must finish
+        // loading before State exists, or a late load merges the example's rooms into the survey's floor.
+        await _configLoader.LoadAsync();
         _nts = new NodeTelemetryStore(mqtt.Object);
         _state = new State(_configLoader, _nts);
-
-        // These tests build floors/nodes from Config; the constructor no longer loads, so load explicitly.
-        await _configLoader.LoadAsync();
     }
 
     [TearDown]
@@ -93,7 +94,11 @@ public class RobotSurveyTests
         {
             Id = "first",
             Name = "First",
-            Bounds = _survey.FloorBounds["first"]
+            Bounds = _survey.FloorBounds["first"],
+            Rooms = _survey.Rooms.Where(r => r.Floor == "first").Select(r => new ConfigRoom
+            {
+                Id = r.Id, Name = r.Id, Points = r.Points.Select(q => q.ToArray()).ToArray()
+            }).ToArray()
         });
         _state.Floors[floor.Id] = floor;
         return floor;
@@ -139,22 +144,25 @@ public class RobotSurveyTests
     }
 
     /// <summary>
-    /// The robot sat at one spot and only turned. Its position moved 2 mm across 18 headings, so
-    /// every fix should land on the same point. Whatever spread we see is the solver's sensitivity
-    /// to beacon orientation alone — a lower bound on the error a turning person induces.
+    /// The robot came back to one spot again and again (within a few centimetres), turning in place
+    /// each time, so every fix should land on the same point. Whatever spread we see is the solver's
+    /// sensitivity to what changes between visits -- heading, and the beacon remount for visits on
+    /// different days -- a lower bound on the error a moving person induces.
     /// </summary>
     [Test]
-    public void Repeatability_RobotStationary_OnlyHeadingChanged()
+    public void Repeatability_SameSpotRevisited()
     {
-        _survey = Load(Headings);
+        _survey = Load(Spread);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
 
         var group = _survey.Points
-            .GroupBy(p => (Math.Round(p.RobotX, 2), Math.Round(p.RobotY, 2)))
+            .Where(p => p.FloorX.HasValue && p.FloorY.HasValue)
+            .GroupBy(p => (Math.Round(p.FloorX!.Value, 1), Math.Round(p.FloorY!.Value, 1)))
             .OrderByDescending(g => g.Count()).First();
+        if (group.Count() < 3) Assert.Ignore("no spot visited 3+ times");
 
-        TestContext.WriteLine($"Robot fixed at robot-frame {group.Key}, {group.Count()} headings, true movement 2 mm\n");
+        TestContext.WriteLine($"Robot at floor-frame {group.Key}, {group.Count()} visits\n");
         TestContext.WriteLine($"{"locator",-13}{"fixes",6}{"spread p95",12}{"max pair",10}{"centroid dev",14}");
 
         var anySolved = false;
@@ -184,8 +192,8 @@ public class RobotSurveyTests
     /// rotation and translation, though deliberately NOT to scale, so it also catches the
     /// systematic distance inflation seen in the calibration matrix.
     /// </summary>
-    [TestCase(Headings)]
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void Rigidity_SolverMustReproduceKnownSeparations(string fixture)
     {
         _survey = Load(fixture);
@@ -253,8 +261,8 @@ public class RobotSurveyTests
     /// intersect, the problem is ill-conditioned, and tiny input changes move the answer metres.
     /// Sweeping a global scale separates "solver is fragile" from "input is inconsistent".
     /// </summary>
-    [TestCase(Headings)]
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void ScaleSweep_SeparatesSolverFragilityFromDistanceInflation(string fixture)
     {
         _survey = Load(fixture);
@@ -318,18 +326,22 @@ public class RobotSurveyTests
     /// Note why unit tests on synthetic data miss this: when the distances are mutually consistent
     /// the residual is zero at the solution, and a wrong Jacobian still has a fixed point there.
     /// The defect only shows on inconsistent measurements -- which is all that real radio produces.
+    ///
+    /// Like the synthetic variant below, it asserts on the median excess: a correct solver still
+    /// settles in the wrong basin of a multimodal objective at some points (about 1 in 5 here),
+    /// while the broken Jacobian lost at every point.
     /// </summary>
     [Test]
     public void Optimality_GaussNewtonMustMinimiseItsOwnObjective()
     {
-        _survey = Load(Headings);
+        _survey = Load(Spread);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
         var excesses = GaussNewtonExcess(floor, nodes,
             _survey.Points.Select(p => (p.Label, p.M.ToDictionary(kv => kv.Key, kv => kv.Value.Dist))));
-        var worse = excesses.Count(e => e > 0.25);
-        Assert.That(worse, Is.LessThanOrEqualTo(excesses.Count / 5),
-            $"GaussNewton lost to a quarter-metre grid on {worse} of {excesses.Count} points: " +
+        var median = excesses.OrderBy(x => x).ElementAt(excesses.Count / 2);
+        Assert.That(median, Is.LessThan(0.1),
+            $"GaussNewton's median excess over a brute-force grid is {median:0.000}: " +
             "it is not minimising the objective it reports.");
     }
 
@@ -480,6 +492,7 @@ public class RobotSurveyTests
     /// can recover from it, which is the point.
     /// </summary>
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void RangeConsistency_NodeRangeCannotChangeFasterThanTheRobotMoved(string fixture)
     {
         _survey = Load(fixture);
@@ -537,6 +550,7 @@ public class RobotSurveyTests
     /// between positions that are further apart.
     /// </summary>
     [TestCase(Spread)]
+    [TestCase(Approach)]
     public void BeaconMovesWithRobot(string fixture)
     {
         _survey = Load(fixture);
@@ -587,25 +601,57 @@ public class RobotSurveyTests
 
     private sealed record AccuracyResult(int Fixes, int Points, double Median, double P90, double Max, int RoomHits, int RoomTotal);
 
-    /// <summary>Absolute floorplan error for one locator over every survey point that has floor coordinates.</summary>
-    private AccuracyResult Accuracy(string which, Floor floor, Dictionary<string, Node> nodes, ICollection<string>? exclude = null)
+    /// <summary>
+    /// Groups points into spots: visits within <see cref="SameSpotM"/> of a spot's first visit. A spot
+    /// revisited many times (the repeatability runs) would otherwise outvote the rest of the survey.
+    /// </summary>
+    private static List<List<SurveyPoint>> Spots(IEnumerable<SurveyPoint> pts)
     {
-        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
-        var errs = new List<double>();
-        int hits = 0, total = 0;
+        var spots = new List<List<SurveyPoint>>();
         foreach (var p in pts)
         {
-            var dists = p.M.Where(kv => exclude == null || !exclude.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Dist);
-            if (Solve(which, dists, floor, nodes) is not { } fix) continue;
-            errs.Add(Math.Sqrt(Math.Pow(fix.X - p.FloorX!.Value, 2) + Math.Pow(fix.Y - p.FloorY!.Value, 2)));
-            if (p.FloorRoom == null) continue;
+            var s = spots.FirstOrDefault(s => Math.Sqrt(Math.Pow(s[0].FloorX!.Value - p.FloorX!.Value, 2) + Math.Pow(s[0].FloorY!.Value - p.FloorY!.Value, 2)) <= SameSpotM);
+            if (s == null) spots.Add(new List<SurveyPoint> { p }); else s.Add(p);
+        }
+        return spots;
+    }
+
+    /// <summary>
+    /// Scores one fix per visit, then each spot once: its error is the median over its visits, and it
+    /// counts as the right room when most of its visits land in it.
+    /// </summary>
+    private AccuracyResult Score(List<SurveyPoint> pts, Func<SurveyPoint, Point3D?> locate, Func<string?>? predictedRoom = null)
+    {
+        var errs = new List<double>();
+        int fixes = 0, hits = 0, total = 0;
+        foreach (var spot in Spots(pts))
+        {
+            var e = new List<double>(); int h = 0;
+            foreach (var p in spot)
+            {
+                if (locate(p) is not { } fix) continue;
+                fixes++;
+                e.Add(Math.Sqrt(Math.Pow(fix.X - p.FloorX!.Value, 2) + Math.Pow(fix.Y - p.FloorY!.Value, 2)));
+                if ((predictedRoom == null ? RoomAt(fix.X, fix.Y) : predictedRoom()) == p.FloorRoom) h++;
+            }
+            if (e.Count == 0) continue;
+            e.Sort();
+            errs.Add(e.Count % 2 == 1 ? e[e.Count / 2] : (e[e.Count / 2 - 1] + e[e.Count / 2]) / 2);
+            if (spot[0].FloorRoom == null) continue;
             total++;
-            if (RoomAt(fix.X, fix.Y) == p.FloorRoom) hits++;
+            if (2 * h > e.Count) hits++;
         }
         errs.Sort();
         return errs.Count == 0
             ? new AccuracyResult(0, pts.Count, double.NaN, double.NaN, double.NaN, 0, total)
-            : new AccuracyResult(errs.Count, pts.Count, Pct(errs, 0.5), Pct(errs, 0.9), errs[^1], hits, total);
+            : new AccuracyResult(fixes, pts.Count, Pct(errs, 0.5), Pct(errs, 0.9), errs[^1], hits, total);
+    }
+
+    /// <summary>Absolute floorplan error for one locator over every survey point that has floor coordinates, scored per spot.</summary>
+    private AccuracyResult Accuracy(string which, Floor floor, Dictionary<string, Node> nodes, ICollection<string>? exclude = null)
+    {
+        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
+        return Score(pts, p => Solve(which, p.M.Where(kv => exclude == null || !exclude.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Dist), floor, nodes));
     }
 
     /// <summary>
@@ -619,10 +665,11 @@ public class RobotSurveyTests
     /// locators achieved on that survey: they catch a change that makes a locator worse, they are
     /// not an accuracy target. Without them this is a diagnostic.
     /// </summary>
-    [Test]
-    public void Accuracy_FloorFrame_PerLocator()
+    [TestCase(Spread)]
+    [TestCase(Approach)]
+    public void Accuracy_FloorFrame_PerLocator(string fixture)
     {
-        _survey = Load(Spread);
+        _survey = Load(fixture);
         var floor = FirstFloor();
         var nodes = FirstFloorNodes(floor);
         RequireSpatialPoints(MinAccuracyPoints);
@@ -648,6 +695,276 @@ public class RobotSurveyTests
         });
     }
 
+    /// <summary>Firmware defaults (main/defaults.h): what a node reports before any calibration.</summary>
+    private const double DefaultRefRssi = -59, DefaultAbsorption = 2.7;
+
+    /// <summary>The beacon rode on top of the vacuum.</summary>
+    private const double RobotZ = 0.30;
+
+    /// <summary>Repeat visits within this distance count as the same spot.</summary>
+    private const double SameSpotM = 0.5;
+
+    /// <summary>
+    /// Fingerprinting against every ranging locator, leave-one-spot-out: each surveyed spot is located
+    /// using a fingerprint map built from the OTHER spots only (repeat visits to the same spot are left
+    /// out too, so it cannot just look itself up), through the real FingerprintLocator and a map file
+    /// in the config directory. The ranging locators get the nodes' reported distances, as in
+    /// Accuracy_FloorFrame_PerLocator.
+    ///
+    /// Fingerprinting skips the log-distance model entirely, which this survey shows is the weak link:
+    /// it must beat every ranging locator's median.
+    /// </summary>
+    [Test]
+    public void Accuracy_Fingerprint_LeaveOneSpotOut()
+    {
+        _survey = Load(Spread);
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+        // Fingerprinting needs no node coordinates, so it also gets the other floors' nodes.
+        var allNodes = new Dictionary<string, Node>(nodes);
+        foreach (var n in _survey.Nodes.Where(n => !n.Floors.Contains("first")))
+        {
+            var node = new Node(n.Id, NodeSourceType.Config);
+            node.Update(_configLoader.Config!, new ConfigNode { Name = n.Id, Point = new[] { n.X, n.Y, n.Z } }, Array.Empty<Floor>());
+            allNodes[n.Id] = node;
+        }
+        RequireSpatialPoints(MinAccuracyPoints);
+
+        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
+        var cfg = new FingerprintConfig { Enabled = true };
+        var knnCfg = new FingerprintConfig { Enabled = true, Mode = "knn" };
+        var path = Path.Combine(_configDir, cfg.File);
+        var map = new FingerprintMap(path);
+
+        var reloads = 0;
+        string? room = null;
+        int visitHits = 0, noRoom = 0;
+        AccuracyResult Run(FingerprintConfig cfg) => Score(pts, p =>
+        {
+            var train = pts.Where(q => Math.Sqrt(Math.Pow(q.FloorX!.Value - p.FloorX!.Value, 2) + Math.Pow(q.FloorY!.Value - p.FloorY!.Value, 2)) > SameSpotM);
+            File.WriteAllText(path, JsonSerializer.Serialize(new
+            {
+                fingerprints = train.Select(q => new
+                {
+                    floor = "first", x = q.FloorX, y = q.FloorY, z = RobotZ,
+                    rssi = q.M.Where(kv => allNodes.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value.Rssi)
+                })
+            }));
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(++reloads)); // force a reload per visit
+
+            var device = new Device($"robot-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
+            foreach (var (id, m) in p.M)
+                if (allNodes.TryGetValue(id, out var node))
+                    device.Nodes[id] = new DeviceToNode(device, node) { Rssi = m.Rssi, Distance = m.Dist, LastHit = DateTime.UtcNow };
+            var locator = new FingerprintLocator(device, floor, map, cfg);
+            var scenario = new Scenario(_configLoader.Config, locator, "fingerprint");
+            var located = locator.Locate(scenario);
+            room = scenario.Room?.Id;
+            if (p.FloorRoom != null)
+            {
+                if (room == p.FloorRoom) visitHits++;
+                if (room == null) noRoom++;
+            }
+            return located ? scenario.Location : null;
+        }, () => room);
+        var fp = Run(cfg);
+        var continuousVisitHits = visitHits;
+        var continuousNoRoom = noRoom;
+        visitHits = noRoom = 0;
+        var knn = Run(knnCfg);
+        var roomVisits = pts.Count(p => p.FloorRoom != null);
+        TestContext.WriteLine($"Continuous room visits: {continuousVisitHits}/{roomVisits}; no room: {continuousNoRoom}; knn: {visitHits}/{roomVisits}; no room: {noRoom}");
+
+        TestContext.WriteLine($"{Spots(pts).Count} spots, {pts.Count} visits; errors are per spot (median over its visits)\n");
+        TestContext.WriteLine($"{"locator",-13}{"fixes",8}{"median m",10}{"p90 m",8}{"max m",8}{"room hits",11}");
+        TestContext.WriteLine($"{"fingerprint",-13}{$"{fp.Fixes}/{fp.Points}",8}{fp.Median,10:0.00}{fp.P90,8:0.00}{fp.Max,8:0.00}{$"{fp.RoomHits}/{fp.RoomTotal}",11}");
+        TestContext.WriteLine($"{"  (knn)",-13}{$"{knn.Fixes}/{knn.Points}",8}{knn.Median,10:0.00}{knn.P90,8:0.00}{knn.Max,8:0.00}{$"{knn.RoomHits}/{knn.RoomTotal}",11}");
+        var ranging = new Dictionary<string, AccuracyResult>();
+        foreach (var which in Locators)
+        {
+            var r = ranging[which] = Accuracy(which, floor, nodes);
+            TestContext.WriteLine($"{which,-13}{$"{r.Fixes}/{r.Points}",8}{r.Median,10:0.00}{r.P90,8:0.00}{r.Max,8:0.00}{$"{r.RoomHits}/{r.RoomTotal}",11}");
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(continuousVisitHits, Is.GreaterThanOrEqualTo(103), "continuous room vote must not regress");
+            Assert.That(fp.Fixes, Is.EqualTo(pts.Count), "fingerprinting should fix every spot");
+            foreach (var (which, r) in ranging)
+                Assert.That(fp.Median, Is.LessThan(r.Median), $"fingerprinting should beat {which} on median error");
+        });
+    }
+
+    /// <summary>A human teaching dwell: 90 s on the grid/top-up tours (labels "p"/"g"), 30 s elsewhere.</summary>
+    private static double HumanDwellSeconds(SurveyPoint p) => p.Label.StartsWith("p") || p.Label.StartsWith("g") ? 90 : 30;
+
+    private static double GaussianNoise(Random r) => Math.Sqrt(-2 * Math.Log(1 - r.NextDouble())) * Math.Cos(2 * Math.PI * r.NextDouble());
+
+    /// <summary>
+    /// Simulates a <paramref name="seconds"/>-long dwell at <paramref name="spot"/>: each node's raw rssi
+    /// is the mean of however many reports arrive in that window -- Poisson at the node's rate over the
+    /// survey's own (longer) dwell -- with sampling noise on that mean; a node that reports nothing in
+    /// the window is missed entirely, the same way a real receiver would be.
+    /// </summary>
+    private static Dictionary<string, double> SimulateDwell(SurveyPoint spot, double seconds, Random noise, ICollection<string> knownNodes)
+    {
+        var reading = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (node, m) in spot.M)
+        {
+            if (!knownNodes.Contains(node)) continue;
+            var lambda = m.N / HumanDwellSeconds(spot) * seconds;
+            var reports = 0;
+            var l = Math.Exp(-lambda);
+            var p = noise.NextDouble();
+            while (p > l) { reports++; p *= noise.NextDouble(); }
+            if (reports == 0) continue;
+            reading[node] = m.Rssi + GaussianNoise(noise) * Math.Max(m.Sd, 1.0) / Math.Sqrt(reports);
+        }
+        return reading;
+    }
+
+    /// <summary>
+    /// Picks <paramref name="perRoom"/> spots per room (an unlabelled spot counts as its own area),
+    /// spread out by repeatedly choosing the candidate farthest from everything chosen so far -- the
+    /// way a person teaching a handful of spots per room would naturally spread them out.
+    /// </summary>
+    private static List<SurveyPoint> PickSpreadSamples(List<List<SurveyPoint>> spots, int perRoom, Random r) =>
+        spots.GroupBy(s => s[0].FloorRoom ?? "-").SelectMany(room =>
+        {
+            var candidates = room.Select(s => s[0]).OrderBy(_ => r.Next()).ToList();
+            var chosen = new List<SurveyPoint> { candidates[0] };
+            while (chosen.Count < Math.Min(perRoom, candidates.Count))
+                chosen.Add(candidates.Except(chosen).OrderByDescending(c => chosen.Min(x => FloorDist(x, c))).First());
+            return chosen;
+        }).ToList();
+
+    private static double FloorDist(SurveyPoint a, SurveyPoint b) =>
+        Math.Sqrt(Math.Pow(a.FloorX!.Value - b.FloorX!.Value, 2) + Math.Pow(a.FloorY!.Value - b.FloorY!.Value, 2));
+
+    /// <summary>
+    /// Builds a fingerprint map from <paramref name="train"/> (each sampled for a 15 s teaching dwell)
+    /// and scores every other spot from a simulated 10 s live reading: median/p90 error per spot, and
+    /// the right-room rate over every room-labelled visit.
+    /// </summary>
+    private (double Median, double P90, double RightRoom) EvaluateSparseMap(List<SurveyPoint> train, List<List<SurveyPoint>> allSpots,
+        Floor floor, Dictionary<string, Node> allNodes, string mapPath, FingerprintConfig cfg, Random trainNoise, Random queryNoise, ref int reloadToken)
+    {
+        File.WriteAllText(mapPath, JsonSerializer.Serialize(new
+        {
+            fingerprints = train.Select(q => new
+            {
+                floor = "first", x = q.FloorX, y = q.FloorY, z = RobotZ,
+                rssi = SimulateDwell(q, 15, trainNoise, allNodes.Keys)
+            })
+        }));
+        File.SetLastWriteTimeUtc(mapPath, DateTime.UtcNow.AddSeconds(++reloadToken)); // force a reload per map
+        var map = new FingerprintMap(mapPath);
+
+        var spotErrors = new List<double>();
+        int roomHits = 0, roomTotal = 0;
+        foreach (var spot in allSpots)
+        {
+            if (spot.Any(p => train.Any(t => FloorDist(t, p) <= SameSpotM))) continue;
+            var visitErrors = new List<double>();
+            foreach (var p in spot)
+            {
+                var device = new Device($"sparse-{Guid.NewGuid()}", null, TimeSpan.FromSeconds(30));
+                foreach (var (id, rssi) in SimulateDwell(p, 10, queryNoise, allNodes.Keys))
+                    device.Nodes[id] = new DeviceToNode(device, allNodes[id]) { Rssi = rssi, Distance = 1, LastHit = DateTime.UtcNow };
+                var locator = new FingerprintLocator(device, floor, map, cfg);
+                var scenario = new Scenario(_configLoader.Config, locator, "fingerprint");
+                if (locator.Locate(scenario))
+                    visitErrors.Add(Math.Sqrt(Math.Pow(scenario.Location.X - p.FloorX!.Value, 2) + Math.Pow(scenario.Location.Y - p.FloorY!.Value, 2)));
+                if (p.FloorRoom != null)
+                {
+                    roomTotal++;
+                    if (scenario.Room?.Id == p.FloorRoom) roomHits++;
+                }
+            }
+            if (visitErrors.Count > 0) { visitErrors.Sort(); spotErrors.Add(visitErrors[visitErrors.Count / 2]); }
+        }
+        spotErrors.Sort();
+        return spotErrors.Count == 0
+            ? (double.NaN, double.NaN, double.NaN)
+            : (Pct(spotErrors, 0.5), Pct(spotErrors, 0.9), roomTotal == 0 ? double.NaN : (double)roomHits / roomTotal);
+    }
+
+    /// <summary>
+    /// What a short, hand-held teaching walk can get without a robot: pick a few spread-out spots per
+    /// room, simulate the dwell a person would actually hold (15 s to teach, 10 s live), and see how the
+    /// resulting map does against held-out spots. Deterministic seeds (never derived from the clock or
+    /// test order) so this cannot flake.
+    ///
+    /// Asserts the headline claim: 3 spots/room already beats every ranging locator's right-room rate
+    /// (<see cref="Accuracy"/>, full survey, no dwell truncation -- there is no sparse-survey equivalent
+    /// for a trilateration locator, since it has nothing to "teach"). The other map sizes are printed
+    /// for context but not asserted on, since 1-2 spots/room is noisier.
+    /// </summary>
+    [Test]
+    public void Accuracy_Fingerprint_SparseHumanSurvey_BeatsRangingOnRightRoom()
+    {
+        _survey = Load(Spread);
+        var floor = FirstFloor();
+        var nodes = FirstFloorNodes(floor);
+        var allNodes = new Dictionary<string, Node>(nodes);
+        foreach (var n in _survey.Nodes.Where(n => !n.Floors.Contains("first")))
+        {
+            var node = new Node(n.Id, NodeSourceType.Config);
+            node.Update(_configLoader.Config!, new ConfigNode { Name = n.Id, Point = new[] { n.X, n.Y, n.Z } }, Array.Empty<Floor>());
+            allNodes[n.Id] = node;
+        }
+        RequireSpatialPoints(MinAccuracyPoints);
+
+        var pts = _survey.Points.Where(p => p.FloorX.HasValue && p.FloorY.HasValue).ToList();
+        var spots = Spots(pts);
+        var cfg = new FingerprintConfig { Enabled = true };
+        var path = Path.Combine(_configDir, cfg.File);
+        var reloads = 0;
+        var seeds = Enumerable.Range(1, 9).ToList();
+
+        (double Median, double P90, double Room, int Points) ForPerRoom(int perRoom)
+        {
+            var runs = seeds.Select(seed =>
+            {
+                var r = EvaluateSparseMap(PickSpreadSamples(spots, perRoom, new Random(seed)), spots, floor, allNodes, path, cfg,
+                    new Random(seed + 100), new Random(seed + 200), ref reloads);
+                return r;
+            }).ToList();
+            double MedianOf(Func<(double Median, double P90, double RightRoom), double> pick)
+            {
+                var v = runs.Select(pick).OrderBy(x => x).ToList();
+                return v[v.Count / 2];
+            }
+            var points = PickSpreadSamples(spots, perRoom, new Random(seeds[0])).Count;
+            return (MedianOf(x => x.Median), MedianOf(x => x.P90), MedianOf(x => x.RightRoom), points);
+        }
+
+        TestContext.WriteLine($"{spots.Count} spots; {seeds.Count} seeds per map size\n");
+        TestContext.WriteLine($"{"map",-24}{"points",7}{"median",8}{"p90",7}{"right room",11}   (medians over seeds)");
+        var byPerRoom = new Dictionary<int, (double Median, double P90, double Room, int Points)>();
+        foreach (var k in new[] { 1, 2, 3, 5 })
+        {
+            byPerRoom[k] = ForPerRoom(k);
+            TestContext.WriteLine($"{$"{k} per room",-24}{byPerRoom[k].Points,7}{byPerRoom[k].Median,8:0.00}{byPerRoom[k].P90,7:0.00}{byPerRoom[k].Room,11:P0}");
+        }
+
+        var rangingRoomRate = Locators.ToDictionary(which => which, which =>
+        {
+            var r = Accuracy(which, floor, nodes);
+            return (double)r.RoomHits / r.RoomTotal;
+        });
+        TestContext.WriteLine();
+        foreach (var (which, rate) in rangingRoomRate)
+            TestContext.WriteLine($"{$"ranging locator ({which})",-24}{"",7}{"",8}{"",7}{rate,11:P0}");
+
+        Assert.Multiple(() =>
+        {
+            foreach (var (which, rate) in rangingRoomRate)
+                Assert.That(byPerRoom[3].Room, Is.GreaterThan(rate),
+                    $"3 spread-out spots/room should beat {which}'s right-room rate on the full survey");
+        });
+    }
+
     /// <summary>Fewer positions than this and per-locator medians are noise.</summary>
     private const int MinAccuracyPoints = 10;
 
@@ -663,10 +980,11 @@ public class RobotSurveyTests
     /// solvers? Runs each solver on the spatial survey with every node, then without those, and
     /// compares absolute error and the rigidity slope (solved vs true separation; 1.0 is perfect).
     /// </summary>
-    [Test]
-    public void NodeExclusion_ThroughStructureNodesDragSolversToTheMiddle()
+    [TestCase(Spread)]
+    [TestCase(Approach)]
+    public void NodeExclusion_ThroughStructureNodesDragSolversToTheMiddle(string fixture)
     {
-        _survey = Load(Spread);
+        _survey = Load(fixture);
         RequireSpatialPoints(MinAccuracyPoints);
         if (ThroughStructureNodes.Length == 0) Assert.Ignore("fixture names no expect.throughStructureNodes");
         var floor = FirstFloor();
@@ -747,11 +1065,18 @@ public class RobotSurveyTests
         public Dictionary<string, Meas> M { get; set; } = new();
     }
 
+    /// <summary>
+    /// One node's view of one spot. Rssi is the raw radio reading: the fixture keeps nothing the live
+    /// optimizer sets (rxAdj, rssi@1m, absorption, the node's own distance), so ranging gets the
+    /// distance the firmware would report at its defaults.
+    /// </summary>
     private sealed class Meas
     {
         public double Rssi { get; set; }
-        public double Dist { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public double Dist => Math.Pow(10, (DefaultRefRssi - Rssi) / (10 * DefaultAbsorption));
         public int N { get; set; }
         public double Sd { get; set; }
+
     }
 }

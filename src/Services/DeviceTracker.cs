@@ -7,7 +7,7 @@ using Serilog;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore) : BackgroundService
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore, RoomLearningService? roomLearning = null) : BackgroundService
 {
     // Coalescing work sets: a device heard by N nodes is marked N times but processed/located once per pass.
     private readonly DirtyDeviceSet _toProcess = new();
@@ -33,6 +33,8 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     /// </remarks>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (roomLearning != null) roomLearning.CorrectionRequested += QueueForLocation;
+
         mqtt.DeviceMessageReceivedAsync += (e) =>
         {
             globalEventDispatcher.OnDeviceMessageReceived(e);
@@ -84,8 +86,11 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         var processTask = ProcessDevicesAsync(stoppingToken);
         var idleCheckTask = CheckIdleDevicesAsync(stoppingToken);
 
-        await Task.WhenAll(processTask, idleCheckTask);
+        try { await Task.WhenAll(processTask, idleCheckTask); }
+        finally { if (roomLearning != null) roomLearning.CorrectionRequested -= QueueForLocation; }
     }
+
+    private void QueueForLocation(Device device) => MarkForLocate(device.Id);
 
     /// <summary>
     /// Handles a Home Assistant discovery message previously published by the companion: creates a tracked
@@ -145,7 +150,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         {
             var d = new Device(id, autoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = autoDiscover.Message?.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
             d.KalmanFilter.Settings = state.KalmanSettings;
-            foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
+            state.BuildScenarios(d);
             Log.Information("[+] Track: {Device} (disc)", d);
             return d;
         });
@@ -201,25 +206,22 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
 
         if (!isNode)
         {
-            if (rx.HasLocation)
+            // Fingerprinting matches raw rssi per node and needs no node coordinates, so a receiver that
+            // was never placed on the map (rx.HasLocation false) is still a feature, not noise. Ranging
+            // locators already restrict their candidate nodes to ones placed on the target floor
+            // (BaseMultilateralizer filters on Node.Floors), so they still ignore it on their own.
+            tele.IncrementMessages();
+            var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
             {
-                tele.IncrementMessages();
-                var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
-                {
-                    var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
-                    d.KalmanFilter.Settings = state.KalmanSettings;
-                    foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
-                    return d;
-                });
-                tele.UpdateDevicesCount(state.Devices.Count);
-                var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
-                if (moved) tele.IncrementMoved();
-                _toProcess.Mark(device.Id);
-            }
-            else
-            {
-                tele.IncrementSkipped();
-            }
+                var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
+                d.KalmanFilter.Settings = state.KalmanSettings;
+                state.BuildScenarios(d);
+                return d;
+            });
+            tele.UpdateDevicesCount(state.Devices.Count);
+            var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
+            if (moved) tele.IncrementMoved();
+            _toProcess.Mark(device.Id);
         }
         return Task.CompletedTask;
     }
@@ -313,6 +315,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             else
             {
                 Log.Information("[-] Track {Device}", device);
+                if (roomLearning != null) await roomLearning.RemoveAsync(device, false);
                 foreach (var ad in device.HassAutoDiscovery)
                 {
                     RememberSelfClear(ad.DiscoveryId);

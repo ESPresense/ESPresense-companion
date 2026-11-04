@@ -219,6 +219,7 @@ public class MqttCoordinator : IMqttCoordinator, IDisposable
                 await mqttClient.SubscribeAsync("espresense/rooms/+/+").ConfigureAwait(false);
                 await mqttClient.SubscribeAsync("espresense/rooms/*/+/set").ConfigureAwait(false);
                 await mqttClient.SubscribeAsync($"{config.DiscoveryTopic}/device_tracker/+/config").ConfigureAwait(false);
+                await mqttClient.SubscribeAsync("espresense/companion/+/room/set").ConfigureAwait(false);
                 await mqttClient.SubscribeAsync("espresense/companion/+/attributes").ConfigureAwait(false);
                 await mqttClient.SubscribeAsync("espresense/companion/lease/+").ConfigureAwait(false);
             }

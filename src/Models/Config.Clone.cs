@@ -23,6 +23,7 @@ namespace ESPresense.Models
                 ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
                 History = History.Clone(),
                 Locators = Locators.Clone(),
+                RoomLearning = new RoomLearningConfig { Enabled = RoomLearning.Enabled },
                 Optimization = Optimization.Clone()
             };
         }
@@ -39,7 +40,27 @@ namespace ESPresense.Models
                 Bfgs = Bfgs.Clone(),
                 Mle = Mle.Clone(),
                 MultiFloor = MultiFloor.Clone(),
-                NearestNode = NearestNode.Clone()
+                NearestNode = NearestNode.Clone(),
+                Fingerprint = Fingerprint.Clone()
+            };
+        }
+    }
+
+    public partial class FingerprintConfig
+    {
+        public FingerprintConfig Clone()
+        {
+            return new FingerprintConfig
+            {
+                Enabled = Enabled,
+                Floors = Floors?.ToArray(),
+                File = File,
+                Mode = Mode,
+                Bandwidth = Bandwidth,
+                Top = Top,
+                K = K,
+                MinCommon = MinCommon,
+                MissingRssi = MissingRssi
             };
         }
     }

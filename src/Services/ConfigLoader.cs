@@ -20,6 +20,7 @@ public class ConfigLoader : BackgroundService
     /// Use <see cref="ConfigAsync"/> to wait for it, or subscribe to <see cref="ConfigChanged"/>.
     /// </summary>
     public Config? Config { get; private set; }
+    public string ConfigDirectory { get; }
 
     /// <summary>
     /// Raised after every successful parse of config.yaml (including the first). Every handler is
@@ -34,6 +35,7 @@ public class ConfigLoader : BackgroundService
     /// </summary>
     public ConfigLoader(string configDir)
     {
+        ConfigDirectory = configDir;
         _configPath = Path.Combine(configDir, "config.yaml");
         _deserializer = new DeserializerBuilder()
             .IgnoreUnmatchedProperties()
