@@ -358,7 +358,7 @@ public sealed class FingerprintSurface
             scored[i] = (used == 0 ? double.PositiveInfinity : chi2, db, i);
         }
 
-        var top = scored.Where(t => double.IsFinite(t.Chi2)).OrderBy(t => t.Chi2).Take(best).ToArray();
+        var top = scored.Where(t => double.IsFinite(t.Chi2)).OrderBy(t => t.Chi2).Take(Math.Max(1, best)).ToArray();
         if (top.Length == 0) return null;
         var w = top.Select(t => 1 / (t.Db + 0.5)).ToArray();
         var ws = w.Sum();
