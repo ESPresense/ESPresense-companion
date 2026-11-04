@@ -36,6 +36,13 @@ public sealed class CsiMotionTracker
     // guess at a duration instead of just counting what already arrived.
     private const int ConsecutiveWindowsForMotion = 2;
 
+    // A node that stops publishing csi_variance (offline, removed, firmware hang) must not leave its
+    // room stuck "in motion" forever -- only Observe() clears _consecutiveElevated, and that only runs
+    // when a new reading arrives. 30s (6 missed 5s reports) is a placeholder: wide enough to ride out a
+    // couple of dropped packets, tight enough to clear a genuinely offline node promptly. Tune against
+    // the real csi_variance cadence once it's observed in the field.
+    private static readonly TimeSpan MotionInactivityTimeout = TimeSpan.FromSeconds(30);
+
     private readonly object _gate = new();
     private readonly Dictionary<string, Queue<(DateTime At, double Value)>> _window = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _consecutiveElevated = new(StringComparer.OrdinalIgnoreCase);
@@ -79,17 +86,24 @@ public sealed class CsiMotionTracker
         return window.Select(s => s.Value).Percentile((int)BaselinePercentile);
     }
 
-    /// <summary>The node's current motion read-out, or null if the node has never reported.</summary>
-    public NodeMotion? GetMotion(string nodeId)
+    /// <summary>
+    /// The node's current motion read-out as of <paramref name="now"/>, or null if the node has never
+    /// reported. <paramref name="now"/> is taken from the caller (ultimately <see cref="CsiFusionService.Tick"/>'s
+    /// own deterministic clock) rather than read from wall-clock here, so a fixture or test driving the
+    /// tracker with historical timestamps does not have every reading spuriously expire against the real
+    /// current time.
+    /// </summary>
+    public NodeMotion? GetMotion(string nodeId, DateTime now)
     {
         lock (_gate)
         {
             if (!_window.TryGetValue(nodeId, out var q) || q.Count == 0) return null;
-            var current = q.Last().Value;
+            var last = q.Last();
             var baseline = Baseline(q);
-            var score = baseline > 0 ? current / baseline : 1.0;
-            var isMotion = _consecutiveElevated.GetValueOrDefault(nodeId) >= ConsecutiveWindowsForMotion;
-            return new NodeMotion(current, baseline, score, isMotion);
+            var score = baseline > 0 ? last.Value / baseline : 1.0;
+            var isMotion = _consecutiveElevated.GetValueOrDefault(nodeId) >= ConsecutiveWindowsForMotion
+                && now - last.At <= MotionInactivityTimeout;
+            return new NodeMotion(last.Value, baseline, score, isMotion);
         }
     }
 }

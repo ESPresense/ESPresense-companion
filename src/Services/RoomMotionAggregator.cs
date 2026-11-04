@@ -14,7 +14,7 @@ public readonly record struct RoomMotion(string RoomId, double MaxScore, bool Mo
 /// </summary>
 public static class RoomMotionAggregator
 {
-    public static Dictionary<string, RoomMotion> Compute(State state, CsiMotionTracker tracker, ILogger? logger = null)
+    public static Dictionary<string, RoomMotion> Compute(State state, CsiMotionTracker tracker, DateTime now, ILogger? logger = null)
     {
         var byRoom = new Dictionary<string, (double MaxScore, bool Motion, List<string> Nodes)>(StringComparer.OrdinalIgnoreCase);
 
@@ -27,7 +27,7 @@ public static class RoomMotionAggregator
                 continue;
             }
 
-            var motion = tracker.GetMotion(node.Id);
+            var motion = tracker.GetMotion(node.Id, now);
             if (motion == null) continue; // node has never reported csi_variance
 
             if (!byRoom.TryGetValue(room.Id, out var agg))

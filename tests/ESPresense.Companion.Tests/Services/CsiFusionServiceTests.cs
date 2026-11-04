@@ -328,4 +328,35 @@ public class CsiFusionServiceTests
         var second = _fusion.Tick(now.AddSeconds(7));
         Assert.That(second, Is.Empty, "an unchanged occupancy snapshot must not be reported as changed");
     }
+
+    [Test]
+    public void Tick_WhenDisabledAtRuntime_ClearsFusedRoomAndPublishesClearedOccupancy()
+    {
+        // A config reload updates this already-running CsiFusionService in place rather than
+        // restarting it, so disabling csi_fusion.enabled at runtime must actively clear state.
+        var floor = BuildFloor("first", Square("Office", 0, 0, 4, 4));
+        var office = RoomById("first", "office");
+        AddCsiNode("office-node", new Point3D(1, 1, 1), floor);
+
+        var now = DateTime.UtcNow;
+        for (var i = 0; i < 20; i++)
+            _tracker.Observe("office-node", 10, now.AddSeconds(-200 + i * 5));
+
+        var officeScenario = MakeScenario(office, 0.9);
+        var device = AddDevice("dev-1", office, officeScenario);
+
+        _tracker.Observe("office-node", 100, now.AddSeconds(1));
+        _tracker.Observe("office-node", 100, now.AddSeconds(2));
+        var occupied = _fusion.Tick(now.AddSeconds(2));
+        Assert.That(occupied.Single(o => o.RoomId == "office").Occupied, Is.True);
+        Assert.That(_fusion.CurrentOccupancy["office"].Occupied, Is.True);
+
+        _state.Config!.CsiFusion.Enabled = false;
+        var cleared = _fusion.Tick(now.AddSeconds(4));
+
+        Assert.That(cleared.Single().RoomId, Is.EqualTo("office"));
+        Assert.That(cleared.Single().Occupied, Is.False, "disabling fusion must publish a cleared (OFF) snapshot, not just stop updating");
+        Assert.That(_fusion.CurrentOccupancy, Is.Empty, "disabled fusion must not keep serving stale occupancy from CurrentOccupancy/GET /api/state/rooms");
+        Assert.That(device.FusedRoom, Is.Null, "disabling fusion must release any tie-break/damping override back to BestScenario");
+    }
 }

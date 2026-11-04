@@ -30,6 +30,13 @@
     "unknown": false
   },
   {
+    "timestamp": "2026-11-03T18:20:00.0000000\u002B00:00",
+    "room": "laundry",
+    "occupied": false,
+    "who": [],
+    "unknown": false
+  },
+  {
     "timestamp": "2026-11-03T18:20:05.0000000\u002B00:00",
     "room": "office",
     "occupied": true,

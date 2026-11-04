@@ -78,7 +78,7 @@ public class RoomMotionAggregatorTests
         _tracker.Observe("laundry-a", 10, start.AddSeconds(100));
         _tracker.Observe("laundry-b", 50, start.AddSeconds(100));
 
-        var byRoom = RoomMotionAggregator.Compute(_state, _tracker);
+        var byRoom = RoomMotionAggregator.Compute(_state, _tracker, start.AddSeconds(100));
 
         Assert.That(byRoom.ContainsKey("laundry"), Is.True);
         Assert.That(byRoom["laundry"].MaxScore, Is.EqualTo(5.0).Within(0.01));
@@ -95,7 +95,7 @@ public class RoomMotionAggregatorTests
         _tracker.Observe("hallway", 10, start);
 
         Dictionary<string, RoomMotion>? byRoom = null;
-        Assert.DoesNotThrow(() => byRoom = RoomMotionAggregator.Compute(_state, _tracker));
+        Assert.DoesNotThrow(() => byRoom = RoomMotionAggregator.Compute(_state, _tracker, start));
 
         Assert.That(byRoom, Is.Not.Null);
         Assert.That(byRoom!.Count, Is.EqualTo(0));
@@ -114,7 +114,7 @@ public class RoomMotionAggregatorTests
         _tracker.Observe("laundry-a", 100, start.AddSeconds(100));
         _tracker.Observe("laundry-a", 100, start.AddSeconds(105));
 
-        var byRoom = RoomMotionAggregator.Compute(_state, _tracker);
+        var byRoom = RoomMotionAggregator.Compute(_state, _tracker, start.AddSeconds(105));
 
         Assert.That(byRoom["laundry"].Motion, Is.True);
     }

@@ -45,7 +45,12 @@ public sealed class CsiFusionService(
     private readonly Dictionary<string, bool> _roomMotionPrev = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTime> _motionStartedAt = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<string>> _who = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, RoomOccupancy> _lastOccupancy = new(StringComparer.OrdinalIgnoreCase);
+
+    // Written only from the tick thread (ExecuteAsync/RunTickAsync), but read concurrently from request
+    // threads via CurrentOccupancy (StateController.GetRooms). A plain Dictionary enumerated by one
+    // thread while another writes it can throw InvalidOperationException or hand back a torn read; the
+    // other dictionaries above are tick-thread-only and don't need this.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, RoomOccupancy> _lastOccupancy = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Current occupancy for every CSI-mapped room, as of the last tick.</summary>
     public IReadOnlyDictionary<string, RoomOccupancy> CurrentOccupancy => _lastOccupancy;
@@ -56,9 +61,30 @@ public sealed class CsiFusionService(
     /// <summary>Runs one fusion pass and returns the rooms whose occupancy changed since the previous tick.</summary>
     internal List<RoomOccupancy> Tick(DateTime now)
     {
-        if (!Enabled) return [];
+        if (!Enabled)
+        {
+            // A config reload updates this already-running service in place rather than restarting it, so
+            // disabling fusion at runtime must actively clear state, not just stop updating it: otherwise
+            // Device.FusedRoom stays pinned to its last value and CurrentOccupancy/HA keep reporting the
+            // last-known occupancy forever. Returning the cleared snapshots routes them through the normal
+            // RunTickAsync publish path, so HA's retained topic also gets the OFF it's expecting.
+            foreach (var device in state.Devices.Values)
+                device.FusedRoom = null;
 
-        var roomMotion = RoomMotionAggregator.Compute(state, tracker, logger);
+            var cleared = _lastOccupancy.Values
+                .Select(a => new RoomOccupancy(a.RoomId, a.RoomName, false, Array.Empty<string>(), false))
+                .ToList();
+
+            _committedRoomId.Clear();
+            _pendingChange.Clear();
+            _roomMotionPrev.Clear();
+            _motionStartedAt.Clear();
+            _who.Clear();
+            _lastOccupancy.Clear();
+            return cleared;
+        }
+
+        var roomMotion = RoomMotionAggregator.Compute(state, tracker, now, logger);
 
         foreach (var device in state.Devices.Values)
             DecideDeviceRoom(device, roomMotion, now);
