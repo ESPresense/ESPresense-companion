@@ -120,6 +120,13 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "fusion-validate")
+        {
+            int exit = ESPresense.Simulation.FusionValidation.FusionValidationCli.Run(args.Skip(1).ToArray());
+            Environment.Exit(exit);
+            return;
+        }
+
         Console.WriteLine("ESPresense Multilateration Algorithm Comparison");
         Console.WriteLine("================================================");
         Console.WriteLine("Testing actual ILocate implementations from ESPresense.Companion\n");
@@ -128,7 +135,8 @@ class Program
         Console.WriteLine("  Run 'dotnet run weightings' to compare weighting schemes");
         Console.WriteLine("  Run 'dotnet run multifloor' to test multi-floor confidence");
         Console.WriteLine("  Pipe a JSON request to 'dotnet run locate' to call ILocate as a CLI");
-        Console.WriteLine("  Run 'dotnet run accuracy baseline' for the public accuracy baseline (real ILocate)\n");
+        Console.WriteLine("  Run 'dotnet run accuracy baseline' for the public accuracy baseline (real ILocate)");
+        Console.WriteLine("  Run 'dotnet run fusion-validate --ha-history FILE --fusion-events FILE' to score CSI+BLE fusion output against HA history (ESPA-463)\n");
         
         // Test scenarios
         var scenarios = new (string Name, Action<MultilaterationSimulator> Configure)[]
