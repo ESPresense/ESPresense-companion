@@ -4,7 +4,6 @@ using ESPresense.Services;
 using MQTTnet.Diagnostics.Logger;
 using Serilog;
 using Serilog.Events;
-using System.Text.Json.Serialization;
 using ESPresense.Optimizers;
 using ESPresense.Controllers;
 using ESPresense.Utils;
@@ -68,13 +67,11 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTe
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
-builder.Services.AddControllersWithViews().AddJsonOptions(opt =>
-{
-    opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    opt.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
-});
+builder.Services.AddSingleton<CalibrationService>();
+builder.Services.AddSingleton<DeviceEnricher>();
+builder.Services.AddControllersWithViews().AddJsonOptions(opt => RestJson.Configure(opt.JsonSerializerOptions));
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(o => o.SchemaFilter<CalibrationCellSchemaFilter>());
 builder.Services.AddHealthChecks();
 
 builder.Services.AddMcpServer(options =>

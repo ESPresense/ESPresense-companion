@@ -52,7 +52,9 @@ public class StateControllerConfigRedactionTests
             deviceSettingsStore.Object,
             nodeTelemetryStore,
             new NodeStateMapper(nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
-            new GlobalEventDispatcher());
+            new GlobalEventDispatcher(),
+            new CalibrationService(state, nodeSettingsStore.Object),
+            new DeviceEnricher(deviceSettingsStore.Object));
 
         // Call the real action method.
         var config = controller.GetConfig();

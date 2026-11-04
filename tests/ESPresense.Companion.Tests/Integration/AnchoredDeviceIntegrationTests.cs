@@ -244,7 +244,9 @@ public class AnchoredDeviceIntegrationTests
             _deviceSettingsStore,
             _nodeTelemetryStore,
             new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
-            Mock.Of<GlobalEventDispatcher>()
+            Mock.Of<GlobalEventDispatcher>(),
+            new CalibrationService(_state, mockNodeSettingsStore.Object),
+            new DeviceEnricher(_deviceSettingsStore)
         );
 
         // Act
@@ -306,7 +308,9 @@ public class AnchoredDeviceIntegrationTests
             _deviceSettingsStore,
             _nodeTelemetryStore,
             new NodeStateMapper(_nodeTelemetryStore, Mock.Of<IFirmwareTypeStore>()),
-            Mock.Of<GlobalEventDispatcher>()
+            Mock.Of<GlobalEventDispatcher>(),
+            new CalibrationService(_state, mockNodeSettingsStore.Object),
+            new DeviceEnricher(_deviceSettingsStore)
         );
 
         // Act
