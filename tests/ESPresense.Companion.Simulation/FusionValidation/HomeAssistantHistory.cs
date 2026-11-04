@@ -84,10 +84,17 @@ public static class HaHistoryClient
         foreach (var seriesNode in root)
         {
             if (seriesNode is not JsonArray series) continue;
+            // minimal_response (see FetchAsync) carries entity_id only on the first row of each series --
+            // every other row has just state/last_changed. Without carrying the id forward, Parse used to
+            // drop almost every transition from a live pull while a round-tripped (SaveToFile'd) file hid
+            // the bug by writing entity_id on every row. Rows before the first entity_id in a series are
+            // still skipped, which matches HA's actual output (entity_id is always on the first row).
+            string? seriesEntityId = null;
             foreach (var rowNode in series)
             {
                 if (rowNode is not JsonObject row) continue;
-                var entityId = row["entity_id"]?.GetValue<string>();
+                var entityId = row["entity_id"]?.GetValue<string>() ?? seriesEntityId;
+                seriesEntityId = entityId;
                 var state = row["state"]?.GetValue<string>();
                 var lastChanged = row["last_changed"]?.GetValue<string>();
                 if (entityId is null || state is null || lastChanged is null) continue;

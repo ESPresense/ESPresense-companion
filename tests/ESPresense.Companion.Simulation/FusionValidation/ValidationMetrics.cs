@@ -129,10 +129,24 @@ public static class ValidationMetrics
         GroundTruth groundTruth,
         TimeSpan searchWindow)
     {
+        // CsiFusionService.Tick emits a snapshot on any change, including Who/Unknown changing while a
+        // room stays occupied -- so naively keeping every Occupied==true event (as this used to) counts
+        // those as additional "starts" too. Keep only rising edges: an occupied event whose room's
+        // previous event was not occupied. The synthetic fixture has one rising edge per room and so
+        // never caught this; real data, with devices joining/leaving mid-episode, does.
         var fusionStarts = events
-            .Where(e => e.Occupied)
             .GroupBy(e => e.Room)
-            .ToDictionary(g => g.Key, g => g.OrderBy(e => e.Timestamp).Select(e => e.Timestamp).ToList());
+            .ToDictionary(g => g.Key, g =>
+            {
+                var starts = new List<DateTimeOffset>();
+                var wasOccupied = false;
+                foreach (var e in g.OrderBy(e => e.Timestamp))
+                {
+                    if (e.Occupied && !wasOccupied) starts.Add(e.Timestamp);
+                    wasOccupied = e.Occupied;
+                }
+                return starts;
+            });
 
         var samples = new List<LatencySample>();
         foreach (var interval in groundTruth.RoomOccupancy)

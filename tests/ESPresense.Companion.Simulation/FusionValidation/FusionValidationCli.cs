@@ -71,6 +71,16 @@ public static class FusionValidationCli
             PrintUsage();
             return 2;
         }
+        catch (Exception ex) when (ex is IOException or FormatException or System.Text.Json.JsonException or InvalidOperationException or NullReferenceException)
+        {
+            // Covers the common bad-input shapes this CLI otherwise lets escape as a raw stack trace:
+            // a missing --ha-history/--fusion-events file (IOException), a malformed --flap timestamp or
+            // --latency-window-minutes number (FormatException), invalid JSON (JsonException), or a
+            // fusion event missing timestamp/room/occupied (NullReferenceException from FusionEventLog's
+            // required-field dereferences).
+            Console.Error.WriteLine($"fusion-validate failed: {ex.Message}");
+            return 1;
+        }
     }
 
     internal static string RoomFromOccupancyEntity(string entityId)

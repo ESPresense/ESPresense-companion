@@ -113,6 +113,28 @@ public class ValidationMetricsTests
     }
 
     [Test]
+    public void Latency_matches_the_rising_edge_not_a_mid_occupancy_Who_change()
+    {
+        // CsiFusionService.Tick emits a snapshot on any change, including Who/Unknown changing
+        // while a room stays occupied. A naive "keep every Occupied==true event" implementation
+        // picks whichever of those lands closest to the HA transition instead of the real start --
+        // the synthetic single-rising-edge fixtures never exercised this, real data does.
+        var groundTruth = new GroundTruth();
+        groundTruth.RoomOccupancy.Add(new RoomOccupancyInterval("office", T("21:17:00"), null));
+
+        var events = new List<FusionRoomEvent>
+        {
+            new(T("21:16:30"), "office", true, Array.Empty<string>(), true),       // real rising edge
+            new(T("21:16:59"), "office", true, new[] { "alice" }, false),           // same episode: Who changed
+        };
+
+        var samples = ValidationMetrics.Latency(events, groundTruth, TimeSpan.FromMinutes(10));
+
+        Assert.That(samples[0].FusionTransitionAt, Is.EqualTo(T("21:16:30")),
+            "must match the rising edge (21:16:30), not the later mid-episode event that only changed Who");
+    }
+
+    [Test]
     public void Latency_leaves_no_match_when_nothing_falls_within_the_search_window()
     {
         var groundTruth = new GroundTruth();
