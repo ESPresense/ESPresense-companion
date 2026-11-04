@@ -44,6 +44,9 @@ public class Scenario(Config? config, ILocate locator, string? name)
     /// </summary>
     [JsonIgnore] public Point3D Fit { get; private set; }
 
+    /// <summary>When <see cref="Fit"/> was last set; a pass that found no fix leaves it alone</summary>
+    [JsonIgnore] public DateTime? FitAt { get; private set; }
+
     /// <summary>
     /// What the latest locator pass used; replaced whole so a reader never sees half a pass
     /// </summary>
@@ -82,6 +85,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
         LastHit = DateTime.UtcNow;
         LastLocation = Location;
         Fit = newLocation;
+        FitAt = DateTime.UtcNow;
 
         // Use the KalmanLocation to get a filtered position
         _kalmanLocation.Update(newLocation);
@@ -92,6 +96,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
         LastHit = DateTime.UtcNow;
         LastLocation = newLocation;
         Fit = newLocation;
+        FitAt = DateTime.UtcNow;
         _kalmanLocation.Reset(newLocation);
     }
 }

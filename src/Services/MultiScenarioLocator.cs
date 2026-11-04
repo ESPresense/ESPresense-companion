@@ -90,14 +90,17 @@ public class MultiScenarioLocator(DeviceTracker dl,
         // -----------------------------------------------------------------
         // 1. Refresh all scenarios -------------------------------------------------
         // -----------------------------------------------------------------
-        device.LastCalculated = DateTime.UtcNow;
+        var passStart = DateTime.UtcNow;
+        device.LastCalculated = passStart;
         var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
 
         // -----------------------------------------------------------------
         // 2. Feed Kalman with the scenario that has the highest raw Confidence
         // -----------------------------------------------------------------
+        // Only a fix found on this pass: a scenario stays Current while one node still hears the device, and
+        // feeding its old fit again would count it twice and keep the filter from starting over after a gap.
         var kalmanSource = device.Scenarios
-            .Where(s => s.Current)
+            .Where(s => s.Current && s.Confidence > 0 && s.FitAt >= passStart)
             .OrderByDescending(s => s.Confidence)
             .FirstOrDefault();
 

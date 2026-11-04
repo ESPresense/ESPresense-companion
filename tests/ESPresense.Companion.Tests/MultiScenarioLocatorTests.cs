@@ -102,6 +102,56 @@ public class MultiScenarioLocatorTests
         Assert.That(device.Location?.X, Is.EqualTo(10).Within(1e-6));
     }
 
+    private class FixThenNoFix(Point3D fit) : ILocate
+    {
+        public int Passes;
+
+        public bool Locate(Scenario scenario)
+        {
+            if (Passes++ == 0)
+            {
+                scenario.Confidence = 100;
+                scenario.UpdateLocation(fit);
+                return true;
+            }
+
+            // One node still hears it, so the scenario stays Current, but there's no fix this pass
+            scenario.Confidence = 0;
+            scenario.LastHit = DateTime.UtcNow;
+            return false;
+        }
+    }
+
+    [Test]
+    public async Task DeviceFilterIsNotFedAnOldFitAgainWhenAPassFindsNoFix()
+    {
+        var workDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg");
+        Directory.CreateDirectory(workDir);
+        var configLoader = new ConfigLoader(workDir);
+        var mqttMock = new Mock<MqttCoordinator>(configLoader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(),
+            new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
+        mqttMock.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
+        var state = new State(configLoader, new NodeTelemetryStore(mqttMock.Object));
+        var tracker = new DeviceTracker(state, mqttMock.Object, new TelemetryService(mqttMock.Object), new GlobalEventDispatcher(),
+            new DeviceSettingsStore(mqttMock.Object, state));
+        var locator = new MultiScenarioLocator(tracker, state, mqttMock.Object, new GlobalEventDispatcher(),
+            new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader), new Mock<ILeaseService>().Object);
+
+        var device = new Device("id", null, TimeSpan.FromSeconds(30));
+        var scenario = new Scenario(null, new FixThenNoFix(new Point3D(3, 4, 0)), "kitchen");
+        device.Scenarios.Add(scenario);
+
+        await locator.ProcessDevice(device);
+        var (_, afterFix) = device.KalmanFilter.GetPrediction();
+        await Task.Delay(20);
+        await locator.ProcessDevice(device);
+        var (_, afterNoFix) = device.KalmanFilter.GetPrediction();
+
+        // Fed again, the filter would grow surer of the old fix; left alone, it only grows less sure as time passes
+        Assert.That(scenario.Current, Is.True);
+        Assert.That(afterNoFix[0, 0], Is.GreaterThanOrEqualTo(afterFix[0, 0]));
+    }
+
     [Test]
     public async Task AnchoredDevicePublishesFixedAttributes()
     {
