@@ -4,7 +4,6 @@ using STJ = System.Text.Json.Serialization;
 using ESPresense.Converters;
 using ESPresense.Extensions;
 using MathNet.Spatial.Euclidean;
-using Newtonsoft.Json;
 
 namespace ESPresense.Models;
 
@@ -46,7 +45,6 @@ public class Device
     [STJ.JsonIgnore] public DeviceAnchor? Anchor { get; private set; }
 
     [STJ.JsonPropertyName("isAnchored")]
-    [JsonProperty("isAnchored")]
     public bool IsAnchored => Anchor != null;
 
     [STJ.JsonConverter(typeof(DeviceToNodeConverter))]

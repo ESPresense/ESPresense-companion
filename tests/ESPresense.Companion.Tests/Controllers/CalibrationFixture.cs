@@ -23,8 +23,8 @@ public sealed class CalibrationFixture : IAsyncDisposable
     public NodeTelemetryStore NodeTelemetry { get; }
     private readonly string _configDir;
 
-    /// <summary>The options REST responses use: the same <see cref="global::ESPresense.Utils.RestJson"/> Program.cs applies.</summary>
-    public static readonly JsonSerializerOptions RestJson = global::ESPresense.Utils.RestJson.Create();
+    /// <summary>The options REST responses use: the same <see cref="global::ESPresense.Utils.JsonDefaults.Web"/> Program.cs applies.</summary>
+    public static readonly JsonSerializerOptions RestJson = global::ESPresense.Utils.JsonDefaults.Web;
 
     private CalibrationFixture(string configDir)
     {

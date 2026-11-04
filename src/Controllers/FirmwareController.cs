@@ -1,3 +1,4 @@
+using ESPresense.Utils;
 using System.IO.Compression;
 using System.Net.WebSockets;
 using System.Text;
@@ -109,11 +110,15 @@ public class FirmwareController : Controller
         async Task Log(string message, int percent)
         {
             _logger.LogInformation("[{per}] {msg}", percent, message);
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { percentComplete = percent, message = message });
+            var json = ProgressMessage(percent, message);
             var buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(json));
             await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
         }
     }
+
+    /// <summary>A firmware-update progress frame sent over the update WebSocket.</summary>
+    internal static string ProgressMessage(int percent, string message) =>
+        System.Text.Json.JsonSerializer.Serialize(new { percentComplete = percent, message = message }, JsonDefaults.Verbatim);
 
     private async Task<MemoryStream> GetFirmware(string url)
     {

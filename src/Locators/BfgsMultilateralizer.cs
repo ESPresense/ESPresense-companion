@@ -5,7 +5,6 @@ using ESPresense.Weighting;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
-using Serilog;
 
 namespace ESPresense.Locators;
 
@@ -13,8 +12,8 @@ public class BfgsMultilateralizer : BaseMultilateralizer
 {
     private readonly IWeighting _weighting;
 
-    public BfgsMultilateralizer(Device device, Floor floor, State state)
-        : base(device, floor, state)
+    public BfgsMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null)
+        : base(device, floor, state, logger)
     {
         // Load weighting from BFGS config, defaulting to Gaussian if not specified
         _weighting = WeightingFactory.Create(state.Config?.Locators?.Bfgs?.Weighting);

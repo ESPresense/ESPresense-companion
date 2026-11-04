@@ -48,7 +48,7 @@ public class McpResources
         _firmwareCatalog = firmwareCatalog;
         _mapper = mapper;
         // Exactly the REST settings, so a tool returns the same JSON as the matching /api endpoint.
-        _jsonOptions = RestJson.Create();
+        _jsonOptions = JsonDefaults.Web;
     }
 
     [McpServerResource(UriTemplate = "state://config", Name = "Application Configuration", MimeType = "application/json")]

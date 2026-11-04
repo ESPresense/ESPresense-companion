@@ -112,7 +112,7 @@ public class CalibrationCellTests
     {
         var generator = new SchemaGenerator(
             new SchemaGeneratorOptions { SchemaFilters = { new CalibrationCellSchemaFilter() } },
-            new JsonSerializerDataContractResolver(RestJson.Create()));
+            new JsonSerializerDataContractResolver(JsonDefaults.Web));
         var repo = new SchemaRepository();
         generator.GenerateSchema(typeof(CalibrationCell), repo);
 

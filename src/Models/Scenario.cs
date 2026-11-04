@@ -1,7 +1,7 @@
 ﻿using ESPresense.Locators;
 using MathNet.Numerics.Optimization;
 using MathNet.Spatial.Euclidean;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace ESPresense.Models;
 

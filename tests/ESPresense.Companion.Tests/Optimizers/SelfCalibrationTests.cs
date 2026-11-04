@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using ESPresense.Companion.Tests.Locators;
 using ESPresense.Models;
@@ -153,7 +154,7 @@ public class SelfCalibrationTests
         };
         var os = Synth(nodes, _ => 3.0, id => bias[id]);
 
-        var results = new IsotonicRegressionOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+        var results = new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
 
         Assert.That(results.Nodes.Keys, Is.EquivalentTo(nodes.Keys), "every receiver should get a proposal");
         foreach (var (id, p) in results.Nodes)
@@ -180,7 +181,7 @@ public class SelfCalibrationTests
         };
         var os = Synth(nodes, _ => 3.0, id => bias[id], noiseSd: 2.0, seed: 42, repeats: 3);
 
-        var results = new IsotonicRegressionOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+        var results = new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
 
         var before = MedianRangeError(os, null);
         var after = MedianRangeError(os, results);
@@ -204,7 +205,7 @@ public class SelfCalibrationTests
         var nodes = MakeNodes();
         var os = Synth(nodes, _ => 6.0, id => id == "n05" ? 40 : 0, noiseSd: 1.0, seed: 7);
 
-        var results = new IsotonicRegressionOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+        var results = new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
 
         Assert.That(results.Nodes, Is.Not.Empty);
         foreach (var (id, p) in results.Nodes)
@@ -232,7 +233,7 @@ public class SelfCalibrationTests
         var mid = MidAbsorption;
         var os = Synth(nodes, _ => mid, id => bias[id], noiseSd: 1.0, seed: 11, repeats: 3);
 
-        var results = new RxAdjRssiOptimizer(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+        var results = new RxAdjRssiOptimizer(_state, NullLogger<RxAdjRssiOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
 
         Assert.That(results.Nodes.Keys, Is.EquivalentTo(nodes.Keys));
         foreach (var (id, p) in results.Nodes)
@@ -256,7 +257,7 @@ public class SelfCalibrationTests
         };
         var os = Synth(nodes, _ => 3.0, id => bias[id], noiseSd: 1.0, seed: 23);
 
-        var results = new PerNodeAbsorptionRxTx(_state).Optimize(os, new Dictionary<string, NodeSettings>());
+        var results = new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
 
         var before = MedianRangeError(os, null);
         var after = MedianRangeError(os, results);
@@ -318,18 +319,18 @@ public class SelfCalibrationTests
         var nss = new NodeSettingsStore(mqtt.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<NodeSettingsStore>>());
         var runner = new OptimizationRunner(_state, nss,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<OptimizationRunner>.Instance,
-            _configLoader, Mock.Of<ILeaseService>());
+            _configLoader, Mock.Of<ILeaseService>(), NullLoggerFactory.Instance);
         return (runner, nss);
     }
 
     private IList<IOptimizer> MakeOptimizers(string mode) => mode == "per_node_absorption"
-        ? new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state) }
+        ? new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance) }
         : new List<IOptimizer>
         {
-            new RxAdjRssiOptimizer(_state),
+            new RxAdjRssiOptimizer(_state, NullLogger<RxAdjRssiOptimizer>.Instance),
             new AbsorptionAvgOptimizer(_state),
-            new AbsorptionErrOptimizer(_state),
-            new IsotonicRegressionOptimizer(_state),
+            new AbsorptionErrOptimizer(_state, NullLogger<AbsorptionErrOptimizer>.Instance),
+            new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance),
         };
 
     /// <summary>

@@ -3,7 +3,6 @@ using ESPresense.Models;
 using ESPresense.Utils;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Spatial.Euclidean;
-using Serilog;
 
 namespace ESPresense.Locators;
 
@@ -15,12 +14,15 @@ public abstract class BaseMultilateralizer : ILocate
     protected readonly Device Device;
     protected readonly Floor Floor;
     protected readonly State State;
+    protected readonly ILogger Logger;
 
-    protected BaseMultilateralizer(Device device, Floor floor, State state)
+    /// <param name="logger">Defaults to the transitional <see cref="DeferredLoggerFactory"/> while State builds locators without one (#1844).</param>
+    protected BaseMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null)
     {
         Device = device;
         Floor = floor;
         State = state;
+        Logger = logger ?? DeferredLoggerFactory.CreateLogger(GetType());
     }
 
     public abstract bool Locate(Scenario scenario);
@@ -158,7 +160,7 @@ public abstract class BaseMultilateralizer : ILocate
     protected int HandleLocatorException(Exception ex, Scenario scenario, Point3D fallbackGuess)
     {
         scenario.UpdateLocation(!double.IsNaN(fallbackGuess.X) ? fallbackGuess : new Point3D());
-        Log.Error("Error finding location for {Device}: {Message}", Device, ex.Message);
+        Logger.LogError("Error finding location for {Device}: {Message}", Device, ex.Message);
         return 0;
     }
 }

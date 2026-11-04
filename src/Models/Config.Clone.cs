@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using TextExtensions;
 using YamlDotNet.Serialization;
 using ESPresense.Extensions;

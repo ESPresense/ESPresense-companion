@@ -1,8 +1,8 @@
+using ESPresense.Utils;
 using ESPresense.Controllers;
 using ESPresense.Models;
 using ESPresense.Utils;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace ESPresense.Services;
 
@@ -111,7 +111,7 @@ public class DeviceService
         foreach (var device in _state.Devices.Values.Where(d => d.LastSeen == null).ToList())
         {
             // Only stamp once the stamp is persisted; otherwise the next pass retries rather than a restart resetting the clock.
-            var payload = JsonConvert.SerializeObject(new { last_seen = now });
+            var payload = MqttPayloads.LastSeen(now);
             if (!await _mqtt.TryEnqueueAsync(MqttTopics.DeviceAttributes(device.Id), payload, retain: true)) continue;
             device.LastSeen = now;
             stamped++;

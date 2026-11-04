@@ -8,7 +8,6 @@ using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
-using Serilog;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
 using ESPresense.Events;
@@ -133,11 +132,7 @@ public class StateController : ControllerBase
         ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
-            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-            {
-                NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
-            };
-            changes.Enqueue(JsonSerializer.Serialize(value, options));
+            changes.Enqueue(JsonSerializer.Serialize(value, JsonDefaults.WebSocket));
             newMessage.Set();
         }
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
@@ -210,7 +205,7 @@ public class StateController : ControllerBase
                     {
                         using var reader = new StreamReader(ms, Encoding.UTF8);
                         var message = await reader.ReadToEndAsync();
-                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, JsonDefaults.WebSocket);
 
                         if (command != null)
                         {
@@ -329,7 +324,7 @@ public class StateController : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to save auto-optimize setting");
+            _logger.LogError(ex, "Failed to save auto-optimize setting");
             return StatusCode(500, new { error = "Failed to save auto-optimize setting" });
         }
     }
