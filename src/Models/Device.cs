@@ -11,8 +11,6 @@ namespace ESPresense.Models;
 public class Device
 {
     private DateTime? _lastSeen;
-    private string? _reportedState;
-    private string? _lastReportedState;
 
     // Kalman filter for location smoothing (settings are shared globally)
     private readonly KalmanLocation _kalmanLocation = new();
@@ -40,8 +38,6 @@ public class Device
 
     public string Id { get; init; }
     public string? Name { get; set; }
-
-    [STJ.JsonIgnore] public Point3D ReportedLocation { get; set; }
 
     [STJ.JsonIgnore] public DeviceAnchor? Anchor { get; private set; }
 
@@ -90,23 +86,6 @@ public class Device
     [STJ.JsonIgnore] public DateTime? LastCalculated { get; set; }
 
     [STJ.JsonIgnore] public IList<AutoDiscovery> HassAutoDiscovery { get; set; } = new List<AutoDiscovery>();
-    [STJ.JsonIgnore]
-    public string? ReportedState
-    {
-        get => _reportedState;
-        set
-        {
-            _reportedState = value;
-            if (value == null || value == _lastReportedState) return; // null only forces a republish
-            PreviousReportedState = _lastReportedState;
-            ReportedStateChanged = DateTime.UtcNow;
-            _lastReportedState = value;
-        }
-    }
-
-    [STJ.JsonIgnore] public string? PreviousReportedState { get; private set; }
-    [STJ.JsonIgnore] public DateTime? ReportedStateChanged { get; private set; }
-
     [STJ.JsonConverter(typeof(TimeSpanMillisConverter))]
     public TimeSpan Timeout { get; set; }
 
@@ -153,10 +132,9 @@ public class Device
         if (anchor != null)
         {
             _kalmanLocation.Reset(anchor.Location);
+            // The locator republishes the Anchored attributes: DeviceStatePublisher remembers the last
+            // best_scenario, so this counts as a change even when room and position match.
             BestScenario = null;
-            // Forget what was published so the locator republishes state and the Anchored attributes,
-            // even when the anchor's room and position match the last located report.
-            ReportedState = null;
         }
         else
         {

@@ -63,7 +63,7 @@ public class DevicePublishContractTests
             var dss = new DeviceSettingsStore(Mqtt.Object, State);
             var tracker = new DeviceTracker(State, Mqtt.Object, tele, new GlobalEventDispatcher(), dss);
             var history = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), configLoader);
-            Locator = new MultiScenarioLocator(tracker, State, Mqtt.Object, new GlobalEventDispatcher(), history, new Mock<ILeaseService>().Object);
+            Locator = new MultiScenarioLocator(tracker, State, new DeviceStatePublisher(Mqtt.Object), new DeviceHistoryWriter(history, State), new GlobalEventDispatcher(), new Mock<ILeaseService>().Object, NullLogger<MultiScenarioLocator>.Instance);
 
             Floor.Update(Config, new ConfigFloor { Id = "f1", Name = "Floor One", Bounds = [[0, 0, 0], [10, 10, 3]] });
             Room.Update(Config, Floor, new ConfigRoom { Id = "r1", Name = "Room One", Points = [[0, 0], [5, 0], [5, 5], [0, 5]] });
@@ -282,7 +282,7 @@ public class MultiScenarioLocatorLeaseTests
                 return null;
             });
 
-        var locator = new MultiScenarioLocator(tracker, state, mqtt.Object, events, history, lease.Object);
+        var locator = new MultiScenarioLocator(tracker, state, new DeviceStatePublisher(mqtt.Object), new DeviceHistoryWriter(history, state), events, lease.Object, NullLogger<MultiScenarioLocator>.Instance);
 
         var first = new Device("test:first", null, TimeSpan.FromSeconds(30));
         var second = new Device("test:second", null, TimeSpan.FromSeconds(30));

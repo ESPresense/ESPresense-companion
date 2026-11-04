@@ -50,7 +50,8 @@ public class DeviceAliasIntegrationTests
             _deviceSettingsStore,
             _deviceService,
             _state,
-            captureService
+            captureService,
+            new DeviceStatePublisher(new Mock<IMqttCoordinator>().Object)
         );
     }
 

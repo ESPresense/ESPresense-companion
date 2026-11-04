@@ -243,10 +243,9 @@ public class DeviceExplanationTests
         _device.Scenarios.Add(scenario);
         _device.BestScenario = scenario;
 
-        _device.ReportedState = "Hall";
-        _device.ReportedState = "Kitchen";
+        var reported = new ReportedDeviceState(State: "Kitchen", PreviousState: "Hall");
 
-        var room = DeviceExplanation.From(_device).Room;
+        var room = DeviceExplanation.From(_device, reported: reported).Room;
 
         Assert.That(room.Room?.Name, Is.EqualTo("Kitchen"));
         Assert.That(room.Inside, Is.True);
@@ -255,17 +254,6 @@ public class DeviceExplanationTests
         Assert.That(room.NearestOtherDistance, Is.EqualTo(1).Within(1e-9));
         Assert.That(room.State, Is.EqualTo("Kitchen"));
         Assert.That(room.PreviousState, Is.EqualTo("Hall"));
-    }
-
-    [Test]
-    public void ReportedState_NullingToForceARepublishIsNotAStateChange()
-    {
-        _device.ReportedState = "Hall";
-        _device.ReportedState = "Kitchen";
-        _device.ReportedState = null;
-        _device.ReportedState = "Kitchen";
-
-        Assert.That(_device.PreviousReportedState, Is.EqualTo("Hall"));
     }
 
     [Test]
