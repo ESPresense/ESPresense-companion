@@ -1,3 +1,4 @@
+using ESPresense.Utils;
 using System.IO.Compression;
 using System.Net.WebSockets;
 using System.Text;
@@ -47,7 +48,7 @@ public class FirmwareController : Controller
     {
         if (!_firmwareUpdateJobs.IsTrustedFirmwareUrl(url))
         {
-            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            _logger.LogWarning("Attempted to download firmware from untrusted URL: {url}", LogSanitizer.Strip(url));
             return StatusCode(StatusCodes.Status400BadRequest, "Only ESPresense GitHub URLs are allowed");
         }
         try
@@ -58,12 +59,12 @@ public class FirmwareController : Controller
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Error downloading firmware from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            _logger.LogError(ex, "Error downloading firmware from {url}", LogSanitizer.Strip(url));
             return StatusCode(StatusCodes.Status502BadGateway, $"Failed to download firmware: {ex.Message}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing firmware download from {url}", url.Replace(Environment.NewLine, "").Replace("\n", "").Replace("\r", ""));
+            _logger.LogError(ex, "Error processing firmware download from {url}", LogSanitizer.Strip(url));
             return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing firmware: {ex.Message}");
         }
     }

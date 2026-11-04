@@ -1,3 +1,4 @@
+using ESPresense.Utils;
 using ESPresense.Controllers;
 using ESPresense.Models;
 using Microsoft.Extensions.Logging;
@@ -39,7 +40,7 @@ public class DeviceService
 
         if (!_state.Devices.TryRemove(deviceId, out var device))
         {
-            _logger.LogDebug("Device {DeviceId} not found for deletion", deviceId.Replace("\r", "").Replace("\n", ""));
+            _logger.LogDebug("Device {DeviceId} not found for deletion", LogSanitizer.Strip(deviceId));
             return false;
         }
 
