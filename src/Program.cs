@@ -67,7 +67,7 @@ builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
 builder.Services.AddSingleton<CalibrationService>();
 builder.Services.AddSingleton<DeviceEnricher>();
-builder.Services.AddControllersWithViews().AddJsonOptions(opt => RestJson.Configure(opt.JsonSerializerOptions));
+builder.Services.AddControllersWithViews().AddJsonOptions(opt => JsonDefaults.ConfigureWeb(opt.JsonSerializerOptions));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o => o.SchemaFilter<CalibrationCellSchemaFilter>());
 builder.Services.AddHealthChecks();

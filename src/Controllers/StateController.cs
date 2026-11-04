@@ -132,11 +132,7 @@ public class StateController : ControllerBase
         ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
         void EnqueueAndSignal<T>(T value)
         {
-            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-            {
-                NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
-            };
-            changes.Enqueue(JsonSerializer.Serialize(value, options));
+            changes.Enqueue(JsonSerializer.Serialize(value, JsonDefaults.WebSocket));
             newMessage.Set();
         }
         void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
@@ -209,7 +205,7 @@ public class StateController : ControllerBase
                     {
                         using var reader = new StreamReader(ms, Encoding.UTF8);
                         var message = await reader.ReadToEndAsync();
-                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, JsonDefaults.WebSocket);
 
                         if (command != null)
                         {

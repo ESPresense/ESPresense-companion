@@ -21,16 +21,8 @@ public class WireFormatTests
     // an apostrophe, non-ASCII letters, an emoji (surrogate pair), a quote, a backslash and control characters.
     private const string AwkwardName = "Kid's <Tag> & \"Ünïcode\" \\ 🙂\n\t\u0001";
 
-    // Mirrors of the inline options in Program.cs (MVC) and StateController (WebSocket) at the time of pinning.
-    private static readonly JsonSerializerOptions Rest = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter() },
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
-    };
-    private static readonly JsonSerializerOptions WebSocket = new(JsonSerializerDefaults.Web)
-    {
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
-    };
+    private static JsonSerializerOptions Rest => JsonDefaults.Web;
+    private static JsonSerializerOptions WebSocket => JsonDefaults.WebSocket;
 
     private static Device AnchoredDevice()
     {
@@ -128,7 +120,7 @@ public class WireFormatTests
     [Test]
     public void WebSocket_CommandIsReadCaseInsensitively()
     {
-        var command = JsonSerializer.Deserialize<WebSocketCommand>("""{"COMMAND":"changeFilter","type":"showAll","Value":"true"}""", new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var command = JsonSerializer.Deserialize<WebSocketCommand>("""{"COMMAND":"changeFilter","type":"showAll","Value":"true"}""", WebSocket);
         Assert.That(command!.Command, Is.EqualTo("changeFilter"));
         Assert.That(command.Type, Is.EqualTo("showAll"));
         Assert.That(command.Value, Is.EqualTo("true"));
