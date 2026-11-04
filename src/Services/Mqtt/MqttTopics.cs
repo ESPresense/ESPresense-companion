@@ -27,6 +27,7 @@ internal static class MqttTopics
     public const string TelemetrySegment = "telemetry";
     public const string StatusSegment = "status";
     public const string UpdateErrorSegment = "update_error";
+    public const string CsiVarianceSegment = "csi_variance";
     public const string SetSegment = "set";
     public const string ConfigSegment = "config";
     public const string AttributesSegment = "attributes";
@@ -35,6 +36,7 @@ internal static class MqttTopics
     public static string NodeTelemetry(string nodeId) => $"espresense/rooms/{nodeId}/telemetry";
     public static string NodeStatus(string nodeId) => $"espresense/rooms/{nodeId}/status";
     public static string NodeUpdateError(string nodeId) => $"espresense/rooms/{nodeId}/update_error";
+    public static string NodeCsiVariance(string nodeId) => $"espresense/rooms/{nodeId}/csi_variance";
     public static string NodeSetting(string nodeId, string setting) => $"espresense/rooms/{nodeId}/{setting}";
     public static string NodeSettingSet(string nodeId, string setting) => $"espresense/rooms/{nodeId}/{setting}/set";
     public static string DeviceMessage(string deviceId, string nodeId) => $"espresense/devices/{deviceId}/{nodeId}";

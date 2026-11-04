@@ -15,6 +15,7 @@ public class MqttTopicRouterTests
         yield return Case("espresense/rooms/node-1/telemetry", new NodeTelemetryRoute(T, "node-1"));
         yield return Case("espresense/rooms/node-1/status", new NodeStatusRoute(T, "node-1"));
         yield return Case("espresense/rooms/node-1/update_error", new NodeUpdateErrorRoute(T, "node-1"));
+        yield return Case("espresense/rooms/node-1/csi_variance", new NodeCsiVarianceRoute(T, "node-1"));
         yield return Case("espresense/rooms/node-1/absorption", new NodeSettingRoute(T, "node-1", "absorption"));
         yield return Case("espresense/rooms/*/absorption/set", new NodeSettingRoute(T, "*", "absorption"));
         yield return Case("espresense/rooms/*/telemetry", new NodeTelemetryRoute(T, "*"));
