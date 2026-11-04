@@ -65,7 +65,7 @@ public class LeaseService : ILeaseService, IDisposable
     const int leaseDurationSecs = 120;
     const int renewalIntervalSecs = 30;
 
-    private const string TopicPrefix = "espresense/companion/lease/";
+    private const string TopicPrefix = MqttTopics.CompanionLeasePrefix;
     private readonly IMqttCoordinator _mqtt;
     private readonly ILogger<LeaseService> _log;
     private readonly string _instanceId = $"{Environment.MachineName}-{Guid.NewGuid().ToString("N")[..8]}".ToLowerInvariant();

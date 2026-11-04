@@ -287,17 +287,17 @@ namespace ESPresense.Services
 
         public async Task Update(string id, string? url)
         {
-            await mqtt.EnqueueAsync($"espresense/rooms/{id}/update/set", url ?? "PRESS");
+            await mqtt.EnqueueAsync(MqttTopics.NodeSettingSet(id, "update"), url ?? "PRESS");
         }
 
         public async Task Arduino(string id, bool on)
         {
-            await mqtt.EnqueueAsync($"espresense/rooms/{id}/arduino_ota/set", on ? "ON" : "OFF");
+            await mqtt.EnqueueAsync(MqttTopics.NodeSettingSet(id, "arduino_ota"), on ? "ON" : "OFF");
         }
 
         public async Task Restart(string id)
         {
-            await mqtt.EnqueueAsync($"espresense/rooms/{id}/restart/set", "PRESS");
+            await mqtt.EnqueueAsync(MqttTopics.NodeSettingSet(id, "restart"), "PRESS");
         }
 
         /// <summary>
@@ -307,7 +307,7 @@ namespace ESPresense.Services
         /// <returns>A task that completes when the retained MQTT messages have been cleared and the in-memory entry removed.</returns>
         public async Task Delete(string id)
         {
-            await mqtt.ClearRetainedAsync($"espresense/rooms/{id}/#");
+            await mqtt.ClearRetainedAsync(MqttTopics.NodeAllTopicsFilter(id));
 
             _storeById.TryRemove(id, out _);
         }

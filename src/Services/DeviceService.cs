@@ -1,5 +1,6 @@
 using ESPresense.Controllers;
 using ESPresense.Models;
+using ESPresense.Utils;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -39,7 +40,7 @@ public class DeviceService
 
         if (!_state.Devices.TryRemove(deviceId, out var device))
         {
-            _logger.LogDebug("Device {DeviceId} not found for deletion", deviceId.Replace("\r", "").Replace("\n", ""));
+            _logger.LogDebug("Device {DeviceId} not found for deletion", LogSanitizer.Strip(deviceId));
             return false;
         }
 
@@ -111,7 +112,7 @@ public class DeviceService
         {
             // Only stamp once the stamp is persisted; otherwise the next pass retries rather than a restart resetting the clock.
             var payload = JsonConvert.SerializeObject(new { last_seen = now });
-            if (!await _mqtt.TryEnqueueAsync($"espresense/companion/{device.Id}/attributes", payload, retain: true)) continue;
+            if (!await _mqtt.TryEnqueueAsync(MqttTopics.DeviceAttributes(device.Id), payload, retain: true)) continue;
             device.LastSeen = now;
             stamped++;
         }
@@ -164,8 +165,8 @@ public class DeviceService
 
         foreach (var topic in new[]
         {
-            $"espresense/companion/{device.Id}",
-            $"espresense/companion/{device.Id}/attributes"
+            MqttTopics.CompanionDeviceState(device.Id),
+            MqttTopics.DeviceAttributes(device.Id)
         })
         {
             try

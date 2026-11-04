@@ -6,7 +6,7 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace ESPresense.Companion.Tests.Services;
 
 /// <summary>
-/// Covers the read-only decision of <see cref="MqttCoordinator"/> (explicit mqtt.read_only flag plus the
+/// Covers the MQTT read-only decision (<see cref="MqttReadOnly"/>) (explicit mqtt.read_only flag plus the
 /// legacy client-id heuristic) and the config plumbing behind it. The connection paths themselves
 /// need a broker and are not covered here.
 /// </summary>
@@ -20,7 +20,7 @@ public class MqttCoordinatorReadOnlyTests
     [TestCase("thread-tracker", true)] // documents the false positive the explicit flag is meant to replace
     public void IsReadOnlyClient_IsTrueForAnyClientIdContainingRead(string? clientId, bool expected)
     {
-        Assert.That(MqttCoordinator.IsReadOnlyClient(clientId), Is.EqualTo(expected));
+        Assert.That(MqttReadOnly.IsReadOnlyClientId(clientId), Is.EqualTo(expected));
     }
 
     [Test]
@@ -29,7 +29,7 @@ public class MqttCoordinatorReadOnlyTests
         var config = new ConfigMqtt();
 
         Assert.That(config.ReadOnly, Is.False);
-        Assert.That(MqttCoordinator.GetReadOnlyReason(config), Is.EqualTo(MqttCoordinator.ReadOnlyReason.None));
+        Assert.That(MqttReadOnly.GetReason(config), Is.EqualTo(MqttReadOnly.Reason.None));
     }
 
     [Test]
@@ -37,7 +37,7 @@ public class MqttCoordinatorReadOnlyTests
     {
         var config = new ConfigMqtt { ClientId = "espresense-companion", ReadOnly = true };
 
-        Assert.That(MqttCoordinator.GetReadOnlyReason(config), Is.EqualTo(MqttCoordinator.ReadOnlyReason.ConfigFlag));
+        Assert.That(MqttReadOnly.GetReason(config), Is.EqualTo(MqttReadOnly.Reason.ConfigFlag));
     }
 
     [Test]
@@ -45,7 +45,7 @@ public class MqttCoordinatorReadOnlyTests
     {
         var config = new ConfigMqtt { ClientId = "bedroom-reader", ReadOnly = true };
 
-        Assert.That(MqttCoordinator.GetReadOnlyReason(config), Is.EqualTo(MqttCoordinator.ReadOnlyReason.ConfigFlag));
+        Assert.That(MqttReadOnly.GetReason(config), Is.EqualTo(MqttReadOnly.Reason.ConfigFlag));
     }
 
     [Test]
@@ -53,7 +53,7 @@ public class MqttCoordinatorReadOnlyTests
     {
         var config = new ConfigMqtt { ClientId = "bedroom-reader", ReadOnly = false };
 
-        Assert.That(MqttCoordinator.GetReadOnlyReason(config), Is.EqualTo(MqttCoordinator.ReadOnlyReason.ClientIdHeuristic));
+        Assert.That(MqttReadOnly.GetReason(config), Is.EqualTo(MqttReadOnly.Reason.ClientIdHeuristic));
     }
 
     [Test]
@@ -85,7 +85,7 @@ mqtt:
 
         Assert.That(config.Mqtt.ReadOnly, Is.True);
         Assert.That(config.Mqtt.ClientId, Is.EqualTo("companion"));
-        Assert.That(MqttCoordinator.GetReadOnlyReason(config.Mqtt), Is.EqualTo(MqttCoordinator.ReadOnlyReason.ConfigFlag));
+        Assert.That(MqttReadOnly.GetReason(config.Mqtt), Is.EqualTo(MqttReadOnly.Reason.ConfigFlag));
     }
 
     [Test]
@@ -102,6 +102,6 @@ mqtt:
 ");
 
         Assert.That(config.Mqtt.ReadOnly, Is.False);
-        Assert.That(MqttCoordinator.GetReadOnlyReason(config.Mqtt), Is.EqualTo(MqttCoordinator.ReadOnlyReason.None));
+        Assert.That(MqttReadOnly.GetReason(config.Mqtt), Is.EqualTo(MqttReadOnly.Reason.None));
     }
 }

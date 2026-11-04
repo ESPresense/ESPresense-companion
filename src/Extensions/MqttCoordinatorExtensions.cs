@@ -28,7 +28,7 @@ namespace ESPresense.Services
                     string.IsNullOrEmpty(oldValue) ? "(empty)" : oldValue,
                     string.IsNullOrEmpty(value) ? "(empty)" : value);
 
-                await mqtt.EnqueueAsync($"espresense/rooms/{id}/{setting}/set", value, retain);
+                await mqtt.EnqueueAsync(MqttTopics.NodeSettingSet(id, setting), value, retain);
             }
         }
 

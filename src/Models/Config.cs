@@ -272,7 +272,8 @@ namespace ESPresense.Models
 
         /// <summary>
         /// When true the companion subscribes and processes messages but never publishes; each publish
-        /// is logged at Information level instead. Defaults to false.
+        /// is logged at Information level instead. Defaults to false. Replaces the deprecated heuristic
+        /// of a <see cref="ClientId"/> containing "read", which still enables read-only mode but logs a warning.
         /// </summary>
         [JsonProperty("read_only")]
         [YamlMember(Alias = "read_only")]

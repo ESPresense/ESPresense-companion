@@ -51,7 +51,7 @@ namespace ESPresense.Services
             }
 
             ds.OriginalId = null; // Clear OriginalId before storing/publishing
-            await mqtt.EnqueueAsync($"espresense/settings/{id}/config", JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), true);
+            await mqtt.EnqueueAsync(MqttTopics.DeviceSettings(id), JsonConvert.SerializeObject(ds, SerializerSettings.NullIgnore), true);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
