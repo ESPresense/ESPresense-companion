@@ -96,5 +96,22 @@ test('a node page draws its links, measured against the map', async ({ page }) =
 	await page.route('**/api/node/node-1', (route) => route.fulfill({ json: { settings: { id: 'node-1', name: 'Node One' }, details: [] } }));
 	await page.goto('/nodes/node-1');
 
-	await expect(page.getByTestId('node-pairs').locator('text')).toHaveText('90.0 / 70.7');
+	await expect(page.getByTestId('node-pairs').locator('text')).toHaveText('90.0 (70.7)');
+});
+
+test('the map can draw every node link, coloured by its worse direction', async ({ page }) => {
+	await mockApi(page, { stubWebSocket: true, nodes });
+	await page.route('**/api/state/calibration', (route) => route.fulfill({ json: { matrix: { 'Node One': { 'Node Two': { distance: 72, mapDistance: 70.7 } }, 'Node Two': { 'Node One': { distance: 141.4, mapDistance: 70.7 } } } } }));
+	await page.setViewportSize({ width: 1400, height: 900 });
+	await page.goto('/');
+
+	await expect(page.getByTestId('node-link')).toHaveCount(0);
+	await page.getByTestId('node-link-controls').getByRole('switch').click();
+
+	const link = page.getByTestId('node-link');
+	await expect(link).toHaveCount(1);
+	await expect(link.locator('line').first()).toHaveAttribute('stroke', 'hsl(0, 50%, 50%)');
+	await link.hover();
+	await expect(link.locator('text')).toHaveText('141.4 (70.7)');
+	await page.screenshot({ path: 'test-results/node-links.png' });
 });
