@@ -23,12 +23,12 @@ internal class NearestNode : ILocate
         var device = _device;
         var maxDistance = _state.Config?.Locators?.NearestNode?.MaxDistance;
         var limited = maxDistance > 0; // unset, 0 or negative means no limit
-        var current = device.Nodes.Values.Where(a => a.Current && (!limited || a.Distance <= maxDistance)).ToArray();
-        // Prefer a placed receiver: an unplaced one's Location is (0, 0, 0), which this locator would
-        // otherwise report as the device's fix. Fall back to an unplaced receiver only when it's all
-        // there is, so a device heard by nothing else still gets a (floorless) fix.
-        var nearest = current.Where(a => a.Node is { HasLocation: true }).MinBy(a => a.Distance)
-            ?? current.MinBy(a => a.Distance);
+        // A receiver without a location can never be the device's fix: its Location defaults to
+        // (0, 0, 0), which default installs must not see reported as a real position. A device heard
+        // only by unplaced receivers gets no fix here (the fingerprint locator can still use them).
+        var nearest = device.Nodes.Values
+            .Where(a => a.Current && a.Node is { HasLocation: true } && (!limited || a.Distance <= maxDistance))
+            .MinBy(a => a.Distance);
         scenario.Trace = new LocatorTrace(
             nearest == null ? LocatorOutcome.NoFix : LocatorOutcome.Fallback,
             null,
@@ -45,12 +45,10 @@ internal class NearestNode : ILocate
         scenario.Confidence = 1;
         scenario.Fixes = 1;
 
-        // A node's configured floors are the ones it helps locate on, which can include floors it
-        // only hears through a ceiling, so the floor comes from where the node physically is.
-        // A node with no position defaults to the origin, so its configured floors are all we know.
-        IReadOnlyList<Floor> floors = node.HasLocation
-            ? SpatialUtils.FindFloorsAt(location.Z, _state.Floors.Values)
-            : node.Floors ?? [];
+        // The floor comes from where the node physically is, which can include a floor it only hears
+        // through a ceiling. `nearest` is always a placed node now, so this never falls back to the
+        // node's configured floors.
+        var floors = SpatialUtils.FindFloorsAt(location.Z, _state.Floors.Values);
 
         // Try to find the room:
         // 1. First try to find a room containing the node's location
