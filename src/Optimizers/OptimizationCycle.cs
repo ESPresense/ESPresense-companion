@@ -10,6 +10,9 @@ internal sealed record OptimizationCycleResult(
     OptimizationResults? SelectedResults,
     int BaselineSamples)
 {
+    /// <summary>The node settings the cycle froze when it started and scored every proposal against, by node id.</summary>
+    public IReadOnlyDictionary<string, NodeSettings> Incumbent { get; init; } = new Dictionary<string, NodeSettings>();
+
     /// <summary>
     /// The result once the runner has tried to apply <see cref="Selected"/>: applied (all nodes written) or not, with
     /// the outcome to report and, when writing failed, why.
@@ -91,7 +94,7 @@ internal static class OptimizationCycle
             var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
                 Array.Empty<OptimizerProposalReport>(), null, false,
                 $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).");
-            return new OptimizationCycleResult(skipped, null, null, null, baselineSamples);
+            return new OptimizationCycleResult(skipped, null, null, null, baselineSamples) { Incumbent = frozen };
         }
 
         // Optimizers get their own copies so nothing they do can touch the frozen incumbent.
@@ -189,7 +192,7 @@ internal static class OptimizationCycle
 
         var report = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
             proposals, chosen?.Name, false, outcome);
-        return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples);
+        return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples) { Incumbent = frozen };
     }
 
     /// <summary>Per node, per role, per scenario: count, sum and sum of squares of the residuals.</summary>

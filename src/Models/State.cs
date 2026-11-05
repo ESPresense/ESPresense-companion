@@ -140,6 +140,11 @@ public class State
 
         foreach (var device in Devices.Values.Where(d => d.IsAnchored && d.Anchor != null))
         {
+            // Nodes and anchors share one id space here. A device whose id is also a node's would turn that
+            // node into an anchor, holding its txRef at a device's rssi@1m in its node-to-node links too.
+            if (Nodes.ContainsKey(device.Id) || (nodes.TryGetValue(device.Id, out var existing) && !existing.IsAnchor))
+                continue;
+
             var anchorLocation = device.Anchor!.Location;
             var anchorNode = nodes.GetOrAdd(device.Id, _ => new OptNode { Id = device.Id, Name = device.Name ?? device.Id, Location = anchorLocation });
             anchorNode.Location = anchorLocation;

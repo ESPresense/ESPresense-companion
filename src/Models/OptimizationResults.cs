@@ -21,6 +21,13 @@ internal readonly record struct PredictedMeasure(Measure Measure, double Predict
 
 public class OptimizationResults
 {
+    /// <summary>What a node with no absorption setting is scored with.</summary>
+    internal const double DefaultAbsorption = 2.7;
+    /// <summary>What a receiver with no rxAdj setting is scored with.</summary>
+    internal const double DefaultRxAdjRssi = 0;
+    /// <summary>What a node transmitter with no txRef setting is scored with.</summary>
+    internal const double DefaultTxRefRssi = -59;
+
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
     /// <summary>
@@ -104,10 +111,10 @@ public class OptimizationResults
                 if (mapDistance <= 0 || double.IsNaN(mapDistance) || double.IsInfinity(mapDistance))
                     continue;
 
-                double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
+                double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? DefaultRxAdjRssi;
                 // An anchored device is ranged with its own rssi@1m in either frame; nothing proposes or stores a txRef for it.
-                double txRefRssi = m.HeldTxRef ?? (deviceFrame ? null : txPv?.TxRefRssi) ?? tx.Calibration.TxRefRssi ?? -59;
-                double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
+                double txRefRssi = m.HeldTxRef ?? (deviceFrame ? null : txPv?.TxRefRssi) ?? tx.Calibration.TxRefRssi ?? DefaultTxRefRssi;
+                double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? DefaultAbsorption;
 
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
                 double measuredRssi = m.GetAdjustedRssi(rxAdjRssi);
