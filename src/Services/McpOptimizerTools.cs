@@ -58,7 +58,7 @@ public class McpOptimizerTools(OptimizerDebugService service)
     [McpServerTool(Name = "run_optimizer_dry_cycle", ReadOnly = true)]
     [Description("Run one optimization cycle now on the current history and return the same report as get_optimizer_last_cycle, applying nothing: no node settings are changed and nothing is published.")]
     public async Task<string> RunOptimizerDryCycle(
-        [Description("Only this optimizer, by name (any mode's), e.g. \"Rx Adj Rssi\"; default the configured set")] string? optimizer = null,
+        [Description("Only this optimizer, by name, e.g. \"Per Node Absorption Rx Tx Adj\"; default the configured set")] string? optimizer = null,
         CancellationToken cancellationToken = default)
     {
         try
