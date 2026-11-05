@@ -8,10 +8,10 @@ using ESPresense.Services;
 
 namespace ESPresense.Locators;
 
-/// <param name="logger">Defaults to the transitional <see cref="DeferredLoggerFactory"/> while State builds locators without one (#1844).</param>
+/// <param name="logger">Null discards; <see cref="ESPresense.Models.ScenarioFactory"/> passes one from the host.</param>
 public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State state, NodeTelemetryStore nts, ILogger<NadarayaWatsonMultilateralizer>? logger = null) : ILocate
 {
-    private readonly ILogger _logger = logger ?? DeferredLoggerFactory.CreateLogger<NadarayaWatsonMultilateralizer>();
+    private readonly ILogger _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<NadarayaWatsonMultilateralizer>.Instance;
 
     public bool Locate(Scenario scenario)
     {

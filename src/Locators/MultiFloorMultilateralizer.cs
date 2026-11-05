@@ -15,11 +15,11 @@ public class MultiFloorMultilateralizer : ILocate
     private readonly IWeighting _weighting;
     private readonly ILogger _logger;
 
-    /// <param name="logger">Defaults to the transitional <see cref="DeferredLoggerFactory"/> while State builds locators without one (#1844).</param>
+    /// <param name="logger">Null discards; <see cref="ESPresense.Models.ScenarioFactory"/> passes one from the host.</param>
     public MultiFloorMultilateralizer(Device device, State state, ILogger<MultiFloorMultilateralizer>? logger = null)
     {
         _device = device;
-        _logger = logger ?? DeferredLoggerFactory.CreateLogger<MultiFloorMultilateralizer>();
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiFloorMultilateralizer>.Instance;
         _state = state;
 
         // Load weighting from MultiFloor config, defaulting to Gaussian if not specified

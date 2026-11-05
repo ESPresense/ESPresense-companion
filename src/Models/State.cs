@@ -28,7 +28,7 @@ public class State
     public State(ConfigLoader cl, NodeTelemetryStore nts, ILoggerFactory loggerFactory)
     {
         _loggerFactory = loggerFactory;
-        ScenarioFactory = new ScenarioFactory(this, nts, _loggerFactory.CreateLogger<ScenarioFactory>());
+        ScenarioFactory = new ScenarioFactory(this, nts, _loggerFactory);
         cl.ConfigChanged += (_, args) => Apply(args);
         if (cl.Config != null) Apply(cl.Config);
     }

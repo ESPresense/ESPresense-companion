@@ -16,8 +16,17 @@ public sealed record LocatorDescriptor(string Name, bool Enabled, bool PerFloor,
 /// <summary>
 /// The single source of truth for which locators exist, which the config enables, and the scenarios a device gets.
 /// </summary>
-public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger<ScenarioFactory> logger)
+public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILoggerFactory loggers)
 {
+    private readonly ILogger _logger = loggers.CreateLogger<ScenarioFactory>();
+
+    // One logger per locator type, shared by every scenario built from it.
+    private readonly ILogger _nelderMeadLogger = loggers.CreateLogger<NelderMeadMultilateralizer>();
+    private readonly ILogger _bfgsLogger = loggers.CreateLogger<BfgsMultilateralizer>();
+    private readonly ILogger _mleLogger = loggers.CreateLogger<MLEMultilateralizer>();
+    private readonly ILogger<MultiFloorMultilateralizer> _multiFloorLogger = loggers.CreateLogger<MultiFloorMultilateralizer>();
+    private readonly ILogger<NadarayaWatsonMultilateralizer> _nadarayaWatsonLogger = loggers.CreateLogger<NadarayaWatsonMultilateralizer>();
+
     /// <summary>
     /// Every locator, in scenario order. The order is load-bearing: MultiScenarioLocator breaks
     /// probability/confidence ties by scenario index.
@@ -28,17 +37,17 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
         return
         [
             NelderMead(l?.NelderMead?.Enabled ?? false, l?.NelderMead?.Floors),
-            new("Bfgs", l?.Bfgs?.Enabled ?? false, true, l?.Bfgs?.Floors, (d, f, s) => new BfgsMultilateralizer(d, f!, s)),
-            new("Mle", l?.Mle?.Enabled ?? false, true, l?.Mle?.Floors, (d, f, s) => new MLEMultilateralizer(d, f!, s)),
-            new("MultiFloor", l?.MultiFloor?.Enabled ?? false, false, null, (d, _, s) => new MultiFloorMultilateralizer(d, s)),
-            new("NadarayaWatson", l?.NadarayaWatson?.Enabled ?? false, true, l?.NadarayaWatson?.Floors, (d, f, s) => new NadarayaWatsonMultilateralizer(d, f!, s, nts)),
+            new("Bfgs", l?.Bfgs?.Enabled ?? false, true, l?.Bfgs?.Floors, (d, f, s) => new BfgsMultilateralizer(d, f!, s, _bfgsLogger)),
+            new("Mle", l?.Mle?.Enabled ?? false, true, l?.Mle?.Floors, (d, f, s) => new MLEMultilateralizer(d, f!, s, _mleLogger)),
+            new("MultiFloor", l?.MultiFloor?.Enabled ?? false, false, null, (d, _, s) => new MultiFloorMultilateralizer(d, s, _multiFloorLogger)),
+            new("NadarayaWatson", l?.NadarayaWatson?.Enabled ?? false, true, l?.NadarayaWatson?.Floors, (d, f, s) => new NadarayaWatsonMultilateralizer(d, f!, s, nts, _nadarayaWatsonLogger)),
             NearestNodeLocator(l?.NearestNode?.Enabled ?? false),
         ];
     }
 
     // These two are also the nothing-enabled fallback, so they are built directly rather than looked up by name.
-    private static LocatorDescriptor NelderMead(bool enabled, string[]? floors) =>
-        new("NelderMead", enabled, true, floors, (d, f, s) => new NelderMeadMultilateralizer(d, f!, s));
+    private LocatorDescriptor NelderMead(bool enabled, string[]? floors) =>
+        new("NelderMead", enabled, true, floors, (d, f, s) => new NelderMeadMultilateralizer(d, f!, s, _nelderMeadLogger));
 
     private static LocatorDescriptor NearestNodeLocator(bool enabled) =>
         new("NearestNode", enabled, false, null, (d, _, s) => new NearestNode(d, s));
@@ -64,7 +73,7 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
         var enabled = Enabled(config);
         if (enabled.Count == 0)
         {
-            logger.LogWarning("No locators enabled, using default NelderMead");
+            _logger.LogWarning("No locators enabled, using default NelderMead");
             enabled = state.Floors.Values.Any()
                 ? [NelderMead(true, floors: null)]
                 : [NearestNodeLocator(true)];

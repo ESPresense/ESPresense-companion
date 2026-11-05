@@ -223,7 +223,7 @@ internal sealed class DiscoveryHandler(IMqttEventSink sink, Func<string> discove
                 return Task.CompletedTask;
             }
 
-            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, discoveryTopic()) || msg == null)
+            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, discoveryTopic(), _logger) || msg == null)
                 throw new MqttMessageProcessingException("Failed to deserialize discovery message", topic, payload, "Discovery");
 
             sink.RaisePreviousDeviceDiscovered(new PreviousDeviceDiscoveredEventArgs
