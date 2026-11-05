@@ -44,30 +44,31 @@ public class StateControllerAutoOptimizeTests
     }
 
     /// <summary>
-    /// The toggle writes the whole optimization section back. A removed or unknown mode left in the file runs
-    /// per_node_absorption with a warning at every load, so the save writes per_node_absorption instead of
-    /// copying the stale value back.
+    /// The toggle writes the whole optimization section back. A removed mode left in the file runs
+    /// per_node_absorption with a warning at every load, so the save replaces it. Any other value is written back
+    /// as it was: the valid mode, and an unknown one, which keeps its own warning until someone fixes the typo.
     /// </summary>
-    [TestCase("legacy")]
-    [TestCase("global_absorption")]
-    [TestCase("per-node-absorption")]
-    public async Task Toggle_ReplacesARemovedOrUnknownModeWithTheOneThatRuns(string staleMode)
+    [TestCase("legacy", "per_node_absorption")]
+    [TestCase("global_absorption", "per_node_absorption")]
+    [TestCase("Global_Absorption", "per_node_absorption")]
+    [TestCase("per_node_absorption", "per_node_absorption")]
+    [TestCase("per-node-absorption", "per-node-absorption")]
+    public async Task Toggle_ReplacesOnlyARemovedMode(string configured, string saved)
     {
         var path = Path.Combine(_configDir, "config.yaml");
-        File.WriteAllText(path, $"timeout: 30\noptimization:\n  enabled: false\n  optimizer: {staleMode}\n  training_window_mins: 20\n");
+        File.WriteAllText(path, $"timeout: 30\noptimization:\n  enabled: false\n  optimizer: {configured}\n  training_window_mins: 20\n");
         var configLoader = new ConfigLoader(_configDir);
         await configLoader.LoadAsync();
         var controller = CreateController(configLoader, out var state);
-        Assume.That(state.Config!.Optimization.Optimizer, Is.EqualTo(staleMode));
+        Assume.That(state.Config!.Optimization.Optimizer, Is.EqualTo(configured));
 
         await controller.ToggleAutoOptimize(true);
 
         var yaml = File.ReadAllText(path);
         Assert.Multiple(() =>
         {
-            Assert.That(yaml, Does.Contain("optimizer: per_node_absorption"));
-            Assert.That(yaml, Does.Not.Contain(staleMode + "\n"), "the stale mode is gone from the file");
-            Assert.That(state.Config!.Optimization.Optimizer, Is.EqualTo("per_node_absorption"));
+            Assert.That(yaml, Does.Contain($"optimizer: {saved}\n"));
+            Assert.That(state.Config!.Optimization.Optimizer, Is.EqualTo(saved));
             Assert.That(state.Config.Optimization.Enabled, Is.True);
             Assert.That(state.Config.Optimization.TrainingWindowMins, Is.EqualTo(20), "other optimization settings survive the save");
         });

@@ -64,6 +64,9 @@ internal class OptimizationRunner : BackgroundService
     /// </summary>
     private static readonly HashSet<string> RemovedModes = new(StringComparer.Ordinal) { "legacy", "global_absorption" };
 
+    /// <summary>Whether <paramref name="mode"/> names a mode that used to exist and now falls back to <see cref="DefaultMode"/>.</summary>
+    internal static bool IsRemovedMode(string? mode) => RemovedModes.Contains(NormalizeMode(mode));
+
     private static string NormalizeMode(string? mode) =>
         string.IsNullOrWhiteSpace(mode) ? DefaultMode : mode.Trim().ToLowerInvariant();
 

@@ -322,10 +322,11 @@ public class StateController : ControllerBase
             // Save a modified copy: the loaded Config is the instance State holds, and only a reload may replace it.
             var optimization = c.Optimization.Clone();
             optimization.Enabled = enable;
-            // The section is written back whole, so write the mode that runs. A config that still names a removed
-            // (legacy, global_absorption) or unknown mode runs per_node_absorption with a warning at every load;
-            // copying that value back would keep the warning forever, and this save is the chance to clear it.
-            optimization.Optimizer = OptimizationRunner.DefaultMode;
+            // The section is written back whole. A mode that was removed (legacy, global_absorption) runs
+            // per_node_absorption with a warning at every load, so replace it rather than copy it back. Anything
+            // else is kept as written: a valid mode must survive the save, and a typo should keep its warning.
+            if (OptimizationRunner.IsRemovedMode(optimization.Optimizer))
+                optimization.Optimizer = OptimizationRunner.DefaultMode;
             await _config.SaveSectionAsync("optimization", optimization);
             return Ok(new { autoOptimize = enable });
         }
