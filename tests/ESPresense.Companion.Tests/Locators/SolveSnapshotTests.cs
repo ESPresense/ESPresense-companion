@@ -165,7 +165,7 @@ public class SolveSnapshotTests
     {
         var floor = new Floor();
         floor.Update(_configLoader.Config!, new ConfigFloor { Id = "f", Name = "f", Bounds = new[] { new[] { -1.0, -1.0, -1.0 }, new[] { 20.0, 16.0, 5.0 } } });
-        _state.Floors[floor.Id] = floor;
+        _state.Floors[floor.Id!] = floor;
         var device = CreateDevice(6, new Random(3), floor);
         var errors = new ErrorCounter();
         var scenario = new Scenario(_configLoader.Config, CreateSolver(solver, device, floor, errors), "f") { Confidence = 0 };
