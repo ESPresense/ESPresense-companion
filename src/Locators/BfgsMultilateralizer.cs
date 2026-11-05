@@ -12,6 +12,9 @@ public class BfgsMultilateralizer : BaseMultilateralizer
 {
     private readonly IWeighting _weighting;
 
+    /// <summary>Replaces the configured weighting; tests use it to act between taking the readings and solving.</summary>
+    internal IWeighting Weighting { init => _weighting = value; }
+
     public BfgsMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null)
         : base(device, floor, state, logger)
     {

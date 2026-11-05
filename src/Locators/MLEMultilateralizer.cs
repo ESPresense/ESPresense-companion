@@ -12,6 +12,9 @@ public class MLEMultilateralizer : BaseMultilateralizer
 {
     private readonly IWeighting _weighting;
 
+    /// <summary>Replaces the configured weighting; tests use it to act between taking the readings and solving.</summary>
+    internal IWeighting Weighting { init => _weighting = value; }
+
     public MLEMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null) : base(device, floor, state, logger)
     {
         // Load weighting from MLE config, defaulting to Gaussian if not specified

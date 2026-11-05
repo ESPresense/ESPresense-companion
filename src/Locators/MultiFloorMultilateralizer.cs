@@ -13,6 +13,9 @@ public class MultiFloorMultilateralizer : ILocate
     private readonly Device _device;
     private readonly State _state;
     private readonly IWeighting _weighting;
+
+    /// <summary>Replaces the configured weighting; tests use it to act between taking the readings and solving.</summary>
+    internal IWeighting Weighting { init => _weighting = value; }
     private readonly ILogger _logger;
 
     /// <param name="logger">Null discards; <see cref="ESPresense.Models.ScenarioFactory"/> passes one from the host.</param>

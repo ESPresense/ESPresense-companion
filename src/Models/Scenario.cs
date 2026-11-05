@@ -79,6 +79,9 @@ public class Scenario(Config? config, ILocate locator, string? name)
     private long _solveVersion;
     private int _abandoned;
 
+    /// <summary>Solves dropped in a row because a newer reading superseded them.</summary>
+    internal int ConsecutiveAbandons => _abandoned;
+
     public bool Locate()
     {
         try
