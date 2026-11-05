@@ -546,7 +546,7 @@ public class OptimizerDebugServiceTests
         _state.Nodes[node.Id] = node;
         var device = new Device("anchor-1", null, TimeSpan.FromSeconds(30)) { Name = "Anchor" };
         device.SetAnchor(new DeviceAnchor(new Point3D(2, 0, 1), null, null));
-        device.Nodes[node.Id] = new DeviceToNode(device, node) { Distance = 2, Rssi = -60, LastHit = DateTime.UtcNow };
+        device.Nodes[node.Id] = new DeviceToNode(device, node) { Distance = 2, Rssi = -60, RefRssi = -59, LastHit = DateTime.UtcNow };
         _state.Devices[device.Id] = device;
 
         var m = _state.ReadMeasures().Measures.Single();

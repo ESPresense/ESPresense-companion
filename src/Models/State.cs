@@ -146,7 +146,10 @@ public class State
             anchorNode.IsAnchor = true;
             anchorNode.Name = device.Name ?? device.Id;
 
-            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current))
+            // The optimizers hold an anchor's txRef at the rssi@1m it was heard with, so a reading
+            // without one (0, as Device.MeasuredRefRssi treats it) would pin the fit to nonsense.
+            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current
+                                                                       && dn.RefRssi != 0 && double.IsFinite(dn.RefRssi)))
             {
                 var rxNode = deviceNode.Node!;
                 var optRx = nodes.GetOrAdd(rxNode.Id, _ => new OptNode { Id = rxNode.Id, Name = rxNode.Name, Location = rxNode.Location });

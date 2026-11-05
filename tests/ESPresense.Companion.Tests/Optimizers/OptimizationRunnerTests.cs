@@ -127,6 +127,36 @@ public class OptimizationRunnerTests
     }
 
     [Test]
+    public async Task RunCycle_RejectedProposal_LogsEachNodesValuesAtInformation()
+    {
+        var snapshot = SnapshotWith(5);
+        foreach (var m in snapshot.Measures) m.RssiRxAdj = 0;
+        var incumbent = _nss.Get("rx");
+        incumbent.Calibration.RxAdjRssi = 2;
+        await _nss.Set("rx", incumbent);
+
+        await RunCycle(snapshot, new ConfigOptimization { Enabled = true, MinSamples = 5 }, new GaugeShiftedOptimizer());
+
+        var info = _log.Collector.GetSnapshot().Where(e => e.Level == LogLevel.Information).Select(e => e.Message).ToList();
+        Assert.That(info, Has.Some.Contains("rejected: better node-to-node"), "sanity: the device-frame gate should have rejected it");
+        Assert.That(info, Has.One.Matches<string>(m => m.StartsWith("Rejected GaugeShifted rx ") && m.Contains("absorption=3.00 (was -)") && m.Contains("rx_adj=-10 (was 2)")),
+            "the rejected proposal's receiver values should be logged beside the incumbent's");
+        Assert.That(info.Count(m => m.StartsWith("Rejected GaugeShifted tx") && m.Contains("tx_ref=-49 (was -)")), Is.EqualTo(5),
+            "one line per transmitter in the proposal");
+    }
+
+    [Test]
+    public void DescribeProposal_LeavesOutValuesNotProposed()
+    {
+        var current = new CalibrationSettings { Absorption = 2.95, RxAdjRssi = -4, TxRefRssi = -59 };
+
+        Assert.That(OptimizationRunner.DescribeProposal(new OptimizerNodeProposal(3.1, 3, -61, 4.2), current),
+            Is.EqualTo("absorption=3.10 (was 2.95), rx_adj=3 (was -4), tx_ref=-61 (was -59), error=4.20"));
+        Assert.That(OptimizationRunner.DescribeProposal(new OptimizerNodeProposal(null, 1, null, null), current), Is.EqualTo("rx_adj=1 (was -4)"));
+        Assert.That(OptimizationRunner.DescribeProposal(new OptimizerNodeProposal(null, null, null, null), current), Is.EqualTo("no values"));
+    }
+
+    [Test]
     public async Task RunCycle_TxRefRxAdjShiftThatCancelsNodeToNode_IsRejected()
     {
         var snapshot = SnapshotWith(5);

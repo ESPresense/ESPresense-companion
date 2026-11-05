@@ -326,5 +326,30 @@ public class StateOptimizationAnchorTests
 
         var anchorMeasure = snapshot.Measures.FirstOrDefault(m => m.Tx.Id == device.Id);
         Assert.That(anchorMeasure, Is.Not.Null, "Should have anchor measure");
+
+        // The optimizers hold an anchored device's txRef at its rssi@1m rather than fitting it.
+        Assert.That(anchorMeasure!.Tx.IsAnchor, Is.True, "anchored device should be marked as an anchor");
+        Assert.That(anchorMeasure.HeldTxRef, Is.EqualTo(-59));
+        Assert.That(nodeToNodeMeasure!.Tx.IsAnchor, Is.False, "a node is not an anchor");
+        Assert.That(nodeToNodeMeasure.HeldTxRef, Is.Null);
+        Assert.That(snapshot.Measures.Any(m => m.Rx.IsAnchor), Is.False);
+    }
+
+    [Test]
+    public void TakeOptimizationSnapshot_SkipsAnchorReadingsWithoutRssiAt1m()
+    {
+        var node = new Node("node1", NodeSourceType.Config);
+        node.Update(_configLoader.Config!, new ConfigNode { Name = "Node 1", Point = new double[] { 0, 0, 0 } }, Enumerable.Empty<Floor>());
+        _state.Nodes["node1"] = node;
+
+        var device = new Device("anchored-device", null, TimeSpan.FromSeconds(30));
+        device.SetAnchor(new DeviceAnchor(new Point3D(2.5, 2.5, 0), null, null));
+        _state.Devices["anchored-device"] = device;
+        device.Nodes["node1"] = new DeviceToNode(device, node) { Rssi = -60, Distance = 3.5, RefRssi = 0, LastHit = DateTime.UtcNow };
+
+        var snapshot = new OptimizationSnapshotStore().Take(_state);
+
+        Assert.That(snapshot.Measures.Where(m => m.Tx.Id == device.Id), Is.Empty,
+            "an anchor's txRef is held at the reading's rssi@1m, so a reading without one cannot be used");
     }
 }

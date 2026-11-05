@@ -388,9 +388,6 @@ internal class OptimizationRunner : BackgroundService
             case OptimizerGateDecision.NotBetter:
                 _logger.LogInformation("Optimizer {Optimizer,-24} found worse results: Composite={Composite:0.000} <= Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
                     p.Optimizer, composite, bestScore, corr, rmse);
-                foreach (var (id, result) in p.Nodes)
-                    _logger.LogDebug("Rejected {NodeId,-20}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}, Error={Error}",
-                        id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
                 break;
             case OptimizerGateDecision.DeviceFrame:
                 _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better node-to-node (Composite={Composite:0.000}) but not with txRef held (Composite={DeviceComposite:0.000} <= Best={Best:0.000}); the gain is a txRef/rxAdj shift devices would see as range bias",
@@ -405,6 +402,9 @@ internal class OptimizationRunner : BackgroundService
                     p.Optimizer, composite, bestScore, corr, rmse);
                 break;
         }
+
+        if (p.Decision is OptimizerGateDecision.MinSamples or OptimizerGateDecision.NotBetter or OptimizerGateDecision.DeviceFrame or OptimizerGateDecision.EverySnapshot)
+            LogRejectedProposal(p);
     }
 
     /// <summary>The most recent live cycle (not dry runs): its report, residuals and selection. Null until one has run.</summary>
@@ -508,6 +508,31 @@ internal class OptimizationRunner : BackgroundService
         {
             _dryRunGate.Release();
         }
+    }
+
+    /// <summary>
+    /// One line per node of a proposal that a gate turned down, each proposed value beside the current one it
+    /// would have replaced, so a rejection can be diagnosed from the log at the default level. The last-cycle
+    /// record (<see cref="LastCycle"/>) has the proposed values too, but not what they would have replaced,
+    /// and only the latest cycle.
+    /// </summary>
+    private void LogRejectedProposal(OptimizerProposalReport p)
+    {
+        if (!_logger.IsEnabled(LogLevel.Information)) return;
+        foreach (var (id, proposed) in p.Nodes.OrderBy(n => n.Key, StringComparer.Ordinal))
+            _logger.LogInformation("Rejected {Optimizer} {NodeId,-20}: {Values}", p.Optimizer, id, DescribeProposal(proposed, _nsd.Get(id).Calibration));
+    }
+
+    /// <summary>"absorption=3.10 (was 2.95), rx_adj=3 (was -4), tx_ref=-61 (was -59), error=4.20", leaving out values not proposed.</summary>
+    internal static string DescribeProposal(OptimizerNodeProposal proposed, CalibrationSettings current)
+    {
+        static string F(double? v, string format) => v is { } d ? (d + 0.0).ToString(format, CultureInfo.InvariantCulture) : "-"; // + 0.0 turns -0 into 0
+        var parts = new List<string>();
+        if (proposed.Absorption != null) parts.Add($"absorption={F(proposed.Absorption, "0.00")} (was {F(current.Absorption, "0.00")})");
+        if (proposed.RxAdjRssi != null) parts.Add($"rx_adj={F(proposed.RxAdjRssi, "0")} (was {F(current.RxAdjRssi, "0")})");
+        if (proposed.TxRefRssi != null) parts.Add($"tx_ref={F(proposed.TxRefRssi, "0")} (was {F(current.TxRefRssi, "0")})");
+        if (proposed.Error != null) parts.Add($"error={F(proposed.Error, "0.00")}");
+        return parts.Count > 0 ? string.Join(", ", parts) : "no values";
     }
 
     /// <summary>

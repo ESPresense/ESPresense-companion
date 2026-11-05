@@ -47,6 +47,8 @@ public class OptimizationResults
     /// device is ranged (with its own rssi@1m, which no optimizer touches), so it is the frame in
     /// which rxAdj has to be right in absolute terms. Node-to-node data cannot tell "every
     /// transmitter k dB hot" from "every receiver k dB hot"; scoring in both frames can.
+    /// Anchored devices are scored with their rssi@1m (<see cref="Measure.HeldTxRef"/>) in both frames,
+    /// as the optimizers fit them.
     /// </summary>
     public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss, bool deviceFrame = false)
         => Evaluate(oss, nss.Get, deviceFrame);
@@ -103,7 +105,8 @@ public class OptimizationResults
                     continue;
 
                 double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
-                double txRefRssi = (deviceFrame ? null : txPv?.TxRefRssi) ?? tx.Calibration.TxRefRssi ?? -59;
+                // An anchored device is ranged with its own rssi@1m in either frame; nothing proposes or stores a txRef for it.
+                double txRefRssi = m.HeldTxRef ?? (deviceFrame ? null : txPv?.TxRefRssi) ?? tx.Calibration.TxRefRssi ?? -59;
                 double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
 
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
