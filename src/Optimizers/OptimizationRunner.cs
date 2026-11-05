@@ -273,32 +273,20 @@ internal class OptimizationRunner : BackgroundService
     /// </summary>
     internal async Task RunCycleAsync(OptimizationSnapshot os, List<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
     {
-        var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
-        if (evalSet.Count == 0) evalSet = oss;
+        // The decision is made without access to the store's writers; only the selected proposal is applied below.
+        var cycle = OptimizationCycle.Evaluate(os, oss, optimization, optimizers, _nsd.Get, dryRun: false, DateTime.UtcNow);
+        LastCycle = cycle;
+        var report = cycle.Report;
 
-        // Freeze the incumbent settings once for the whole cycle. NodeSettingsStore.Get reads whatever the
-        // store holds at that moment, so scoring straight from it would let the same proposal score
-        // differently depending on whether an earlier cycle's MQTT writes had been echoed back yet.
-        var frozen = new Dictionary<string, NodeSettings>(StringComparer.Ordinal);
-        foreach (var id in os.GetNodeIds().Concat(evalSet.SelectMany(s => s.GetNodeIds())).Distinct())
-            frozen[id] = _nsd.Get(id);
-        NodeSettings Frozen(string id) => frozen.TryGetValue(id, out var settings) ? settings : _nsd.Get(id);
-
-        var baselineResults = new OptimizationResults();
-        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(evalSet, Frozen);
-        _state.OptimizerState.ValidationSamples = baselineSamples;
-        if (baselineSamples < optimization.MinSamples)
+        _state.OptimizerState.ValidationSamples = cycle.BaselineSamples;
+        _state.OptimizerState.LastOutcome = report.Outcome;
+        if (cycle.BaselineSamples < optimization.MinSamples)
         {
-            _logger.LogDebug("Optimization skipped: baseline evaluated on {Samples} measurements, need at least {MinSamples} (min_samples)", baselineSamples, optimization.MinSamples);
-            _state.OptimizerState.LastOutcome = $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).";
+            _logger.LogDebug("Optimization skipped: baseline evaluated on {Samples} measurements, need at least {MinSamples} (min_samples)", cycle.BaselineSamples, optimization.MinSamples);
             return;
         }
 
-        // Use weights from ConfigOptimization
-        double correlationWeight = optimization.CorrelationWeight;
-        double rmseWeight = optimization.RmseWeight;
-        double bestScore = (bestCorr * correlationWeight) + ((1 - bestRmse / (1 + bestRmse)) * rmseWeight);
-
+        var (bestScore, bestCorr, bestRmse, _) = report.Baseline;
         if (double.IsNaN(_previousBestCorr) || double.IsNaN(_previousBestRmse) || Math.Abs(bestCorr - _previousBestCorr) > 0.001 || Math.Abs(bestRmse - _previousBestRmse) > 0.001)
         {
             _logger.LogInformation("Baseline metrics: Composite={Composite:0.000} (R={R:0.000}, RMSE={RMSE:0.000})", bestScore, bestCorr, bestRmse);
@@ -309,96 +297,18 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.BestR = bestCorr;
         _state.OptimizerState.BestRMSE = bestRmse;
 
-        // Optimizers get their own copies so nothing they do can touch the frozen incumbent.
-        var currentSettings = os.GetNodeIds().ToDictionary(id => id, id => Frozen(id).Clone());
+        foreach (var p in report.Proposals)
+            LogDecision(p, bestScore);
 
-        // Every optimizer is scored against the same incumbent and only the best passing proposal is
-        // applied. Applying them greedily in sequence made the outcome depend on list order, and let an
-        // absorption-only proposal land on top of another optimizer's rxAdj: a pair nobody fitted.
-        (IOptimizer Optimizer, OptimizationResults Results, double Composite, double Corr, double Rmse)? best = null;
-
-        foreach (var optimizer in optimizers)
-        {
-            var results = optimizer.Optimize(os, currentSettings).QuantizeForApplication();
-            var (corr, rmse, samples) = results.Evaluate(evalSet, Frozen);
-            if (samples < optimization.MinSamples)
-            {
-                _logger.LogDebug("Optimizer {Optimizer,-24} rejected: evaluated on {Samples} measurements, need at least {MinSamples} (min_samples)",
-                    optimizer.Name, samples, optimization.MinSamples);
-                continue;
-            }
-
-            // Use weights from ConfigOptimization
-            var composite = (corr * correlationWeight) + ((1 - rmse / (1 + rmse)) * rmseWeight);
-
-            if (double.IsNaN(composite) || double.IsInfinity(composite) || composite <= bestScore + optimization.MinimumImprovement)
-            {
-                _logger.LogInformation("Optimizer {Optimizer,-24} found worse results: Composite={Composite:0.000} <= Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
-                    optimizer.Name, composite, bestScore, corr, rmse);
-
-                foreach (var (id, result) in results.Nodes)
-                    _logger.LogDebug("Rejected {NodeId,-20}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}, Error={Error}",
-                        id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
-                continue;
-            }
-
-            // A proposal that moves txRef must also win with txRef held where it is: devices are ranged
-            // with their own rssi@1m, so a txRef/rxAdj shift that cancels node-to-node is a plain range
-            // bias for every device. See OptimizationResults.Evaluate.
-            if (results.Nodes.Values.Any(r => r.TxRefRssi != null))
-            {
-                var (dCorr, dRmse, _) = results.Evaluate(evalSet, Frozen, deviceFrame: true);
-                var deviceComposite = (dCorr * correlationWeight) + ((1 - dRmse / (1 + dRmse)) * rmseWeight);
-                if (double.IsNaN(deviceComposite) || double.IsInfinity(deviceComposite) || deviceComposite <= bestScore)
-                {
-                    _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better node-to-node (Composite={Composite:0.000}) but not with txRef held (Composite={DeviceComposite:0.000} <= Best={Best:0.000}); the gain is a txRef/rxAdj shift devices would see as range bias",
-                        optimizer.Name, composite, deviceComposite, bestScore);
-                    continue;
-                }
-            }
-
-            // On a home that has not changed, successive snapshots differ only by noise, and rxAdj and
-            // absorption trade off almost perfectly over the narrow band of distances one receiver sees.
-            // A proposal that is ahead on the aggregate because one snapshot's noise favours it would be
-            // applied, then undone by the next cycle's noise, and settings wander along that ridge
-            // indefinitely. So it must also win against the incumbent on every eval snapshot by itself.
-            if (evalSet.Count > 1)
-            {
-                var losesOn = evalSet.Where(snap =>
-                {
-                    var one = new List<OptimizationSnapshot> { snap };
-                    var (bc, br, bs) = baselineResults.Evaluate(one, Frozen);
-                    var (pc, pr, ps) = results.Evaluate(one, Frozen);
-                    if (bs < optimization.MinSamples || ps < optimization.MinSamples) return false;
-                    var baseOne = (bc * correlationWeight) + ((1 - br / (1 + br)) * rmseWeight);
-                    var propOne = (pc * correlationWeight) + ((1 - pr / (1 + pr)) * rmseWeight);
-                    return double.IsNaN(propOne) || propOne <= baseOne;
-                }).Count();
-                if (losesOn > 0)
-                {
-                    _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better on the aggregate (Composite={Composite:0.000} > Best={Best:0.000}) but not on {LosesOn} of {Snapshots} snapshots on their own; treating the gain as noise",
-                        optimizer.Name, composite, bestScore, losesOn, evalSet.Count);
-                    continue;
-                }
-            }
-
-            _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
-                optimizer.Name, composite, bestScore, corr, rmse);
-            if (best == null || composite > best.Value.Composite)
-                best = (optimizer, results, composite, corr, rmse);
-        }
-
-        if (best == null)
-        {
-            _state.OptimizerState.LastOutcome = "No proposal beat the current calibration on the held-out data.";
+        if (cycle.Selected == null || cycle.SelectedResults == null)
             return;
-        }
 
-        var (chosen, chosenResults, chosenComposite, chosenCorr, chosenRmse) = best.Value;
-        _logger.LogInformation("Applying {Optimizer} (Composite={Composite:0.000}, R={R:0.000}, RMSE={RMSE:0.000})", chosen.Name, chosenComposite, chosenCorr, chosenRmse);
-        _state.OptimizerState.BestR = chosenCorr;
-        _state.OptimizerState.BestRMSE = chosenRmse;
-        _state.OptimizerState.LastOutcome = $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenCorr:0.000}, RMSE={chosenRmse:0.000}).";
+        var chosen = cycle.Selected;
+        var chosenResults = cycle.SelectedResults;
+        var chosenScore = report.Proposals.First(p => p.Decision == OptimizerGateDecision.Selected).Score;
+        _logger.LogInformation("Applying {Optimizer} (Composite={Composite:0.000}, R={R:0.000}, RMSE={RMSE:0.000})", chosen.Name, chosenScore.Composite, chosenScore.R, chosenScore.Rmse);
+        _state.OptimizerState.BestR = chosenScore.R;
+        _state.OptimizerState.BestRMSE = chosenScore.Rmse;
 
         foreach (var (id, result) in chosenResults.Nodes)
         {
@@ -420,6 +330,115 @@ internal class OptimizationRunner : BackgroundService
                     id, string.Join(", ", atLimit));
 
             await _nsd.Set(id, nodeSettings);
+        }
+    }
+
+    private void LogDecision(OptimizerProposalReport p, double bestScore)
+    {
+        var (composite, corr, rmse, samples) = p.Score;
+        switch (p.Decision)
+        {
+            case OptimizerGateDecision.MinSamples:
+                _logger.LogDebug("Optimizer {Optimizer,-24} rejected: evaluated on {Samples} measurements, need at least {MinSamples} (min_samples)",
+                    p.Optimizer, samples, p.Gates.MinSamples.Required);
+                break;
+            case OptimizerGateDecision.NotBetter:
+                _logger.LogInformation("Optimizer {Optimizer,-24} found worse results: Composite={Composite:0.000} <= Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
+                    p.Optimizer, composite, bestScore, corr, rmse);
+                foreach (var (id, result) in p.Nodes)
+                    _logger.LogDebug("Rejected {NodeId,-20}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}, Error={Error}",
+                        id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
+                break;
+            case OptimizerGateDecision.DeviceFrame:
+                _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better node-to-node (Composite={Composite:0.000}) but not with txRef held (Composite={DeviceComposite:0.000} <= Best={Best:0.000}); the gain is a txRef/rxAdj shift devices would see as range bias",
+                    p.Optimizer, composite, p.Gates.DeviceFrame!.Composite, bestScore);
+                break;
+            case OptimizerGateDecision.EverySnapshot:
+                _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better on the aggregate (Composite={Composite:0.000} > Best={Best:0.000}) but not on {LosesOn} of {Snapshots} snapshots on their own; treating the gain as noise",
+                    p.Optimizer, composite, bestScore, p.Gates.EverySnapshot!.LostOn, p.Gates.EverySnapshot.Of);
+                break;
+            default:
+                _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
+                    p.Optimizer, composite, bestScore, corr, rmse);
+                break;
+        }
+    }
+
+    /// <summary>The most recent live cycle (not dry runs): its report, residuals and selection. Null until one has run.</summary>
+    internal OptimizationCycleResult? LastCycle
+    {
+        get => Volatile.Read(ref _lastCycle);
+        private set => Volatile.Write(ref _lastCycle, value);
+    }
+    private OptimizationCycleResult? _lastCycle;
+
+    /// <summary>The optimizers the next scheduled cycle will run, by name.</summary>
+    internal IReadOnlyList<string> OptimizerNames
+    {
+        get { lock (_optimizersLock) return _optimizers.Select(o => o.Name).ToList(); }
+    }
+
+    /// <summary>The configured optimizer mode (legacy, global_absorption or per_node_absorption).</summary>
+    internal string Mode
+    {
+        get { lock (_optimizersLock) return _lastOptimizerMode ?? "legacy"; }
+    }
+
+    /// <summary>Every optimizer a dry run can be asked for by name, whatever the configured mode.</summary>
+    internal IReadOnlyList<string> KnownOptimizerNames => AllOptimizers().Select(o => o.Name).ToList();
+
+    private IEnumerable<IOptimizer> AllOptimizers() =>
+        BuildOptimizers("legacy").Concat(BuildOptimizers("global_absorption")).Concat(BuildOptimizers("per_node_absorption"));
+
+    /// <summary>Thrown by <see cref="DryRunAsync"/> when it cannot run; the message says why.</summary>
+    internal sealed class DryRunUnavailableException(string message) : Exception(message);
+
+    private readonly SemaphoreSlim _dryRunGate = new(1, 1);
+
+    /// <summary>
+    /// Runs one cycle now on the current history and reports it, applying nothing: the cycle is
+    /// <see cref="OptimizationCycle.Evaluate"/>, which only ever reads node settings. It uses fresh optimizer instances, so
+    /// it shares no state with a live cycle that may be running, does not touch <see cref="OptimizerState"/> or
+    /// <see cref="LastCycle"/>, and needs no lease. Dry runs are serialized with each other. The history is only
+    /// collected while this instance holds the optimization lease, so on an instance that does not, there is nothing to run on.
+    /// </summary>
+    /// <param name="optimizer">Run only the optimizer with this name (any mode's; case-insensitive), or the configured set when null.</param>
+    internal async Task<OptimizationCycleResult> DryRunAsync(string? optimizer, CancellationToken cancellationToken = default)
+    {
+        var optimization = _state.Config?.Optimization ?? new ConfigOptimization();
+
+        IList<IOptimizer> optimizers;
+        if (string.IsNullOrWhiteSpace(optimizer))
+        {
+            optimizers = BuildOptimizers(Mode);
+        }
+        else
+        {
+            var match = AllOptimizers().FirstOrDefault(o => string.Equals(o.Name, optimizer.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (match == null)
+                throw new DryRunUnavailableException($"Unknown optimizer '{optimizer}'. Known: {string.Join(", ", KnownOptimizerNames)}.");
+            optimizers = new List<IOptimizer> { match };
+        }
+
+        var snapshots = Snapshots.ToArray();
+        if (!OptimizationDataSplit.TryCreate(snapshots, optimization.EffectiveValidationFraction, out var split) || split == null)
+            throw new DryRunUnavailableException(
+                $"The history holds {snapshots.Length} snapshots; a cycle needs at least {OptimizationDataSplit.MinimumSnapshots} to split into training and validation." +
+                (_state.OptimizerState.LeaseHolder == "This instance" ? "" : " Snapshots are only collected while this instance holds the optimization lease."));
+
+        var note = HasSufficientHistory(snapshots, optimization)
+            ? null
+            : $"The history spans less than {MinimumHistoryFraction:P0} of the {optimization.EffectiveTrainingWindowMins}-minute training window; a scheduled cycle would not run on it yet.";
+
+        await _dryRunGate.WaitAsync(cancellationToken);
+        try
+        {
+            var result = await Task.Run(() => OptimizationCycle.Evaluate(split.Training, split.Validation, optimization, optimizers, _nsd.Get, dryRun: true, DateTime.UtcNow), cancellationToken);
+            return note == null ? result : result with { Report = result.Report with { Note = note } };
+        }
+        finally
+        {
+            _dryRunGate.Release();
         }
     }
 

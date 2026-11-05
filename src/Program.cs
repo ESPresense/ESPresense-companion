@@ -59,7 +59,9 @@ builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
 
 builder.Services.AddHostedService<MultiScenarioLocator>();
-builder.Services.AddHostedService<OptimizationRunner>();
+// A singleton as well as a hosted service, so OptimizerDebugService reads the same runner's history and last cycle.
+builder.Services.AddSingleton<OptimizationRunner>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<OptimizationRunner>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceTracker>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceSettingsStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSettingsStore>());
@@ -68,6 +70,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Teleme
 builder.Services.AddHostedService<DeviceCleanupService>();
 builder.Services.AddSingleton<State>();
 builder.Services.AddSingleton<CalibrationService>();
+builder.Services.AddSingleton(provider => new OptimizerDebugService(provider.GetRequiredService<OptimizationRunner>(), provider.GetRequiredService<State>()));
 builder.Services.AddSingleton<DeviceEnricher>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt => JsonDefaults.ConfigureWeb(opt.JsonSerializerOptions));
 builder.Services.AddEndpointsApiExplorer();
@@ -80,6 +83,7 @@ builder.Services.AddMcpServer(options =>
 })
     .WithResources<McpResources>()
     .WithTools<McpResources>()
+    .WithTools<McpOptimizerTools>()
     .WithHttpTransport();
 
 var app = builder.Build();

@@ -12,6 +12,13 @@ namespace ESPresense.Models;
 /// </summary>
 public readonly record struct OptimizationEvaluation(double Correlation, double RMSE, int Samples);
 
+/// <summary>One measure as <see cref="OptimizationResults.Predict"/> scores it: modelled and measured RSSI in dB.</summary>
+internal readonly record struct PredictedMeasure(Measure Measure, double Predicted, double Measured)
+{
+    /// <summary>Measured minus predicted: positive when the link is louder than the model expects.</summary>
+    public double Residual => Measured - Predicted;
+}
+
 public class OptimizationResults
 {
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
@@ -54,6 +61,25 @@ public class OptimizationResults
         List<double> predictedValues = new();
         List<double> measuredValues = new();
 
+        foreach (var p in Predict(oss, getSettings, deviceFrame))
+        {
+            predictedValues.Add(p.Predicted);
+            measuredValues.Add(p.Measured);
+        }
+
+        var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
+        var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
+
+        return new OptimizationEvaluation(correlation, rmse, predictedValues.Count);
+    }
+
+    /// <summary>
+    /// The RSSI this proposal predicts for each usable measure in <paramref name="oss"/>, next to the RSSI it
+    /// would have been measured at with the proposed rxAdj. <see cref="Evaluate(List{OptimizationSnapshot}, Func{string, NodeSettings}, bool)"/>
+    /// scores exactly these pairs; the optimizer diagnostics report their residuals (measured minus predicted) per node.
+    /// </summary>
+    internal IEnumerable<PredictedMeasure> Predict(IEnumerable<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, bool deviceFrame = false)
+    {
         foreach (var os in oss)
         {
             foreach (var m in os.Measures)
@@ -81,14 +107,8 @@ public class OptimizationResults
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
                 double measuredRssi = m.GetAdjustedRssi(rxAdjRssi);
 
-                predictedValues.Add(predictedRssi);
-                measuredValues.Add(measuredRssi);
+                yield return new PredictedMeasure(m, predictedRssi, measuredRssi);
             }
         }
-
-        var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
-        var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
-
-        return new OptimizationEvaluation(correlation, rmse, predictedValues.Count);
     }
 }
