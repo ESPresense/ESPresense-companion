@@ -71,7 +71,7 @@ Backend
 4. `MqttCoordinator`: catch all exceptions in `ConnectedAsync` and fault/reset the connection TCS; make `_reconnectRequired`/`_mqttClient` volatile; replace `ClientId.Contains("read")` with an explicit `mqtt.read_only` config flag.
 5. Remove AutoMapper and the committed license key: replace `MappingProfile`/`MappingActions` with a static `NodeState.From(Node, telemetry)`. Two call sites.
 6. Delete dead code: `CombinedOptimizer`, `JointRxAdjAbsorptionOptimizer`, `WeightedJointRxAdjAbsorptionOptimizer`, `TwoStageRxAdjAbsorptionOptimizer`; either register `FixAbsolutePaths` or delete it; drop `MathNet.Filtering*`, fix the invalid `<RuntimeIdentifiers>linux</RuntimeIdentifiers>`.
-7. NaN guards: `CalculateConfidence`, `CalculatePearsonCorrelation` (one sentinel), `AbsorptionAvgOptimizer` distance ≤ 1, `OptimizationResults.Evaluate` `Log10(0)`, `Normalize` of a zero vector in NM/MLE.
+7. NaN guards: `CalculateConfidence`, `CalculatePearsonCorrelation` (one sentinel), ~~`AbsorptionAvgOptimizer` distance ≤ 1~~ (removed with the optimizer), `OptimizationResults.Evaluate` `Log10(0)`, `Normalize` of a zero vector in NM/MLE.
 8. `NodeSettingsStore` round-trip: add inbound cases for `forget_after_ms` and `count_ms`; prune `_storeByAlias` on alias change; optimistically update the cache on `Set`.
 
 Frontend

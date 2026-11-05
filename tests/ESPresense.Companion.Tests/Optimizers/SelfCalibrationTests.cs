@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging.Abstractions;
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using ESPresense.Companion.Tests.Locators;
 using ESPresense.Models;
@@ -164,6 +164,40 @@ public class SelfCalibrationTests
         TestContext.WriteLine($"median range error: uncalibrated {before:0.00} m -> calibrated {after:0.00} m");
         Assert.That(results.Nodes, Is.Not.Empty, "joint fit proposed nothing");
         Assert.That(after, Is.LessThan(before / 2), "calibration should at least halve the median range error");
+    }
+
+    /// <summary>
+    /// A hopeless home (absorption well above the configured ceiling, one receiver 40 dB hot) must produce
+    /// clamped proposals, not runaway ones. The clamps are what make continuous calibration safe to leave on:
+    /// a bad week of data can only push settings to the fence.
+    /// </summary>
+    [Test]
+    public void PerNodeAbsorptionRxTx_ProposalsStayWithinConfiguredLimits()
+    {
+        var nodes = MakeNodes();
+        var os = Synth(nodes, _ => 6.0, id => id == "n05" ? 40 : 0, noiseSd: 1.0, seed: 7);
+
+        var results = new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
+
+        foreach (var (id, p) in results.Nodes.OrderBy(kv => kv.Key))
+            TestContext.WriteLine($"{id}: absorption {p.Absorption:0.000} rxAdj {p.RxAdjRssi:0.00} txRef {p.TxRefRssi:0.00}");
+        Assert.That(results.Nodes, Is.Not.Empty);
+        foreach (var (id, p) in results.Nodes)
+        {
+            if (p.Absorption != null) Assert.That(p.Absorption, Is.InRange(Opt.AbsorptionMin, Opt.AbsorptionMax), $"{id} absorption");
+            if (p.RxAdjRssi != null) Assert.That(p.RxAdjRssi, Is.InRange(Opt.RxAdjRssiMin, Opt.RxAdjRssiMax), $"{id} rxAdj");
+            if (p.TxRefRssi != null) Assert.That(p.TxRefRssi, Is.InRange(Opt.TxRefRssiMin, Opt.TxRefRssiMax), $"{id} txRef");
+        }
+
+        // Absorption 6 is beyond the ceiling, so every receiver sits on it rather than past it.
+        Assert.That(results.Nodes.Values.Select(p => p.Absorption), Has.All.EqualTo(Opt.AbsorptionMax).Within(1e-6),
+            "an absorption above the configured ceiling should pin every receiver's proposal to it");
+
+        // The joint fit spreads the capped absorption over rxAdj and txRef, so the hot receiver need not land on
+        // rxAdj_max itself; it must still stand well clear of every other receiver rather than be absorbed by them.
+        var hot = results.Nodes["n05"].RxAdjRssi!.Value;
+        foreach (var (id, p) in results.Nodes.Where(kv => kv.Key != "n05"))
+            Assert.That(hot - p.RxAdjRssi!.Value, Is.GreaterThan(20), $"the 40 dB hot receiver should stand out from {id}");
     }
 
     // ---- robot survey: real radio, through the pipeline as shipped -------------------------------
