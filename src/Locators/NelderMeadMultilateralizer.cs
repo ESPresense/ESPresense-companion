@@ -12,6 +12,9 @@ public class NelderMeadMultilateralizer : BaseMultilateralizer
 {
     private readonly IWeighting _weighting;
 
+    /// <summary>Replaces the configured weighting; tests use it to act between taking the readings and solving.</summary>
+    internal IWeighting Weighting { init => _weighting = value; }
+
     public NelderMeadMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null) : base(device, floor, state, logger)
     {
         // Load weighting from NelderMead config, defaulting to Gaussian if not specified
@@ -45,6 +48,7 @@ public class NelderMeadMultilateralizer : BaseMultilateralizer
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
+                        scenario.ThrowIfSuperseded();
                         var distanceFromBoundingBox = lowerBound.Subtract(x)
                             .PointwiseMaximum(x.Subtract(upperBound))
                             .PointwiseMaximum(0)

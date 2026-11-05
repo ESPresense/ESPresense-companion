@@ -69,9 +69,55 @@ public class Scenario(Config? config, ILocate locator, string? name)
         ? $"{LocatorName} ({Name})"
         : LocatorName;
 
+    /// <summary>
+    /// After this many abandoned solves in a row the next one runs to the end, so a device heard by
+    /// many nodes still gets a position when its readings arrive faster than a solve finishes.
+    /// </summary>
+    internal const int MaxConsecutiveAbandons = 3;
+
+    private Device? _solveDevice;
+    private long _solveVersion;
+    private int _abandoned;
+
+    /// <summary>Solves dropped in a row because a newer reading superseded them.</summary>
+    internal int ConsecutiveAbandons => _abandoned;
+
     public bool Locate()
     {
-        return Locator.Locate(this);
+        try
+        {
+            var moved = Locator.Locate(this);
+            _abandoned = 0;
+            return moved;
+        }
+        catch (ReadingsSupersededException)
+        {
+            // A newer reading re-queued the device, and the next pass solves on it; this result would be stale.
+            _abandoned++;
+            return false;
+        }
+        finally
+        {
+            _solveDevice = null;
+        }
+    }
+
+    /// <summary>
+    /// Takes the device's current readings for one solve and notes their version, so
+    /// <see cref="ThrowIfSuperseded"/> can stop the solve once a newer reading arrives.
+    /// </summary>
+    internal DeviceToNode[] TakeReadings(Device device)
+    {
+        _solveDevice = device;
+        _solveVersion = device.ReadingVersion; // before the copy: a reading landing during it bumps past this
+        return device.CurrentReadings();
+    }
+
+    /// <summary>Called from a solver's objective: stops a solve whose readings have been superseded.</summary>
+    internal void ThrowIfSuperseded()
+    {
+        if (_solveDevice != null && _abandoned < MaxConsecutiveAbandons && _solveDevice.ReadingVersion != _solveVersion)
+            throw new ReadingsSupersededException();
     }
 
     public void UpdateLocation(Point3D newLocation)

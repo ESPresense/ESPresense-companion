@@ -35,8 +35,8 @@ public abstract class BaseMultilateralizer : ILocate
     {
         var confidence = scenario.Confidence ?? 0;
 
-        nodes = Device.Nodes.Values
-            .Where(a => a.Current && (a.Node?.Floors?.Contains(Floor) ?? false))
+        nodes = scenario.TakeReadings(Device)
+            .Where(a => a.Node?.Floors?.Contains(Floor) ?? false)
             .OrderBy(a => a.Distance)
             .ToArray();
 
@@ -159,6 +159,7 @@ public abstract class BaseMultilateralizer : ILocate
     /// </summary>
     protected int HandleLocatorException(Exception ex, Scenario scenario, Point3D fallbackGuess)
     {
+        if (ex is ReadingsSupersededException) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(ex); // not a failure: Scenario.Locate drops this solve
         scenario.UpdateLocation(!double.IsNaN(fallbackGuess.X) ? fallbackGuess : new Point3D());
         Logger.LogError("Error finding location for {Device}: {Message}", Device, ex.Message);
         return 0;
