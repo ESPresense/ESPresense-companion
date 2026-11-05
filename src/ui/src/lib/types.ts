@@ -221,6 +221,24 @@ export interface OptimizerState {
 	lastOutcome?: string;
 	leaseHolder?: string;
 	leaseExpiresAt?: string;
+	deviceResidual?: DeviceResidualState;
+}
+
+/** What the device_residual optimizer learned from located devices in its last cycle. */
+export interface DeviceResidualState {
+	updatedAt: string;
+	windows: number;
+	devices: number;
+	movingDevices: number;
+	/** Mean |leave-one-out residual| (dB) over the training windows, incumbent and proposal. */
+	residualBefore?: number;
+	residualAfter?: number;
+	/** Mean solver scale (fitted / measured distance); near 1 when the calibration is right. */
+	scaleBefore?: number;
+	scaleAfter?: number;
+	devicesApplied: number;
+	/** Per node: trust (variance of its leave-one-out residuals, dB^2) and the rxAdj change proposed. */
+	nodes: Record<string, { rxAdjChange?: number; variance: number; weight: number; windows: number }>;
 }
 
 export interface CalibrationResponse {
