@@ -143,6 +143,7 @@ public class State
             var anchorLocation = device.Anchor!.Location;
             var anchorNode = nodes.GetOrAdd(device.Id, _ => new OptNode { Id = device.Id, Name = device.Name ?? device.Id, Location = anchorLocation });
             anchorNode.Location = anchorLocation;
+            anchorNode.IsAnchor = true;
             anchorNode.Name = device.Name ?? device.Id;
 
             foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current))

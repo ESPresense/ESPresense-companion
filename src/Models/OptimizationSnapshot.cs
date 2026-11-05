@@ -51,6 +51,9 @@ public class OptNode
     public string Id { get; set; }
     public string? Name { get; set; }
     public Point3D Location { get; set; }
+
+    /// <summary>An anchored device standing in as a transmitter (see <see cref="State.ReadMeasures"/>), not a node.</summary>
+    public bool IsAnchor { get; set; }
 }
 
 public class Measure

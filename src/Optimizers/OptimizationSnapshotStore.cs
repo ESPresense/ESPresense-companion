@@ -4,7 +4,8 @@ namespace ESPresense.Optimizers;
 
 /// <summary>
 /// The rolling history of node-to-node and anchor measurements the optimizers train and validate on.
-/// Owned by <see cref="OptimizationRunner"/>; nothing else reads it.
+/// Owned by <see cref="OptimizationRunner"/>, which alone writes it; <see cref="ESPresense.Services.OptimizerDebugService"/>
+/// also reads it, through <see cref="ToArray"/>, to report on the history.
 /// </summary>
 public sealed class OptimizationSnapshotStore
 {

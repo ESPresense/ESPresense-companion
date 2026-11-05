@@ -8,6 +8,12 @@ public sealed record OptimizationDataSplit(
     public const int MinimumValidationSnapshots = 2;
     public const int MinimumSnapshots = MinimumValidationSnapshots + 2;
 
+    /// <summary>
+    /// The snapshots, oldest first, whose measures were pooled into <see cref="Training"/>. Read this rather than
+    /// re-deriving the split, so a report on the training set always describes the snapshots it was built from.
+    /// </summary>
+    public IReadOnlyList<OptimizationSnapshot> TrainingSnapshots { get; init; } = Array.Empty<OptimizationSnapshot>();
+
     public static bool TryCreate(
         IEnumerable<OptimizationSnapshot> snapshots,
         double validationFraction,
@@ -36,7 +42,7 @@ public sealed record OptimizationDataSplit(
             Measures = trainingSnapshots.SelectMany(snapshot => snapshot.Measures).ToList()
         };
 
-        split = new OptimizationDataSplit(training, ordered.Skip(trainingCount).ToArray());
+        split = new OptimizationDataSplit(training, ordered.Skip(trainingCount).ToArray()) { TrainingSnapshots = trainingSnapshots };
         return true;
     }
 }

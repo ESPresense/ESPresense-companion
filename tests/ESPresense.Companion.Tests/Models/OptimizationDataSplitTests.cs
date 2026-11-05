@@ -45,6 +45,19 @@ public class OptimizationDataSplitTests
     }
 
     [Test]
+    public void TryCreate_ExposesTheSnapshotsPooledForTraining()
+    {
+        var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var snapshots = Enumerable.Range(0, 6).Select(index => Snapshot(start.AddMinutes(index), index)).Reverse().ToArray();
+
+        Assert.That(OptimizationDataSplit.TryCreate(snapshots, 0.2, out var split), Is.True);
+
+        // max(2, ceil(6 * 0.2)) = 2 held out; the 4 oldest, oldest first, are the ones pooled into Training.
+        Assert.That(split!.TrainingSnapshots.Select(s => s.Timestamp), Is.EqualTo(Enumerable.Range(0, 4).Select(i => start.AddMinutes(i))));
+        Assert.That(split.Training.Measures, Is.EqualTo(split.TrainingSnapshots.SelectMany(s => s.Measures)));
+    }
+
+    [Test]
     public void CombinedTrainingSnapshot_GroupsNodesByIdAcrossSamples()
     {
         var first = Snapshot(DateTime.UtcNow, 1);

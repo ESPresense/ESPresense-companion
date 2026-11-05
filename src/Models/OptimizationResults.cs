@@ -12,6 +12,13 @@ namespace ESPresense.Models;
 /// </summary>
 public readonly record struct OptimizationEvaluation(double Correlation, double RMSE, int Samples);
 
+/// <summary>One measure as <see cref="OptimizationResults.Predict"/> scores it: modelled and measured RSSI in dB.</summary>
+internal readonly record struct PredictedMeasure(Measure Measure, double Predicted, double Measured)
+{
+    /// <summary>Measured minus predicted: positive when the link is louder than the model expects.</summary>
+    public double Residual => Measured - Predicted;
+}
+
 public class OptimizationResults
 {
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
@@ -50,10 +57,31 @@ public class OptimizationResults
     /// (for example when an earlier cycle's MQTT writes are echoed back) while the cycle runs.
     /// </summary>
     public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, bool deviceFrame = false)
-    {
-        List<double> predictedValues = new();
-        List<double> measuredValues = new();
+        => Score(Predict(oss, getSettings, deviceFrame).ToList());
 
+    /// <summary>
+    /// Pearson R and RMSE of predicted against measured RSSI over <paramref name="predictions"/>: the reduction
+    /// <see cref="Evaluate(List{OptimizationSnapshot}, Func{string, NodeSettings}, bool)"/> applies to <see cref="Predict"/>.
+    /// Lets a caller that also needs the per-measure residuals predict once and score from the same list.
+    /// </summary>
+    internal static OptimizationEvaluation Score(IReadOnlyList<PredictedMeasure> predictions)
+    {
+        var predictedValues = predictions.Select(p => p.Predicted).ToList();
+        var measuredValues = predictions.Select(p => p.Measured).ToList();
+
+        var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
+        var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
+
+        return new OptimizationEvaluation(correlation, rmse, predictedValues.Count);
+    }
+
+    /// <summary>
+    /// The RSSI this proposal predicts for each usable measure in <paramref name="oss"/>, next to the RSSI it
+    /// would have been measured at with the proposed rxAdj. <see cref="Evaluate(List{OptimizationSnapshot}, Func{string, NodeSettings}, bool)"/>
+    /// scores exactly these pairs; the optimizer diagnostics report their residuals (measured minus predicted) per node.
+    /// </summary>
+    internal IEnumerable<PredictedMeasure> Predict(IEnumerable<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, bool deviceFrame = false)
+    {
         foreach (var os in oss)
         {
             foreach (var m in os.Measures)
@@ -81,14 +109,8 @@ public class OptimizationResults
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
                 double measuredRssi = m.GetAdjustedRssi(rxAdjRssi);
 
-                predictedValues.Add(predictedRssi);
-                measuredValues.Add(measuredRssi);
+                yield return new PredictedMeasure(m, predictedRssi, measuredRssi);
             }
         }
-
-        var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
-        var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
-
-        return new OptimizationEvaluation(correlation, rmse, predictedValues.Count);
     }
 }
