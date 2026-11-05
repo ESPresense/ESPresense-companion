@@ -1,23 +1,47 @@
 name: Docker Release
+# Release images, named after the git tag:
+#
+#   vX.Y.Z          -> X.Y.Z, latest
+#   vX.Y.Z-beta.N   -> X.Y.Z-beta.N, beta
+#
+# Runs on a tag push (a release published by hand in the GitHub UI) or is
+# called by release.yml, whose GITHUB_TOKEN-created tags trigger nothing.
 on:
   push:
     tags: [ 'v*' ]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to build, e.g. v2.6.5-beta.1
+        required: true
+        type: string
 
 jobs:
   deploy:
-    name: Deploy to Docker add-on with tag
+    name: Build and push release image
     runs-on: ubuntu-latest
     environment: CI - release environment
     steps:
+      - name: Resolve tag
+        id: version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "Tag $TAG is not vX.Y.Z or vX.Y.Z-beta.N" >&2
+            exit 1
+          fi
+          if [[ "$VERSION" == *-* ]]; then CHANNEL=beta; else CHANNEL=latest; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "Building espresense/espresense-companion:$VERSION (+ :$CHANNEL)" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout the repository
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-      - name: Git Semantic Version
-        id: version
-        uses: paulhatch/semantic-version@v6.0.5
-        with:
-          version_format: "${major}.${minor}.${patch}"
+          ref: refs/tags/${{ steps.version.outputs.tag }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -41,5 +65,7 @@ jobs:
             --platform linux/arm,linux/arm64,linux/amd64 \
             --output "type=image,push=true" \
             --file ./Dockerfile . \
+            --label "org.opencontainers.image.version=${{ steps.version.outputs.version }}" \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
             --tag "espresense/espresense-companion:${{ steps.version.outputs.version }}" \
-            --tag "espresense/espresense-companion:latest"
+            --tag "espresense/espresense-companion:${{ steps.version.outputs.channel }}"
