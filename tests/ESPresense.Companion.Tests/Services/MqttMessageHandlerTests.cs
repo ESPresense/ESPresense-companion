@@ -1,4 +1,5 @@
 using ESPresense.Events;
+using ESPresense.Models;
 using ESPresense.Services;
 
 namespace ESPresense.Companion.Tests.Services;
@@ -131,6 +132,22 @@ public class MqttMessageHandlerTests
         Assert.That(sink.Discovered[0].DiscoveryId, Is.EqualTo("espresense-d"));
         Assert.That(sink.Discovered[0].DeviceId, Is.Null);
         Assert.That(sink.Discovered[0].AutoDiscover, Is.Null);
+    }
+
+    [Test]
+    public void Discovery_MalformedPayload_LogsUnderAutoDiscovery_NotTheCoordinator()
+    {
+        var sink = new FakeSink();
+        var coordinatorLogger = new Microsoft.Extensions.Logging.Testing.FakeLogger<MqttCoordinator>();
+        var discoveryLogger = new Microsoft.Extensions.Logging.Testing.FakeLogger<AutoDiscovery>();
+        var handler = new DiscoveryHandler(sink, () => "homeassistant", coordinatorLogger, discoveryLogger);
+
+        Assert.ThrowsAsync<MqttMessageProcessingException>(() =>
+            handler.HandleAsync(new DiscoveryRoute("homeassistant/device_tracker/espresense-d/config", "espresense-d"), "{not json"));
+
+        var parseFailure = discoveryLogger.Collector.GetSnapshot().Single(r => r.Message.StartsWith("Failed to deserialize discovery message"));
+        Assert.That(parseFailure.Category, Is.EqualTo(typeof(AutoDiscovery).FullName));
+        Assert.That(coordinatorLogger.Collector.GetSnapshot().Where(r => r.Message.StartsWith("Failed to deserialize")), Is.Empty);
     }
 
     [Test]

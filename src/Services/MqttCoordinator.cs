@@ -40,11 +40,23 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
     private readonly MqttMessageHandlers _handlers;
     private volatile MqttTopicRouter _router = new("homeassistant");
 
+    /// <summary>For tests and tools: inbound discovery parse failures are discarded.</summary>
     public MqttCoordinator(
         ConfigLoader cfg,
         ILogger<MqttCoordinator> logger,
         IMqttNetLogger mqttNetLogger,
         SupervisorConfigLoader supervisorConfigLoader)
+        : this(cfg, logger, mqttNetLogger, supervisorConfigLoader, NullLogger<AutoDiscovery>.Instance)
+    {
+    }
+
+    /// <param name="discoveryLogger">Logs inbound HA discovery parsing under the AutoDiscovery category. DI picks this constructor.</param>
+    public MqttCoordinator(
+        ConfigLoader cfg,
+        ILogger<MqttCoordinator> logger,
+        IMqttNetLogger mqttNetLogger,
+        SupervisorConfigLoader supervisorConfigLoader,
+        ILogger<AutoDiscovery> discoveryLogger)
     {
         _logger = logger ?? NullLogger<MqttCoordinator>.Instance;
         var connection = new MqttConnection(
@@ -55,7 +67,7 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
 
         _connection = connection;
         _connection.MessageReceived += OnMqttMessageReceived;
-        _handlers = new MqttMessageHandlers(this, () => DiscoveryTopic, _logger);
+        _handlers = new MqttMessageHandlers(this, () => DiscoveryTopic, _logger, discoveryLogger);
     }
 
     /// <summary>For tests: a coordinator over a given connection.</summary>

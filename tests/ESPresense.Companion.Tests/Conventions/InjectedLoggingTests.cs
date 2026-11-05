@@ -185,4 +185,26 @@ public class ConstructedLoggingTests
         factory.Verify(f => f.CreateLogger(typeof(DeviceTracker).FullName!), Times.Once, "DeviceTracker");
         factory.Verify(f => f.CreateLogger(typeof(AutoDiscovery).FullName!), Times.Once, "DeviceTracker's discovery logger");
     }
+
+    [Test]
+    public async Task DependencyInjection_GivesMqttCoordinatorAnAutoDiscoveryLogger()
+    {
+        // Inbound discovery parse failures are logged by AutoDiscovery.TryDeserialize under its own category.
+        var configLoader = new ConfigLoader(Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString()));
+        var discoveryLogger = new FakeLogger<AutoDiscovery>();
+        var services = new ServiceCollection();
+        services.AddSingleton(configLoader);
+        services.AddSingleton<ILogger<MqttCoordinator>>(NullLogger<MqttCoordinator>.Instance);
+        services.AddSingleton<ILogger<AutoDiscovery>>(discoveryLogger);
+        services.AddSingleton<IMqttNetLogger>(new MqttNetLogger());
+        services.AddSingleton(new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance));
+        services.AddSingleton<MqttCoordinator>();
+
+        using var sp = services.BuildServiceProvider();
+        var mqtt = sp.GetRequiredService<MqttCoordinator>();
+
+        await mqtt.OnMqttMessageReceived(ESPresense.Companion.Tests.Services.MqttRoutingCharacterizationTests.Message(
+            "homeassistant/device_tracker/espresense-d/config", "{not json"));
+        Assert.That(discoveryLogger.Collector.GetSnapshot().Select(r => r.Message), Has.Some.StartsWith("Failed to deserialize discovery message"));
+    }
 }
