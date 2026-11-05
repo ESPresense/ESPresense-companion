@@ -18,9 +18,6 @@ public sealed record LocatorDescriptor(string Name, bool Enabled, bool PerFloor,
 /// </summary>
 public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger<ScenarioFactory> logger)
 {
-    private const string NelderMeadName = "NelderMead";
-    private const string NearestNodeName = "NearestNode";
-
     /// <summary>
     /// Every locator, in scenario order. The order is load-bearing: MultiScenarioLocator breaks
     /// probability/confidence ties by scenario index.
@@ -30,14 +27,21 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
         var l = c?.Locators;
         return
         [
-            new(NelderMeadName, l?.NelderMead?.Enabled ?? false, true, l?.NelderMead?.Floors, (d, f, s) => new NelderMeadMultilateralizer(d, f!, s)),
+            NelderMead(l?.NelderMead?.Enabled ?? false, l?.NelderMead?.Floors),
             new("Bfgs", l?.Bfgs?.Enabled ?? false, true, l?.Bfgs?.Floors, (d, f, s) => new BfgsMultilateralizer(d, f!, s)),
             new("Mle", l?.Mle?.Enabled ?? false, true, l?.Mle?.Floors, (d, f, s) => new MLEMultilateralizer(d, f!, s)),
             new("MultiFloor", l?.MultiFloor?.Enabled ?? false, false, null, (d, _, s) => new MultiFloorMultilateralizer(d, s)),
             new("NadarayaWatson", l?.NadarayaWatson?.Enabled ?? false, true, l?.NadarayaWatson?.Floors, (d, f, s) => new NadarayaWatsonMultilateralizer(d, f!, s, nts)),
-            new(NearestNodeName, l?.NearestNode?.Enabled ?? false, false, null, (d, _, s) => new NearestNode(d, s)),
+            NearestNodeLocator(l?.NearestNode?.Enabled ?? false),
         ];
     }
+
+    // These two are also the nothing-enabled fallback, so they are built directly rather than looked up by name.
+    private static LocatorDescriptor NelderMead(bool enabled, string[]? floors) =>
+        new("NelderMead", enabled, true, floors, (d, f, s) => new NelderMeadMultilateralizer(d, f!, s));
+
+    private static LocatorDescriptor NearestNodeLocator(bool enabled) =>
+        new("NearestNode", enabled, false, null, (d, _, s) => new NearestNode(d, s));
 
     /// <summary>The locators <paramref name="c"/> enables, in scenario order.</summary>
     public IReadOnlyList<LocatorDescriptor> Enabled(Config? c) => All(c).Where(d => d.Enabled).ToList();
@@ -57,14 +61,13 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
             yield break;
         }
 
-        var all = All(config);
-        IReadOnlyList<LocatorDescriptor> enabled = all.Where(d => d.Enabled).ToList();
+        var enabled = Enabled(config);
         if (enabled.Count == 0)
         {
             logger.LogWarning("No locators enabled, using default NelderMead");
             enabled = state.Floors.Values.Any()
-                ? [all.Single(d => d.Name == NelderMeadName) with { Floors = null }]
-                : [all.Single(d => d.Name == NearestNodeName)];
+                ? [NelderMead(true, floors: null)]
+                : [NearestNodeLocator(true)];
         }
 
         foreach (var locator in enabled)

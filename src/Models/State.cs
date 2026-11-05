@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using ESPresense.Extensions;
-using ESPresense.Locators;
 using ESPresense.Services;
-using ESPresense.Weighting;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Linq;
 

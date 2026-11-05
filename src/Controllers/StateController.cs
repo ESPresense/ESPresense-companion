@@ -318,8 +318,10 @@ public class StateController : ControllerBase
             var c = _config.Config;
             if (c == null) return StatusCode(500, new { error = "Config not loaded" });
 
-            c.Optimization.Enabled = enable;
-            await _config.SaveSectionAsync("optimization", c.Optimization);
+            // Save a modified copy: the loaded Config is the instance State holds, and only a reload may replace it.
+            var optimization = c.Optimization.Clone();
+            optimization.Enabled = enable;
+            await _config.SaveSectionAsync("optimization", optimization);
             return Ok(new { autoOptimize = enable });
         }
         catch (Exception ex)
