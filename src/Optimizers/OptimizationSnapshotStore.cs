@@ -19,9 +19,13 @@ public sealed class OptimizationSnapshotStore
     /// <returns>The new snapshot.</returns>
     public OptimizationSnapshot Take(State state)
     {
-        var os = state.ReadMeasures();
         var expiryMinutes = state.Config?.Optimization?.EffectiveTrainingWindowMins ?? 30;
         var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
+        // Each snapshot carries the device windows that closed since the previous one, so held-out
+        // snapshots hold the device windows of their own interval.
+        DateTime since;
+        lock (_lock) since = _snapshots.Count > 0 ? _snapshots[^1].Timestamp : expiryThreshold;
+        var os = state.ReadMeasures(since);
         lock (_lock)
         {
             _snapshots.RemoveAll(s => s.Timestamp < expiryThreshold);

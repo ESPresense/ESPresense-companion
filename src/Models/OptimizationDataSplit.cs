@@ -39,7 +39,9 @@ public sealed record OptimizationDataSplit(
         var training = new OptimizationSnapshot
         {
             Timestamp = trainingSnapshots[^1].Timestamp,
-            Measures = trainingSnapshots.SelectMany(snapshot => snapshot.Measures).ToList()
+            Measures = trainingSnapshots.SelectMany(snapshot => snapshot.Measures).ToList(),
+            DeviceWindows = trainingSnapshots.SelectMany(snapshot => snapshot.DeviceWindows).ToList(),
+            Geometry = ordered.LastOrDefault(snapshot => snapshot.Geometry != null)?.Geometry
         };
 
         split = new OptimizationDataSplit(training, ordered.Skip(trainingCount).ToArray()) { TrainingSnapshots = trainingSnapshots };

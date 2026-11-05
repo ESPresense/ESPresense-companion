@@ -6,7 +6,8 @@ namespace ESPresense.Services;
 
 /// <summary>
 /// Background service that, each time a <see cref="Device"/> surfaces from the tracker pipeline:
-///   1. Fuses its scenarios (<see cref="ScenarioFusion.Update"/>), unless it is anchored.
+///   1. Fuses its scenarios (<see cref="ScenarioFusion.Update"/>), unless it is anchored, and hands its
+///      new readings to <see cref="State.DeviceResiduals"/> when the device_residual optimizer is collecting.
 ///   2. Builds one <see cref="DeviceReport"/> for it.
 ///   3. Publishes the report (<see cref="IDeviceStatePublisher"/>).
 ///   4. When the attributes went out: raises OnDeviceChanged and, for located devices, records history.
@@ -40,6 +41,8 @@ public class MultiScenarioLocator(DeviceTracker dl,
         {
             var fusion = ScenarioFusion.Update(device, config?.Filtering ?? new ConfigFiltering(), now);
             best = fusion.Best;
+            if (config?.Optimization is { CollectsDeviceWindows: true } optimization)
+                state.DeviceResiduals.Observe(device, now, optimization.DeviceResidual);
             // A locator reporting a new position; the Kalman output drifts every pass, so it isn't compared.
             locationChanged = fusion.Moved > 0;
         }

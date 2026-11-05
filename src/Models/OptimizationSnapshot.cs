@@ -7,6 +7,15 @@ public class OptimizationSnapshot
     public DateTime Timestamp { get; set; }
     public List<Measure> Measures { get; set; } = new();
 
+    /// <summary>
+    /// Located devices' readings that closed in this snapshot's interval (see <c>DeviceResidualStore</c>).
+    /// Empty unless the device_residual optimizer is collecting them.
+    /// </summary>
+    public List<DeviceWindow> DeviceWindows { get; set; } = new();
+
+    /// <summary>The node positions and floor bounds <see cref="DeviceWindows"/> are solved against.</summary>
+    public DeviceGeometry? Geometry { get; set; }
+
     public OptimizationSnapshot()
     {
         Timestamp = DateTime.UtcNow;

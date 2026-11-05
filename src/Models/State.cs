@@ -77,6 +77,9 @@ public class State
     public DeviceTrackingRules TrackingRules { get; private set; } = DeviceTrackingRules.Empty;
 
     public OptimizerState OptimizerState { get; set; } = new();
+
+    /// <summary>Windowed readings of located devices, for the device_residual optimizer. Fed by the locator.</summary>
+    public ESPresense.Optimizers.DeviceResidualStore DeviceResiduals { get; } = new();
     public LocatorState LocatorState { get; } = new();
 
     public (double? BestRMSE, double? BestR) RecordCalibrationMetrics(double? rmse, double? r)
@@ -105,9 +108,11 @@ public class State
     }
 
     /// <summary>
-    /// The current node-to-node and anchor measurements, without adding them to the optimizer's history
+    /// The current node-to-node and anchor measurements, without adding them to the optimizer's history.
+    /// With <paramref name="deviceWindowsSince"/>, also the device windows that closed after it (and the
+    /// geometry to solve them against), when the device_residual optimizer is collecting them.
     /// </summary>
-    public OptimizationSnapshot ReadMeasures()
+    public OptimizationSnapshot ReadMeasures(DateTime? deviceWindowsSince = null)
     {
         Dictionary<string, OptNode> nodes = new();
         var os = new OptimizationSnapshot
@@ -137,6 +142,12 @@ public class State
                     });
                 }
             }
+
+        if (deviceWindowsSince is { } since && Config?.Optimization is { CollectsDeviceWindows: true })
+        {
+            os.DeviceWindows = DeviceResiduals.Windows(since, os.Timestamp, os.Timestamp);
+            os.Geometry = DeviceGeometry.From(this);
+        }
 
         foreach (var device in Devices.Values.Where(d => d.IsAnchored && d.Anchor != null))
         {

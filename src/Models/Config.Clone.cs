@@ -160,9 +160,15 @@ namespace ESPresense.Models
                 KeepSnapshotMins = KeepSnapshotMins,
                 MinSamples = MinSamples,
                 Limits = new Dictionary<string, double>(Limits),
-                Weights = new Dictionary<string, double>(Weights)
+                Weights = new Dictionary<string, double>(Weights),
+                DeviceResidual = DeviceResidual.Clone()
             };
         }
+    }
+
+    public partial class ConfigDeviceResidual
+    {
+        public ConfigDeviceResidual Clone() => (ConfigDeviceResidual)MemberwiseClone(); // value types only
     }
 
     public partial class ConfigFiltering
