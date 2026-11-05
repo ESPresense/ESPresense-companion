@@ -8,7 +8,7 @@ using Moq;
 namespace ESPresense.Companion.Tests.Optimizers;
 
 /// <summary>
-/// The joint optimizers used to store the global objective as every node's Error, so every node
+/// The joint optimizer used to store the global objective as every node's Error, so every node
 /// reported the same number and a node whose links did not fit could not be told apart.
 /// </summary>
 [FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
@@ -49,12 +49,7 @@ public class PerNodeErrorTests
         }
     }
 
-    private IOptimizer Create(string mode) => mode switch
-    {
-        "per_node_absorption" => new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance),
-        "global_absorption" => new GlobalAbsorptionRxTxOptimizer(_state, NullLogger<GlobalAbsorptionRxTxOptimizer>.Instance),
-        _ => throw new ArgumentOutOfRangeException(nameof(mode))
-    };
+    private IOptimizer Create() => new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance);
 
     /// <summary>
     /// Five nodes that hear each other both ways, with RSSI from the log-distance model (txRef -59,
@@ -93,34 +88,31 @@ public class PerNodeErrorTests
         return os;
     }
 
-    [TestCase("per_node_absorption")]
-    [TestCase("global_absorption")]
-    public void Optimize_ErrorSinglesOutTheNodeWhoseLinksDoNotFit(string mode)
+    [Test]
+    public void Optimize_ErrorSinglesOutTheNodeWhoseLinksDoNotFit()
     {
-        var results = Create(mode).Optimize(Mesh("e"), new Dictionary<string, NodeSettings>());
+        var results = Create().Optimize(Mesh("e"), new Dictionary<string, NodeSettings>());
 
         Assert.That(results.Nodes.Keys, Is.EquivalentTo(new[] { "a", "b", "c", "d", "e" }));
         var errors = results.Nodes.ToDictionary(kv => kv.Key, kv => kv.Value.Error);
         Assert.That(errors.Values, Has.All.Not.Null.And.All.GreaterThanOrEqualTo(0));
 
-        // The global fit's quadratic, asymmetric objective bends the shared absorption toward e's links,
-        // so the others carry some of its error; e must still be the node that stands out.
+        // The other nodes share links with e, so they may carry some of its error; e must still stand out.
         foreach (var id in new[] { "a", "b", "c", "d" })
             Assert.That(errors["e"], Is.GreaterThan(1.25 * errors[id]!.Value), $"e should stand out from {id}: {string.Join(", ", errors)}");
     }
 
-    [TestCase("per_node_absorption")]
-    [TestCase("global_absorption")]
-    public void Optimize_ErrorIsTheNodesRmsResidualInDb(string mode)
+    [Test]
+    public void Optimize_ErrorIsTheNodesRmsResidualInDb()
     {
         // Clean data fits to within rounding, so every node's residual is near 0 dB whatever the
         // objective's priors or penalties add up to.
-        var clean = Create(mode).Optimize(Mesh(null), new Dictionary<string, NodeSettings>());
+        var clean = Create().Optimize(Mesh(null), new Dictionary<string, NodeSettings>());
         Assert.That(clean.Nodes.Values.Select(n => n.Error), Has.All.Not.Null.And.All.LessThan(1.0));
 
         // Every link on e is exactly 10 dB off, and e's fit cannot absorb an alternating error, so its
         // RMS residual is on that scale rather than the scale of a squared or averaged objective.
-        var noisy = Create(mode).Optimize(Mesh("e"), new Dictionary<string, NodeSettings>());
+        var noisy = Create().Optimize(Mesh("e"), new Dictionary<string, NodeSettings>());
         Assert.That(noisy.Nodes["e"].Error, Is.InRange(5.0, 12.0));
     }
 }

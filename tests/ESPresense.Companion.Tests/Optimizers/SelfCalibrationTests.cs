@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging.Abstractions;
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using ESPresense.Companion.Tests.Locators;
 using ESPresense.Models;
@@ -141,110 +141,8 @@ public class SelfCalibrationTests
     }
 
     /// <summary>
-    /// Noise-free sanity: when the world matches the log-distance model exactly, isotonic
-    /// regression must hand back the exact per-receiver absorption and gain error it was shown.
-    /// An optimizer that cannot pass this is not calibrating, whatever else it does.
-    /// </summary>
-    [Test]
-    public void Isotonic_NoiseFree_RecoversAbsorptionAndRxBiasExactly()
-    {
-        var nodes = MakeNodes();
-        var bias = new Dictionary<string, double>
-        {
-            ["n01"] = 0, ["n02"] = 6, ["n03"] = -4, ["n04"] = 12, ["n05"] = 18,
-            ["n06"] = 3, ["n07"] = 9, ["n08"] = -2, ["n09"] = 15, ["n10"] = 1,
-        };
-        var os = Synth(nodes, _ => 3.0, id => bias[id]);
-
-        var results = new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
-
-        Assert.That(results.Nodes.Keys, Is.EquivalentTo(nodes.Keys), "every receiver should get a proposal");
-        foreach (var (id, p) in results.Nodes)
-        {
-            Assert.That(p.Absorption, Is.EqualTo(3.0).Within(0.05), $"{id} absorption");
-            Assert.That(p.RxAdjRssi, Is.EqualTo(bias[id]).Within(0.5), $"{id} rxAdj");
-        }
-    }
-
-    /// <summary>
-    /// The real question: with 2 dB of radio noise on every reading, does applying the proposed
-    /// calibration make inferred distances better than the uncalibrated defaults? The injected
-    /// gain errors reach 18 dB, which uncalibrated turns into ~4x range error — calibration
-    /// has to claw most of that back even though no single reading is trustworthy.
-    /// </summary>
-    [Test]
-    public void Isotonic_NoisyRadio_CalibrationImprovesRanging()
-    {
-        var nodes = MakeNodes();
-        var bias = new Dictionary<string, double>
-        {
-            ["n01"] = 0, ["n02"] = 6, ["n03"] = -4, ["n04"] = 12, ["n05"] = 18,
-            ["n06"] = 3, ["n07"] = 9, ["n08"] = -2, ["n09"] = 15, ["n10"] = 1,
-        };
-        var os = Synth(nodes, _ => 3.0, id => bias[id], noiseSd: 2.0, seed: 42, repeats: 3);
-
-        var results = new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
-
-        var before = MedianRangeError(os, null);
-        var after = MedianRangeError(os, results);
-        TestContext.WriteLine($"median range error: uncalibrated {before:0.00} m -> calibrated {after:0.00} m");
-        Assert.That(after, Is.LessThan(before / 2), "calibration should at least halve the median range error");
-
-        // The gain estimate is an intercept extrapolated to 1 m; receivers in far corners see a
-        // narrow band of distances, so 2 dB of noise legitimately moves it a few dB.
-        foreach (var (id, p) in results.Nodes)
-            Assert.That(p.RxAdjRssi, Is.EqualTo(bias[id]).Within(6.0), $"{id} rxAdj drifted from the injected gain error");
-    }
-
-    /// <summary>
-    /// A hopeless home — absorption well above the configured ceiling, one receiver 40 dB hot —
-    /// must produce clamped proposals, not runaway ones. The clamps are what make continuous
-    /// calibration safe to leave on: a bad week of data can only push settings to the fence.
-    /// </summary>
-    [Test]
-    public void Isotonic_ProposalsStayWithinConfiguredLimits()
-    {
-        var nodes = MakeNodes();
-        var os = Synth(nodes, _ => 6.0, id => id == "n05" ? 40 : 0, noiseSd: 1.0, seed: 7);
-
-        var results = new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
-
-        Assert.That(results.Nodes, Is.Not.Empty);
-        foreach (var (id, p) in results.Nodes)
-        {
-            Assert.That(p.Absorption, Is.InRange(Opt.AbsorptionMin, Opt.AbsorptionMax), $"{id} absorption");
-            Assert.That(p.RxAdjRssi, Is.InRange(Opt.RxAdjRssiMin, Opt.RxAdjRssiMax), $"{id} rxAdj");
-        }
-        Assert.That(results.Nodes["n05"].RxAdjRssi, Is.EqualTo(Opt.RxAdjRssiMax).Within(1e-6),
-            "a 40 dB hot receiver should pin its proposal to the configured maximum");
-    }
-
-    /// <summary>
-    /// RxAdjRssiOptimizer assumes the mid-limits absorption and a -59 reference, and fits only the
-    /// per-receiver gain. Generate a world matching those assumptions and it must find each bias.
-    /// </summary>
-    [Test]
-    public void RxAdj_RecoversPerReceiverBias()
-    {
-        var nodes = MakeNodes();
-        var bias = new Dictionary<string, double>
-        {
-            ["n01"] = 0, ["n02"] = 5, ["n03"] = -3, ["n04"] = 10, ["n05"] = 16,
-            ["n06"] = 2, ["n07"] = 8, ["n08"] = -1, ["n09"] = 13, ["n10"] = 4,
-        };
-        var mid = MidAbsorption;
-        var os = Synth(nodes, _ => mid, id => bias[id], noiseSd: 1.0, seed: 11, repeats: 3);
-
-        var results = new RxAdjRssiOptimizer(_state, NullLogger<RxAdjRssiOptimizer>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
-
-        Assert.That(results.Nodes.Keys, Is.EquivalentTo(nodes.Keys));
-        foreach (var (id, p) in results.Nodes)
-            Assert.That(p.RxAdjRssi, Is.EqualTo(bias[id]).Within(2.0), $"{id} rxAdj");
-    }
-
-    /// <summary>
-    /// per_node_absorption is what config.example.yaml ships, so it is what most users' continuous
-    /// calibration actually runs. It fits rxAdj+absorption per receiver and txRef per transmitter
+    /// per_node_absorption is the only optimizer mode, so it is what every user's continuous
+    /// calibration runs. It fits rxAdj+absorption per receiver and txRef per transmitter
     /// jointly, which leaves a gauge freedom (txRef up, rxAdj down); so instead of checking the
     /// parameters, check the thing users feel — the calibrated system must range better.
     /// </summary>
@@ -266,6 +164,40 @@ public class SelfCalibrationTests
         TestContext.WriteLine($"median range error: uncalibrated {before:0.00} m -> calibrated {after:0.00} m");
         Assert.That(results.Nodes, Is.Not.Empty, "joint fit proposed nothing");
         Assert.That(after, Is.LessThan(before / 2), "calibration should at least halve the median range error");
+    }
+
+    /// <summary>
+    /// A hopeless home (absorption well above the configured ceiling, one receiver 40 dB hot) must produce
+    /// clamped proposals, not runaway ones. The clamps are what make continuous calibration safe to leave on:
+    /// a bad week of data can only push settings to the fence.
+    /// </summary>
+    [Test]
+    public void PerNodeAbsorptionRxTx_ProposalsStayWithinConfiguredLimits()
+    {
+        var nodes = MakeNodes();
+        var os = Synth(nodes, _ => 6.0, id => id == "n05" ? 40 : 0, noiseSd: 1.0, seed: 7);
+
+        var results = new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance).Optimize(os, new Dictionary<string, NodeSettings>());
+
+        foreach (var (id, p) in results.Nodes.OrderBy(kv => kv.Key))
+            TestContext.WriteLine($"{id}: absorption {p.Absorption:0.000} rxAdj {p.RxAdjRssi:0.00} txRef {p.TxRefRssi:0.00}");
+        Assert.That(results.Nodes, Is.Not.Empty);
+        foreach (var (id, p) in results.Nodes)
+        {
+            if (p.Absorption != null) Assert.That(p.Absorption, Is.InRange(Opt.AbsorptionMin, Opt.AbsorptionMax), $"{id} absorption");
+            if (p.RxAdjRssi != null) Assert.That(p.RxAdjRssi, Is.InRange(Opt.RxAdjRssiMin, Opt.RxAdjRssiMax), $"{id} rxAdj");
+            if (p.TxRefRssi != null) Assert.That(p.TxRefRssi, Is.InRange(Opt.TxRefRssiMin, Opt.TxRefRssiMax), $"{id} txRef");
+        }
+
+        // Absorption 6 is beyond the ceiling, so every receiver sits on it rather than past it.
+        Assert.That(results.Nodes.Values.Select(p => p.Absorption), Has.All.EqualTo(Opt.AbsorptionMax).Within(1e-6),
+            "an absorption above the configured ceiling should pin every receiver's proposal to it");
+
+        // The joint fit spreads the capped absorption over rxAdj and txRef, so the hot receiver need not land on
+        // rxAdj_max itself; it must still stand well clear of every other receiver rather than be absorbed by them.
+        var hot = results.Nodes["n05"].RxAdjRssi!.Value;
+        foreach (var (id, p) in results.Nodes.Where(kv => kv.Key != "n05"))
+            Assert.That(hot - p.RxAdjRssi!.Value, Is.GreaterThan(20), $"the 40 dB hot receiver should stand out from {id}");
     }
 
     // ---- robot survey: real radio, through the pipeline as shipped -------------------------------
@@ -325,15 +257,8 @@ public class SelfCalibrationTests
         return (runner, nss);
     }
 
-    private IList<IOptimizer> MakeOptimizers(string mode) => mode == "per_node_absorption"
-        ? new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance) }
-        : new List<IOptimizer>
-        {
-            new RxAdjRssiOptimizer(_state, NullLogger<RxAdjRssiOptimizer>.Instance),
-            new AbsorptionAvgOptimizer(_state),
-            new AbsorptionErrOptimizer(_state, NullLogger<AbsorptionErrOptimizer>.Instance),
-            new IsotonicRegressionOptimizer(_state, NullLogger<IsotonicRegressionOptimizer>.Instance),
-        };
+    private IList<IOptimizer> MakeOptimizers() =>
+        new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance) };
 
     /// <summary>
     /// Distance the system would infer under these settings; same model OptimizationResults.Evaluate
@@ -359,17 +284,16 @@ public class SelfCalibrationTests
     /// in <see cref="OptimizationRunner.RunCycleAsync"/> — runs on half the robot-surveyed
     /// positions, and whatever calibration it chose to apply is scored on the held-out half.
     ///
-    /// On the survey this was developed against, both modes cut held-out median range error from
+    /// On the survey this was developed against, a cycle cuts held-out median range error from
     /// 8.62 m (cold-start defaults) to ~2.3 m, well under the nodes' own tuned firmware estimates
-    /// (4.94 m); the bar here is half, leaving room for other homes. per_node_absorption (the
-    /// config.example.yaml default) used to make it WORSE (10.65 m): its quartic penalty against
+    /// (4.94 m); the bar here is half, leaving room for other homes. per_node_absorption used to
+    /// make it WORSE (10.65 m): its quartic penalty against
     /// under-estimated distances pushed rxAdj positive, and the joint fit hid that behind a
     /// matching txRef shift the gate's RSSI-space score cannot see. It now fits in dB with txRef
     /// anchored, and the gate also scores with txRef held (see OptimizationResults.Evaluate).
     /// </summary>
-    [TestCase("legacy", 0.5)]
-    [TestCase("per_node_absorption", 0.5)]
-    public async Task RobotSurvey_HeldOut_CalibrationCycleImprovesRanging(string mode, double maxRatio)
+    [TestCase(0.5)]
+    public async Task RobotSurvey_HeldOut_CalibrationCycleImprovesRanging(double maxRatio)
     {
         var survey = LoadSpread();
         var rxNodes = RxNodes(survey);
@@ -388,19 +312,19 @@ public class SelfCalibrationTests
             .Select(kv => Math.Abs(kv.Value.Dist - rxNodes[kv.Key].Location.DistanceTo(Truth(pt))))));
 
         var before = HeldOutMedian(test, rxNodes, nss);
-        await runner.RunCycleAsync(fitOs, new List<OptimizationSnapshot> { evalOs, fitOs }, Opt, MakeOptimizers(mode));
+        await runner.RunCycleAsync(fitOs, new List<OptimizationSnapshot> { evalOs, fitOs }, Opt, MakeOptimizers());
         var after = HeldOutMedian(test, rxNodes, nss);
 
         var applied = rxNodes.Keys.Where(id => nss.Get(id).Calibration.Absorption != null
                                             || nss.Get(id).Calibration.RxAdjRssi != null).ToList();
-        TestContext.WriteLine($"mode {mode}: cycle applied calibration to {applied.Count} receivers (absorption/rxAdj)");
+        TestContext.WriteLine($"mode per_node_absorption: cycle applied calibration to {applied.Count} receivers (absorption/rxAdj)");
         foreach (var id in applied) TestContext.WriteLine($"  {id,-6} {Describe(nss, id)}");
         TestContext.WriteLine($"\nheld-out median |range error|: before cycle {before:0.00} m, after {after:0.00} m " +
                               $"(nodes' own reported distances: {reported:0.00} m)");
 
-        Assert.That(applied, Is.Not.Empty, $"a calibration cycle ({mode}) applied nothing on cold-start defaults");
+        Assert.That(applied, Is.Not.Empty, $"a calibration cycle (per_node_absorption) applied nothing on cold-start defaults");
         Assert.That(after, Is.LessThanOrEqualTo(before * maxRatio),
-            $"a calibration cycle ({mode}) should cut held-out range error to at most {maxRatio:0%} of cold-start defaults: " +
+            $"a calibration cycle (per_node_absorption) should cut held-out range error to at most {maxRatio:0%} of cold-start defaults: " +
             $"{before:0.00} m -> {after:0.00} m. Either the optimizer fits noise or the gate accepted calibration " +
             "that does not hold up on data the cycle never saw.");
     }
@@ -413,9 +337,8 @@ public class SelfCalibrationTests
     /// (per-measurement sd from the survey) and the short history production keeps; after the
     /// first applied calibration the settings must stay put and held-out ranging must not slide.
     /// </summary>
-    [TestCase("legacy")]
-    [TestCase("per_node_absorption")]
-    public async Task RobotSurvey_SuccessiveCycles_SettingsConvergeRatherThanWander(string mode)
+    [Test]
+    public async Task RobotSurvey_SuccessiveCycles_SettingsConvergeRatherThanWander()
     {
         var survey = LoadSpread();
         var rxNodes = RxNodes(survey);
@@ -426,7 +349,7 @@ public class SelfCalibrationTests
         OptimizationSnapshot Noisy() => Snapshot(train, rxNodes, m => m.Rssi + Math.Max(1.0, m.Sd) * Gauss(rnd));
 
         var (runner, nss) = MakeRunner();
-        var optimizers = MakeOptimizers(mode);
+        var optimizers = MakeOptimizers();
 
         // ExecuteAsync primes three snapshots before the first cycle and keeps a few minutes of history.
         const int cycles = 8, window = 4;
@@ -444,7 +367,7 @@ public class SelfCalibrationTests
         }
 
         var ids = rxNodes.Keys.OrderBy(x => x).ToList();
-        TestContext.WriteLine($"mode {mode}: settings (absorption/rxAdj) after each cycle, held-out median range error");
+        TestContext.WriteLine($"mode per_node_absorption: settings (absorption/rxAdj) after each cycle, held-out median range error");
         TestContext.WriteLine($"{"cycle",5} {"m",6}  " + string.Join(" ", ids.Select(id => $"{id,9}")));
         foreach (var t in trajectory)
             TestContext.WriteLine($"{t.Cycle,5} {t.HeldOut,6:0.00}  " + string.Join(" ", ids.Select(id =>
@@ -465,12 +388,12 @@ public class SelfCalibrationTests
                 if (Math.Abs((rx1 ?? 0) - (rx0 ?? 0)) > 3) wander.Add($"cycle {t.Cycle} {id} rxAdj {rx0} -> {rx1}");
                 if (Math.Abs((ab1 ?? 0) - (ab0 ?? 0)) > 0.3) wander.Add($"cycle {t.Cycle} {id} absorption {ab0:0.00} -> {ab1:0.00}");
             }
-        Assert.That(wander, Is.Empty, $"settings kept moving after cycle {settleBy} ({mode}):\n  " + string.Join("\n  ", wander));
+        Assert.That(wander, Is.Empty, $"settings kept moving after cycle {settleBy} (per_node_absorption):\n  " + string.Join("\n  ", wander));
 
         // And where it settles has to be good: the same bar as the single clean cycle, now under noise.
         var cold = HeldOutMedian(test, rxNodes, MakeRunner().Nss);
         Assert.That(trajectory[^1].HeldOut, Is.LessThanOrEqualTo(cold * 0.5),
-            $"after {cycles} noisy cycles ({mode}) held-out range error is {trajectory[^1].HeldOut:0.00} m against {cold:0.00} m cold-start; " +
+            $"after {cycles} noisy cycles (per_node_absorption) held-out range error is {trajectory[^1].HeldOut:0.00} m against {cold:0.00} m cold-start; " +
             "the gate let noise-fitted calibration through and then protected it");
     }
 
@@ -481,9 +404,8 @@ public class SelfCalibrationTests
     /// the locators. First-floor nodes only, as in RobotSurveyTests; error is XY distance from the
     /// robot's LiDAR position.
     /// </summary>
-    [TestCase("legacy")]
-    [TestCase("per_node_absorption")]
-    public async Task RobotSurvey_HeldOut_CalibrationImprovesPosition(string mode)
+    [Test]
+    public async Task RobotSurvey_HeldOut_CalibrationImprovesPosition()
     {
         var survey = LoadSpread();
         var rxNodes = RxNodes(survey);
@@ -493,7 +415,7 @@ public class SelfCalibrationTests
         var (runner, nss) = MakeRunner();
         await runner.RunCycleAsync(Snapshot(train.Where((_, i) => i % 2 == 0), rxNodes),
             new List<OptimizationSnapshot> { Snapshot(train.Where((_, i) => i % 2 == 1), rxNodes), Snapshot(train.Where((_, i) => i % 2 == 0), rxNodes) },
-            Opt, MakeOptimizers(mode));
+            Opt, MakeOptimizers());
         var cold = MakeRunner().Nss;
 
         var harness = new SurveyLocatorHarness(_state, _configLoader, _nts, survey.FloorBounds["first"],
@@ -520,7 +442,7 @@ public class SelfCalibrationTests
         // that rescales every range moves them little or not at all; both stay in the table for reference.
         var solvers = RobotSurveyTests.Solvers;
         var locators = RobotSurveyTests.Locators;
-        TestContext.WriteLine($"mode {mode}: held-out median XY position error (m) by locator");
+        TestContext.WriteLine($"mode per_node_absorption: held-out median XY position error (m) by locator");
         TestContext.WriteLine($"{"locator",-12} {"cold",8} {"calibrated",11} {"reported",9}");
         var ratios = new Dictionary<string, double>();
         foreach (var which in locators)
@@ -538,9 +460,9 @@ public class SelfCalibrationTests
         // solver can sit near 1.0 while the others carry the mean. Worst single solver on the bundled
         // fixture is bfgs in per_node_absorption at 0.85, so this ceiling has about 15% headroom; the
         // ratios are correlated (same ranges, same calibration), so the mean is not much steadier than one.
-        Assert.That(ratios.Values, Has.All.LessThan(1.0), $"the applied calibration ({mode}) made a solving locator worse; ratios {shown}");
+        Assert.That(ratios.Values, Has.All.LessThan(1.0), $"the applied calibration (per_node_absorption) made a solving locator worse; ratios {shown}");
         Assert.That(ratios.Values.Average(), Is.LessThan(0.8),
-            $"the applied calibration ({mode}) should cut the solving locators' held-out position error by at least 20% on average; ratios {shown}");
+            $"the applied calibration (per_node_absorption) should cut the solving locators' held-out position error by at least 20% on average; ratios {shown}");
     }
 
     private sealed class Survey
