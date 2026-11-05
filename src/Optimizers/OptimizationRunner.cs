@@ -316,7 +316,7 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.BestRMSE = bestRmse;
 
         foreach (var p in report.Proposals)
-            LogDecision(p, bestScore);
+            LogDecision(p, bestScore, cycle.Incumbent);
 
         if (cycle.Selected == null || cycle.SelectedResults == null)
             return;
@@ -376,7 +376,7 @@ internal class OptimizationRunner : BackgroundService
         }
     }
 
-    private void LogDecision(OptimizerProposalReport p, double bestScore)
+    private void LogDecision(OptimizerProposalReport p, double bestScore, IReadOnlyDictionary<string, NodeSettings> incumbent)
     {
         var (composite, corr, rmse, samples) = p.Score;
         switch (p.Decision)
@@ -388,9 +388,6 @@ internal class OptimizationRunner : BackgroundService
             case OptimizerGateDecision.NotBetter:
                 _logger.LogInformation("Optimizer {Optimizer,-24} found worse results: Composite={Composite:0.000} <= Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
                     p.Optimizer, composite, bestScore, corr, rmse);
-                foreach (var (id, result) in p.Nodes)
-                    _logger.LogDebug("Rejected {NodeId,-20}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}, Error={Error}",
-                        id, result.Absorption, result.RxAdjRssi, result.TxRefRssi, result.Error);
                 break;
             case OptimizerGateDecision.DeviceFrame:
                 _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better node-to-node (Composite={Composite:0.000}) but not with txRef held (Composite={DeviceComposite:0.000} <= Best={Best:0.000}); the gain is a txRef/rxAdj shift devices would see as range bias",
@@ -405,6 +402,9 @@ internal class OptimizationRunner : BackgroundService
                     p.Optimizer, composite, bestScore, corr, rmse);
                 break;
         }
+
+        if (p.Decision is OptimizerGateDecision.MinSamples or OptimizerGateDecision.NotBetter or OptimizerGateDecision.DeviceFrame or OptimizerGateDecision.EverySnapshot)
+            LogRejectedProposal(p, incumbent);
     }
 
     /// <summary>The most recent live cycle (not dry runs): its report, residuals and selection. Null until one has run.</summary>
@@ -508,6 +508,41 @@ internal class OptimizationRunner : BackgroundService
         {
             _dryRunGate.Release();
         }
+    }
+
+    /// <summary>
+    /// One line per node of a proposal that a gate turned down, each proposed value beside the incumbent one it
+    /// would have replaced, as the cycle froze and scored it, so a rejection can be diagnosed from the log at the
+    /// default level. The last-cycle record (<see cref="LastCycle"/>) has the proposed values too, but not what
+    /// they would have replaced, and only the latest cycle.
+    /// </summary>
+    private void LogRejectedProposal(OptimizerProposalReport p, IReadOnlyDictionary<string, NodeSettings> incumbent)
+    {
+        if (!_logger.IsEnabled(LogLevel.Information)) return;
+        foreach (var (id, proposed) in p.Nodes.OrderBy(n => n.Key, StringComparer.Ordinal))
+        {
+            var current = incumbent.TryGetValue(id, out var ns) ? ns : _nsd.Get(id);
+            _logger.LogInformation("Rejected {Optimizer} {NodeId,-20}: {Values}", p.Optimizer, id, DescribeProposal(proposed, current.Calibration));
+        }
+    }
+
+    /// <summary>
+    /// "absorption=3.10 (was 2.95), rx_adj=3 (was -4), tx_ref=-61 (was unset, scored as -59), error=4.20", leaving out
+    /// values not proposed. An unset incumbent value is shown with the default <see cref="OptimizationResults"/>
+    /// scores it with, labelled as such so it is not mistaken for a setting the node reported.
+    /// </summary>
+    internal static string DescribeProposal(OptimizerNodeProposal proposed, CalibrationSettings current)
+    {
+        // Round first, then + 0.0, so a value that rounds to zero from below (or is already -0) prints as 0, not -0.
+        static string F(double v, string format) =>
+            (Math.Round(v, format == "0" ? 0 : 2, MidpointRounding.AwayFromZero) + 0.0).ToString(format, CultureInfo.InvariantCulture);
+        static string Was(double? v, double scoredAs, string format) => v is { } d ? $"was {F(d, format)}" : $"was unset, scored as {F(scoredAs, format)}";
+        var parts = new List<string>();
+        if (proposed.Absorption is { } a) parts.Add($"absorption={F(a, "0.00")} ({Was(current.Absorption, OptimizationResults.DefaultAbsorption, "0.00")})");
+        if (proposed.RxAdjRssi is { } r) parts.Add($"rx_adj={F(r, "0")} ({Was(current.RxAdjRssi, OptimizationResults.DefaultRxAdjRssi, "0")})");
+        if (proposed.TxRefRssi is { } t) parts.Add($"tx_ref={F(t, "0")} ({Was(current.TxRefRssi, OptimizationResults.DefaultTxRefRssi, "0")})");
+        if (proposed.Error is { } e) parts.Add($"error={F(e, "0.00")}");
+        return parts.Count > 0 ? string.Join(", ", parts) : "no values";
     }
 
     /// <summary>

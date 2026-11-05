@@ -127,6 +127,74 @@ public class OptimizationRunnerTests
     }
 
     [Test]
+    public async Task RunCycle_RejectedProposal_LogsEachNodesValuesAtInformation()
+    {
+        var snapshot = SnapshotWith(5);
+        foreach (var m in snapshot.Measures) m.RssiRxAdj = 0;
+        var incumbent = _nss.Get("rx");
+        incumbent.Calibration.RxAdjRssi = 2;
+        await _nss.Set("rx", incumbent);
+
+        await RunCycle(snapshot, new ConfigOptimization { Enabled = true, MinSamples = 5 }, new GaugeShiftedOptimizer());
+
+        var info = _log.Collector.GetSnapshot().Where(e => e.Level == LogLevel.Information).Select(e => e.Message).ToList();
+        Assert.That(info, Has.Some.Contains("rejected: better node-to-node"), "sanity: the device-frame gate should have rejected it");
+        Assert.That(info, Has.One.Matches<string>(m => m.StartsWith("Rejected GaugeShifted rx ") && m.Contains("absorption=3.00 (was unset, scored as 2.70)") && m.Contains("rx_adj=-10 (was 2)")),
+            "the rejected proposal's receiver values should be logged beside the incumbent's");
+        Assert.That(info.Count(m => m.StartsWith("Rejected GaugeShifted tx") && m.Contains("tx_ref=-49 (was unset, scored as -59)")), Is.EqualTo(5),
+            "one line per transmitter in the proposal");
+    }
+
+    /// <summary>Proposes like <see cref="GaugeShiftedOptimizer"/>, but first runs <paramref name="duringFit"/>, standing in for an MQTT echo that lands mid-cycle.</summary>
+    private sealed class DuringFitOptimizer(Action duringFit) : IOptimizer
+    {
+        public string Name => "GaugeShifted";
+
+        public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
+        {
+            duringFit();
+            return new GaugeShiftedOptimizer().Optimize(os, existingSettings);
+        }
+    }
+
+    [Test]
+    public async Task RunCycle_RejectedProposal_LogsTheIncumbentItWasScoredAgainst()
+    {
+        var snapshot = SnapshotWith(5);
+        foreach (var m in snapshot.Measures) m.RssiRxAdj = 0;
+        var incumbent = _nss.Get("rx");
+        incumbent.Calibration.RxAdjRssi = 2;
+        await _nss.Set("rx", incumbent);
+
+        var echo = new DuringFitOptimizer(() =>
+        {
+            var changed = _nss.Get("rx");
+            changed.Calibration.RxAdjRssi = 7;
+            _nss.Set("rx", changed).GetAwaiter().GetResult();
+        });
+        await RunCycle(snapshot, new ConfigOptimization { Enabled = true, MinSamples = 5 }, echo);
+
+        Assert.That(_nss.Get("rx").Calibration.RxAdjRssi, Is.EqualTo(7), "sanity: the store changed while the cycle ran");
+        var info = _log.Collector.GetSnapshot().Where(e => e.Level == LogLevel.Information).Select(e => e.Message).ToList();
+        Assert.That(info, Has.One.Matches<string>(m => m.StartsWith("Rejected GaugeShifted rx ") && m.Contains("rx_adj=-10 (was 2)")),
+            "the log should show the frozen incumbent the proposal was scored against, not the store after the cycle");
+    }
+
+    [Test]
+    public void DescribeProposal_LeavesOutValuesNotProposed()
+    {
+        var current = new CalibrationSettings { Absorption = 2.95, RxAdjRssi = -4, TxRefRssi = -59 };
+
+        Assert.That(OptimizationRunner.DescribeProposal(new OptimizerNodeProposal(3.1, 3, -61, 4.2), current),
+            Is.EqualTo("absorption=3.10 (was 2.95), rx_adj=3 (was -4), tx_ref=-61 (was -59), error=4.20"));
+        Assert.That(OptimizationRunner.DescribeProposal(new OptimizerNodeProposal(null, 1, null, null), current), Is.EqualTo("rx_adj=1 (was -4)"));
+        Assert.That(OptimizationRunner.DescribeProposal(new OptimizerNodeProposal(null, null, null, null), current), Is.EqualTo("no values"));
+        Assert.That(OptimizationRunner.DescribeProposal(new OptimizerNodeProposal(3.1, -0.4, -61, null), new CalibrationSettings()),
+            Is.EqualTo("absorption=3.10 (was unset, scored as 2.70), rx_adj=0 (was unset, scored as 0), tx_ref=-61 (was unset, scored as -59)"),
+            "an unset incumbent is shown with the default it is scored with, and -0 as 0");
+    }
+
+    [Test]
     public async Task RunCycle_TxRefRxAdjShiftThatCancelsNodeToNode_IsRejected()
     {
         var snapshot = SnapshotWith(5);

@@ -140,13 +140,21 @@ public class State
 
         foreach (var device in Devices.Values.Where(d => d.IsAnchored && d.Anchor != null))
         {
+            // Nodes and anchors share one id space here. A device whose id is also a node's would turn that
+            // node into an anchor, holding its txRef at a device's rssi@1m in its node-to-node links too.
+            if (Nodes.ContainsKey(device.Id) || (nodes.TryGetValue(device.Id, out var existing) && !existing.IsAnchor))
+                continue;
+
             var anchorLocation = device.Anchor!.Location;
             var anchorNode = nodes.GetOrAdd(device.Id, _ => new OptNode { Id = device.Id, Name = device.Name ?? device.Id, Location = anchorLocation });
             anchorNode.Location = anchorLocation;
             anchorNode.IsAnchor = true;
             anchorNode.Name = device.Name ?? device.Id;
 
-            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current))
+            // The optimizers hold an anchor's txRef at the rssi@1m it was heard with, so a reading
+            // without one (0, as Device.MeasuredRefRssi treats it) would pin the fit to nonsense.
+            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current
+                                                                       && dn.RefRssi != 0 && double.IsFinite(dn.RefRssi)))
             {
                 var rxNode = deviceNode.Node!;
                 var optRx = nodes.GetOrAdd(rxNode.Id, _ => new OptNode { Id = rxNode.Id, Name = rxNode.Name, Location = rxNode.Location });

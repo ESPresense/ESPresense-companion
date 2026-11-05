@@ -16,12 +16,17 @@ namespace ESPresense.Optimizers;
 /// asymmetric one (the previous quartic penalty on under-estimates) bends the whole fit toward
 /// over-estimating. Huber loss caps the pull of multipath outliers.
 ///
-/// Anchoring txRef. With only node-to-node data, "every transmitter is k dB hot" and "every
+/// Holding txRef near a reference. With only node-to-node data, "every transmitter is k dB hot" and "every
 /// receiver is k dB hot" produce identical RSSI, so the data alone cannot place the calibration;
 /// but devices are ranged with their own rssi@1m, which the optimizer never touches, so the choice
-/// matters to them: rxAdj must be right in absolute terms. The anchor is the reference the
+/// matters to them: rxAdj must be right in absolute terms. The reference is what the
 /// transmitter already advertises (its configured txRef, else the rssi@1m on the measurement), and
 /// txRef only moves off it when the evidence outweighs the prior.
+///
+/// Anchored devices are not given a txRef at all: they are ranged with their own rssi@1m, so the fit
+/// holds them there (<see cref="Measure.HeldTxRef"/>). That removes the gauge freedom outright, so
+/// with anchors in the data the txRef prior gives up the common shift and only keeps the nodes'
+/// txRefs from straying apart: rxAdj is placed by the anchors, not by where the incumbent sat.
 /// </summary>
 public class PerNodeAbsorptionRxTx : IOptimizer
 {
@@ -53,6 +58,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
 
         var measures = os.Measures
             .Where(m => m.Rx?.Location != null && m.Tx?.Location != null)
+            .Where(m => !m.IsUnusableAnchor) // nothing to hold its txRef at, and it must not be fitted like a node
             .Select(m => (m, logD: Math.Log10(m.Rx.Location.DistanceTo(m.Tx.Location))))
             .Where(t => double.IsFinite(t.logD))
             .ToList();
@@ -64,7 +70,8 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         }
 
         var rxIds = measures.Select(t => t.m.Rx.Id).Distinct().ToList();
-        var txIds = measures.Select(t => t.m.Tx.Id).Distinct().ToList();
+        // Only nodes have a txRef to fit; an anchored device's is held at its rssi@1m.
+        var txIds = measures.Where(t => t.m.HeldTxRef == null).Select(t => t.m.Tx.Id).Distinct().ToList();
 
         // Layout: [rxAdj, absorption] per receiver, then txRef per transmitter.
         var rxIndex = rxIds.Select((id, i) => (id, i)).ToDictionary(t => t.id, t => 2 * t.i);
@@ -74,7 +81,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         var midAbsorption = (optimization.AbsorptionMin + optimization.AbsorptionMax) / 2.0;
 
         // The reference each transmitter is held near: what it is already calibrated or advertised at.
-        var txAnchor = txIds.ToDictionary(id => id, id =>
+        var txPriorRef = txIds.ToDictionary(id => id, id =>
         {
             existingSettings.TryGetValue(id, out var ns);
             var configured = ns?.Calibration?.TxRefRssi;
@@ -82,6 +89,13 @@ public class PerNodeAbsorptionRxTx : IOptimizer
             var refs = measures.Where(t => t.m.Tx.Id == id).Select(t => t.m.RefRssi).Where(double.IsFinite).ToList();
             return refs.Count > 0 ? refs.Average() : -59;
         });
+
+        // With anchors in the data the gauge is placed by them, so the prior must not also place it:
+        // it then holds only how far each node's txRef strays relative to the others (its departure from
+        // its reference, less the mean departure), and a common shift is left to the anchors. Without
+        // anchors the full prior is all that places the gauge.
+        bool anchored = measures.Any(t => t.m.HeldTxRef != null);
+        double TxPriorCentre(Vector<double> x) => anchored && txIds.Count > 0 ? txIds.Average(id => x[txIndex[id]] - txPriorRef[id]) : 0;
 
         // Inverse-variance weights, normalised to mean 1 so the priors keep their meaning.
         var weights = measures.Select(t => t.m.RssiVar > 0 ? 1.0 / Math.Max(t.m.RssiVar.Value, 0.1) : 1.0).ToArray();
@@ -93,7 +107,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
             var (m, logD) = measures[i];
             double rxAdj = x[rxIndex[m.Rx.Id]];
             double absorption = x[rxIndex[m.Rx.Id] + 1];
-            double txRef = x[txIndex[m.Tx.Id]];
+            double txRef = m.HeldTxRef ?? x[txIndex[m.Tx.Id]];
             return m.GetAdjustedRssi(rxAdj) - (txRef - 10 * absorption * logD);
         }
 
@@ -109,8 +123,9 @@ public class PerNodeAbsorptionRxTx : IOptimizer
 
             foreach (var id in rxIds)
                 loss += AbsorptionPrior / rxIds.Count * Math.Pow(x[rxIndex[id] + 1] - midAbsorption, 2);
+            var centre = TxPriorCentre(x);
             foreach (var id in txIds)
-                loss += TxRefPrior / txIds.Count * Math.Pow(x[txIndex[id]] - txAnchor[id], 2);
+                loss += TxRefPrior / txIds.Count * Math.Pow(x[txIndex[id]] - txPriorRef[id] - centre, 2);
             return loss;
         }
 
@@ -126,12 +141,14 @@ public class PerNodeAbsorptionRxTx : IOptimizer
                 // (GetAdjustedRssi re-bases it), and 0 when it does not and rxAdj cannot be fitted.
                 if (m.RssiRxAdj != null) grad[r] -= g;
                 grad[r + 1] += g * 10 * logD;
-                grad[txIndex[m.Tx.Id]] -= g;
+                if (m.HeldTxRef == null) grad[txIndex[m.Tx.Id]] -= g;
             }
             foreach (var id in rxIds)
                 grad[rxIndex[id] + 1] += 2 * AbsorptionPrior / rxIds.Count * (x[rxIndex[id] + 1] - midAbsorption);
+            // The centre's own derivative drops out: the departures from it sum to zero.
+            var centre = TxPriorCentre(x);
             foreach (var id in txIds)
-                grad[txIndex[id]] += 2 * TxRefPrior / txIds.Count * (x[txIndex[id]] - txAnchor[id]);
+                grad[txIndex[id]] += 2 * TxRefPrior / txIds.Count * (x[txIndex[id]] - txPriorRef[id] - centre);
             return grad;
         }
 
@@ -151,7 +168,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         {
             int t = txIndex[id];
             lower[t] = optimization.TxRefRssiMin; upper[t] = optimization.TxRefRssiMax;
-            initial[t] = Math.Clamp(txAnchor[id], lower[t], upper[t]);
+            initial[t] = Math.Clamp(txPriorRef[id], lower[t], upper[t]);
         }
 
         try

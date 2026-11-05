@@ -21,6 +21,17 @@ internal readonly record struct PredictedMeasure(Measure Measure, double Predict
 
 public class OptimizationResults
 {
+    // The scoring defaults for a node with no setting. Absorption and txRef match the firmware's own defaults
+    // (DEFAULT_ABSORPTION and DEFAULT_TX_REF_RSSI in ESPresense main/defaults.h), which is what an unset node
+    // actually runs with; keep them in step if the firmware changes.
+
+    /// <summary>What a node with no absorption setting is scored with (firmware DEFAULT_ABSORPTION).</summary>
+    internal const double DefaultAbsorption = 2.7;
+    /// <summary>What a receiver with no rxAdj setting is scored with.</summary>
+    internal const double DefaultRxAdjRssi = 0;
+    /// <summary>What a node transmitter with no txRef setting is scored with (firmware DEFAULT_TX_REF_RSSI).</summary>
+    internal const double DefaultTxRefRssi = -59;
+
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
     /// <summary>
@@ -47,6 +58,8 @@ public class OptimizationResults
     /// device is ranged (with its own rssi@1m, which no optimizer touches), so it is the frame in
     /// which rxAdj has to be right in absolute terms. Node-to-node data cannot tell "every
     /// transmitter k dB hot" from "every receiver k dB hot"; scoring in both frames can.
+    /// Anchored devices are scored with their rssi@1m (<see cref="Measure.HeldTxRef"/>) in both frames,
+    /// as the optimizers fit them.
     /// </summary>
     public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, NodeSettingsStore nss, bool deviceFrame = false)
         => Evaluate(oss, nss.Get, deviceFrame);
@@ -87,6 +100,7 @@ public class OptimizationResults
             foreach (var m in os.Measures)
             {
                 if (m.Tx?.Id == null || m.Rx?.Id == null) continue;
+                if (m.IsUnusableAnchor) continue; // no rssi@1m to score it with; see Measure.HeldTxRef
                 var tx = getSettings(m.Tx.Id);
                 var rx = getSettings(m.Rx.Id);
 
@@ -102,9 +116,10 @@ public class OptimizationResults
                 if (mapDistance <= 0 || double.IsNaN(mapDistance) || double.IsInfinity(mapDistance))
                     continue;
 
-                double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? 0;
-                double txRefRssi = (deviceFrame ? null : txPv?.TxRefRssi) ?? tx.Calibration.TxRefRssi ?? -59;
-                double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? 2.7;
+                double rxAdjRssi = rxPv?.RxAdjRssi ?? rx.Calibration.RxAdjRssi ?? DefaultRxAdjRssi;
+                // An anchored device is ranged with its own rssi@1m in either frame; nothing proposes or stores a txRef for it.
+                double txRefRssi = m.HeldTxRef ?? (deviceFrame ? null : txPv?.TxRefRssi) ?? tx.Calibration.TxRefRssi ?? DefaultTxRefRssi;
+                double pathLossExponent = rxPv?.Absorption ?? rx.Calibration.Absorption ?? DefaultAbsorption;
 
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
                 double measuredRssi = m.GetAdjustedRssi(rxAdjRssi);
