@@ -3,12 +3,22 @@ using System.Runtime.CompilerServices;
 using ESPresense.Controllers;
 using ESPresense.Events;
 using ESPresense.Models;
-using Serilog;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ESPresense.Services;
 
-public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore) : BackgroundService
+/// <param name="loggerFactory">Supplied by DI. Also logs the discovery entries of the devices this tracker creates.</param>
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore, ILoggerFactory loggerFactory) : BackgroundService
 {
+    /// <summary>For tests and tools that build a DeviceTracker by hand: its loggers discard everything.</summary>
+    public DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore)
+        : this(state, mqtt, tele, globalEventDispatcher, deviceSettingsStore, NullLoggerFactory.Instance)
+    {
+    }
+
+    private readonly ILogger<DeviceTracker> _logger = loggerFactory.CreateLogger<DeviceTracker>();
+    private readonly ILogger<AutoDiscovery> _discoveryLogger = loggerFactory.CreateLogger<AutoDiscovery>();
+
     // Coalescing work sets: a device heard by N nodes is marked N times but processed/located once per pass.
     private readonly DirtyDeviceSet _toProcess = new();
     private readonly DirtyDeviceSet _toLocate = new();
@@ -72,10 +82,10 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                         if (device.LastSeen == null)
                         {
                             device.LastSeen = lastSeen;
-                            Log.Information("Restored Last Seen for device {DeviceId} to {LastSeen}", arg.DeviceId, lastSeen);
+                            _logger.LogInformation("Restored Last Seen for device {DeviceId} to {LastSeen}", arg.DeviceId, lastSeen);
                         }
                     }
-                    catch (Exception ex) { Log.Warning(ex, "Failed to parse last_seen for device {DeviceId}", arg.DeviceId); }
+                    catch (Exception ex) { _logger.LogWarning(ex, "Failed to parse last_seen for device {DeviceId}", arg.DeviceId); }
                 }
             }
         };
@@ -99,7 +109,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             if (_selfClearedDiscoveryIds.TryRemove(arg.DiscoveryId, out var clearedAt) && DateTime.UtcNow - clearedAt <= SelfClearTtl)
             {
                 // Echo of the clear we published when the device stopped being tracked; the device stays.
-                Log.Debug("Ignoring our own discovery clear for {DiscoveryId}", arg.DiscoveryId);
+                _logger.LogDebug("Ignoring our own discovery clear for {DiscoveryId}", arg.DiscoveryId);
                 return;
             }
 
@@ -108,13 +118,13 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             var deviceId = arg.DeviceId ?? FindDeviceIdByDiscoveryId(arg.DiscoveryId);
             if (deviceId != null && state.Devices.TryRemove(deviceId, out var removedDevice))
             {
-                Log.Information("[-] Removed device: {Device} (disc)", removedDevice);
+                _logger.LogInformation("[-] Removed device: {Device} (disc)", removedDevice);
                 tele.UpdateDevicesCount(state.Devices.Count);
                 globalEventDispatcher.OnDeviceRemoved(removedDevice.Id);
             }
             else
             {
-                Log.Debug("Device not found for deletion: {DiscoveryId}", arg.DiscoveryId);
+                _logger.LogDebug("Device not found for deletion: {DiscoveryId}", arg.DiscoveryId);
             }
             return;
         }
@@ -122,7 +132,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         var autoDiscover = arg.AutoDiscover;
         if (autoDiscover.Component != "device_tracker")
         {
-            Log.Debug("Ignoring, component isn't device_tracker (" + autoDiscover.Component + ")");
+            _logger.LogDebug("Ignoring, component isn't device_tracker ({Component})", autoDiscover.Component);
             return;
         }
         var discoveredId = arg.DeviceId ?? autoDiscover.Message?.StateTopic?.Split("/").Last();
@@ -137,16 +147,16 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         // resurrects the entity it just removed. Honour the exclusion before it exists.
         if (state.IsExcluded(discoveredId, autoDiscover.Message?.Name))
         {
-            Log.Debug("Ignoring excluded device {DeviceId} (disc)", discoveredId);
+            _logger.LogDebug("Ignoring excluded device {DeviceId} (disc)", discoveredId);
             return;
         }
 
         state.Devices.GetOrAdd(discoveredId, id =>
         {
-            var d = new Device(id, autoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = autoDiscover.Message?.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
+            var d = new Device(id, autoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), _discoveryLogger) { Name = autoDiscover.Message?.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
             d.KalmanFilter.Settings = state.KalmanSettings;
             foreach (var scenario in state.ScenarioFactory.Create(d)) d.Scenarios.Add(scenario);
-            Log.Information("[+] Track: {Device} (disc)", d);
+            _logger.LogInformation("[+] Track: {Device} (disc)", d);
             return d;
         });
     }
@@ -183,7 +193,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         var rx = state.Nodes.GetOrAdd(arg.NodeId, id =>
         {
             if (tele.AddUnknownNode(id))
-                Log.Warning("Unknown node {nodeId}", id);
+                _logger.LogWarning("Unknown node {NodeId}", id);
             return new Node(id, NodeSourceType.Discovered);
         });
 
@@ -206,7 +216,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 tele.IncrementMessages();
                 var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
                 {
-                    var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
+                    var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), _discoveryLogger) { Check = true };
                     d.KalmanFilter.Settings = state.KalmanSettings;
                     foreach (var scenario in state.ScenarioFactory.Create(d)) d.Scenarios.Add(scenario);
                     return d;
@@ -281,7 +291,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 if (!wasTracked)
                 {
                     tele.UpdateTrackedDevices(state.Devices.Values.Count(a => a.Track));
-                    Log.Information("[+] Track {Device} (anchored)", device);
+                    _logger.LogInformation("[+] Track {Device} (anchored)", device);
                     foreach (var ad in device.HassAutoDiscovery)
                         await ad.Send(mqtt);
                     return true;
@@ -290,14 +300,14 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             }
             else
             {
-                Log.Warning("Anchor failed to apply for device {DeviceId} - falling back to normal tracking", device.Id);
+                _logger.LogWarning("Anchor failed to apply for device {DeviceId} - falling back to normal tracking", device.Id);
             }
             // If anchor failed to apply, fall through to normal tracking logic
         }
 
         if (device.Check)
         {
-            Log.Debug("Checking {Device}", device);
+            _logger.LogDebug("Checking {Device}", device);
             var decision = state.TrackingRules.ShouldTrack(device.Id, device.Name);
             if (decision.ConfiguredName != null) device.Name = decision.ConfiguredName;
             device.Track = decision.Track;
@@ -308,13 +318,13 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             tele.UpdateTrackedDevices(state.Devices.Values.Count(a => a.Track));
             if (device.Track)
             {
-                Log.Information("[+] Track {Device}", device);
+                _logger.LogInformation("[+] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
                     await ad.Send(mqtt);
             }
             else
             {
-                Log.Information("[-] Track {Device}", device);
+                _logger.LogInformation("[-] Track {Device}", device);
                 foreach (var ad in device.HassAutoDiscovery)
                 {
                     RememberSelfClear(ad.DiscoveryId);

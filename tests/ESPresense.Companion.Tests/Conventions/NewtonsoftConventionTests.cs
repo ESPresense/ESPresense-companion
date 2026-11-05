@@ -17,10 +17,10 @@ public class NewtonsoftConventionTests
         // "port" lands in a string member (Newtonsoft coerces it, System.Text.Json would throw).
         "Program.cs",
 
-        // TODO(#1844): MqttMessageHandlers parses device messages, node telemetry, device settings and device
+        // TODO(#1854): MqttMessageHandlers parses device messages, node telemetry, device settings and device
         // attributes with Newtonsoft; the models carry Newtonsoft attributes for that parse. The attributes
-        // arrive as Dictionary<string, object>, and DeviceTracker (#1844) restores last_seen only when
-        // Newtonsoft has already made it a DateTime, so the parse moves to JsonDefaults.MqttRead with #1844.
+        // arrive as Dictionary<string, object>, and DeviceTracker restores last_seen only when Newtonsoft has
+        // already made it a DateTime, so the parse moves to JsonDefaults.MqttRead with #1854.
         "Services/Mqtt/MqttMessageHandlers.cs",
         "Services/MqttCoordinator.cs",            // catches the JsonSerializationException that parse throws
         "Models/DeviceMessage.cs",

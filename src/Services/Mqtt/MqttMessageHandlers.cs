@@ -199,7 +199,8 @@ internal sealed class DeviceAttributesHandler(IMqttEventSink sink) : IMqttMessag
 /// Home Assistant <c>device_tracker</c> discovery. An empty payload is a cleared retained config (DeviceId and
 /// AutoDiscover null); a config not published by a companion is reported as malformed.
 /// </summary>
-internal sealed class DiscoveryHandler(IMqttEventSink sink, Func<string> discoveryTopic, ILogger? logger) : IMqttMessageHandler<DiscoveryRoute>
+/// <param name="discoveryLogger">Parse failures and the parsed <see cref="AutoDiscovery"/> log under this, the AutoDiscovery category.</param>
+internal sealed class DiscoveryHandler(IMqttEventSink sink, Func<string> discoveryTopic, ILogger? logger, ILogger<AutoDiscovery>? discoveryLogger = null) : IMqttMessageHandler<DiscoveryRoute>
 {
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
 
@@ -223,7 +224,7 @@ internal sealed class DiscoveryHandler(IMqttEventSink sink, Func<string> discove
                 return Task.CompletedTask;
             }
 
-            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, discoveryTopic()) || msg == null)
+            if (!AutoDiscovery.TryDeserialize(topic, payload, out var msg, discoveryTopic(), discoveryLogger) || msg == null)
                 throw new MqttMessageProcessingException("Failed to deserialize discovery message", topic, payload, "Discovery");
 
             sink.RaisePreviousDeviceDiscovered(new PreviousDeviceDiscoveredEventArgs
@@ -243,7 +244,7 @@ internal sealed class DiscoveryHandler(IMqttEventSink sink, Func<string> discove
 }
 
 /// <summary>Holds one handler per message family and sends a matched route to the right one.</summary>
-internal sealed class MqttMessageHandlers(IMqttEventSink sink, Func<string> discoveryTopic, ILogger? logger)
+internal sealed class MqttMessageHandlers(IMqttEventSink sink, Func<string> discoveryTopic, ILogger? logger, ILogger<AutoDiscovery>? discoveryLogger = null)
 {
     private readonly NodeTelemetryHandler _telemetry = new(sink);
     private readonly NodeStatusHandler _status = new(sink);
@@ -253,7 +254,7 @@ internal sealed class MqttMessageHandlers(IMqttEventSink sink, Func<string> disc
     private readonly DeviceSettingsHandler _deviceSettings = new(sink);
     private readonly DeviceAttributesHandler _deviceAttributes = new(sink);
 
-    private readonly DiscoveryHandler _discovery = new(sink, discoveryTopic, logger);
+    private readonly DiscoveryHandler _discovery = new(sink, discoveryTopic, logger, discoveryLogger);
 
     public Task DispatchAsync(MqttRoute route, string? payload) => route switch
     {

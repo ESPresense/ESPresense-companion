@@ -19,11 +19,12 @@ public class Device
     /// </summary>
     [STJ.JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
 
-    public Device(string id, string? discoveryId, TimeSpan timeout)
+    /// <param name="discoveryLogger">Logs the device's HA discovery publishes; null discards.</param>
+    public Device(string id, string? discoveryId, TimeSpan timeout, ILogger<AutoDiscovery>? discoveryLogger = null)
     {
         Id = id;
         Timeout = timeout;
-        HassAutoDiscovery.Add(new AutoDiscovery("device_tracker", this, discoveryId, "bluetooth"));
+        HassAutoDiscovery.Add(new AutoDiscovery("device_tracker", this, discoveryId, "bluetooth", discoveryLogger));
     }
 
     public override string ToString()

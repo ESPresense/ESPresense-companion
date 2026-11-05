@@ -1,5 +1,6 @@
 ﻿using ESPresense.Services;
 using ESPresense.Utils;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TextExtensions;
@@ -8,10 +9,6 @@ namespace ESPresense.Models;
 
 public class AutoDiscovery
 {
-    // Devices (and so their discovery records) are still built by DeviceTracker and MqttCoordinator,
-    // which can't pass a logger until #1843/#1844 merge.
-    private static readonly ILogger<AutoDiscovery> DeferredLogger = DeferredLoggerFactory.CreateLogger<AutoDiscovery>();
-
     private readonly ILogger _logger;
     private bool _sent;
 
@@ -21,7 +18,7 @@ public class AutoDiscovery
 
     public AutoDiscovery(string component, Device dev, string? discoveryId = null, string? sourceType = null, ILogger<AutoDiscovery>? logger = null)
     {
-        _logger = logger ?? DeferredLogger;
+        _logger = logger ?? NullLogger<AutoDiscovery>.Instance;
         DiscoveryId = discoveryId ?? $"espresense-{dev.Id}".ToSnakeCase();
         Component = component;
 
@@ -47,7 +44,7 @@ public class AutoDiscovery
 
     public AutoDiscovery(string component, string discoveryId, DiscoveryRecord message, ILogger<AutoDiscovery>? logger = null)
     {
-        _logger = logger ?? DeferredLogger;
+        _logger = logger ?? NullLogger<AutoDiscovery>.Instance;
         DiscoveryId = discoveryId;
         Component = component;
         Message = message;
@@ -71,7 +68,7 @@ public class AutoDiscovery
 
     internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant", ILogger<AutoDiscovery>? logger = null)
     {
-        logger ??= DeferredLogger;
+        logger ??= NullLogger<AutoDiscovery>.Instance;
         var parts = topic.Split("/");
         if (parts.Length != 4 || parts[0] != discoveryTopic || parts[3] != "config")
         {

@@ -17,16 +17,10 @@ public class LoggingConventionTests
 
     private static readonly string[] Bootstrap = { "Program.cs" };
 
-    // TODO(#1843, #1844): these files are being rewritten on other branches; convert them once those merge.
-    private static readonly string[] Deferred =
-    {
-        "Services/DeviceTracker.cs",      // #1844
-    };
-
     [Test]
-    public void StaticSerilogLog_IsOnlyUsedByBootstrapAndDeferredFiles()
+    public void StaticSerilogLog_IsOnlyUsedByBootstrap()
     {
-        var allowed = new HashSet<string>(Bootstrap.Concat(Deferred), StringComparer.Ordinal);
+        var allowed = new HashSet<string>(Bootstrap, StringComparer.Ordinal);
         var offenders = SourceScan.FilesMatching(StaticSerilog).Where(f => !allowed.Contains(f)).ToList();
 
         Assert.That(offenders, Is.Empty,
@@ -58,27 +52,5 @@ public class LoggingConventionTests
             .ToList();
 
         Assert.That(offenders, Is.Empty, "Use named placeholders ({NodeId}) in logging templates: " + string.Join("; ", offenders));
-    }
-
-    private static readonly Regex DeferredFactory = new(@"\bDeferredLoggerFactory\b", RegexOptions.Compiled);
-
-    // Types constructed by the deferred files above, which can't pass them a logger yet.
-    // TODO(#1843, #1844, #1845): empty this list and delete DeferredLoggerFactory once those merge.
-    private static readonly string[] DeferredFactoryUsers =
-    {
-        "Program.cs",
-        "Utils/DeferredLoggerFactory.cs",
-        "Locators/BaseMultilateralizer.cs",          // built by State (#1844)
-        "Locators/MultiFloorMultilateralizer.cs",    // built by State (#1844)
-        "Locators/NadarayaWatsonMultilateralizer.cs", // built by State (#1844)
-        "Models/AutoDiscovery.cs",                   // built via Device by DeviceTracker/MqttCoordinator (#1843, #1844)
-    };
-
-    [Test]
-    public void DeferredLoggerFactory_DoesNotSpread()
-    {
-        var users = SourceScan.FilesMatching(DeferredFactory);
-        Assert.That(users, Is.EquivalentTo(DeferredFactoryUsers),
-            "DeferredLoggerFactory is only a bridge for types the deferred files construct; inject ILogger<T> everywhere else.");
     }
 }

@@ -16,13 +16,13 @@ public abstract class BaseMultilateralizer : ILocate
     protected readonly State State;
     protected readonly ILogger Logger;
 
-    /// <param name="logger">Defaults to the transitional <see cref="DeferredLoggerFactory"/> while State builds locators without one (#1844).</param>
+    /// <param name="logger">Null discards; <see cref="ESPresense.Models.ScenarioFactory"/> passes one from the host.</param>
     protected BaseMultilateralizer(Device device, Floor floor, State state, ILogger? logger = null)
     {
         Device = device;
         Floor = floor;
         State = state;
-        Logger = logger ?? DeferredLoggerFactory.CreateLogger(GetType());
+        Logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
     }
 
     public abstract bool Locate(Scenario scenario);
