@@ -58,6 +58,7 @@ public class PerNodeAbsorptionRxTx : IOptimizer
 
         var measures = os.Measures
             .Where(m => m.Rx?.Location != null && m.Tx?.Location != null)
+            .Where(m => !m.IsUnusableAnchor) // nothing to hold its txRef at, and it must not be fitted like a node
             .Select(m => (m, logD: Math.Log10(m.Rx.Location.DistanceTo(m.Tx.Location))))
             .Where(t => double.IsFinite(t.logD))
             .ToList();

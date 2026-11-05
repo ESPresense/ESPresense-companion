@@ -269,4 +269,93 @@ public class AnchorGaugeTests
         Assert.That(proposal.Decision, Is.EqualTo(OptimizerGateDecision.DeviceFrame));
         Assert.That(cycle.Selected, Is.Null);
     }
+
+    /// <summary>
+    /// An anchor reading with no usable rssi@1m has nothing to hold its txRef at. Whatever builds the
+    /// measure, it must not pin the fit to 0 dBm, nor be fitted like a node (which would propose a txRef
+    /// for the device's id): the fit and the scoring both leave it out.
+    /// </summary>
+    [Test]
+    public void AnchorWithoutRssiAt1m_IsLeftOutOfTheFitAndTheScore()
+    {
+        var os = Synth();
+        var unusable = os.Measures.Where(m => m.Tx.Id == "a1").ToList();
+        foreach (var m in unusable) m.RefRssi = 0;
+
+        Assert.That(unusable.Select(m => m.HeldTxRef), Has.All.Null, "no rssi@1m, nothing to hold");
+        Assert.That(unusable.Select(m => m.IsUnusableAnchor), Has.All.True);
+        Assert.That(os.Measures.Where(m => m.Tx.Id == "a2").Select(m => m.HeldTxRef), Has.All.EqualTo(AnchorRefRssi));
+
+        var results = Make().Optimize(os, new Dictionary<string, NodeSettings>());
+        Assert.That(results.Nodes.ContainsKey("a1"), Is.False, "an anchor must never get a proposal, usable or not");
+        foreach (var id in NodeIds)
+            Assert.That(results.Nodes[id].RxAdjRssi, Is.EqualTo(Bias[id]).Within(1.0), $"{id} rxAdj, from the anchors that do have an rssi@1m");
+
+        var eval = Calibration().Evaluate(new List<OptimizationSnapshot> { os }, NoSettings);
+        Assert.That(eval.Samples, Is.EqualTo(os.Measures.Count - unusable.Count), "scoring skips it too");
+        Assert.That(eval.RMSE, Is.EqualTo(0).Within(1e-9));
+    }
+
+    /// <summary>
+    /// A wrong anchor. With anchors present nothing but the anchor links places the gauge (the txRef prior
+    /// lets go of the common shift), so an anchor whose rssi@1m is off moves every rxAdj. One of three
+    /// equally-heard anchors reporting 3 dB hot should move rxAdj by about a third of that, in the
+    /// direction the bias implies, and no node by more than the bias itself. This documents how much a
+    /// single bad anchor costs, and catches a change that starts trusting one anchor over the rest.
+    /// </summary>
+    [Test]
+    public void OneBiasedAnchor_MovesRxAdjByItsShareOfTheBias()
+    {
+        const double bias = 3;
+        var os = Synth();
+        foreach (var m in os.Measures.Where(m => m.Tx.Id == "a1")) m.RefRssi += bias; // reports 3 dB hotter than it transmits
+
+        var results = Make().Optimize(os, new Dictionary<string, NodeSettings>());
+
+        var errors = NodeIds.ToDictionary(id => id, id => results.Nodes[id].RxAdjRssi!.Value - Bias[id]);
+        var mean = errors.Values.Average();
+        TestContext.WriteLine($"one of {AnchorIds.Length} anchors {bias} dB hot: mean rxAdj error {mean:0.00} dB, range {errors.Values.Min():0.00}..{errors.Values.Max():0.00}");
+
+        // Held 3 dB too high, the anchor predicts its links 3 dB louder than they are; lowering rxAdj
+        // (rssi is raw - rxAdj, so that raises the measured side) is how the fit meets it part way.
+        Assert.That(mean, Is.EqualTo(-bias / AnchorIds.Length).Within(0.5), "about the biased anchor's share of the bias");
+        foreach (var (id, e) in errors)
+            Assert.That(Math.Abs(e), Is.LessThan(bias), $"{id}: a single biased anchor must not move rxAdj by more than its bias");
+    }
+
+    /// <summary>
+    /// The prior's re-centring on its own: with anchors present, where the incumbent's txRefs sit as a
+    /// group must not matter, only how they sit relative to each other. The same data fitted from an
+    /// incumbent on the true gauge and from one drifted 6 dB along it must give the same calibration.
+    /// (Without the re-centring the drifted start pulled rxAdj 2.5 dB toward itself.) With no anchors the
+    /// full prior is what places the gauge, so there the start must still matter.
+    /// </summary>
+    [Test]
+    public void TxRefPrior_WithAnchors_IgnoresTheIncumbentsCommonOffset()
+    {
+        static NodeSettings OnGauge(string id)
+        {
+            var ns = new NodeSettings(id);
+            if (!Bias.ContainsKey(id)) return ns;
+            ns.Calibration.TxRefRssi = (int)NodeTxRef;
+            ns.Calibration.RxAdjRssi = (int)Bias[id];
+            ns.Calibration.Absorption = Absorption;
+            return ns;
+        }
+
+        var anchored = Synth();
+        var fromTrue = Make().Optimize(anchored, NodeIds.ToDictionary(id => id, OnGauge));
+        var fromDrifted = Make().Optimize(anchored, NodeIds.ToDictionary(id => id, DriftedSettings));
+        foreach (var id in NodeIds)
+        {
+            Assert.That(fromDrifted.Nodes[id].RxAdjRssi, Is.EqualTo(fromTrue.Nodes[id].RxAdjRssi).Within(0.1), $"{id} rxAdj");
+            Assert.That(fromDrifted.Nodes[id].TxRefRssi, Is.EqualTo(fromTrue.Nodes[id].TxRefRssi).Within(0.1), $"{id} txRef");
+        }
+
+        var nodesOnly = Synth(anchors: false);
+        var freeFromTrue = Make().Optimize(nodesOnly, NodeIds.ToDictionary(id => id, OnGauge));
+        var freeFromDrifted = Make().Optimize(nodesOnly, NodeIds.ToDictionary(id => id, DriftedSettings));
+        Assert.That(NodeIds.Average(id => freeFromTrue.Nodes[id].RxAdjRssi!.Value - freeFromDrifted.Nodes[id].RxAdjRssi!.Value),
+            Is.EqualTo(Drift).Within(0.5), "sanity: without anchors the prior still places the gauge where the incumbent is");
+    }
 }

@@ -21,11 +21,15 @@ internal readonly record struct PredictedMeasure(Measure Measure, double Predict
 
 public class OptimizationResults
 {
-    /// <summary>What a node with no absorption setting is scored with.</summary>
+    // The scoring defaults for a node with no setting. Absorption and txRef match the firmware's own defaults
+    // (DEFAULT_ABSORPTION and DEFAULT_TX_REF_RSSI in ESPresense main/defaults.h), which is what an unset node
+    // actually runs with; keep them in step if the firmware changes.
+
+    /// <summary>What a node with no absorption setting is scored with (firmware DEFAULT_ABSORPTION).</summary>
     internal const double DefaultAbsorption = 2.7;
     /// <summary>What a receiver with no rxAdj setting is scored with.</summary>
     internal const double DefaultRxAdjRssi = 0;
-    /// <summary>What a node transmitter with no txRef setting is scored with.</summary>
+    /// <summary>What a node transmitter with no txRef setting is scored with (firmware DEFAULT_TX_REF_RSSI).</summary>
     internal const double DefaultTxRefRssi = -59;
 
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
@@ -96,6 +100,7 @@ public class OptimizationResults
             foreach (var m in os.Measures)
             {
                 if (m.Tx?.Id == null || m.Rx?.Id == null) continue;
+                if (m.IsUnusableAnchor) continue; // no rssi@1m to score it with; see Measure.HeldTxRef
                 var tx = getSettings(m.Tx.Id);
                 var rx = getSettings(m.Rx.Id);
 
