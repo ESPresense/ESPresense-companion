@@ -30,21 +30,59 @@ public class StateControllerAutoOptimizeTests
         try { Directory.Delete(_configDir, recursive: true); } catch { /* best effort */ }
     }
 
+    private StateController CreateController(ConfigLoader configLoader, out State state)
+    {
+        var mqtt = new Mock<IMqttCoordinator>();
+        var nts = new NodeTelemetryStore(mqtt.Object);
+        state = new State(configLoader, nts);
+        var nss = new Mock<NodeSettingsStore>(mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>()) { CallBase = true };
+        var dss = new Mock<DeviceSettingsStore>(mqtt.Object, state);
+        return new StateController(
+            Mock.Of<ILogger<StateController>>(), state, configLoader, nss.Object, dss.Object, nts,
+            new NodeStateMapper(nts, Mock.Of<IFirmwareTypeStore>()), new GlobalEventDispatcher(),
+            new CalibrationService(state, nss.Object), new DeviceEnricher(dss.Object));
+    }
+
+    /// <summary>
+    /// The toggle writes the whole optimization section back. A removed or unknown mode left in the file runs
+    /// per_node_absorption with a warning at every load, so the save writes per_node_absorption instead of
+    /// copying the stale value back.
+    /// </summary>
+    [TestCase("legacy")]
+    [TestCase("global_absorption")]
+    [TestCase("per-node-absorption")]
+    public async Task Toggle_ReplacesARemovedOrUnknownModeWithTheOneThatRuns(string staleMode)
+    {
+        var path = Path.Combine(_configDir, "config.yaml");
+        File.WriteAllText(path, $"timeout: 30\noptimization:\n  enabled: false\n  optimizer: {staleMode}\n  training_window_mins: 20\n");
+        var configLoader = new ConfigLoader(_configDir);
+        await configLoader.LoadAsync();
+        var controller = CreateController(configLoader, out var state);
+        Assume.That(state.Config!.Optimization.Optimizer, Is.EqualTo(staleMode));
+
+        await controller.ToggleAutoOptimize(true);
+
+        var yaml = File.ReadAllText(path);
+        Assert.Multiple(() =>
+        {
+            Assert.That(yaml, Does.Contain("optimizer: per_node_absorption"));
+            Assert.That(yaml, Does.Not.Contain(staleMode + "\n"), "the stale mode is gone from the file");
+            Assert.That(state.Config!.Optimization.Optimizer, Is.EqualTo("per_node_absorption"));
+            Assert.That(state.Config.Optimization.Enabled, Is.True);
+            Assert.That(state.Config.Optimization.TrainingWindowMins, Is.EqualTo(20), "other optimization settings survive the save");
+        });
+
+        await configLoader.StopAsync(CancellationToken.None);
+        configLoader.Dispose();
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public async Task Toggle_SavesAndReloads_WithoutMutatingTheAppliedConfig(bool enable)
     {
         var configLoader = new ConfigLoader(_configDir);
         await configLoader.LoadAsync();
-        var mqtt = new Mock<IMqttCoordinator>();
-        var nts = new NodeTelemetryStore(mqtt.Object);
-        var state = new State(configLoader, nts);
-        var nss = new Mock<NodeSettingsStore>(mqtt.Object, Mock.Of<ILogger<NodeSettingsStore>>()) { CallBase = true };
-        var dss = new Mock<DeviceSettingsStore>(mqtt.Object, state);
-        var controller = new StateController(
-            Mock.Of<ILogger<StateController>>(), state, configLoader, nss.Object, dss.Object, nts,
-            new NodeStateMapper(nts, Mock.Of<IFirmwareTypeStore>()), new GlobalEventDispatcher(),
-            new CalibrationService(state, nss.Object), new DeviceEnricher(dss.Object));
+        var controller = CreateController(configLoader, out var state);
 
         var before = state.Config!;
         var result = await controller.ToggleAutoOptimize(enable);
