@@ -260,7 +260,7 @@ public class OptimizerDebugServiceTests
     {
         AddHistory();
 
-        var ex = Assert.ThrowsAsync<OptimizerUnavailableException>(() => _service.RunDryCycleAsync("nope"));
+        var ex = Assert.ThrowsAsync<UnknownOptimizerException>(() => _service.RunDryCycleAsync("nope"));
         Assert.That(ex!.Message, Does.Contain("Absorption Avg"));
     }
 
@@ -378,6 +378,7 @@ public class OptimizerDebugServiceTests
         Assert.That(cell.MapDistance, Is.EqualTo(2));
         Assert.That(cell.Distance, Is.EqualTo(2.5));
         Assert.That(_service.GetMeasures("node-b").Cells, Is.Empty);
+        Assert.That(_service.GetMeasures("").Cells, Has.Count.EqualTo(1), "?nodeId= with no value means no filter");
     }
 
     [Test]
@@ -424,6 +425,91 @@ public class OptimizerDebugServiceTests
         Assert.That(proposal.GetProperty("nodes").GetProperty("node-a").GetProperty("absorption").GetDouble(), Is.EqualTo(3.0));
         Assert.That(proposal.GetProperty("nodes").GetProperty("node-a").TryGetProperty("txRefRssi", out _), Is.False, "unchanged values are left out");
         Assert.That(proposal.GetProperty("gates").GetProperty("deviceFrame").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [Test]
+    public async Task Controller_UnknownOptimizerIs400_TooLittleHistoryIs409()
+    {
+        var controller = new OptimizerController(_service);
+
+        Assert.That((await controller.DryRun()).Result, Is.TypeOf<ConflictObjectResult>(), "no history yet: retry later");
+        AddHistory();
+        Assert.That((await controller.DryRun("nope")).Result, Is.TypeOf<BadRequestObjectResult>(), "a typo: retrying will not help");
+        Assert.That((await controller.GetResiduals(dryRun: true, optimizer: "nope")).Result, Is.TypeOf<BadRequestObjectResult>());
+    }
+
+    [Test]
+    public async Task LiveCycle_PublishFailsPartWay_IsReportedUnappliedWithTheError()
+    {
+        AddHistory();
+        var writes = 0;
+        _mqtt.Setup(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
+            .Returns(() => ++writes > 1 ? throw new InvalidOperationException("broker unreachable") : Task.CompletedTask);
+
+        Assert.ThrowsAsync<InvalidOperationException>(() => _runner.RunScheduledCycleAsync(Optimization, new List<IOptimizer> { new FixedAbsorption() }));
+
+        var report = _service.GetLastCycle()!;
+        Assert.That(report.Selected, Is.EqualTo("Fixed"));
+        Assert.That(report.Applied, Is.False);
+        Assert.That(report.Proposals.Single().Applied, Is.False);
+        Assert.That(report.ApplyError, Is.EqualTo("broker unreachable"));
+        Assert.That(report.Outcome, Is.EqualTo("Failed applying Fixed: 1 of 3 nodes written before the error."));
+        Assert.That(_state.OptimizerState.LastOutcome, Is.EqualTo(report.Outcome));
+    }
+
+    [Test]
+    public async Task NoHistory_BlamesTheDisabledSetting_NotTheLease()
+    {
+        _configLoader.Config!.Optimization.Enabled = false;
+
+        var dry = JsonDocument.Parse(await new McpOptimizerTools(_service).RunOptimizerDryCycle()).RootElement;
+
+        Assert.That(dry.GetProperty("error").GetString(), Does.Contain("optimization.enabled").And.Not.Contain("lease"));
+        Assert.That(_service.GetMeasures().Reason, Does.Contain("optimization.enabled").And.Not.Contain("lease"));
+    }
+
+    [Test]
+    public void NoHistory_WhileEnabled_BlamesTheLeaseOnlyWhenAnotherInstanceHoldsIt()
+    {
+        _configLoader.Config!.Optimization.Enabled = true;
+        var lease = new Mock<ILeaseService>();
+        var runner = new OptimizationRunner(_state, _nss, NullLogger<OptimizationRunner>.Instance, _configLoader, lease.Object, NullLoggerFactory.Instance);
+        var service = new OptimizerDebugService(runner, _state);
+
+        lease.Setup(l => l.GetStatus("optimization")).Returns(new LeaseStatus("other-instance", DateTime.UtcNow.AddMinutes(1), false));
+        Assert.That(service.GetMeasures().Reason, Does.Contain("lease"));
+
+        lease.Setup(l => l.GetStatus("optimization")).Returns(new LeaseStatus("this-instance", DateTime.UtcNow.AddMinutes(1), true));
+        Assert.That(service.GetMeasures().Reason, Does.Not.Contain("lease").And.Not.Contain("disabled"));
+    }
+
+    [Test]
+    public async Task DryRun_WhileDisabled_SaysNothingWouldBeApplied()
+    {
+        AddHistory();
+        _configLoader.Config!.Optimization.Enabled = false;
+
+        var report = await _service.RunDryCycleAsync();
+
+        Assert.That(report.Note, Does.Contain("disabled"));
+    }
+
+    [Test]
+    public async Task UnknownConfiguredMode_ReportsTheLegacyFallback()
+    {
+        _configLoader.Config!.Optimization.Optimizer = "global-absorption";
+        var runner = new OptimizationRunner(_state, _nss, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>(), NullLoggerFactory.Instance);
+        var service = new OptimizerDebugService(runner, _state);
+        var start = DateTime.UtcNow.AddMinutes(-15);
+        runner.Snapshots.AddRange(Enumerable.Range(0, 31).Select(i => MeshSnapshot(start.AddSeconds(30 * i))));
+
+        var status = service.GetStatus();
+        Assert.That(status.Mode, Is.EqualTo("legacy"));
+        Assert.That(status.ConfiguredMode, Is.EqualTo("global-absorption"));
+        Assert.That(status.Optimizers, Has.Count.EqualTo(4));
+
+        var report = await service.RunDryCycleAsync();
+        Assert.That(report.Note, Does.Contain("'global-absorption'").And.Contain("legacy set runs"));
     }
 
     [Test]

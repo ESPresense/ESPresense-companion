@@ -56,8 +56,7 @@ internal class OptimizationRunner : BackgroundService
 
     private IList<IOptimizer> BuildOptimizers(string? mode)
     {
-        mode = mode?.ToLowerInvariant() ?? "legacy";
-        return mode switch
+        return ResolveMode(mode) switch
         {
             "global_absorption" => new List<IOptimizer> { new GlobalAbsorptionRxTxOptimizer(_state, _loggerFactory.CreateLogger<GlobalAbsorptionRxTxOptimizer>()) },
             "per_node_absorption" => new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, _loggerFactory.CreateLogger<PerNodeAbsorptionRxTx>()) },
@@ -200,7 +199,7 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.TrainingSamples = split.Training.Measures.Count;
         SetStatus("Optimizing", $"Training on {split.Training.Measures.Count} measurements and validating newer holdout data.");
 
-        await RunCycleAsync(split.Training, split.Validation.ToList(), optimization, currentOptimizers);
+        await RunCycleAsync(split.Training, split.Validation, optimization, currentOptimizers);
         _state.OptimizerState.LastRunAt = DateTime.UtcNow;
         return true;
     }
@@ -271,7 +270,7 @@ internal class OptimizationRunner : BackgroundService
     /// than applied greedily in list order, which let an absorption-only proposal land on top of another
     /// optimizer's rxAdj: a pair nobody fitted.
     /// </summary>
-    internal async Task RunCycleAsync(OptimizationSnapshot os, List<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
+    internal async Task RunCycleAsync(OptimizationSnapshot os, IReadOnlyList<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
     {
         // The decision is made without access to the store's writers; only the selected proposal is applied below.
         var cycle = OptimizationCycle.Evaluate(os, oss, optimization, optimizers, _nsd.Get, dryRun: false, DateTime.UtcNow);
@@ -310,6 +309,30 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.BestR = chosenScore.R;
         _state.OptimizerState.BestRMSE = chosenScore.Rmse;
 
+        // The report says applied only once every node has been written: a publish that throws part way (MQTT down)
+        // leaves it unapplied, with what was written and why it stopped, before the error reaches ExecuteAsync.
+        var written = 0;
+        try
+        {
+            await ApplyAsync(chosenResults, optimization, () => written++);
+        }
+        catch (Exception ex)
+        {
+            var failed = cycle.WithApplication(false,
+                $"Failed applying {chosen.Name}: {written} of {chosenResults.Nodes.Count} nodes written before the error.", ex.Message);
+            LastCycle = failed;
+            _state.OptimizerState.LastOutcome = failed.Report.Outcome;
+            throw;
+        }
+
+        var applied = cycle.WithApplication(true,
+            $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenScore.R:0.000}, RMSE={chosenScore.Rmse:0.000}).");
+        LastCycle = applied;
+        _state.OptimizerState.LastOutcome = applied.Report.Outcome;
+    }
+
+    private async Task ApplyAsync(OptimizationResults chosenResults, ConfigOptimization optimization, Action nodeWritten)
+    {
         foreach (var (id, result) in chosenResults.Nodes)
         {
             _logger.LogInformation("Applied {NodeId,-20}: Absorption={Absorption:0.00}, RxAdj={RxAdj:00}, TxAdj={TxAdj:00}, Error={Error}",
@@ -330,6 +353,7 @@ internal class OptimizationRunner : BackgroundService
                     id, string.Join(", ", atLimit));
 
             await _nsd.Set(id, nodeSettings);
+            nodeWritten();
         }
     }
 
@@ -378,10 +402,39 @@ internal class OptimizationRunner : BackgroundService
         get { lock (_optimizersLock) return _optimizers.Select(o => o.Name).ToList(); }
     }
 
-    /// <summary>The configured optimizer mode (legacy, global_absorption or per_node_absorption).</summary>
+    /// <summary>The optimizer mode that runs: legacy, global_absorption or per_node_absorption. Anything else runs legacy.</summary>
     internal string Mode
     {
+        get { lock (_optimizersLock) return ResolveMode(_lastOptimizerMode); }
+    }
+
+    /// <summary>The optimizer mode as configured, lower-cased, which may not be one <see cref="BuildOptimizers"/> knows.</summary>
+    internal string ConfiguredMode
+    {
         get { lock (_optimizersLock) return _lastOptimizerMode ?? "legacy"; }
+    }
+
+    internal static string ResolveMode(string? mode) => mode?.ToLowerInvariant() switch
+    {
+        "global_absorption" => "global_absorption",
+        "per_node_absorption" => "per_node_absorption",
+        _ => "legacy"
+    };
+
+    /// <summary>Whether this instance holds the optimization lease right now; snapshots are only taken while it does.</summary>
+    internal bool HoldsLease => _leaseService.GetStatus(OptimizationLeaseName)?.IsOwned == true;
+
+    /// <summary>
+    /// Why the history may be empty or short, for messages: optimization is disabled (nothing is sampled), or this
+    /// instance does not hold the lease (another instance samples). Null when neither applies.
+    /// </summary>
+    internal string? WhyNoSampling()
+    {
+        if (_state.Config?.Optimization is not { Enabled: true })
+            return "Optimization is disabled (optimization.enabled), so no snapshots are collected.";
+        if (!HoldsLease)
+            return "Snapshots are only collected while this instance holds the optimization lease, and it does not.";
+        return null;
     }
 
     /// <summary>Every optimizer a dry run can be asked for by name, whatever the configured mode.</summary>
@@ -389,9 +442,6 @@ internal class OptimizationRunner : BackgroundService
 
     private IEnumerable<IOptimizer> AllOptimizers() =>
         BuildOptimizers("legacy").Concat(BuildOptimizers("global_absorption")).Concat(BuildOptimizers("per_node_absorption"));
-
-    /// <summary>Thrown by <see cref="DryRunAsync"/> when it cannot run; the message says why.</summary>
-    internal sealed class DryRunUnavailableException(string message) : Exception(message);
 
     private readonly SemaphoreSlim _dryRunGate = new(1, 1);
 
@@ -418,19 +468,24 @@ internal class OptimizationRunner : BackgroundService
         {
             var match = AllOptimizers().FirstOrDefault(o => string.Equals(o.Name, optimizer.Trim(), StringComparison.OrdinalIgnoreCase));
             if (match == null)
-                throw new DryRunUnavailableException($"Unknown optimizer '{optimizer}'. Known: {string.Join(", ", KnownOptimizerNames)}.");
+                throw new UnknownOptimizerException($"Unknown optimizer '{optimizer}'. Known: {string.Join(", ", KnownOptimizerNames)}.");
             optimizers = new List<IOptimizer> { match };
         }
 
         var snapshots = Snapshots.ToArray();
         if (!OptimizationDataSplit.TryCreate(snapshots, optimization.EffectiveValidationFraction, out var split) || split == null)
-            throw new DryRunUnavailableException(
+            throw new OptimizerUnavailableException(
                 $"The history holds {snapshots.Length} snapshots; a cycle needs at least {OptimizationDataSplit.MinimumSnapshots} to split into training and validation." +
-                (_state.OptimizerState.LeaseHolder == "This instance" ? "" : " Snapshots are only collected while this instance holds the optimization lease."));
+                (WhyNoSampling() is { } why ? " " + why : ""));
 
-        var note = HasSufficientHistory(snapshots, optimization)
-            ? null
-            : $"The history spans less than {MinimumHistoryFraction:P0} of the {optimization.EffectiveTrainingWindowMins}-minute training window; a scheduled cycle would not run on it yet.";
+        var notes = new List<string>();
+        if (!optimization.Enabled)
+            notes.Add("Optimization is disabled (optimization.enabled): no live cycle runs, so nothing would be applied.");
+        if (!HasSufficientHistory(snapshots, optimization))
+            notes.Add($"The history spans less than {MinimumHistoryFraction:P0} of the {optimization.EffectiveTrainingWindowMins}-minute training window; a scheduled cycle would not run on it yet.");
+        if (string.IsNullOrWhiteSpace(optimizer) && ConfiguredMode != Mode)
+            notes.Add($"The configured optimizer mode '{ConfiguredMode}' is not one of legacy, global_absorption or per_node_absorption, so the legacy set runs.");
+        var note = notes.Count > 0 ? string.Join(" ", notes) : null;
 
         await _dryRunGate.WaitAsync(cancellationToken);
         try

@@ -43,7 +43,7 @@ public class McpOptimizerTools(OptimizerDebugService service)
                     ? "The dry cycle was skipped: too few validation measurements (min_samples)."
                     : "No optimization cycle with proposals has run since start-up.");
         }
-        catch (OptimizerUnavailableException ex)
+        catch (Exception ex) when (ex is OptimizerUnavailableException or UnknownOptimizerException)
         {
             return Error(ex.Message);
         }
@@ -65,7 +65,7 @@ public class McpOptimizerTools(OptimizerDebugService service)
         {
             return JsonSerializer.Serialize(await service.RunDryCycleAsync(optimizer, cancellationToken), Json);
         }
-        catch (OptimizerUnavailableException ex)
+        catch (Exception ex) when (ex is OptimizerUnavailableException or UnknownOptimizerException)
         {
             return Error(ex.Message);
         }

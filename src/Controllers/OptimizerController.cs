@@ -27,6 +27,10 @@ public class OptimizerController(OptimizerDebugService service) : ControllerBase
                 ? residuals
                 : NotFound(new { ok = false, error = "No residuals: no cycle with proposals has run, or it was skipped for too few validation measurements." });
         }
+        catch (UnknownOptimizerException ex)
+        {
+            return BadRequest(new { ok = false, error = ex.Message });
+        }
         catch (OptimizerUnavailableException ex)
         {
             return Conflict(new { ok = false, error = ex.Message });
@@ -43,6 +47,10 @@ public class OptimizerController(OptimizerDebugService service) : ControllerBase
         try
         {
             return await service.RunDryCycleAsync(optimizer, cancellationToken);
+        }
+        catch (UnknownOptimizerException ex)
+        {
+            return BadRequest(new { ok = false, error = ex.Message });
         }
         catch (OptimizerUnavailableException ex)
         {

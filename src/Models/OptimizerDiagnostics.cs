@@ -7,10 +7,14 @@ namespace ESPresense.Models;
 // Serialized with JsonDefaults.Web like every other REST and MCP payload. RSSI and residuals are in dB,
 // distances in metres, composites in the weighted score RunCycleAsync gates on (higher is better).
 
-/// <summary>What the optimizer is doing and what it has to work with.</summary>
+/// <summary>
+/// What the optimizer is doing and what it has to work with. <see cref="Mode"/> is the mode that runs;
+/// <see cref="ConfiguredMode"/> is what the config says, which differs when it names no known mode and legacy runs instead.
+/// </summary>
 public sealed record OptimizerStatus(
     bool Enabled,
     string Mode,
+    string ConfiguredMode,
     string Phase,
     string Message,
     IReadOnlyList<string> Optimizers,
@@ -55,7 +59,9 @@ public sealed record OptimizerScore(double Composite, double R, double Rmse, int
 /// <summary>
 /// One optimization cycle: the incumbent's score on the eval set and every proposal with the gate's verdict.
 /// <see cref="DryRun"/> cycles never apply anything; <see cref="Applied"/> is then always false and
-/// <see cref="Selected"/> names what a live cycle would have applied.
+/// <see cref="Selected"/> names what a live cycle would have applied. In a live cycle <see cref="Applied"/> becomes
+/// true only once every node of the selected proposal has been written; while the writes are in progress the
+/// outcome says "Applying", and if one fails <see cref="ApplyError"/> says why and <see cref="Applied"/> stays false.
 /// </summary>
 public sealed record OptimizerCycleReport(
     DateTime At,
@@ -68,7 +74,8 @@ public sealed record OptimizerCycleReport(
     string? Selected,
     bool Applied,
     string Outcome,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null);
 
 /// <summary>Where a proposal stopped. Gates are checked in this order; the first one failed is the decision.</summary>
 public enum OptimizerGateDecision

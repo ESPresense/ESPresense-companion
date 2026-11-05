@@ -38,6 +38,7 @@ public class OptimizerDebugService
         return new OptimizerStatus(
             optimization.Enabled,
             _runner.Mode,
+            _runner.ConfiguredMode,
             os.Phase,
             os.Message,
             _runner.OptimizerNames,
@@ -65,29 +66,19 @@ public class OptimizerDebugService
     /// Residuals of the last live cycle, or (with <paramref name="dryRun"/>) of a dry cycle run now.
     /// Null when there is no live cycle yet or it was skipped for too few validation measures.
     /// </summary>
-    /// <exception cref="OptimizerUnavailableException">A dry run was asked for and cannot run.</exception>
+    /// <exception cref="OptimizerUnavailableException">A dry run was asked for and there is too little history.</exception>
+    /// <exception cref="UnknownOptimizerException">A dry run was asked for an optimizer that does not exist.</exception>
     public async Task<OptimizerResidualsReport?> GetResidualsAsync(bool dryRun = false, string? optimizer = null, CancellationToken cancellationToken = default)
     {
         if (!dryRun) return _runner.LastCycle?.Residuals;
-        return (await DryRun(optimizer, cancellationToken)).Residuals;
+        return (await _runner.DryRunAsync(optimizer, cancellationToken)).Residuals;
     }
 
     /// <summary>Runs one cycle now on the current history and reports it, applying nothing.</summary>
-    /// <exception cref="OptimizerUnavailableException">Unknown optimizer, or too little history to split.</exception>
+    /// <exception cref="OptimizerUnavailableException">Too little history to split.</exception>
+    /// <exception cref="UnknownOptimizerException">No optimizer has that name.</exception>
     public async Task<OptimizerCycleReport> RunDryCycleAsync(string? optimizer = null, CancellationToken cancellationToken = default)
-        => (await DryRun(optimizer, cancellationToken)).Report;
-
-    private async Task<OptimizationCycleResult> DryRun(string? optimizer, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await _runner.DryRunAsync(optimizer, cancellationToken);
-        }
-        catch (OptimizationRunner.DryRunUnavailableException ex)
-        {
-            throw new OptimizerUnavailableException(ex.Message);
-        }
-    }
+        => (await _runner.DryRunAsync(optimizer, cancellationToken)).Report;
 
     /// <summary>
     /// The pooled training snapshot the next cycle would fit, one cell per tx/rx pair, optionally only the pairs
@@ -95,11 +86,13 @@ public class OptimizerDebugService
     /// </summary>
     public OptimizerMeasuresReport GetMeasures(string? nodeId = null)
     {
+        if (string.IsNullOrWhiteSpace(nodeId)) nodeId = null;
         var snapshots = _runner.Snapshots.ToArray();
         var empty = new Dictionary<string, string?>();
         if (!OptimizationDataSplit.TryCreate(snapshots, Optimization.EffectiveValidationFraction, out var split) || split == null)
             return new OptimizerMeasuresReport(false,
-                $"The history holds {snapshots.Length} snapshots; at least {OptimizationDataSplit.MinimumSnapshots} are needed to split off a training set.",
+                $"The history holds {snapshots.Length} snapshots; at least {OptimizationDataSplit.MinimumSnapshots} are needed to split off a training set." +
+                (_runner.WhyNoSampling() is { } why ? " " + why : ""),
                 null, null, 0, 0, empty, Array.Empty<OptimizerMeasureCell>());
 
         var trainingSnapshots = split.TrainingSnapshots;
@@ -147,5 +140,11 @@ public class OptimizerDebugService
     }
 }
 
-/// <summary>An optimizer debugging request that cannot be answered now; the message says why.</summary>
+/// <summary>
+/// An optimizer debugging request that cannot be answered yet (for example too little history); the message says
+/// why. Retrying later can succeed. REST maps it to 409.
+/// </summary>
 public sealed class OptimizerUnavailableException(string message) : Exception(message);
+
+/// <summary>A dry run asked for an optimizer name that does not exist; the message lists the known ones. REST maps it to 400.</summary>
+public sealed class UnknownOptimizerException(string message) : ArgumentException(message);

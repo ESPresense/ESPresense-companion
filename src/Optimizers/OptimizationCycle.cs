@@ -8,13 +8,31 @@ internal sealed record OptimizationCycleResult(
     OptimizerResidualsReport? Residuals,
     IOptimizer? Selected,
     OptimizationResults? SelectedResults,
-    int BaselineSamples);
+    int BaselineSamples)
+{
+    /// <summary>
+    /// The result once the runner has tried to apply <see cref="Selected"/>: applied (all nodes written) or not, with
+    /// the outcome to report and, when writing failed, why.
+    /// </summary>
+    public OptimizationCycleResult WithApplication(bool applied, string outcome, string? applyError = null) => this with
+    {
+        Report = Report with
+        {
+            Applied = applied,
+            Outcome = outcome,
+            ApplyError = applyError,
+            Proposals = Report.Proposals.Select(p => p.Decision == OptimizerGateDecision.Selected ? p with { Applied = applied } : p).ToList()
+        }
+    };
+}
 
 /// <summary>
 /// The decision half of an optimization cycle: scores the incumbent and every optimizer's proposal and runs the gate
 /// described on <see cref="OptimizationRunner.RunCycleAsync"/>. It is given a function that reads node settings and
 /// nothing else, so it cannot write settings or publish anything: the live runner applies what it selects, and a dry
-/// run (<see cref="OptimizationRunner.DryRunAsync"/>) only reports it.
+/// run (<see cref="OptimizationRunner.DryRunAsync"/>) only reports it. The report it returns never says
+/// <see cref="OptimizerCycleReport.Applied"/>: only the runner knows that, once the writes have succeeded
+/// (<see cref="OptimizationCycleResult.WithApplication"/>).
 /// </summary>
 internal static class OptimizationCycle
 {
@@ -54,8 +72,17 @@ internal static class OptimizationCycle
             frozen[id] = readSettings(id);
         NodeSettings Frozen(string id) => frozen.TryGetValue(id, out var ns) ? ns : readSettings(id);
 
+        // Each scenario is predicted once; the same predictions are scored and fed to the residual report.
+        var residuals = new ResidualAccumulator();
+        OptimizationEvaluation Score(string scenario, OptimizationResults results, bool deviceFrame = false)
+        {
+            var predictions = results.Predict(evalSet, Frozen, deviceFrame).ToList();
+            residuals.Add(scenario, predictions);
+            return OptimizationResults.Score(predictions);
+        }
+
         var baselineResults = new OptimizationResults();
-        var (bestCorr, bestRmse, baselineSamples) = baselineResults.Evaluate(evalSet, Frozen);
+        var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
         var bestScore = Composite(bestCorr, bestRmse, optimization);
         var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples);
 
@@ -75,14 +102,11 @@ internal static class OptimizationCycle
             ? evalSet.Select(snap => baselineResults.Evaluate(new List<OptimizationSnapshot> { snap }, Frozen)).ToList()
             : null;
 
-        var residuals = new ResidualAccumulator();
-        residuals.Add(IncumbentScenario, baselineResults.Predict(evalSet, Frozen));
-
         var scored = new List<(IOptimizer Optimizer, OptimizationResults Results, OptimizerScore Score, OptimizerGates Gates, OptimizerGateDecision Decision)>();
         foreach (var optimizer in optimizers)
         {
             var results = optimizer.Optimize(os, currentSettings).QuantizeForApplication();
-            var (corr, rmse, samples) = results.Evaluate(evalSet, Frozen);
+            var (corr, rmse, samples) = Score(optimizer.Name, results);
             var composite = Composite(corr, rmse, optimization);
             var score = new OptimizerScore(composite, corr, rmse, samples);
 
@@ -97,7 +121,7 @@ internal static class OptimizationCycle
             var movesTxRef = results.Nodes.Values.Any(r => r.TxRefRssi != null);
             if (movesTxRef)
             {
-                var (dCorr, dRmse, _) = results.Evaluate(evalSet, Frozen, deviceFrame: true);
+                var (dCorr, dRmse, _) = Score(DeviceFrameScenario(optimizer.Name), results, deviceFrame: true);
                 var deviceComposite = Composite(dCorr, dRmse, optimization);
                 deviceFrame = new OptimizerDeviceFrameGate(deviceComposite, dCorr, dRmse, bestScore,
                     IsFinite(deviceComposite) && !(deviceComposite <= bestScore));
@@ -130,9 +154,6 @@ internal static class OptimizationCycle
                 OptimizerGateDecision.Passed;
 
             scored.Add((optimizer, results, score, new OptimizerGates(minSamples, improvement, deviceFrame, everySnapshot), decision));
-
-            residuals.Add(optimizer.Name, results.Predict(evalSet, Frozen));
-            if (movesTxRef) residuals.Add(DeviceFrameScenario(optimizer.Name), results.Predict(evalSet, Frozen, deviceFrame: true));
         }
 
         // Every optimizer is scored against the same incumbent and only the best passing proposal is
@@ -147,7 +168,7 @@ internal static class OptimizationCycle
             s.Optimizer.Name,
             s.Score,
             i == selected ? OptimizerGateDecision.Selected : s.Decision,
-            i == selected && !dryRun,
+            false,
             s.Gates,
             s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))).ToList();
 
@@ -159,7 +180,7 @@ internal static class OptimizationCycle
             var s = scored[sel];
             chosen = s.Optimizer;
             chosenResults = s.Results;
-            outcome = $"{(dryRun ? "Would apply" : "Applied")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes (held-out R={s.Score.R:0.000}, RMSE={s.Score.Rmse:0.000}).";
+            outcome = $"{(dryRun ? "Would apply" : "Applying")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes (held-out R={s.Score.R:0.000}, RMSE={s.Score.Rmse:0.000}).";
         }
         else
         {
@@ -167,7 +188,7 @@ internal static class OptimizationCycle
         }
 
         var report = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
-            proposals, chosen?.Name, chosen != null && !dryRun, outcome);
+            proposals, chosen?.Name, false, outcome);
         return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples);
     }
 
@@ -178,7 +199,7 @@ internal static class OptimizationCycle
         private readonly Dictionary<string, (string? Name, bool Anchor)> _nodes = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Node, bool AsRx, string Scenario), (int N, double Sum, double SumSq)> _acc = new();
 
-        public void Add(string scenario, IEnumerable<PredictedMeasure> predictions)
+        public void Add(string scenario, IReadOnlyList<PredictedMeasure> predictions)
         {
             if (!_scenarios.Contains(scenario)) _scenarios.Add(scenario);
             foreach (var p in predictions)

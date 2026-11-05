@@ -57,15 +57,17 @@ public class OptimizationResults
     /// (for example when an earlier cycle's MQTT writes are echoed back) while the cycle runs.
     /// </summary>
     public OptimizationEvaluation Evaluate(List<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, bool deviceFrame = false)
-    {
-        List<double> predictedValues = new();
-        List<double> measuredValues = new();
+        => Score(Predict(oss, getSettings, deviceFrame).ToList());
 
-        foreach (var p in Predict(oss, getSettings, deviceFrame))
-        {
-            predictedValues.Add(p.Predicted);
-            measuredValues.Add(p.Measured);
-        }
+    /// <summary>
+    /// Pearson R and RMSE of predicted against measured RSSI over <paramref name="predictions"/>: the reduction
+    /// <see cref="Evaluate(List{OptimizationSnapshot}, Func{string, NodeSettings}, bool)"/> applies to <see cref="Predict"/>.
+    /// Lets a caller that also needs the per-measure residuals predict once and score from the same list.
+    /// </summary>
+    internal static OptimizationEvaluation Score(IReadOnlyList<PredictedMeasure> predictions)
+    {
+        var predictedValues = predictions.Select(p => p.Predicted).ToList();
+        var measuredValues = predictions.Select(p => p.Measured).ToList();
 
         var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
         var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
