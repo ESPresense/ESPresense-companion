@@ -398,9 +398,11 @@ internal class OptimizationRunner : BackgroundService
     /// <summary>
     /// Runs one cycle now on the current history and reports it, applying nothing: the cycle is
     /// <see cref="OptimizationCycle.Evaluate"/>, which only ever reads node settings. It uses fresh optimizer instances, so
-    /// it shares no state with a live cycle that may be running, does not touch <see cref="OptimizerState"/> or
-    /// <see cref="LastCycle"/>, and needs no lease. Dry runs are serialized with each other. The history is only
-    /// collected while this instance holds the optimization lease, so on an instance that does not, there is nothing to run on.
+    /// no optimizer object is shared with a live cycle that may be running, does not touch <see cref="OptimizerState"/> or
+    /// <see cref="LastCycle"/>, and needs no lease. Dry runs are serialized with each other but not with the live cycle:
+    /// both read the same node settings, so a dry run issued while a live cycle is applying its proposal may score
+    /// against a settings set that is only partly applied. The history is only collected while this instance holds
+    /// the optimization lease, so on an instance that does not, there is nothing to run on.
     /// </summary>
     /// <param name="optimizer">Run only the optimizer with this name (any mode's; case-insensitive), or the configured set when null.</param>
     internal async Task<OptimizationCycleResult> DryRunAsync(string? optimizer, CancellationToken cancellationToken = default)

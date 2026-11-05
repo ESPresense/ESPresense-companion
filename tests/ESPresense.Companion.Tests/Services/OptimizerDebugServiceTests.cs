@@ -60,7 +60,7 @@ public class OptimizerDebugServiceTests
         try { Directory.Delete(_configDir, recursive: true); } catch (IOException) { }
     }
 
-    private static OptimizationSnapshot MeshSnapshot(DateTime at)
+    private static OptimizationSnapshot MeshSnapshot(DateTime at, double absorption = 3.0)
     {
         var nodes = Nodes.ToDictionary(n => n.Id, n => new OptNode { Id = n.Id, Name = n.Id.ToUpperInvariant(), Location = n.At });
         var os = new OptimizationSnapshot { Timestamp = at };
@@ -68,7 +68,7 @@ public class OptimizerDebugServiceTests
             foreach (var rx in nodes.Values.Where(r => r != tx))
             {
                 var d = tx.Location.DistanceTo(rx.Location);
-                os.Measures.Add(new Measure { Tx = tx, Rx = rx, Rssi = -59 - 30 * Math.Log10(d), RssiRxAdj = 0, RefRssi = -59, Distance = d });
+                os.Measures.Add(new Measure { Tx = tx, Rx = rx, Rssi = -59 - 10 * absorption * Math.Log10(d), RssiRxAdj = 0, RefRssi = -59, Distance = d });
             }
         return os;
     }
@@ -90,6 +90,19 @@ public class OptimizerDebugServiceTests
         {
             var results = new OptimizationResults();
             foreach (var (id, _) in Nodes) results.Nodes[id] = new ProposedValues { Absorption = 3.0 };
+            return results;
+        }
+    }
+
+    /// <summary>The same absorption for every node.</summary>
+    private sealed class UniformAbsorption(string name, double absorption) : IOptimizer
+    {
+        public string Name => name;
+
+        public OptimizationResults Optimize(OptimizationSnapshot os, Dictionary<string, NodeSettings> existingSettings)
+        {
+            var results = new OptimizationResults();
+            foreach (var (id, _) in Nodes) results.Nodes[id] = new ProposedValues { Absorption = absorption };
             return results;
         }
     }
@@ -150,6 +163,62 @@ public class OptimizerDebugServiceTests
         Assert.That(report.Applied, Is.True);
         Assert.That(report.Outcome, Is.EqualTo(_state.OptimizerState.LastOutcome));
         Assert.That(_nss.Get("node-a").Calibration.Absorption, Is.EqualTo(3.0), "the live cycle applied it");
+    }
+
+    /// <summary>
+    /// The truth is 3.0 and the incumbent 2.7: 2.9 passes every gate but 3.0 scores higher, and 2.4 is worse than the
+    /// incumbent. A proposal stopped at the improvement gate still has its later gates computed.
+    /// </summary>
+    [Test]
+    public async Task LiveCycle_RanksPassingProposals_AndRecordsTheWorseOne()
+    {
+        AddHistory();
+
+        await _runner.RunScheduledCycleAsync(Optimization, new List<IOptimizer>
+        {
+            new UniformAbsorption("Close", 2.9), new UniformAbsorption("Exact", 3.0), new UniformAbsorption("Worse", 2.4)
+        });
+
+        var report = _service.GetLastCycle()!;
+        var byName = report.Proposals.ToDictionary(p => p.Optimizer);
+        Assert.That(byName["Exact"].Decision, Is.EqualTo(OptimizerGateDecision.Selected));
+        Assert.That(byName["Close"].Decision, Is.EqualTo(OptimizerGateDecision.Passed));
+        Assert.That(byName["Close"].Applied, Is.False);
+        Assert.That(byName["Close"].Score.Composite, Is.GreaterThan(report.Baseline.Composite).And.LessThan(byName["Exact"].Score.Composite));
+
+        var worse = byName["Worse"];
+        Assert.That(worse.Decision, Is.EqualTo(OptimizerGateDecision.NotBetter));
+        Assert.That(worse.Gates.Improvement.Passed, Is.False);
+        Assert.That(worse.Gates.Improvement.Composite, Is.LessThan(worse.Gates.Improvement.Baseline));
+        Assert.That(worse.Gates.EverySnapshot, Is.EqualTo(new OptimizerEverySnapshotGate(7, 7, false)), "computed although the proposal already failed");
+
+        // The proposal-level min-samples gate is kept from the original gate, but a proposal is scored on the same
+        // measures as the baseline, and a baseline short of min_samples skips the cycle, so it passes whenever it is reached.
+        Assert.That(report.Proposals.Select(p => p.Gates.MinSamples), Has.All.EqualTo(new OptimizerMinSamplesGate(report.Baseline.Samples, 5, true)));
+    }
+
+    /// <summary>
+    /// Two held-out snapshots follow absorption 3.0 and one follows the incumbent 2.7 exactly. A proposal of 3.0 is
+    /// better on the aggregate but worse on the third snapshot by itself, so the every-snapshot gate stops it.
+    /// </summary>
+    [Test]
+    public void Evaluate_BetterOnTheAggregateButNotOnEverySnapshot_IsStoppedByTheEverySnapshotGate()
+    {
+        var t = DateTime.UtcNow;
+        var training = MeshSnapshot(t.AddMinutes(-10));
+        var held = new List<OptimizationSnapshot> { MeshSnapshot(t.AddMinutes(-2)), MeshSnapshot(t.AddMinutes(-1)), MeshSnapshot(t, absorption: 2.7) };
+        var reads = 0;
+
+        var result = OptimizationCycle.Evaluate(training, held, new ConfigOptimization { Enabled = true },
+            new List<IOptimizer> { new UniformAbsorption("Exact", 3.0) }, id => { reads++; return new NodeSettings(id); }, dryRun: false, t);
+
+        var p = result.Report.Proposals.Single();
+        Assert.That(p.Gates.Improvement.Passed, Is.True, "better on the aggregate");
+        Assert.That(p.Gates.EverySnapshot, Is.EqualTo(new OptimizerEverySnapshotGate(1, 3, false)));
+        Assert.That(p.Decision, Is.EqualTo(OptimizerGateDecision.EverySnapshot));
+        Assert.That(result.Selected, Is.Null);
+        Assert.That(result.Report.Outcome, Is.EqualTo("No proposal beat the current calibration on the held-out data."));
+        Assert.That(reads, Is.EqualTo(Nodes.Length), "each node's settings are read once, then frozen");
     }
 
     [Test]
@@ -296,6 +365,8 @@ public class OptimizerDebugServiceTests
         // 5 snapshots, max(2, ceil(5 * 0.2)) = 2 held out, 3 pooled for training.
         Assert.That(report.Available, Is.True);
         Assert.That(report.TrainingSnapshots, Is.EqualTo(3));
+        Assert.That(report.From, Is.EqualTo(start));
+        Assert.That(report.To, Is.EqualTo(start.AddMinutes(2)));
         Assert.That(report.Names, Is.EqualTo(new Dictionary<string, string?> { ["anchor-1"] = "Anchor", ["node-a"] = "A" }));
         var cell = report.Cells.Single();
         Assert.That(cell.Tx, Is.EqualTo("anchor-1"));

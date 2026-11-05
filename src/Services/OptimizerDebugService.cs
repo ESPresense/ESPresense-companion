@@ -32,7 +32,7 @@ public class OptimizerDebugService
         OptimizerSplitSizes? split = null;
         if (OptimizationDataSplit.TryCreate(snapshots, optimization.EffectiveValidationFraction, out var s) && s != null)
             split = new OptimizerSplitSizes(
-                snapshots.Length - s.Validation.Count, s.Training.Measures.Count,
+                s.TrainingSnapshots.Count, s.Training.Measures.Count,
                 s.Validation.Count, s.Validation.Sum(v => v.Measures.Count));
 
         return new OptimizerStatus(
@@ -102,7 +102,7 @@ public class OptimizerDebugService
                 $"The history holds {snapshots.Length} snapshots; at least {OptimizationDataSplit.MinimumSnapshots} are needed to split off a training set.",
                 null, null, 0, 0, empty, Array.Empty<OptimizerMeasureCell>());
 
-        var trainingSnapshots = snapshots.OrderBy(x => x.Timestamp).Take(snapshots.Length - split.Validation.Count).ToArray();
+        var trainingSnapshots = split.TrainingSnapshots;
         var measures = split.Training.Measures
             .Where(m => m.Tx?.Id != null && m.Rx?.Id != null)
             .Where(m => nodeId == null || string.Equals(m.Tx.Id, nodeId, StringComparison.OrdinalIgnoreCase) || string.Equals(m.Rx.Id, nodeId, StringComparison.OrdinalIgnoreCase))
@@ -141,9 +141,9 @@ public class OptimizerDebugService
             .ToList();
 
         return new OptimizerMeasuresReport(true, null,
-            trainingSnapshots.Length > 0 ? trainingSnapshots[0].Timestamp : null,
-            trainingSnapshots.Length > 0 ? trainingSnapshots[^1].Timestamp : null,
-            trainingSnapshots.Length, measures.Count, names, cells);
+            trainingSnapshots.Count > 0 ? trainingSnapshots[0].Timestamp : null,
+            trainingSnapshots.Count > 0 ? trainingSnapshots[^1].Timestamp : null,
+            trainingSnapshots.Count, measures.Count, names, cells);
     }
 }
 
