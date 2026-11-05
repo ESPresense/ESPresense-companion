@@ -16,9 +16,9 @@ public class AutoDiscovery
     public string DiscoveryId { get; internal set; }
     public string Component { get; internal set; }
 
-    public AutoDiscovery(string component, Device dev, string? discoveryId = null, string? sourceType = null, ILogger? logger = null)
+    public AutoDiscovery(string component, Device dev, string? discoveryId = null, string? sourceType = null, ILogger<AutoDiscovery>? logger = null)
     {
-        _logger = logger ?? NullLogger.Instance;
+        _logger = logger ?? NullLogger<AutoDiscovery>.Instance;
         DiscoveryId = discoveryId ?? $"espresense-{dev.Id}".ToSnakeCase();
         Component = component;
 
@@ -42,9 +42,9 @@ public class AutoDiscovery
         };
     }
 
-    public AutoDiscovery(string component, string discoveryId, DiscoveryRecord message, ILogger? logger = null)
+    public AutoDiscovery(string component, string discoveryId, DiscoveryRecord message, ILogger<AutoDiscovery>? logger = null)
     {
-        _logger = logger ?? NullLogger.Instance;
+        _logger = logger ?? NullLogger<AutoDiscovery>.Instance;
         DiscoveryId = discoveryId;
         Component = component;
         Message = message;
@@ -66,9 +66,9 @@ public class AutoDiscovery
         await mqtt.EnqueueAsync(MqttTopics.DiscoveryConfig(mqtt.DiscoveryTopic, Component, DiscoveryId), null, true);
     }
 
-    internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant", ILogger? logger = null)
+    internal static bool TryDeserialize(string topic, string payload, out AutoDiscovery? msg, string discoveryTopic = "homeassistant", ILogger<AutoDiscovery>? logger = null)
     {
-        logger ??= NullLogger.Instance;
+        logger ??= NullLogger<AutoDiscovery>.Instance;
         var parts = topic.Split("/");
         if (parts.Length != 4 || parts[0] != discoveryTopic || parts[3] != "config")
         {

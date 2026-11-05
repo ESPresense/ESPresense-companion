@@ -20,7 +20,7 @@ public class Device
     [STJ.JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
 
     /// <param name="discoveryLogger">Logs the device's HA discovery publishes; null discards.</param>
-    public Device(string id, string? discoveryId, TimeSpan timeout, ILogger? discoveryLogger = null)
+    public Device(string id, string? discoveryId, TimeSpan timeout, ILogger<AutoDiscovery>? discoveryLogger = null)
     {
         Id = id;
         Timeout = timeout;

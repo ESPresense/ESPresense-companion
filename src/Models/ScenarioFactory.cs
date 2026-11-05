@@ -21,9 +21,9 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
     private readonly ILogger _logger = loggers.CreateLogger<ScenarioFactory>();
 
     // One logger per locator type, shared by every scenario built from it.
-    private readonly ILogger _nelderMeadLogger = loggers.CreateLogger<NelderMeadMultilateralizer>();
-    private readonly ILogger _bfgsLogger = loggers.CreateLogger<BfgsMultilateralizer>();
-    private readonly ILogger _mleLogger = loggers.CreateLogger<MLEMultilateralizer>();
+    private readonly ILogger<NelderMeadMultilateralizer> _nelderMeadLogger = loggers.CreateLogger<NelderMeadMultilateralizer>();
+    private readonly ILogger<BfgsMultilateralizer> _bfgsLogger = loggers.CreateLogger<BfgsMultilateralizer>();
+    private readonly ILogger<MLEMultilateralizer> _mleLogger = loggers.CreateLogger<MLEMultilateralizer>();
     private readonly ILogger<MultiFloorMultilateralizer> _multiFloorLogger = loggers.CreateLogger<MultiFloorMultilateralizer>();
     private readonly ILogger<NadarayaWatsonMultilateralizer> _nadarayaWatsonLogger = loggers.CreateLogger<NadarayaWatsonMultilateralizer>();
 
