@@ -122,6 +122,22 @@ public class AnchorGaugeTests
 
     private static NodeSettings NoSettings(string id) => new(id);
 
+    private const double Drift = 6;
+
+    /// <summary>
+    /// An incumbent that has drifted <see cref="Drift"/> dB along the gauge: every node's txRef configured
+    /// at -53 instead of -59 and every rxAdj that much low. Node-to-node it fits perfectly; anchors see the drift.
+    /// </summary>
+    private static NodeSettings DriftedSettings(string id)
+    {
+        var ns = new NodeSettings(id);
+        if (!Bias.ContainsKey(id)) return ns;
+        ns.Calibration.TxRefRssi = (int)(NodeTxRef + Drift);
+        ns.Calibration.RxAdjRssi = (int)(Bias[id] - Drift);
+        ns.Calibration.Absorption = Absorption;
+        return ns;
+    }
+
     private IOptimizer Make() => new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance);
 
     /// <summary>
@@ -174,7 +190,7 @@ public class AnchorGaugeTests
     }
 
     /// <summary>
-    /// The fit itself. The incumbent has drifted 6 dB along the gauge (every node's txRef configured
+    /// The fit itself. The incumbent has drifted 6 dB along the gauge (<see cref="DriftedSettings"/>: every node's txRef configured
     /// at -53 instead of -59), which node-to-node data cannot see, so without anchors the txRef prior
     /// keeps the fit on the drifted side of the ridge and every rxAdj comes out ~6 dB low. With
     /// anchors, whose txRef is held at their rssi@1m, the ridge is gone: rxAdj lands on the true
@@ -185,15 +201,7 @@ public class AnchorGaugeTests
     [Test]
     public void Optimize_AnchorsPinTheGauge()
     {
-        const double drift = 6;
-        Dictionary<string, NodeSettings> Drifted() => NodeIds.ToDictionary(id => id, id =>
-        {
-            var ns = new NodeSettings(id);
-            ns.Calibration.TxRefRssi = (int)(NodeTxRef + drift);
-            ns.Calibration.RxAdjRssi = (int)(Bias[id] - drift);
-            ns.Calibration.Absorption = Absorption;
-            return ns;
-        });
+        Dictionary<string, NodeSettings> Drifted() => NodeIds.ToDictionary(id => id, DriftedSettings);
 
         double MeanRxAdjError(OptimizationResults r) => NodeIds.Average(id => r.Nodes[id].RxAdjRssi!.Value - Bias[id]);
 
@@ -232,5 +240,33 @@ public class AnchorGaugeTests
             foreach (var id in NodeIds)
                 Assert.That(results.Nodes[id].RxAdjRssi, Is.EqualTo(Bias[id]).Within(1.0), $"{id} rxAdj with the anchors held at rssi@1m");
         }
+    }
+
+    /// <summary>
+    /// The acceptance limit this fix leaves in place, pinned down so it is a known behaviour rather than a
+    /// surprise. From the same drifted incumbent, the anchored fit recovers the true calibration and beats
+    /// the incumbent node-to-node. But the device-frame gate scores it with every node's txRef held at the
+    /// incumbent's -53, so the corrected rxAdj puts the 56 node-to-node links 6 dB out to fix the 24 anchor
+    /// links, and the gate turns it down. While node links outnumber anchor links, a drifted incumbent is
+    /// not walked back by this gate; changing that means changing the gate, which #1859 left as is.
+    /// </summary>
+    [Test]
+    public void Cycle_DriftedIncumbent_RecoveryIsStillRejectedByTheDeviceFrameGate()
+    {
+        var training = Synth();
+        var heldOut = new List<OptimizationSnapshot> { training, Synth(), Synth() };
+        var optimization = new ConfigOptimization { Enabled = true, MinSamples = 5 };
+
+        var cycle = OptimizationCycle.Evaluate(training, heldOut, optimization, new[] { Make() }, DriftedSettings, dryRun: true, DateTime.UtcNow);
+
+        var proposal = cycle.Report.Proposals.Single();
+        Assert.That(training.Measures.Count(m => m.Tx.IsAnchor), Is.LessThan(training.Measures.Count(m => !m.Tx.IsAnchor)), "sanity: node links outnumber anchor links");
+        foreach (var id in NodeIds)
+            Assert.That(proposal.Nodes[id].RxAdjRssi, Is.EqualTo(Bias[id]).Within(1.0), $"sanity: {id} rxAdj recovered");
+        Assert.That(proposal.Gates.Improvement.Passed, Is.True, "the recovery beats the drifted incumbent on the held-out data");
+        Assert.That(proposal.Gates.DeviceFrame, Is.Not.Null);
+        Assert.That(proposal.Gates.DeviceFrame!.Passed, Is.False, "with node txRefs held at the drifted incumbent, the recovery loses");
+        Assert.That(proposal.Decision, Is.EqualTo(OptimizerGateDecision.DeviceFrame));
+        Assert.That(cycle.Selected, Is.Null);
     }
 }
