@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using ESPresense.Converters;
 
 namespace ESPresense.Utils;
@@ -47,11 +48,13 @@ public static class JsonDefaults
     public static JsonSerializerOptions Verbatim { get; } = ReadOnly(LikeNewtonsoft(new JsonSerializerOptions()));
 
     /// <summary>
-    /// Reading JSON other publishers wrote to MQTT, as leniently as Newtonsoft did: names matched case-insensitively,
-    /// comments and trailing commas allowed, numbers and booleans accepted for string members.
+    /// Reading JSON other publishers wrote to MQTT (node reports and telemetry, device settings, discovery, attributes),
+    /// as leniently as Newtonsoft did: names matched case-insensitively, comments and trailing commas allowed, numbers
+    /// and booleans accepted for string members. <see cref="MqttNameAttribute"/> names apply here and nowhere else.
     /// </summary>
     public static JsonSerializerOptions MqttRead { get; } = ReadOnly(new JsonSerializerOptions
     {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { MqttNameAttribute.Apply } },
         PropertyNameCaseInsensitive = true,
         AllowTrailingCommas = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
