@@ -202,6 +202,8 @@ public class RobotSurveyReplayTests
         double? X, double? Y, double? Z, string? Room, string? Floor,
         double? MultiFloorFitX, double? MultiFloorFitY, double? NearestFitX, double? NearestFitY);
 
+    [Explicit("Long-running real-time replay harness (~20 min/seed); run manually with ESPA479_* env vars, see class doc comment")]
+    [Category("LongRunning")]
     [TestCase(1)]
     [TestCase(2)]
     [TestCase(3)]
