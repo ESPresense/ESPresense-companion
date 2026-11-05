@@ -143,16 +143,32 @@ internal static class DeviceResidualModel
     /// How much a device moves: the spread (sum of the x and y standard deviations) of its solved positions
     /// over 1.5 m, clipped to [0.05, 1]. A device that sits still cannot tell a node's offset from its own
     /// position, so its residuals teach the node terms little.
+    ///
+    /// The spread is net of fix noise. With a few dB of radio noise, fixes of a device that never moves still
+    /// scatter by about half a metre, which alone would score it 0.5. Noise is estimated per axis from
+    /// successive fixes (half the mean squared difference: successive fixes of a still device differ by noise
+    /// only, while a moving device's spread grows far beyond its step) and its variance is taken off.
+    /// <paramref name="positions"/> must be in time order.
     /// </summary>
     public static double Mobility(IReadOnlyList<Point3D> positions)
     {
-        if (positions.Count < 2) return 0.05;
-        double mx = 0, my = 0;
-        foreach (var p in positions) { mx += p.X; my += p.Y; }
-        mx /= positions.Count; my /= positions.Count;
-        double vx = 0, vy = 0;
-        foreach (var p in positions) { vx += (p.X - mx) * (p.X - mx); vy += (p.Y - my) * (p.Y - my); }
-        var spread = Math.Sqrt(vx / positions.Count) + Math.Sqrt(vy / positions.Count);
+        if (positions.Count < 3) return 0.05;
+        static double Spread(IReadOnlyList<Point3D> ps, Func<Point3D, double> axis)
+        {
+            double mean = 0, successive = 0;
+            for (int i = 0; i < ps.Count; i++)
+            {
+                mean += axis(ps[i]);
+                if (i > 0) successive += Math.Pow(axis(ps[i]) - axis(ps[i - 1]), 2);
+            }
+            mean /= ps.Count;
+            double variance = 0;
+            foreach (var p in ps) variance += Math.Pow(axis(p) - mean, 2);
+            variance /= ps.Count;
+            var noise = successive / (ps.Count - 1) / 2;
+            return Math.Sqrt(Math.Max(0, variance - noise));
+        }
+        var spread = Spread(positions, p => p.X) + Spread(positions, p => p.Y);
         return Math.Clamp(spread / 1.5, 0.05, 1.0);
     }
 }

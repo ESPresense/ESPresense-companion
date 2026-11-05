@@ -31,9 +31,11 @@ public class OptimizationSnapshot
         return Measures.ToLookup(a => a.Tx, OptNodeIdComparer.Instance);
     }
 
+    /// <summary>Every node in the measures, then any further node that heard a device window.</summary>
     public string[] GetNodeIds()
     {
         return Measures.SelectMany(m => new[] { m.Rx.Id, m.Tx.Id })
+            .Concat(DeviceWindows.SelectMany(w => w.Readings.Select(r => r.NodeId)))
             .Distinct()
             .ToArray();
     }

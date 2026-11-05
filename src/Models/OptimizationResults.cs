@@ -34,6 +34,12 @@ public class OptimizationResults
 
     public Dictionary<string, ProposedValues> Nodes { get; set; } = new();
 
+    /// <summary>Per-device rssi@1m learned by the device_residual optimizer; applied on their own guards, not the composite.</summary>
+    public Dictionary<string, ProposedDeviceValues> Devices { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>What the device_residual optimizer learned this cycle (residual and scale before/after, per-node trust); null for other optimizers.</summary>
+    public DeviceResidualState? DeviceResidual { get; set; }
+
     /// <summary>
     /// Rounds the proposal to the precision that is actually applied (absorption to 2 decimals, rxAdj and txRef
     /// to whole dB, matching <see cref="NodeSettingsStore"/>), so a proposal is scored as the value the node
@@ -48,8 +54,11 @@ public class OptimizationResults
                 Absorption = pair.Value.Absorption is { } absorption ? Math.Round(absorption, 2) : null,
                 RxAdjRssi = pair.Value.RxAdjRssi is { } rxAdjRssi ? Math.Round(rxAdjRssi) : null,
                 TxRefRssi = pair.Value.TxRefRssi is { } txRefRssi ? Math.Round(txRefRssi) : null,
-                Error = pair.Value.Error
-            })
+                Error = pair.Value.Error,
+                DeviceResidualVariance = pair.Value.DeviceResidualVariance
+            }),
+        Devices = Devices,
+        DeviceResidual = DeviceResidual
     };
 
     /// <summary>
