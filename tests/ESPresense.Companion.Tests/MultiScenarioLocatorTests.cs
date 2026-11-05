@@ -63,6 +63,70 @@ public class MultiScenarioLocatorTests
         mqttMock.Verify();
     }
 
+    private class FixAt(Point3D fit) : ILocate
+    {
+        public bool Locate(Scenario scenario)
+        {
+            scenario.Confidence = 100;
+            scenario.UpdateLocation(fit);
+            return true;
+        }
+    }
+
+    [Test]
+    public void DeviceFilterIsFedTheRawFitNotTheScenariosSmoothedPosition()
+    {
+        var device = new Device("id", null, TimeSpan.FromSeconds(30));
+        var scenario = new Scenario(null, new FixAt(new Point3D(10, 0, 0)), "kitchen");
+        scenario.UpdateLocation(new Point3D(0, 0, 0)); // the scenario's own filter starts at the origin
+        device.Scenarios.Add(scenario);
+
+        ScenarioFusion.Update(device, new ConfigFiltering(), DateTime.UtcNow);
+
+        // A 10 m jump a moment later is mostly ignored by the scenario's filter. The device's filter is fresh, so it
+        // starts wherever it's fed: at the raw fit, not at the scenario's already-smoothed position.
+        Assert.That(scenario.Location.X, Is.LessThan(5));
+        Assert.That(device.Location?.X, Is.EqualTo(10).Within(1e-6));
+    }
+
+    private class FixThenNoFix(Point3D fit) : ILocate
+    {
+        public int Passes;
+
+        public bool Locate(Scenario scenario)
+        {
+            if (Passes++ == 0)
+            {
+                scenario.Confidence = 100;
+                scenario.UpdateLocation(fit);
+                return true;
+            }
+
+            // One node still hears it, so the scenario stays Current, but there's no fix this pass
+            scenario.Confidence = 0;
+            scenario.LastHit = DateTime.UtcNow;
+            return false;
+        }
+    }
+
+    [Test]
+    public async Task DeviceFilterIsNotFedAnOldFitAgainWhenAPassFindsNoFix()
+    {
+        var device = new Device("id", null, TimeSpan.FromSeconds(30));
+        var scenario = new Scenario(null, new FixThenNoFix(new Point3D(3, 4, 0)), "kitchen");
+        device.Scenarios.Add(scenario);
+
+        ScenarioFusion.Update(device, new ConfigFiltering(), DateTime.UtcNow);
+        var (_, afterFix) = device.KalmanFilter.GetPrediction();
+        await Task.Delay(20);
+        ScenarioFusion.Update(device, new ConfigFiltering(), DateTime.UtcNow);
+        var (_, afterNoFix) = device.KalmanFilter.GetPrediction();
+
+        // Fed again, the filter would grow surer of the old fix; left alone, it only grows less sure as time passes
+        Assert.That(scenario.Current, Is.True);
+        Assert.That(afterNoFix[0, 0], Is.GreaterThanOrEqualTo(afterFix[0, 0]));
+    }
+
     [Test]
     public async Task AnchoredDevicePublishesFixedAttributes()
     {

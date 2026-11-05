@@ -1,6 +1,7 @@
 using ESPresense.Extensions;
 using ESPresense.Services;
 using ESPresense.Locators;
+using ESPresense.Utils;
 using MathNet.Spatial.Euclidean;
 
 namespace ESPresense.Models;
@@ -124,12 +125,15 @@ public sealed record DeviceExplanation(
         if (floors.Length > 1 && floors[0].Probability - floors[1].Probability < CloseFloorRace)
             hints.Add($"The floor race is close: {floors[0].Floor.Name} {floors[0].Probability * 100:F0}%, {floors[1].Floor.Name} {floors[1].Probability * 100:F0}%.");
 
+        if (!device.IsAnchored && device.Hold.Challenger is { } challenger && device.Hold.ChallengerSince is { } since)
+            hints.Add($"Holding {device.Room?.Name ?? device.Floor?.Name ?? "the current place"}: {challenger} has led for {(DateTime.UtcNow - since).TotalSeconds:F1} s, and has to keep the lead before the reported place switches.");
+
         if (!device.IsAnchored)
         {
             if (room.Room == null && room.NearestOtherRoom is { } nearest && best is { Outcome: not LocatorOutcome.NoFix })
                 hints.Add($"The position isn't inside any room. The nearest is {nearest.Name} at {room.NearestOtherDistance:F1} m.");
-            else if (room.Room is { } current && !room.Inside && best != null)
-                hints.Add($"The position has drifted outside {current.Name}, but the room only updates after a move of 10 cm.");
+            else if (room.Room is { } current && !room.Inside && best != null && device.Hold.Challenger == null)
+                hints.Add($"The position is just outside {current.Name}, within the room margin, so {current.Name} is kept.");
             else if (room is { Inside: true, DistanceToEdge: < NearWall, NearestOtherRoom: { } next, NearestOtherDistance: < 2 * NearWall })
                 hints.Add($"Only {room.DistanceToEdge:F1} m from {room.Room?.Name}'s wall, next to {next.Name}, so the room may flip.");
         }
@@ -247,7 +251,7 @@ public sealed record DeviceExplanation(
     }
 
     private static double DistanceToEdge(Polygon2D polygon, Point2D point) =>
-        polygon.Edges.Select(e => e.ClosestPointTo(point).DistanceTo(point)).DefaultIfEmpty(double.PositiveInfinity).Min();
+        SpatialUtils.DistanceToEdge(polygon, point);
 
     private static ExplainedPlace Place(Floor floor) => new(floor.Id, floor.Name);
     private static ExplainedPlace? PlaceOrNull(Floor? floor) => floor == null ? null : Place(floor);
