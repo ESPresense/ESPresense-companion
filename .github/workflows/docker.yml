@@ -1,26 +1,50 @@
 name: Deploy to Docker
+# Unreleased images. Releases (beta and stable) are built by docker-rel.yml.
+#
+#   push to main  -> edge, main-<sha7>
+#   pull request  -> pr-<number>, pr-<number>-<sha7>   (sha of the PR head)
+#
+# These never touch :beta, :latest or any version tag, so a PR build can't
+# overwrite what the add-ons or a soak are pinned to.
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: docker-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   deploy:
-    name: Deploy to Docker add-on with tag
+    name: Build and push unreleased image
+    # Fork PRs get no Docker Hub secrets; skip instead of failing at login.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     environment: CI - release environment
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          # Build the PR head, not the merge commit, so pr-N-<sha> is exactly that commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Git Semantic Version
-        id: version
-        uses: paulhatch/semantic-version@v6.0.5
-        with:
-          version_format: "${major}.${minor}.${patch}-b${increment}"
+      - name: Compute tags
+        id: tags
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          IMAGE=espresense/espresense-companion
+          SHORT=${SHA::7}
+          if [[ -n "$PR" ]]; then
+            TAGS="$IMAGE:pr-$PR $IMAGE:pr-$PR-$SHORT"
+          else
+            TAGS="$IMAGE:edge $IMAGE:main-$SHORT"
+          fi
+          echo "args=$(printf -- '--tag %s ' $TAGS)" >> "$GITHUB_OUTPUT"
+          { echo "### Image tags"; for t in $TAGS; do echo "- \`$t\`"; done; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -41,5 +65,5 @@ jobs:
             --platform linux/arm,linux/arm64,linux/amd64 \
             --output "type=image,push=true" \
             --file ./Dockerfile . \
-            --tag "espresense/espresense-companion:${{ steps.version.outputs.version }}" \
-            --tag "espresense/espresense-companion:beta"
+            --label "org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}" \
+            ${{ steps.tags.outputs.args }}

@@ -1,0 +1,67 @@
+name: Release
+# One button for both channels (Actions -> Release -> Run workflow):
+#
+#   beta    tag vX.Y.Z-beta.N at main (or `ref`) as a prerelease. The BETA
+#           add-on and :beta pick it up.
+#   stable  publish Release Drafter's draft as vX.Y.Z at the newest beta's
+#           commit (or `ref`). The stable add-on and :latest pick it up.
+#
+# Tags and releases made with GITHUB_TOKEN trigger no other workflows, so this
+# calls the image build and the add-on dispatch itself. Publishing by hand in
+# the GitHub UI still works through the tag-push and release triggers.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: beta = prerelease from main; stable = promote the newest beta
+        type: choice
+        options: [ beta, stable ]
+        default: beta
+      ref:
+        description: Commit or branch to release (optional; see above for defaults)
+        required: false
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Publish ${{ inputs.channel }}
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
+          REF: ${{ inputs.ref }}
+        run: bash .github/scripts/release.sh "$CHANNEL" "$REF"
+
+  docker:
+    needs: publish
+    uses: ./.github/workflows/docker-rel.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
+    secrets: inherit
+
+  dispatch:
+    needs: [ publish, docker ]
+    uses: ./.github/workflows/release-dispatch.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
+      sha: ${{ needs.publish.outputs.sha }}
+      prerelease: ${{ needs.publish.outputs.prerelease == 'true' }}
+    secrets: inherit

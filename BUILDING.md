@@ -10,6 +10,24 @@ While developing you use vite as your webserver and it proxies /api and /ws to t
 
 On deployment it's the opposite, the dotnet server runs and serves up precompiled html and js files.
 
+## Release channels and image tags
+
+| Channel | Built from | Image tags (`espresense/espresense-companion`) | Home Assistant |
+|---|---|---|---|
+| PR | each push to a PR in this repo | `pr-<number>`, `pr-<number>-<sha7>` | — |
+| Edge | each merge to `main` | `edge`, `main-<sha7>` | — |
+| Beta | a `vX.Y.Z-beta.N` prerelease | `X.Y.Z-beta.N`, `beta` | ESPresense Companion - BETA add-on |
+| Stable | a `vX.Y.Z` release | `X.Y.Z`, `latest` | ESPresense Companion add-on |
+
+PR and edge images never move `beta`, `latest` or a version tag. Pin a soak to `pr-<number>-<sha7>` or `main-<sha7>`.
+
+Releasing is one workflow, **Actions → Release → Run workflow**:
+
+- **beta** tags `main` (or the `ref` you give) as the next `vX.Y.Z-beta.N` prerelease, where `X.Y.Z` is Release Drafter's draft version. Its notes list the PRs new since the previous beta.
+- **stable** publishes the draft as `vX.Y.Z` at the newest beta's commit, so stable is exactly what beta users ran. The notes drop PRs merged after that commit. Pass `ref` to release a different commit of `main`.
+
+Both build the image and notify `ESPresense/hassio-addons`, which moves the add-ons. Prereleases skip the ESPresense.com notification. Publishing a release by hand in the GitHub UI still works; tick "Set as a pre-release" and name it `vX.Y.Z-beta.N` for a beta. To preview either button, run `DRY_RUN=1 .github/scripts/release.sh beta|stable [ref]` locally.
+
 ## Running read-only against a live broker
 
 To debug against your real MQTT broker without a dev instance changing anything, set `read_only: true` in the dev config's `mqtt` section, with a `client_id` that differs from your production Companion (the broker disconnects one of two clients sharing an ID):

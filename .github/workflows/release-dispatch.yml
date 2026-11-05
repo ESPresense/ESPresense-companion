@@ -3,29 +3,47 @@ name: Dispatch Events
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag that was just published
+        required: true
+        type: string
+      prerelease:
+        required: true
+        type: boolean
+      sha:
+        description: Commit the tag points at
+        required: true
+        type: string
 
 jobs:
   dispatch:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      PRERELEASE: ${{ inputs.prerelease || github.event.release.prerelease || false }}
     steps:
       - name: Wait for the release image to be published
         # Docker Release builds on the tag push, which races this workflow's
         # release:published trigger. hassio-addons smoke-tests by pulling the
         # image, so don't notify anyone until the tag actually exists.
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          VERSION="${TAG#v}"
           for i in $(seq 1 60); do
-            if curl -sf "https://hub.docker.com/v2/repositories/espresense/espresense-companion/tags/$TAG" >/dev/null; then
-              echo "espresense/espresense-companion:$TAG is published"
+            if curl -sf "https://hub.docker.com/v2/repositories/espresense/espresense-companion/tags/$VERSION" >/dev/null; then
+              echo "espresense/espresense-companion:$VERSION is published"
               exit 0
             fi
-            echo "waiting for espresense/espresense-companion:$TAG ($i/60)"
+            echo "waiting for espresense/espresense-companion:$VERSION ($i/60)"
             sleep 15
           done
-          echo "timed out waiting for espresense/espresense-companion:$TAG" >&2
+          echo "timed out waiting for espresense/espresense-companion:$VERSION" >&2
           exit 1
 
       - name: Repository Dispatch to ESPresense.com
+        # The website lists stable releases only.
+        if: env.PRERELEASE != 'true'
         uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.ESPRESENSE_CONTENTS_TOKEN }}
@@ -34,11 +52,13 @@ jobs:
           client-payload: >
             {
               "repository": "ESPresense/ESPresense-companion",
-              "ref": "${{ github.ref }}",
-              "sha": "${{ github.sha }}"
+              "ref": "refs/tags/${{ env.TAG }}",
+              "sha": "${{ inputs.sha || github.sha }}"
             }
 
       - name: Repository Dispatch to hass-addons
+        # The beta add-on takes prereleases and stable releases; the stable
+        # add-on filters prereleases out itself.
         uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.ESPRESENSE_CONTENTS_TOKEN }}
@@ -47,6 +67,6 @@ jobs:
           client-payload: >
             {
               "repository": "ESPresense/ESPresense-companion",
-              "ref": "${{ github.ref }}",
-              "sha": "${{ github.sha }}"
+              "ref": "refs/tags/${{ env.TAG }}",
+              "sha": "${{ inputs.sha || github.sha }}"
             }
