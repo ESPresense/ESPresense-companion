@@ -1,4 +1,5 @@
 using ESPresense.Models;
+using ESPresense.Optimizers;
 using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
 using Moq;
@@ -98,7 +99,7 @@ public class StateOptimizationAnchorTests
         device.Nodes["node2"] = deviceNode2;
 
         // Act
-        var snapshot = _state.TakeOptimizationSnapshot();
+        var snapshot = new OptimizationSnapshotStore().Take(_state);
 
         // Assert - Should have measures from anchored device to nodes
         Assert.That(snapshot.Measures, Has.Count.GreaterThanOrEqualTo(2));
@@ -138,11 +139,11 @@ public class StateOptimizationAnchorTests
         var deviceNode = new DeviceToNode(device, node);
         device.Nodes["node1"] = deviceNode;
         deviceNode.ReadMessage(new DeviceMessage { Rssi = -60, RssiRxAdj = 4, RefRssi = -59, Distance = 3.5 });
-        var before = _state.TakeOptimizationSnapshot().Measures.Single(m => m.Tx.Id == device.Id);
+        var before = new OptimizationSnapshotStore().Take(_state).Measures.Single(m => m.Tx.Id == device.Id);
 
         // The node's rxAdj moves from 4 to 7, so the same signal is now published 3 dB lower.
         deviceNode.ReadMessage(new DeviceMessage { Rssi = -63, RssiRxAdj = 7, RefRssi = -59, Distance = 3.5 });
-        var after = _state.TakeOptimizationSnapshot().Measures.Single(m => m.Tx.Id == device.Id);
+        var after = new OptimizationSnapshotStore().Take(_state).Measures.Single(m => m.Tx.Id == device.Id);
 
         Assert.That(before.GetAdjustedRssi(5), Is.EqualTo(-61));
         Assert.That(after.GetAdjustedRssi(5), Is.EqualTo(before.GetAdjustedRssi(5)), "readings from either side of an rxAdj change must agree once re-based");
@@ -188,7 +189,7 @@ public class StateOptimizationAnchorTests
         device.Nodes["node2"] = deviceNode2;
 
         // Act
-        var snapshot = _state.TakeOptimizationSnapshot();
+        var snapshot = new OptimizationSnapshotStore().Take(_state);
 
         // Assert - Only current measurement should be included
         var anchorMeasures = snapshot.Measures.Where(m => m.Tx.Id == device.Id).ToList();
@@ -219,7 +220,7 @@ public class StateOptimizationAnchorTests
         device.Nodes["node1"] = deviceNode1;
 
         // Act
-        var snapshot = _state.TakeOptimizationSnapshot();
+        var snapshot = new OptimizationSnapshotStore().Take(_state);
 
         // Assert - Regular devices should not appear as Tx in measures
         var deviceMeasures = snapshot.Measures.Where(m => m.Tx.Id == device.Id).ToList();
@@ -265,7 +266,7 @@ public class StateOptimizationAnchorTests
         device.Nodes["node-without-location"] = deviceNode2;
 
         // Act
-        var snapshot = _state.TakeOptimizationSnapshot();
+        var snapshot = new OptimizationSnapshotStore().Take(_state);
 
         // Assert - Only node with location should be included
         var anchorMeasures = snapshot.Measures.Where(m => m.Tx.Id == device.Id).ToList();
@@ -315,7 +316,7 @@ public class StateOptimizationAnchorTests
         device.Nodes["rx-node"] = deviceNode;
 
         // Act
-        var snapshot = _state.TakeOptimizationSnapshot();
+        var snapshot = new OptimizationSnapshotStore().Take(_state);
 
         // Assert - Should have both node-to-node and anchor measures
         Assert.That(snapshot.Measures, Has.Count.EqualTo(2));

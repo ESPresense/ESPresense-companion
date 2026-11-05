@@ -145,7 +145,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         {
             var d = new Device(id, autoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Name = autoDiscover.Message?.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
             d.KalmanFilter.Settings = state.KalmanSettings;
-            foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
+            foreach (var scenario in state.ScenarioFactory.Create(d)) d.Scenarios.Add(scenario);
             Log.Information("[+] Track: {Device} (disc)", d);
             return d;
         });
@@ -208,7 +208,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 {
                     var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30)) { Check = true };
                     d.KalmanFilter.Settings = state.KalmanSettings;
-                    foreach (var scenario in state.GetScenarios(d)) d.Scenarios.Add(scenario);
+                    foreach (var scenario in state.ScenarioFactory.Create(d)) d.Scenarios.Add(scenario);
                     return d;
                 });
                 tele.UpdateDevicesCount(state.Devices.Count);
@@ -298,7 +298,9 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         if (device.Check)
         {
             Log.Debug("Checking {Device}", device);
-            device.Track = state.ShouldTrack(device);
+            var decision = state.TrackingRules.ShouldTrack(device.Id, device.Name);
+            if (decision.ConfiguredName != null) device.Name = decision.ConfiguredName;
+            device.Track = decision.Track;
             device.Check = false;
         }
         if (device.Track != wasTracked)

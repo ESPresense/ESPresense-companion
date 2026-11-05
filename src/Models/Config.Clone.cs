@@ -14,6 +14,7 @@ namespace ESPresense.Models
                 Mqtt = Mqtt?.Clone(),
                 Timeout = Timeout,
                 AwayTimeout = AwayTimeout,
+                DeviceRetention = DeviceRetention,
                 Gps = Gps.Clone(),
                 Map = Map.Clone(),
                 Floors = Floors.Select(f => f.Clone()).ToArray(),
@@ -22,7 +23,8 @@ namespace ESPresense.Models
                 ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
                 History = History.Clone(),
                 Locators = Locators.Clone(),
-                Optimization = Optimization.Clone()
+                Optimization = Optimization.Clone(),
+                Filtering = Filtering?.Clone()! // a null section stays null; consumers default it
             };
         }
     }
@@ -163,6 +165,11 @@ namespace ESPresense.Models
         }
     }
 
+    public partial class ConfigFiltering
+    {
+        public ConfigFiltering Clone() => (ConfigFiltering)MemberwiseClone(); // doubles only
+    }
+
     public partial class ConfigHistory
     {
         public ConfigHistory Clone()
@@ -197,6 +204,7 @@ namespace ESPresense.Models
                 Latitude = Latitude,
                 Longitude = Longitude,
                 Elevation = Elevation,
+                Rotation = Rotation,
                 Report = Report
             };
         }

@@ -27,7 +27,7 @@ public class PerNodeErrorTests
 
         _configLoader = new ConfigLoader(_configDir);
         _state = new State(_configLoader, new NodeTelemetryStore(mqtt.Object));
-        _state.Config = new Config { Optimization = new ConfigOptimization { Enabled = true } };
+        _state.Apply(new Config { Optimization = new ConfigOptimization { Enabled = true } });
     }
 
     [TearDown]

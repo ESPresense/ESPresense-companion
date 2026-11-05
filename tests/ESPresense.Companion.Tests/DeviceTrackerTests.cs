@@ -294,6 +294,27 @@ public class DeviceTrackerTests
     }
 
     [Test]
+    public async Task CheckDevice_AppliesTheConfiguredNameForALiteralId()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_configDir, "config.yaml"), """
+            devices:
+              - id: "test:named"
+                name: "Configured Name"
+            """);
+        await _configLoader.LoadAsync();
+
+        var device = new Device("test:named", null, TimeSpan.FromSeconds(30)) { Name = "Advertised", Check = true };
+        _state.Devices[device.Id] = device;
+
+        Assert.That(await CheckDeviceAsync(_deviceTracker, device), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(device.Track, Is.True);
+            Assert.That(device.Name, Is.EqualTo("Configured Name"));
+        });
+    }
+
+    [Test]
     public async Task UntrackClearEcho_DoesNotRemoveDevice_ButExternalClearDoes()
     {
         // Tracked device with no config match: the next check untracks it, which publishes a retained clear

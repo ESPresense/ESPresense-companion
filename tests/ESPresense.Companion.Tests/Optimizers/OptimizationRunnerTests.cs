@@ -304,7 +304,7 @@ public class OptimizationRunnerTests
     [Test]
     public async Task ScheduledCycle_WithTooLittleHistory_AppliesNothing()
     {
-        _state.OptimizationSnaphots.AddRange(TimedSnapshots(4, TimeSpan.FromSeconds(30)));
+        _runner.Snapshots.AddRange(TimedSnapshots(4, TimeSpan.FromSeconds(30)));
 
         var ran = await _runner.RunScheduledCycleAsync(new ConfigOptimization { Enabled = true, TrainingWindowMins = 30 }, new List<IOptimizer> { new FixedAbsorptionOptimizer() });
 
@@ -315,7 +315,7 @@ public class OptimizationRunnerTests
     [Test]
     public async Task ScheduledCycle_WithEnoughHistory_FitsOlderDataAndValidatesOnNewer()
     {
-        _state.OptimizationSnaphots.AddRange(TimedSnapshots(31, TimeSpan.FromSeconds(30)));
+        _runner.Snapshots.AddRange(TimedSnapshots(31, TimeSpan.FromSeconds(30)));
 
         var ran = await _runner.RunScheduledCycleAsync(new ConfigOptimization { Enabled = true, TrainingWindowMins = 30 }, new List<IOptimizer> { new FixedAbsorptionOptimizer() });
 

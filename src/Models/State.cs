@@ -1,90 +1,68 @@
 using System.Collections.Concurrent;
-using DotNet.Globbing;
-using DotNet.Globbing.Token;
 using ESPresense.Extensions;
-using ESPresense.Locators;
 using ESPresense.Services;
-using ESPresense.Weighting;
-using Serilog;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Linq;
 
 namespace ESPresense.Models;
 
 public class State
 {
-    private readonly NodeTelemetryStore _nts;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly object _calibrationMetricsLock = new();
     private double? _bestCalibrationRMSE;
     private double? _bestCalibrationR;
 
-    /// <summary>
-    /// Initializes a new State, wiring telemetry and configuration handling.
-    /// </summary>
-    /// <remarks>
-    /// Subscribes to the provided ConfigLoader's ConfigChanged event and loads the current configuration if present.
-    /// Loading the configuration populates Floors, Nodes, device tracking structures (by literal and pattern globs),
-    /// selects the locators' weighting strategy, and marks existing Devices for checking.
-    /// </remarks>
-    // ponytail: device ids/names are matched case-insensitively everywhere else (all the dictionaries are OrdinalIgnoreCase), globs must agree
-    private static readonly GlobOptions GlobOpts = new() { Evaluation = { CaseInsensitive = true } };
-
-    public State(ConfigLoader cl, NodeTelemetryStore nts)
+    /// <summary>For tests and tools that build a State by hand: its loggers discard everything.</summary>
+    public State(ConfigLoader cl, NodeTelemetryStore nts) : this(cl, nts, NullLoggerFactory.Instance)
     {
-        _nts = nts;
-        void LoadConfig(Config c)
-        {
-            Config = c;
-            foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
-            foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
-
-            var idsToTrack = new List<Glob>();
-            var configDeviceById = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);
-            foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
-                if (!string.IsNullOrWhiteSpace(d.Id))
-                {
-                    var glob = Glob.Parse(d.Id, GlobOpts);
-                    if (glob.Tokens.All(a => a is LiteralToken))
-                        configDeviceById.GetOrAdd(d.Id, a => d);
-                    else
-                        idsToTrack.Add(glob);
-                }
-
-            var namesToTrack = new List<Glob>();
-            var configDeviceByName = new ConcurrentDictionary<string, ConfigDevice>(StringComparer.OrdinalIgnoreCase);
-            foreach (var d in c.Devices ?? Enumerable.Empty<ConfigDevice>())
-                if (!string.IsNullOrWhiteSpace(d.Name))
-                {
-                    var glob = Glob.Parse(d.Name, GlobOpts);
-                    if (glob.Tokens.All(a => a is LiteralToken))
-                        configDeviceByName.GetOrAdd(d.Name, a => d);
-                    else
-                        namesToTrack.Add(glob);
-                }
-
-            IdsToTrack = idsToTrack;
-            ConfigDeviceById = configDeviceById;
-            NamesToTrack = namesToTrack;
-            ConfigDeviceByName = configDeviceByName;
-
-            // Update Kalman filter settings and propagate to all devices
-            var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
-            if (!newKalmanSettings.Equals(KalmanSettings))
-            {
-                KalmanSettings = newKalmanSettings;
-                foreach (var device in Devices.Values)
-                {
-                    device.KalmanFilter.Settings = KalmanSettings;
-                }
-            }
-
-            foreach (var device in Devices.Values) device.Check = true;
-        }
-
-        cl.ConfigChanged += (_, args) => { LoadConfig(args); };
-        if (cl.Config != null) LoadConfig(cl.Config);
     }
 
-    public Config? Config;
+    /// <summary>
+    /// Initializes a new State, wiring telemetry and configuration handling. DI picks this constructor.
+    /// </summary>
+    /// <remarks>
+    /// Subscribes to the provided ConfigLoader's ConfigChanged event and applies the current configuration if present;
+    /// see <see cref="Apply"/>.
+    /// </remarks>
+    public State(ConfigLoader cl, NodeTelemetryStore nts, ILoggerFactory loggerFactory)
+    {
+        _loggerFactory = loggerFactory;
+        ScenarioFactory = new ScenarioFactory(this, nts, _loggerFactory.CreateLogger<ScenarioFactory>());
+        cl.ConfigChanged += (_, args) => Apply(args);
+        if (cl.Config != null) Apply(cl.Config);
+    }
+
+    /// <summary>The current config. Replaced only through <see cref="Apply"/>.</summary>
+    public Config? Config { get; private set; }
+
+    /// <summary>
+    /// Makes <paramref name="c"/> the current config: updates floors and nodes, rebuilds the tracking rules,
+    /// republishes Kalman settings to every device, and marks every device to be re-checked.
+    /// </summary>
+    internal void Apply(Config c)
+    {
+        // Build anything that can fail before touching state, so a bad config can't half-apply.
+        var trackingRules = DeviceTrackingRules.FromConfig(c, _loggerFactory.CreateLogger<DeviceTrackingRules>());
+
+        Config = c;
+        TrackingRules = trackingRules;
+        foreach (var cf in c.Floors ?? Enumerable.Empty<ConfigFloor>()) Floors.GetOrAdd(cf.GetId()).Update(c, cf);
+        foreach (var cn in c.Nodes ?? Enumerable.Empty<ConfigNode>()) Nodes.GetOrAdd(cn.GetId(), a => new Node(cn.GetId(), NodeSourceType.Config)).Update(c, cn, GetFloorsByIds(cn.Floors));
+
+        // Update Kalman filter settings and propagate to all devices
+        var newKalmanSettings = KalmanFilterSettings.FromConfig(c?.Filtering);
+        if (!newKalmanSettings.Equals(KalmanSettings))
+        {
+            KalmanSettings = newKalmanSettings;
+            foreach (var device in Devices.Values)
+            {
+                device.KalmanFilter.Settings = KalmanSettings;
+            }
+        }
+
+        foreach (var device in Devices.Values) device.Check = true;
+    }
 
     /// <summary>
     /// Shared Kalman filter settings used by all devices
@@ -94,11 +72,10 @@ public class State
     public ConcurrentDictionary<string, Node> Nodes { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Device> Devices { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentDictionary<string, Floor> Floors { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceByName { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    public ConcurrentDictionary<string, ConfigDevice> ConfigDeviceById { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    public List<Glob> IdsToTrack { get; private set; } = new();
-    public List<Glob> NamesToTrack { get; private set; } = new();
-    public List<OptimizationSnapshot> OptimizationSnaphots { get; } = new();
+
+    /// <summary>The devices / exclude_devices rules from the current config, compiled once per load.</summary>
+    public DeviceTrackingRules TrackingRules { get; private set; } = DeviceTrackingRules.Empty;
+
     public OptimizerState OptimizerState { get; set; } = new();
     public LocatorState LocatorState { get; } = new();
 
@@ -125,28 +102,6 @@ public class State
             _bestCalibrationRMSE = null;
             _bestCalibrationR = null;
         }
-    }
-
-    /// <summary>
-    /// Creates an optimization snapshot from current node measurements and purges expired snapshots.
-    /// </summary>
-    /// <remarks>
-    /// Iterates through all nodes and their receiver measurements, recording only those marked as current into a new snapshot
-    /// timestamped with the current UTC time. It then removes any snapshots older than the configured expiration threshold
-    /// (the training window, 30 minutes by default) before adding the new snapshot to the collection.
-    /// </remarks>
-    /// <returns>The newly created optimization snapshot containing active measurements.</returns>
-    public OptimizationSnapshot TakeOptimizationSnapshot()
-    {
-        var os = ReadMeasures();
-
-        // Remove expired snapshots by time
-        var expiryMinutes = Config?.Optimization?.EffectiveTrainingWindowMins ?? 30;
-        var expiryThreshold = DateTime.UtcNow.AddMinutes(-expiryMinutes);
-        OptimizationSnaphots.RemoveAll(s => s.Timestamp < expiryThreshold);
-        OptimizationSnaphots.Add(os);
-
-        return os;
     }
 
     /// <summary>
@@ -214,7 +169,7 @@ public class State
         return os;
     }
 
-    IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
+    internal IEnumerable<Floor> GetFloorsByIds(string[]? floorIds)
     {
         if (floorIds == null)
         {
@@ -227,98 +182,14 @@ public class State
                     yield return floor;
     }
 
-    public IEnumerable<Scenario> GetScenarios(Device device)
-    {
-        // Check if device is anchored first - if so, only return the anchor scenario
-        if (device.IsAnchored && device.Anchor != null)
-        {
-            var anchor = device.Anchor;
-            var scenario = new Scenario(Config, new AnchorLocator(anchor.Location, anchor.Floor, anchor.Room, Floors.Values), "Anchored")
-            {
-                Confidence = 100
-            };
-            yield return scenario;
-            yield break;
-        }
+    /// <summary>Builds the scenarios a device is located with. Locators, their order and the fallback live in <see cref="ScenarioFactory"/>.</summary>
+    public ScenarioFactory ScenarioFactory { get; }
 
-        var nelderMead = Config?.Locators?.NelderMead;
-        var bfgs = Config?.Locators?.Bfgs;
-        var mle = Config?.Locators?.Mle;
-        var multiFloor = Config?.Locators?.MultiFloor;
-        var nadarayaWatson = Config?.Locators?.NadarayaWatson;
-        var nearestNode = Config?.Locators?.NearestNode;
+    public IEnumerable<Scenario> GetScenarios(Device device) => ScenarioFactory.Create(device);
 
-        if ((nelderMead?.Enabled ?? false) || (bfgs?.Enabled ?? false) || (mle?.Enabled ?? false) || (multiFloor?.Enabled ?? false) || (nadarayaWatson?.Enabled ?? false) || (nearestNode?.Enabled ?? false))
-        {
-            if (nelderMead?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(nelderMead?.Floors))
-                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
+    /// <summary>Whether <paramref name="device"/> should be tracked. Pure: the configured name is not applied.</summary>
+    public bool ShouldTrack(Device device) => TrackingRules.ShouldTrack(device.Id, device.Name).Track;
 
-            if (bfgs?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(bfgs?.Floors))
-                    yield return new Scenario(Config, new BfgsMultilateralizer(device, floor, this), floor.Name);
-
-            if (mle?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(mle?.Floors))
-                    yield return new Scenario(Config, new MLEMultilateralizer(device, floor, this), floor.Name);
-
-            if (multiFloor?.Enabled ?? false)
-                yield return new Scenario(Config, new MultiFloorMultilateralizer(device, this), "MultiFloor");
-
-            if (nadarayaWatson?.Enabled ?? false)
-                foreach (var floor in GetFloorsByIds(nadarayaWatson?.Floors))
-                    yield return new Scenario(Config, new NadarayaWatsonMultilateralizer(device, floor, this, _nts), floor.Name);
-
-            if (nearestNode?.Enabled ?? false)
-                yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
-        }
-        else
-        {
-            Log.Warning("No locators enabled, using default NelderMead");
-            if (Floors.Values.Any())
-            {
-                foreach (var floor in Floors.Values)
-                    yield return new Scenario(Config, new NelderMeadMultilateralizer(device, floor, this), floor.Name);
-            }
-            else
-            {
-                yield return new Scenario(Config, new NearestNode(device, this), "NearestNode");
-            }
-        }
-    }
-
-    public bool ShouldTrack(Device device)
-    {
-        if (IsExcluded(device))
-            return false;
-
-        if (ConfigDeviceById.TryGetValue(device.Id, out var cdById))
-        {
-            if (!string.IsNullOrWhiteSpace(cdById.Name))
-                device.Name = cdById.Name;
-            return true;
-        }
-        if (!string.IsNullOrWhiteSpace(device.Name) && ConfigDeviceByName.TryGetValue(device.Name, out _))
-            return true;
-        if (!string.IsNullOrWhiteSpace(device.Id) && IdsToTrack.Any(a => a.IsMatch(device.Id)))
-            return true;
-        if (!string.IsNullOrWhiteSpace(device.Name) && NamesToTrack.Any(a => a.IsMatch(device.Name)))
-            return true;
-        return false;
-    }
-
-    private bool IsExcluded(Device device) => IsExcluded(device.Id, device.Name);
-
-    /// <summary>
-    /// Whether exclude_devices matches this id or name. Takes the raw pair rather than a Device so
-    /// callers can decide before constructing one -- autodiscovery needs that, or it resurrects an
-    /// excluded device from its own leftover discovery message.
-    /// </summary>
-    public bool IsExcluded(string? id, string? name)
-    {
-        return Config?.ExcludeDevices.Any(d =>
-            (!string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(id) && Glob.Parse(d.Id, GlobOpts).IsMatch(id)) ||
-            (!string.IsNullOrWhiteSpace(d.Name) && !string.IsNullOrWhiteSpace(name) && Glob.Parse(d.Name, GlobOpts).IsMatch(name))
-        ) ?? false;
-    }
+    /// <inheritdoc cref="DeviceTrackingRules.IsExcluded"/>
+    public bool IsExcluded(string? id, string? name) => TrackingRules.IsExcluded(id, name);
 }
