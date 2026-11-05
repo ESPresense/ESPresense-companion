@@ -165,7 +165,7 @@ namespace ESPresense.Models
     public partial class ConfigOptimization
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
-        [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "legacy"; // Options: global_absorption, per_node_absorption, legacy
+        [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "per_node_absorption"; // The only mode; the removed legacy and global_absorption modes fall back to it
         [YamlMember(Alias = "sample_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? SampleIntervalSecs { get; set; }
         [YamlMember(Alias = "training_window_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? TrainingWindowMins { get; set; }
         [YamlMember(Alias = "optimization_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? OptimizationIntervalSecs { get; set; }

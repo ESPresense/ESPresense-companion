@@ -9,7 +9,7 @@ namespace ESPresense.Models;
 
 /// <summary>
 /// What the optimizer is doing and what it has to work with. <see cref="Mode"/> is the mode that runs;
-/// <see cref="ConfiguredMode"/> is what the config says, which differs when it names no known mode and legacy runs instead.
+/// <see cref="ConfiguredMode"/> is what the config says, which differs when it names a removed or unknown mode and per_node_absorption runs instead.
 /// </summary>
 public sealed record OptimizerStatus(
     bool Enabled,

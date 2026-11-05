@@ -38,7 +38,7 @@ internal class OptimizationRunner : BackgroundService
 
         _cfg.ConfigChanged += (_, config) =>
         {
-            var optimizerMode = config?.Optimization?.Optimizer?.ToLowerInvariant() ?? "legacy";
+            var optimizerMode = NormalizeMode(config?.Optimization?.Optimizer);
             lock (_optimizersLock)
             {
                 if (_lastOptimizerMode == optimizerMode)
@@ -49,26 +49,45 @@ internal class OptimizationRunner : BackgroundService
             }
         };
 
-        var initialMode = _cfg.Config?.Optimization?.Optimizer?.ToLowerInvariant() ?? "legacy";
+        var initialMode = NormalizeMode(_cfg.Config?.Optimization?.Optimizer);
         _optimizers = BuildOptimizers(initialMode);
         _lastOptimizerMode = initialMode;
     }
 
-    private IList<IOptimizer> BuildOptimizers(string? mode)
+    /// <summary>The only optimizer mode, and what an unset <c>optimization.optimizer</c> means.</summary>
+    internal const string DefaultMode = "per_node_absorption";
+
+    /// <summary>
+    /// Modes that used to exist. Each was weaker by construction than the per-node joint fit:
+    /// <c>legacy</c> chained four per-receiver optimizers that ignored transmitter effects, and
+    /// <c>global_absorption</c> fitted one absorption for every receiver.
+    /// </summary>
+    private static readonly HashSet<string> RemovedModes = new(StringComparer.Ordinal) { "legacy", "global_absorption" };
+
+    private static string NormalizeMode(string? mode) =>
+        string.IsNullOrWhiteSpace(mode) ? DefaultMode : mode.Trim().ToLowerInvariant();
+
+    /// <summary>The optimizers the next cycle will run.</summary>
+    internal IReadOnlyList<IOptimizer> CurrentOptimizers
     {
-        return ResolveMode(mode) switch
-        {
-            "global_absorption" => new List<IOptimizer> { new GlobalAbsorptionRxTxOptimizer(_state, _loggerFactory.CreateLogger<GlobalAbsorptionRxTxOptimizer>()) },
-            "per_node_absorption" => new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, _loggerFactory.CreateLogger<PerNodeAbsorptionRxTx>()) },
-            _ => new List<IOptimizer>
-            {
-                new RxAdjRssiOptimizer(_state, _loggerFactory.CreateLogger<RxAdjRssiOptimizer>()),
-                new AbsorptionAvgOptimizer(_state),
-                new AbsorptionErrOptimizer(_state, _loggerFactory.CreateLogger<AbsorptionErrOptimizer>()),
-                new IsotonicRegressionOptimizer(_state, _loggerFactory.CreateLogger<IsotonicRegressionOptimizer>())
-            }
-        };
+        get { lock (_optimizersLock) return _optimizers.ToList(); }
     }
+
+    /// <summary>Applies the configured mode: always <see cref="DefaultMode"/>, with a warning when the config names anything else.</summary>
+    private IList<IOptimizer> BuildOptimizers(string mode)
+    {
+        if (RemovedModes.Contains(mode))
+            _logger.LogWarning("Optimizer mode {Mode} has been removed; using {DefaultMode}. Remove optimization.optimizer from the config (or set it to per_node_absorption) to silence this warning", mode, DefaultMode);
+        else if (mode != DefaultMode)
+            _logger.LogWarning("Unknown optimizer mode {Mode}; using {DefaultMode}", mode, DefaultMode);
+
+        return CreateOptimizers();
+    }
+
+    /// <summary>Fresh optimizer instances for the one mode, without the mode warnings (dry runs build these too).</summary>
+    private IList<IOptimizer> CreateOptimizers() =>
+        new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, _loggerFactory.CreateLogger<PerNodeAbsorptionRxTx>()) };
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -402,24 +421,17 @@ internal class OptimizationRunner : BackgroundService
         get { lock (_optimizersLock) return _optimizers.Select(o => o.Name).ToList(); }
     }
 
-    /// <summary>The optimizer mode that runs: legacy, global_absorption or per_node_absorption. Anything else runs legacy.</summary>
-    internal string Mode
-    {
-        get { lock (_optimizersLock) return ResolveMode(_lastOptimizerMode); }
-    }
+    /// <summary>The optimizer mode that runs. per_node_absorption is the only one, whatever the config says.</summary>
+    internal string Mode => DefaultMode;
 
-    /// <summary>The optimizer mode as configured, lower-cased, which may not be one <see cref="BuildOptimizers"/> knows.</summary>
+    /// <summary>
+    /// The optimizer mode as configured, lower-cased; it differs from <see cref="Mode"/> when the config still names a
+    /// removed mode (legacy, global_absorption) or an unknown one.
+    /// </summary>
     internal string ConfiguredMode
     {
-        get { lock (_optimizersLock) return _lastOptimizerMode ?? "legacy"; }
+        get { lock (_optimizersLock) return _lastOptimizerMode ?? DefaultMode; }
     }
-
-    internal static string ResolveMode(string? mode) => mode?.ToLowerInvariant() switch
-    {
-        "global_absorption" => "global_absorption",
-        "per_node_absorption" => "per_node_absorption",
-        _ => "legacy"
-    };
 
     /// <summary>Whether this instance holds the optimization lease right now; snapshots are only taken while it does.</summary>
     internal bool HoldsLease => _leaseService.GetStatus(OptimizationLeaseName)?.IsOwned == true;
@@ -437,11 +449,8 @@ internal class OptimizationRunner : BackgroundService
         return null;
     }
 
-    /// <summary>Every optimizer a dry run can be asked for by name, whatever the configured mode.</summary>
-    internal IReadOnlyList<string> KnownOptimizerNames => AllOptimizers().Select(o => o.Name).ToList();
-
-    private IEnumerable<IOptimizer> AllOptimizers() =>
-        BuildOptimizers("legacy").Concat(BuildOptimizers("global_absorption")).Concat(BuildOptimizers("per_node_absorption"));
+    /// <summary>Every optimizer a dry run can be asked for by name.</summary>
+    internal IReadOnlyList<string> KnownOptimizerNames => CreateOptimizers().Select(o => o.Name).ToList();
 
     private readonly SemaphoreSlim _dryRunGate = new(1, 1);
 
@@ -454,7 +463,7 @@ internal class OptimizationRunner : BackgroundService
     /// against a settings set that is only partly applied. The history is only collected while this instance holds
     /// the optimization lease, so on an instance that does not, there is nothing to run on.
     /// </summary>
-    /// <param name="optimizer">Run only the optimizer with this name (any mode's; case-insensitive), or the configured set when null.</param>
+    /// <param name="optimizer">Run only the optimizer with this name (case-insensitive), or the configured set when null.</param>
     internal async Task<OptimizationCycleResult> DryRunAsync(string? optimizer, CancellationToken cancellationToken = default)
     {
         var optimization = _state.Config?.Optimization ?? new ConfigOptimization();
@@ -462,11 +471,11 @@ internal class OptimizationRunner : BackgroundService
         IList<IOptimizer> optimizers;
         if (string.IsNullOrWhiteSpace(optimizer))
         {
-            optimizers = BuildOptimizers(Mode);
+            optimizers = CreateOptimizers();
         }
         else
         {
-            var match = AllOptimizers().FirstOrDefault(o => string.Equals(o.Name, optimizer.Trim(), StringComparison.OrdinalIgnoreCase));
+            var match = CreateOptimizers().FirstOrDefault(o => string.Equals(o.Name, optimizer.Trim(), StringComparison.OrdinalIgnoreCase));
             if (match == null)
                 throw new UnknownOptimizerException($"Unknown optimizer '{optimizer}'. Known: {string.Join(", ", KnownOptimizerNames)}.");
             optimizers = new List<IOptimizer> { match };
@@ -484,7 +493,9 @@ internal class OptimizationRunner : BackgroundService
         if (!HasSufficientHistory(snapshots, optimization))
             notes.Add($"The history spans less than {MinimumHistoryFraction:P0} of the {optimization.EffectiveTrainingWindowMins}-minute training window; a scheduled cycle would not run on it yet.");
         if (string.IsNullOrWhiteSpace(optimizer) && ConfiguredMode != Mode)
-            notes.Add($"The configured optimizer mode '{ConfiguredMode}' is not one of legacy, global_absorption or per_node_absorption, so the legacy set runs.");
+            notes.Add(RemovedModes.Contains(ConfiguredMode)
+                ? $"The configured optimizer mode '{ConfiguredMode}' has been removed, so {DefaultMode} runs."
+                : $"The configured optimizer mode '{ConfiguredMode}' is not {DefaultMode}, the only mode, so {DefaultMode} runs.");
         var note = notes.Count > 0 ? string.Join(" ", notes) : null;
 
         await _dryRunGate.WaitAsync(cancellationToken);

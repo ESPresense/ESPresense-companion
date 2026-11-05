@@ -244,14 +244,13 @@ public class OptimizerDebugServiceTests
     }
 
     [Test]
-    public async Task DryRun_OneOptimizerByName_AnyMode()
+    public async Task DryRun_OneOptimizerByName_IgnoresCase()
     {
         AddHistory();
-        Assume.That(_runner.OptimizerNames, Does.Not.Contain("Absorption Avg"), "the point is an optimizer the configured mode does not run");
 
-        var report = await _service.RunDryCycleAsync("absorption avg");
+        var report = await _service.RunDryCycleAsync("per node absorption rx tx adj");
 
-        Assert.That(report.Proposals.Select(p => p.Optimizer), Is.EqualTo(new[] { "Absorption Avg" }));
+        Assert.That(report.Proposals.Select(p => p.Optimizer), Is.EqualTo(new[] { "Per Node Absorption Rx Tx Adj" }));
         Assert.That(_mqtt.Invocations, Is.Empty);
     }
 
@@ -261,7 +260,7 @@ public class OptimizerDebugServiceTests
         AddHistory();
 
         var ex = Assert.ThrowsAsync<UnknownOptimizerException>(() => _service.RunDryCycleAsync("nope"));
-        Assert.That(ex!.Message, Does.Contain("Absorption Avg"));
+        Assert.That(ex!.Message, Does.Contain("Per Node Absorption Rx Tx Adj"));
     }
 
     [Test]
@@ -396,7 +395,7 @@ public class OptimizerDebugServiceTests
 
         var status = _service.GetStatus();
 
-        Assert.That(status.Mode, Is.EqualTo(_state.Config!.Optimization.Optimizer.ToLowerInvariant()));
+        Assert.That(status.Mode, Is.EqualTo("per_node_absorption"));
         Assert.That(status.Optimizers, Is.EqualTo(_runner.OptimizerNames).And.Not.Empty);
         Assert.That(status.SnapshotCount, Is.EqualTo(31));
         Assert.That(status.MeasurementCount, Is.EqualTo(31 * 6));
@@ -494,22 +493,24 @@ public class OptimizerDebugServiceTests
         Assert.That(report.Note, Does.Contain("disabled"));
     }
 
-    [Test]
-    public async Task UnknownConfiguredMode_ReportsTheLegacyFallback()
+    [TestCase("legacy", "has been removed")]
+    [TestCase("global_absorption", "has been removed")]
+    [TestCase("global-absorption", "is not per_node_absorption")]
+    public async Task RemovedOrUnknownConfiguredMode_ReportsThePerNodeFallback(string configured, string why)
     {
-        _configLoader.Config!.Optimization.Optimizer = "global-absorption";
+        _configLoader.Config!.Optimization.Optimizer = configured;
         var runner = new OptimizationRunner(_state, _nss, NullLogger<OptimizationRunner>.Instance, _configLoader, Mock.Of<ILeaseService>(), NullLoggerFactory.Instance);
         var service = new OptimizerDebugService(runner, _state);
         var start = DateTime.UtcNow.AddMinutes(-15);
         runner.Snapshots.AddRange(Enumerable.Range(0, 31).Select(i => MeshSnapshot(start.AddSeconds(30 * i))));
 
         var status = service.GetStatus();
-        Assert.That(status.Mode, Is.EqualTo("legacy"));
-        Assert.That(status.ConfiguredMode, Is.EqualTo("global-absorption"));
-        Assert.That(status.Optimizers, Has.Count.EqualTo(4));
+        Assert.That(status.Mode, Is.EqualTo("per_node_absorption"));
+        Assert.That(status.ConfiguredMode, Is.EqualTo(configured));
+        Assert.That(status.Optimizers, Is.EqualTo(new[] { "Per Node Absorption Rx Tx Adj" }));
 
         var report = await service.RunDryCycleAsync();
-        Assert.That(report.Note, Does.Contain("'global-absorption'").And.Contain("legacy set runs"));
+        Assert.That(report.Note, Does.Contain($"'{configured}'").And.Contain(why).And.Contain("per_node_absorption runs"));
     }
 
     [Test]
