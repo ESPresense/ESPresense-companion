@@ -27,11 +27,22 @@ internal sealed record OptimizationCycleResult(
             Proposals = Report.Proposals.Select(p => p.Decision == OptimizerGateDecision.Selected ? p with { Applied = applied } : p).ToList()
         }
     };
+
+    /// <summary>The result once the runner has written the learned rssi@1m of <paramref name="written"/> devices.</summary>
+    public OptimizationCycleResult WithDevicesApplied(IReadOnlySet<string> written) => written.Count == 0 ? this : this with
+    {
+        Report = Report with
+        {
+            Outcome = $"{Report.Outcome} Wrote learned rssi@1m to {written.Count} device{(written.Count == 1 ? "" : "s")}.",
+            Devices = Report.Devices?.Select(d => written.Contains(d.Device) ? d with { Applied = true } : d).ToList()
+        }
+    };
 }
 
 /// <summary>
 /// The decision half of an optimization cycle: scores the incumbent and every optimizer's proposal and runs the gate
-/// described on <see cref="OptimizationRunner.RunCycleAsync"/>. It is given a function that reads node settings and
+/// described on <see cref="OptimizationRunner.RunCycleAsync"/>, and decides which learned device rssi@1m values
+/// would be written (<see cref="DecideDeviceReference"/>). It is given a function that reads node settings and
 /// nothing else, so it cannot write settings or publish anything: the live runner applies what it selects, and a dry
 /// run (<see cref="OptimizationRunner.DryRunAsync"/>) only reports it. The report it returns never says
 /// <see cref="OptimizerCycleReport.Applied"/>: only the runner knows that, once the writes have succeeded
@@ -46,6 +57,48 @@ internal static class OptimizationCycle
     internal static double Composite(double corr, double rmse, ConfigOptimization optimization)
         => (corr * optimization.CorrelationWeight) + ((1 - rmse / (1 + rmse)) * optimization.RmseWeight);
 
+    /// <summary>The device term of the composite: device_weight x (1 - e / (1 + e)), e the mean |leave-one-out residual| in dB.</summary>
+    internal static double DeviceTerm(DeviceEvaluation device, ConfigOptimization optimization)
+        => optimization.DeviceWeight * (1 - device.DeviceRmse / (1 + device.DeviceRmse));
+
+    /// <summary>Learned rssi@1m outside this range is not written: no BLE device is that loud or that quiet at 1 m.</summary>
+    internal const int DeviceRefMin = -100, DeviceRefMax = -20;
+
+    /// <summary>A learned rssi@1m must have held within 1 dB for this many cycles before it is written.</summary>
+    internal const int DeviceRefStableCycles = 2;
+
+    /// <summary>
+    /// A learned rssi@1m closer than this to the device's current one is not written. Node changes are centred, so
+    /// every device's learned value carries the same sub-dB share of the nodes' mean; writing that to every device
+    /// would be churn, not calibration.
+    /// </summary>
+    internal const double DeviceRefDeadbandDb = 1;
+
+    /// <summary>
+    /// Whether a device's learned rssi@1m is written to its device settings: only with apply_device_ref, for a
+    /// device with min_windows windows that moves (mobility at least 0.3: a device that sits still cannot tell its
+    /// own loudness from its spot's quirks), whose value has held within 1 dB for <see cref="DeviceRefStableCycles"/>
+    /// cycles, that is not anchored (anchors are ground truth), and when the value is plausible and differs from the
+    /// current one by at least <see cref="DeviceRefDeadbandDb"/>. Not part of the composite: device windows keep the
+    /// rssi@1m they were ranged with.
+    /// </summary>
+    internal static OptimizerDeviceReference DecideDeviceReference(string id, ProposedDeviceValues proposal, DeviceSettings? existing, ConfigDeviceResidual settings)
+    {
+        var value = (int)Math.Round(proposal.RefRssi);
+        double current = existing?.RefRssi ?? proposal.CurrentRefRssi;
+        var decision =
+            !settings.ApplyDeviceRef ? OptimizerDeviceReferenceDecision.Disabled :
+            proposal.Windows < settings.MinWindows ? OptimizerDeviceReferenceDecision.TooFewWindows :
+            proposal.Mobility < DeviceResidualOptimizer.MovingMobility ? OptimizerDeviceReferenceDecision.SitsStill :
+            proposal.StableCycles < DeviceRefStableCycles ? OptimizerDeviceReferenceDecision.NotYetStable :
+            existing?.HasAnchor == true ? OptimizerDeviceReferenceDecision.Anchored :
+            value < DeviceRefMin || value > DeviceRefMax ? OptimizerDeviceReferenceDecision.OutOfRange :
+            Math.Abs(proposal.RefRssi - current) < DeviceRefDeadbandDb || value == (int)Math.Round(current) ? OptimizerDeviceReferenceDecision.Unchanged :
+            OptimizerDeviceReferenceDecision.Apply;
+        return new OptimizerDeviceReference(id, value, Math.Round(proposal.RefRssi, 1), current, proposal.Windows,
+            Math.Round(proposal.Mobility, 2), proposal.StableCycles, decision, false);
+    }
+
     private static bool IsFinite(double d) => !double.IsNaN(d) && !double.IsInfinity(d);
 
     // The gates below are written as !(score <= bar) rather than score > bar on purpose: that is how the gate has
@@ -54,6 +107,7 @@ internal static class OptimizationCycle
     /// <param name="os">The (pooled) snapshot the optimizers fit.</param>
     /// <param name="oss">The held-out snapshots proposals are scored on. <paramref name="os"/> itself is excluded unless it is all there is.</param>
     /// <param name="readSettings">Reads a node's current settings. Called once per node; the cycle scores against that frozen view.</param>
+    /// <param name="readDeviceSettings">Reads a device's settings, to decide whether its learned rssi@1m would be written; null treats every device as having none.</param>
     public static OptimizationCycleResult Evaluate(
         OptimizationSnapshot os,
         IReadOnlyList<OptimizationSnapshot> oss,
@@ -61,7 +115,8 @@ internal static class OptimizationCycle
         IEnumerable<IOptimizer> optimizers,
         Func<string, NodeSettings> readSettings,
         bool dryRun,
-        DateTime at)
+        DateTime at,
+        Func<string, DeviceSettings?>? readDeviceSettings = null)
     {
         var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
         if (evalSet.Count == 0) evalSet = oss.ToList();
@@ -84,16 +139,33 @@ internal static class OptimizationCycle
             return OptimizationResults.Score(predictions);
         }
 
+        // The device term (#1860) exists only when there are held-out device windows and a weight to give them.
+        // Without it every composite below is exactly the node-to-node one.
+        var scoreDevices = optimization.DeviceWeight > 0 && evalSet.Any(s => s.DeviceWindows.Count > 0);
+        var minDeviceNodes = optimization.DeviceResidual.EffectiveMinNodes;
+        var noDevices = (Total: DeviceEvaluation.None, PerSnapshot: Enumerable.Repeat(DeviceEvaluation.None, evalSet.Count).ToArray());
+        (DeviceEvaluation Total, DeviceEvaluation[] PerSnapshot) ScoreDevices(OptimizationResults results) =>
+            scoreDevices ? results.EvaluateDevices(evalSet, Frozen, minDeviceNodes) : noDevices;
+        double WithDevices(double composite, DeviceEvaluation device) =>
+            scoreDevices && device.HasData ? composite + DeviceTerm(device, optimization) : composite;
+        OptimizerDeviceScore? DeviceScore(DeviceEvaluation device) =>
+            scoreDevices && device.HasData ? new OptimizerDeviceScore(device.DeviceRmse, device.Scale, device.Windows, DeviceTerm(device, optimization)) : null;
+
         var baselineResults = new OptimizationResults();
         var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
-        var bestScore = Composite(bestCorr, bestRmse, optimization);
-        var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples);
+        var baselineDevices = ScoreDevices(baselineResults);
+        var bestScore = WithDevices(Composite(bestCorr, bestRmse, optimization), baselineDevices.Total);
+        var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples) { Device = DeviceScore(baselineDevices.Total) };
+        var deviceWindows = os.DeviceWindows.Count + evalSet.Sum(s => s.DeviceWindows.Count) > 0
+            ? new OptimizerDeviceWindows(os.DeviceWindows.Count, evalSet.Sum(s => s.DeviceWindows.Count))
+            : null;
 
         if (baselineSamples < optimization.MinSamples)
         {
             var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
                 Array.Empty<OptimizerProposalReport>(), null, false,
-                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).");
+                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).")
+            { DeviceWindows = deviceWindows };
             return new OptimizationCycleResult(skipped, null, null, null, baselineSamples) { Incumbent = frozen };
         }
 
@@ -110,8 +182,9 @@ internal static class OptimizationCycle
         {
             var results = optimizer.Optimize(os, currentSettings).QuantizeForApplication();
             var (corr, rmse, samples) = Score(optimizer.Name, results);
-            var composite = Composite(corr, rmse, optimization);
-            var score = new OptimizerScore(composite, corr, rmse, samples);
+            var devices = ScoreDevices(results);
+            var composite = WithDevices(Composite(corr, rmse, optimization), devices.Total);
+            var score = new OptimizerScore(composite, corr, rmse, samples) { Device = DeviceScore(devices.Total) };
 
             var minSamples = new OptimizerMinSamplesGate(samples, optimization.MinSamples, samples >= optimization.MinSamples);
             var improvement = new OptimizerImprovementGate(composite, bestScore, optimization.MinimumImprovement,
@@ -125,7 +198,7 @@ internal static class OptimizationCycle
             if (movesTxRef)
             {
                 var (dCorr, dRmse, _) = Score(DeviceFrameScenario(optimizer.Name), results, deviceFrame: true);
-                var deviceComposite = Composite(dCorr, dRmse, optimization);
+                var deviceComposite = WithDevices(Composite(dCorr, dRmse, optimization), devices.Total);
                 deviceFrame = new OptimizerDeviceFrameGate(deviceComposite, dCorr, dRmse, bestScore,
                     IsFinite(deviceComposite) && !(deviceComposite <= bestScore));
             }
@@ -143,8 +216,8 @@ internal static class OptimizationCycle
                     var (bc, br, bs) = baselinePerSnapshot[i];
                     var (pc, pr, ps) = results.Evaluate(new List<OptimizationSnapshot> { snap }, Frozen);
                     if (bs < optimization.MinSamples || ps < optimization.MinSamples) return false;
-                    var propOne = Composite(pc, pr, optimization);
-                    return double.IsNaN(propOne) || propOne <= Composite(bc, br, optimization);
+                    var propOne = WithDevices(Composite(pc, pr, optimization), devices.PerSnapshot[i]);
+                    return double.IsNaN(propOne) || propOne <= WithDevices(Composite(bc, br, optimization), baselineDevices.PerSnapshot[i]);
                 }).Count();
                 everySnapshot = new OptimizerEverySnapshotGate(losesOn, evalSet.Count, losesOn == 0);
             }
@@ -173,7 +246,21 @@ internal static class OptimizationCycle
             i == selected ? OptimizerGateDecision.Selected : s.Decision,
             false,
             s.Gates,
-            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))).ToList();
+            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))
+        {
+            DeviceResidual = s.Results.DeviceResidual
+        }).ToList();
+
+        // Learned device rssi@1m: decided on their own guards whichever node proposal (if any) is selected.
+        var learned = new Dictionary<string, ProposedDeviceValues>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in scored)
+            foreach (var (id, proposal) in s.Results.Devices)
+                learned[id] = proposal;
+        var deviceReferences = learned.Count == 0 ? null : learned
+            .Where(d => d.Value.Windows >= optimization.DeviceResidual.MinWindows)
+            .OrderByDescending(d => d.Value.Windows).ThenBy(d => d.Key, StringComparer.Ordinal)
+            .Select(d => DecideDeviceReference(d.Key, d.Value, readDeviceSettings?.Invoke(d.Key), optimization.DeviceResidual))
+            .ToList();
 
         string outcome;
         IOptimizer? chosen = null;
@@ -191,7 +278,11 @@ internal static class OptimizationCycle
         }
 
         var report = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
-            proposals, chosen?.Name, false, outcome);
+            proposals, chosen?.Name, false, outcome)
+        {
+            DeviceWindows = deviceWindows,
+            Devices = deviceReferences,
+        };
         return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples) { Incumbent = frozen };
     }
 

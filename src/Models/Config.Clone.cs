@@ -161,6 +161,7 @@ namespace ESPresense.Models
                 MinSamples = MinSamples,
                 Limits = new Dictionary<string, double>(Limits),
                 Weights = new Dictionary<string, double>(Weights),
+                DeviceWeight = DeviceWeight,
                 DeviceResidual = DeviceResidual.Clone()
             };
         }

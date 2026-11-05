@@ -1,3 +1,4 @@
+using ESPresense.Optimizers;
 using ESPresense.Services;
 using ESPresense.Utils;
 using System;
@@ -17,6 +18,18 @@ internal readonly record struct PredictedMeasure(Measure Measure, double Predict
 {
     /// <summary>Measured minus predicted: positive when the link is louder than the model expects.</summary>
     public double Residual => Measured - Predicted;
+}
+
+/// <summary>
+/// Outcome of <see cref="OptimizationResults.EvaluateDevices"/>: how well a calibration places located devices.
+/// </summary>
+/// <param name="DeviceRmse">Mean |leave-one-out residual| in dB: how far each node's reading of a device is from what the fix made without it predicts.</param>
+/// <param name="Scale">Mean solver scale (fitted / measured distance); a right calibration has scale near 1.</param>
+/// <param name="Windows">Device windows scored.</param>
+public readonly record struct DeviceEvaluation(double DeviceRmse, double Scale, int Windows)
+{
+    public static DeviceEvaluation None => new(double.NaN, double.NaN, 0);
+    public bool HasData => Windows > 0 && double.IsFinite(DeviceRmse);
 }
 
 public class OptimizationResults
@@ -136,5 +149,61 @@ public class OptimizationResults
                 yield return new PredictedMeasure(m, predictedRssi, measuredRssi);
             }
         }
+    }
+
+    /// <summary>
+    /// Scores this proposal on the located devices in <paramref name="oss"/>: re-solves every device window with
+    /// the proposed rxAdj and absorption (the incumbent's where the proposal has none) and averages each node's
+    /// |leave-one-out residual|. Node-to-node scoring cannot see what a device-facing rxAdj fixes; this can.
+    /// Each window keeps the rssi@1m it was ranged with, so like the device frame of <see cref="Evaluate(List{OptimizationSnapshot}, Func{string, NodeSettings}, bool)"/>
+    /// it judges rxAdj in absolute terms, and txRef proposals do not enter at all. Every node gets the same solver
+    /// weight, as in the locators. Returns the total and the score of each snapshot's windows on their own.
+    /// </summary>
+    public (DeviceEvaluation Total, DeviceEvaluation[] PerSnapshot) EvaluateDevices(IReadOnlyList<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, int minNodes)
+    {
+        var perSnapshot = Enumerable.Repeat(DeviceEvaluation.None, oss.Count).ToArray();
+        var geometry = oss.LastOrDefault(s => s.Geometry != null && s.DeviceWindows.Count > 0)?.Geometry;
+        if (geometry == null) return (DeviceEvaluation.None, perSnapshot);
+
+        var solver = DeviceGridSolver.For(geometry);
+        var windows = DeviceResidualModel.Prepare(oss.SelectMany((s, k) => s.DeviceWindows.Select(w => (w, k))), solver, minNodes, _ => 0);
+        if (windows.Count == 0) return (DeviceEvaluation.None, perSnapshot);
+
+        var count = solver.NodeIds.Count;
+        var rxAdj = new double[count];
+        var absorption = new double[count];
+        var weights = Enumerable.Repeat(1.0, count).ToArray();
+        for (int n = 0; n < count; n++)
+        {
+            var id = solver.NodeIds[n];
+            Nodes.TryGetValue(id, out var pv);
+            var settings = getSettings(id);
+            rxAdj[n] = pv?.RxAdjRssi ?? settings.Calibration.RxAdjRssi ?? 0;
+            absorption[n] = pv?.Absorption ?? settings.Calibration.Absorption ?? DeviceResidualModel.DefaultAbsorption;
+        }
+
+        var pass = DeviceResidualModel.Run(solver, windows, rxAdj, absorption, w => w.Source.RefRssi, weights, leaveOneOut: true);
+
+        var sumAbs = new double[oss.Count];
+        var residuals = new long[oss.Count];
+        var sumScale = new double[oss.Count];
+        var scored = new int[oss.Count];
+        for (int i = 0; i < windows.Count; i++)
+        {
+            var k = windows[i].Group;
+            foreach (var r in pass.LooResidual![i])
+            {
+                sumAbs[k] += Math.Abs(r);
+                residuals[k]++;
+            }
+            sumScale[k] += Math.Pow(10, pass.LogScale[i]);
+            scored[k]++;
+        }
+
+        for (int k = 0; k < oss.Count; k++)
+            if (scored[k] > 0)
+                perSnapshot[k] = new DeviceEvaluation(sumAbs[k] / residuals[k], sumScale[k] / scored[k], scored[k]);
+        var total = new DeviceEvaluation(sumAbs.Sum() / residuals.Sum(), sumScale.Sum() / scored.Sum(), scored.Sum());
+        return (total, perSnapshot);
     }
 }

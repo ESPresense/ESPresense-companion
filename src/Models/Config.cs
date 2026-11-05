@@ -165,7 +165,7 @@ namespace ESPresense.Models
     public partial class ConfigOptimization
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
-        [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "per_node_absorption"; // The only mode; the removed legacy and global_absorption modes fall back to it
+        [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "per_node_absorption"; // per_node_absorption (default) or device_residual; the removed legacy and global_absorption modes fall back to per_node_absorption
         [YamlMember(Alias = "sample_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? SampleIntervalSecs { get; set; }
         [YamlMember(Alias = "training_window_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? TrainingWindowMins { get; set; }
         [YamlMember(Alias = "optimization_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? OptimizationIntervalSecs { get; set; }
@@ -194,6 +194,12 @@ namespace ESPresense.Models
         [YamlIgnore] public double CorrelationWeight => Weights.TryGetValue("correlation", out var val) ? val : 0.5;
         [YamlIgnore] public double RmseWeight => Weights.TryGetValue("rmse", out var val) ? val : 0.5;
 
+        /// <summary>
+        /// Weight of the device-residual term in a proposal's composite score: device_weight x (1 - e / (1 + e)),
+        /// e the mean |leave-one-out residual| in dB over held-out device windows. 0 scores node-to-node only.
+        /// </summary>
+        [YamlMember(Alias = "device_weight")] public double DeviceWeight { get; set; } = 1.0;
+
         /// <summary>Settings for the device_residual optimizer and the device windows it trains on.</summary>
         [YamlMember(Alias = "device_residual")] public ConfigDeviceResidual DeviceResidual { get; set; } = new();
 
@@ -201,7 +207,10 @@ namespace ESPresense.Models
         /// Whether located devices' readings are being windowed for the device_residual optimizer. Only that
         /// optimizer uses them, so other modes keep no device windows and score exactly as before.
         /// </summary>
-        [YamlIgnore] public bool CollectsDeviceWindows => Enabled && string.Equals(Optimizer, "device_residual", StringComparison.OrdinalIgnoreCase);
+        [YamlIgnore] public bool CollectsDeviceWindows => Enabled && DeviceResidualMode;
+
+        /// <summary>Whether the configured optimizer mode is device_residual.</summary>
+        [YamlIgnore] public bool DeviceResidualMode => string.Equals(Optimizer?.Trim(), "device_residual", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
