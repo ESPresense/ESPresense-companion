@@ -23,8 +23,8 @@ internal class NearestNode : ILocate
         var device = _device;
         var maxDistance = _state.Config?.Locators?.NearestNode?.MaxDistance;
         var limited = maxDistance > 0; // unset, 0 or negative means no limit
-        var nearest = device.Nodes.Values
-            .Where(a => a.Current && (!limited || a.Distance <= maxDistance))
+        var nearest = device.CurrentReadings()
+            .Where(a => !limited || a.Distance <= maxDistance)
             .MinBy(a => a.Distance);
         scenario.Trace = new LocatorTrace(
             nearest == null ? LocatorOutcome.NoFix : LocatorOutcome.Fallback,

@@ -47,6 +47,16 @@ public class Device
     [STJ.JsonConverter(typeof(DeviceToNodeConverter))]
     public ConcurrentDictionary<string, DeviceToNode> Nodes { get; } = new(comparer: StringComparer.OrdinalIgnoreCase);
 
+    private long _readingVersion;
+
+    /// <summary>Bumped after every reading lands, so a solve can tell its snapshot has been superseded.</summary>
+    [STJ.JsonIgnore] public long ReadingVersion => Interlocked.Read(ref _readingVersion);
+
+    internal void ReadingArrived() => Interlocked.Increment(ref _readingVersion);
+
+    /// <summary>The current readings, copied so a locator works on one fixed set; see <see cref="DeviceToNode.Snapshot"/>.</summary>
+    public DeviceToNode[] CurrentReadings() => Nodes.Values.Select(n => n.Snapshot()).Where(n => n.Current).ToArray();
+
     [STJ.JsonConverter(typeof(RoomConverter))]
     public Room? Room => Anchor?.Room ?? BestScenario?.Room;
 

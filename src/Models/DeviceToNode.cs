@@ -21,6 +21,24 @@ public class DeviceToNode(Device device, Node node)
 
     public bool Current => DateTime.UtcNow - LastHit < Device!.Timeout;
 
+    /// <summary>
+    /// A detached copy of this reading. MQTT updates the live object from another thread, and a solver
+    /// that re-reads it every iteration chases a moving target: it can stop converging and fits a blend
+    /// of old and new readings. A newer reading re-queues the device, so solving on a copy loses nothing.
+    /// </summary>
+    public DeviceToNode Snapshot() => new(Device, Node)
+    {
+        Distance = Distance,
+        DistVar = DistVar,
+        Rssi = Rssi,
+        RssiRxAdj = RssiRxAdj,
+        RssiVar = RssiVar,
+        RefRssi = RefRssi,
+        LastHit = LastHit,
+        Hits = Hits,
+        LastDistance = LastDistance,
+    };
+
     public bool ReadMessage(DeviceMessage payload)
     {
         Rssi = payload.Rssi;
@@ -34,6 +52,7 @@ public class DeviceToNode(Device device, Node node)
         DistVar = payload.DistVar;
         LastHit = DateTime.UtcNow;
         Hits++;
+        Device?.ReadingArrived(); // last, so a snapshot taken after reading the version can't miss these fields
         return moved;
     }
 

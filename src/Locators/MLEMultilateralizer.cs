@@ -56,6 +56,7 @@ public class MLEMultilateralizer : BaseMultilateralizer
                 var obj = ObjectiveFunction.Value(
                     x =>
                     {
+                        scenario.ThrowIfSuperseded();
                         var distanceFromBoundingBox = lowerBound.Subtract(x)
                             .PointwiseMaximum(x.Subtract(upperBound))
                             .PointwiseMaximum(0)

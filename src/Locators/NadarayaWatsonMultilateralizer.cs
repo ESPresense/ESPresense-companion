@@ -15,8 +15,8 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
 
     public bool Locate(Scenario scenario)
     {
-        var heard = device.Nodes.Values
-            .Where(n => n.Current && (n.Node?.Floors?.Contains(floor) ?? false))
+        var heard = device.CurrentReadings()
+            .Where(n => n.Node?.Floors?.Contains(floor) ?? false)
             .OrderBy(n => n.Distance)
             .ToArray();
 

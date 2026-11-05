@@ -206,7 +206,7 @@ public sealed record DeviceExplanation(
     {
         var used = trace.Used.Select(u => Used(u, trace));
         var rejected = links
-            .Where(dn => !trace.Used.Any(u => u.Link == dn))
+            .Where(dn => !trace.Used.Any(u => u.Link.Node == dn.Node)) // the trace holds the solve's copies; one reading per node
             .Select(dn => new ExplainedNode(dn.Node?.Id, dn.Node?.Name, false, Rejection(dn, trace, s), null, null, null, null));
         return used.Concat(rejected).ToArray();
     }

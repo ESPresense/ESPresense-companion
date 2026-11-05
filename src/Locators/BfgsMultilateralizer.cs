@@ -46,10 +46,13 @@ public class BfgsMultilateralizer : BaseMultilateralizer
                 var lowerBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[0].X, Floor.Bounds[0].Y, Floor.Bounds[0].Z });
                 var upperBound = Vector<double>.Build.DenseOfArray(new[] { Floor.Bounds[1].X, Floor.Bounds[1].Y, Floor.Bounds[1].Z });
                 var obj = ObjectiveFunction.Gradient(
-                    x => nodes
-                        .Select((dn, i) => new { err = Error(x, dn), weight = Weight(i, nodes.Length) })
-                        .Sum(a => a.weight * Math.Pow(a.err, 2)) / weightSum
-                    ,
+                    x =>
+                    {
+                        scenario.ThrowIfSuperseded();
+                        return nodes
+                            .Select((dn, i) => new { err = Error(x, dn), weight = Weight(i, nodes.Length) })
+                            .Sum(a => a.weight * Math.Pow(a.err, 2)) / weightSum;
+                    },
                     x =>
                     {
                         var current = new Point3D(x[0], x[1], x[2]);
