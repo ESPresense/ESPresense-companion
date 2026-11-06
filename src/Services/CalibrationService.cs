@@ -56,7 +56,9 @@ public class CalibrationService(State state, NodeSettingsStore nsd)
             c.Anchored.Add(anchorName);
             var txM = c.Matrix.GetOrAdd(anchorName);
 
-            foreach (var (rxId, deviceNode) in device.Nodes.Where(dn => dn.Value.Current && dn.Value.Node?.HasLocation == true))
+            // Only stationary receivers, as for node-to-node links and the optimizer's measures: a node that
+            // moves (stationary: false) has no fixed distance to the anchor, so its pair would be noise in R/RMSE.
+            foreach (var (rxId, deviceNode) in device.Nodes.Where(dn => dn.Value.Current && dn.Value.Node is { HasLocation: true, Stationary: true }))
             {
                 var rxNode = deviceNode.Node!;
                 var rxNs = Settings(rxNode.Id);

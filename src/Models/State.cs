@@ -117,7 +117,8 @@ public class State
         foreach (var (txId, txNode) in Nodes)
             foreach (var (rxId, meas) in txNode.RxNodes)
             {
-                if (meas.Rx == null) continue;
+                // A node that moves (stationary: false) has no fixed distance to fit, as a receiver or a transmitter.
+                if (meas.Rx == null || !txNode.Stationary || !meas.Rx.Stationary) continue;
                 var tx = nodes.GetOrAdd(txId, a => new OptNode { Id = txId, Name = txNode.Name, Location = txNode.Location });
                 var rx = nodes.GetOrAdd(rxId, a => new OptNode { Id = rxId, Name = meas.Rx.Name, Location = meas.Rx.Location });
                 tx.Location = txNode.Location;

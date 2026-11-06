@@ -46,10 +46,10 @@ public sealed class CalibrationFixture : IAsyncDisposable
         return f;
     }
 
-    private Node AddNode(string id, string name, double x, double y, double z)
+    private Node AddNode(string id, string name, double x, double y, double z, bool stationary = true)
     {
         var node = new Node(id, NodeSourceType.Config);
-        node.Update(ConfigLoader.Config!, new ConfigNode { Name = name, Point = new[] { x, y, z } }, Enumerable.Empty<Floor>());
+        node.Update(ConfigLoader.Config!, new ConfigNode { Name = name, Point = new[] { x, y, z }, Stationary = stationary }, Enumerable.Empty<Floor>());
         State.Nodes[id] = node;
         return node;
     }
@@ -62,6 +62,8 @@ public sealed class CalibrationFixture : IAsyncDisposable
         var a = AddNode("node-a", "Alpha", 0, 0, 1);
         var b = AddNode("node-b", "Bravo", 4, 0, 1);
         var c = AddNode("node-c", "Charlie", 0, 3, 1);
+        // A node on a car: it has a point, but stationary: false says it is only sometimes there.
+        var d = AddNode("node-d", "Delta", -2, 15, 0.5, stationary: false);
 
         // Full mesh, with a NaN variance, a missing variance and a stale link that must be skipped.
         Link(a, b, 4.5, -71, 0.25);
@@ -82,6 +84,8 @@ public sealed class CalibrationFixture : IAsyncDisposable
         anchored.SetAnchor(new DeviceAnchor(new Point3D(2, 0, 1), null, null));
         anchored.Nodes["node-a"] = new DeviceToNode(anchored, a) { Distance = 2.25, Rssi = -60, DistVar = 0.75, LastHit = DateTime.UtcNow };
         anchored.Nodes["node-b"] = new DeviceToNode(anchored, b) { Distance = 1.5, Rssi = -58, LastHit = DateTime.UtcNow };
+        // Delta hears it too; with no fixed distance to the anchor it gets no cell and no R/RMSE pair.
+        anchored.Nodes["node-d"] = new DeviceToNode(anchored, d) { Distance = 10, Rssi = -90, LastHit = DateTime.UtcNow };
         State.Devices[anchored.Id] = anchored;
 
         // An anchored device with no current readings stays out; a plain device never appears.
