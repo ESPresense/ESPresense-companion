@@ -16,7 +16,6 @@ public class OptimizationDataSplitTests
 
         Assert.That(created, Is.True);
         Assert.That(split, Is.Not.Null);
-        // Measures without tx/rx ids have no link identity to average on, so they pass through unchanged.
         Assert.That(split!.Training.Measures.Select(measure => measure.Rssi), Is.EqualTo(new[] { 0d, 1d, 2d }));
         Assert.That(split.Validation.SelectMany(snapshot => snapshot.Measures).Select(measure => measure.Rssi),
             Is.EqualTo(new[] { 3d, 4d }));
@@ -55,8 +54,7 @@ public class OptimizationDataSplitTests
 
         // max(2, ceil(6 * 0.2)) = 2 held out; the 4 oldest, oldest first, are the ones pooled into Training.
         Assert.That(split!.TrainingSnapshots.Select(s => s.Timestamp), Is.EqualTo(Enumerable.Range(0, 4).Select(i => start.AddMinutes(i))));
-        // Training members are averaged per link, so this is no longer the raw pooling; with id-less
-        // measures the pass-through keeps every measure (see TryCreate).
+        Assert.That(split.Training.Measures, Is.EqualTo(split.TrainingSnapshots.SelectMany(s => s.Measures)));
     }
 
     [Test]
@@ -65,15 +63,13 @@ public class OptimizationDataSplitTests
         var first = Snapshot(DateTime.UtcNow, 1);
         var second = Snapshot(DateTime.UtcNow.AddSeconds(1), 2);
         first.Measures[0].Rx = new OptNode { Id = "receiver" };
-        second.Measures[0].Rx = new OptNode { Id = "receiver" };
-        first.Measures[0].Tx = second.Measures[0].Tx = new OptNode { Id = "tx" };
+        second.Measures[0].Rx = new OptNode { Id = "RECEIVER" };
         var snapshots = new[] { first, second, Snapshot(DateTime.UtcNow.AddSeconds(2), 3), Snapshot(DateTime.UtcNow.AddSeconds(3), 4) };
 
         OptimizationDataSplit.TryCreate(snapshots, 0.2, out var split);
 
-        // Same link across two snapshots is one averaged measure now (issue #1868).
         Assert.That(split!.Training.ByRx().Count, Is.EqualTo(1));
-        Assert.That(split.Training.ByRx().Single().Count(), Is.EqualTo(1));
+        Assert.That(split.Training.ByRx().Single().Count(), Is.EqualTo(2));
     }
 
     private static OptimizationSnapshot Snapshot(DateTime timestamp, double rssi)
@@ -81,8 +77,7 @@ public class OptimizationDataSplitTests
         return new OptimizationSnapshot
         {
             Timestamp = timestamp,
-            // Distinct link ids per snapshot so averaging does not collapse them (see TryCreate).
-            Measures = new List<Measure> { new() { Rssi = rssi, Rx = new OptNode { Id = "rx-" + rssi }, Tx = new OptNode { Id = "tx-" + rssi } } }
+            Measures = new List<Measure> { new() { Rssi = rssi } }
         };
     }
 }

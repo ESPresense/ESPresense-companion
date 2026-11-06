@@ -39,29 +39,7 @@ public sealed record OptimizationDataSplit(
         var training = new OptimizationSnapshot
         {
             Timestamp = trainingSnapshots[^1].Timestamp,
-            // One measure per (tx, rx, rxAdj-at-capture) link, averaged across the pooled snapshots
-            // (issue #1868): the same static link sampled every 30 s is not dozens of independent
-            // observations, and pooling them raw lets the fit chase sampling noise on a few links.
-            Measures = trainingSnapshots.SelectMany(snapshot => snapshot.Measures)
-                .GroupBy(m => m.Tx?.Id != null && m.Rx?.Id != null ? $"{m.Tx.Id}|{m.Rx.Id}|{m.RssiRxAdj}" : null)
-                .Select(g =>
-                {
-                    var first = g.First();
-                    var n = g.Count();
-                    if (g.Key == null) return first;
-                    return new Measure
-                    {
-                        Tx = first.Tx,
-                        Rx = first.Rx,
-                        Rssi = g.Average(m => m.Rssi),
-                        RssiRxAdj = first.RssiRxAdj,
-                        RssiVar = g.Count(m => m.RssiVar is > 0) > 0
-                            ? g.Where(m => m.RssiVar is > 0).Average(m => m.RssiVar!.Value) : first.RssiVar,
-                        RefRssi = first.RefRssi,
-                        Distance = g.Average(m => m.Distance),
-                        DistVar = first.DistVar,
-                    };
-                }).ToList()
+            Measures = trainingSnapshots.SelectMany(snapshot => snapshot.Measures).ToList()
         };
 
         split = new OptimizationDataSplit(training, ordered.Skip(trainingCount).ToArray()) { TrainingSnapshots = trainingSnapshots };
