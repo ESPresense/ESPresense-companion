@@ -73,6 +73,10 @@ public sealed class CalibrationFixture : IAsyncDisposable
         Link(c, a, 3.25, -64, 0.125);
         Link(c, b, 4.75, -77, 1.0);
         Link(b, b, 9, -90, null, DateTime.UtcNow.AddHours(-1));
+        // Delta also exchanges node-to-node telemetry directly with a fixed node, both as tx and as rx; as a
+        // non-stationary node it has no fixed distance either way, so neither pair gets a cell or an R/RMSE pair.
+        Link(d, a, 12, -85, 0.4);
+        Link(a, d, 12, -85, 0.4);
 
         // Settings: Alpha has everything, Bravo only tx_ref_rssi, Charlie only rx_adj_rssi.
         Nsd.Setup(x => x.Get("node-a")).Returns(new NodeSettings { Id = "node-a", Calibration = new CalibrationSettings { TxRefRssi = -59, RxAdjRssi = 2, Absorption = 2.7 } });

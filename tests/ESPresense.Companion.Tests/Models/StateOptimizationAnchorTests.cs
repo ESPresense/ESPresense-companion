@@ -274,6 +274,35 @@ public class StateOptimizationAnchorTests
         Assert.That(anchorMeasures[0].Rx.Id, Is.EqualTo(nodeWithLocation.Id));
     }
 
+    /// <summary>
+    /// A node with stationary: false (a car) can have a point configured, but the anchor's distance to it is only
+    /// right while the node happens to be there, so it is left out, as it is from node-to-node links.
+    /// </summary>
+    [Test]
+    public void TakeOptimizationSnapshot_RequiresStationaryNode()
+    {
+        Node Placed(string id, bool stationary)
+        {
+            var node = new Node(id, NodeSourceType.Config);
+            node.Update(_configLoader.Config!, new ConfigNode { Name = id, Point = new double[] { 0, 0, 0 }, Stationary = stationary }, Enumerable.Empty<Floor>());
+            _state.Nodes[id] = node;
+            return node;
+        }
+        var fixedNode = Placed("fixed-node", stationary: true);
+        var car = Placed("car", stationary: false);
+
+        var device = new Device("anchored-device", null, TimeSpan.FromSeconds(30));
+        device.SetAnchor(new DeviceAnchor(new Point3D(2.5, 2.5, 0), null, null));
+        _state.Devices["anchored-device"] = device;
+        foreach (var node in new[] { fixedNode, car })
+            device.Nodes[node.Id] = new DeviceToNode(device, node) { Distance = 3.5, Rssi = -60, RefRssi = -59, LastHit = DateTime.UtcNow };
+
+        var snapshot = new OptimizationSnapshotStore().Take(_state);
+
+        var anchorMeasures = snapshot.Measures.Where(m => m.Tx.Id == device.Id).ToList();
+        Assert.That(anchorMeasures.Select(m => m.Rx.Id), Is.EqualTo(new[] { "fixed-node" }));
+    }
+
     [Test]
     public void TakeOptimizationSnapshot_MixesNodeToNodeAndAnchorMeasures()
     {

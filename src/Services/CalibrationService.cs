@@ -29,12 +29,14 @@ public class CalibrationService(State state, NodeSettingsStore nsd)
         var settings = new Dictionary<string, NodeSettings>();
         NodeSettings Settings(string id) => settings.TryGetValue(id, out var ns) ? ns : settings[id] = nsd.Get(id);
 
-        // Process traditional Node-to-Node relationships
-        foreach (var (txId, tx) in state.Nodes.Where(kv => kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
+        // Process traditional Node-to-Node relationships. Only stationary tx/rx, as for the anchored-device
+        // loop below and the optimizer's measures: a node that moves (stationary: false) has no fixed
+        // distance to its peer, so its pair would be noise in R/RMSE.
+        foreach (var (txId, tx) in state.Nodes.Where(kv => kv.Value.Stationary && kv.Value.RxNodes.Values.Any(n => n.Current)).OrderBy(a => a.Value.Name))
         {
             var txNs = Settings(txId);
             var txM = c.Matrix.GetOrAdd(tx.Name ?? txId);
-            foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current).OrderBy(a => a.Value.Rx?.Name))
+            foreach (var (rxId, rx) in tx.RxNodes.Where(a => a.Value.Current && a.Value.Rx?.Stationary == true).OrderBy(a => a.Value.Rx?.Name))
             {
                 var rxNs = Settings(rxId);
                 Put(txM, rx.Rx?.Name ?? rxId, new CalibrationCell(
