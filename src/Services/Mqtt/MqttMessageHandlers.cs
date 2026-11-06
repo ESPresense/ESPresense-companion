@@ -1,7 +1,8 @@
 using ESPresense.Events;
 using ESPresense.Models;
+using System.Text.Json;
+using ESPresense.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
-using Newtonsoft.Json;
 
 namespace ESPresense.Services;
 
@@ -76,15 +77,17 @@ internal static class AsyncEvent
 internal static class MqttPayload
 {
     /// <summary>
-    /// Deserializes <paramref name="payload"/>; a <c>null</c> result or a <see cref="JsonException"/> becomes an
-    /// <see cref="MqttMessageProcessingException"/> carrying the topic, payload and message type.
+    /// Deserializes <paramref name="payload"/> with <see cref="JsonDefaults.MqttRead"/>; an empty payload or JSON
+    /// <c>null</c> (<paramref name="nullMessage"/>) or a <see cref="JsonException"/> (<paramref name="parseFailedMessage"/>)
+    /// becomes an <see cref="MqttMessageProcessingException"/> carrying the topic, payload and message type.
     /// </summary>
     public static T Deserialize<T>(MqttRoute route, string? payload, string messageType, string nullMessage, string parseFailedMessage) where T : class
     {
         T? result;
         try
         {
-            result = JsonConvert.DeserializeObject<T>(payload ?? "");
+            // Newtonsoft returned null for an empty or whitespace payload where System.Text.Json throws; keep that.
+            result = string.IsNullOrWhiteSpace(payload) ? null : JsonSerializer.Deserialize<T>(payload, JsonDefaults.MqttRead);
         }
         catch (JsonException ex)
         {

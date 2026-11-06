@@ -1,49 +1,42 @@
-﻿using Newtonsoft.Json;
+﻿using ESPresense.Utils;
 
 namespace ESPresense.Models;
 
+/// <summary>
+/// A node's <c>telemetry</c> payload. Also returned by the API (<see cref="NodeStateTele.Telemetry"/>) under the
+/// declared names; <see cref="MqttNameAttribute"/> gives the firmware's name where it differs.
+/// </summary>
 public class NodeTelemetry
 {
-    [JsonProperty("ip")]
     public string? Ip { get; set; }
 
-    [JsonProperty("uptime")]
     public int Uptime { get; set; }
 
-    [JsonProperty("firm")]
+    [MqttName("firm")]
     public string? Firmware { get; set; }
 
-    [JsonProperty("board")]
     public string? Board { get; set; }
 
-    [JsonProperty("rssi")]
     public int Rssi { get; set; }
 
-    [JsonProperty("ver")]
+    [MqttName("ver")]
     public string? Version { get; set; }
 
-    [JsonProperty("count")]
     public int Count { get; set; }
 
-    [JsonProperty("adverts")]
     public int Adverts { get; set; }
 
-    [JsonProperty("seen")]
     public int Seen { get; set; }
 
-    [JsonProperty("reported")]
     public int Reported { get; set; }
 
-    [JsonProperty("freeHeap")]
     public int FreeHeap { get; set; }
 
-    [JsonProperty("maxAllocHeap")]
     public int MaxAllocHeap { get; set; }
 
-    [JsonProperty("memFrag")]
+    [MqttName("memFrag")]
     public double MemoryFragmentation { get; set; }
 
-    [JsonProperty("scanHighWater")]
     public int ScanHighWater { get; set; }
 
 }

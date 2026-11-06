@@ -33,7 +33,7 @@ public class DeviceTrackerTests
         {
             var line = await sr.ReadLineAsync();
             if (line == null) break;
-            var testData = JsonConvert.DeserializeObject<TestData>(line);
+            var testData = System.Text.Json.JsonSerializer.Deserialize<TestData>(line, JsonDefaults.MqttRead);
             if (testData!=null) testDatas.Add(testData);
         }
 
@@ -416,5 +416,38 @@ public class DeviceTrackerTests
         });
 
         Assert.That(_state.Devices.ContainsKey("by-id"), Is.False);
+    }
+
+    // ---------------------------------------------------------------------
+    // last_seen restore from retained attributes (#1854)
+    // ---------------------------------------------------------------------
+
+    private static object? AttributeValue(string json) =>
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json, JsonDefaults.MqttRead)!["last_seen"];
+
+    [Test]
+    public void ReadLastSeen_PublishedUtcStamp_IsUtc()
+    {
+        var value = AttributeValue("""{"last_seen":"2026-11-05T14:02:40.2543849Z"}""");
+        Assert.That(value, Is.TypeOf<System.Text.Json.JsonElement>());
+
+        var lastSeen = DeviceTracker.ReadLastSeen(value);
+
+        Assert.That(lastSeen, Is.EqualTo(new DateTime(2026, 11, 5, 14, 2, 40, DateTimeKind.Utc).AddTicks(2543849)));
+        Assert.That(lastSeen!.Value.Kind, Is.EqualTo(DateTimeKind.Utc));
+    }
+
+    [Test]
+    public void ReadLastSeen_NonIsoString_FallsBackToDateTimeParse()
+    {
+        Assert.That(DeviceTracker.ReadLastSeen(AttributeValue("""{"last_seen":"5 Nov 2026 14:02"}""")), Is.EqualTo(new DateTime(2026, 11, 5, 14, 2, 0)));
+    }
+
+    [TestCase("""{"last_seen":null}""")]
+    [TestCase("""{"last_seen":"not a date"}""")]
+    [TestCase("""{"last_seen":1730815360}""")]
+    public void ReadLastSeen_NothingUsable_IsNull(string json)
+    {
+        Assert.That(DeviceTracker.ReadLastSeen(AttributeValue(json)), Is.Null);
     }
 }

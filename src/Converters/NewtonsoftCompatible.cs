@@ -97,9 +97,10 @@ internal static class NewtonsoftCompatible
     }
 
     /// <summary>
-    /// Newtonsoft's reading of a JSON scalar into a string member: numbers and booleans become their text
-    /// (<c>12</c> → <c>"12"</c>, <c>1.5</c> → <c>"1.5"</c>, <c>true</c> → <c>"True"</c>) instead of failing the whole message.
-    /// Matters for discovery messages, where other bridges publish under the same prefix.
+    /// Newtonsoft's reading of a JSON scalar into a string member: a number keeps its text exactly as sent
+    /// (<c>12</c> → <c>"12"</c>, <c>1.50</c> → <c>"1.50"</c>, <c>1e3</c> → <c>"1e3"</c>) and a boolean becomes
+    /// <c>"true"</c> or <c>"false"</c>, instead of failing the whole message. Matters for discovery messages, where
+    /// other bridges publish under the same prefix, and for names in device reports and settings.
     /// </summary>
     public sealed class LenientStringConverter : JsonConverter<string>
     {
@@ -107,10 +108,9 @@ internal static class NewtonsoftCompatible
         {
             JsonTokenType.String => reader.GetString(),
             JsonTokenType.Null => null,
-            JsonTokenType.Number when reader.TryGetInt64(out var l) => l.ToString(CultureInfo.InvariantCulture),
-            JsonTokenType.Number => reader.GetDouble().ToString(CultureInfo.InvariantCulture),
-            JsonTokenType.True => bool.TrueString,
-            JsonTokenType.False => bool.FalseString,
+            JsonTokenType.Number => Encoding.UTF8.GetString(reader.HasValueSequence ? System.Buffers.BuffersExtensions.ToArray(reader.ValueSequence) : reader.ValueSpan),
+            JsonTokenType.True => "true",
+            JsonTokenType.False => "false",
             _ => throw new JsonException($"Unexpected {reader.TokenType} where a string was expected")
         };
 
