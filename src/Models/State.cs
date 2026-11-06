@@ -153,7 +153,10 @@ public class State
 
             // The optimizers hold an anchor's txRef at the rssi@1m it was heard with, so a reading
             // without one (0, as Device.MeasuredRefRssi treats it) would pin the fit to nonsense.
-            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node?.HasLocation == true && dn.Current
+            // Only stationary receivers, as for node-to-node links (DeviceTracker): a node with
+            // stationary: false (a car) may have a point configured, but it is only where the node
+            // sometimes is, so the anchor's distance to it is unknown.
+            foreach (var deviceNode in device.Nodes.Values.Where(dn => dn.Node is { HasLocation: true, Stationary: true } && dn.Current
                                                                        && dn.RefRssi != 0 && double.IsFinite(dn.RefRssi)))
             {
                 var rxNode = deviceNode.Node!;
