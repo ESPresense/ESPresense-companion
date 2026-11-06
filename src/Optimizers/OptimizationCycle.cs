@@ -79,8 +79,8 @@ internal static class OptimizationCycle
     /// device with min_windows windows that moves (mobility at least 0.3: a device that sits still cannot tell its
     /// own loudness from its spot's quirks), whose value has held within 1 dB for <see cref="DeviceRefStableCycles"/>
     /// cycles, that is not anchored (anchors are ground truth), and when the value is plausible and differs from the
-    /// current one by at least <see cref="DeviceRefDeadbandDb"/>. Not part of the composite: device windows keep the
-    /// rssi@1m they were ranged with.
+    /// current one by at least <see cref="DeviceRefDeadbandDb"/>. Not part of the composite: every proposal is scored
+    /// with the same learned rssi@1m values, whether or not they are written.
     /// </summary>
     internal static OptimizerDeviceReference DecideDeviceReference(string id, ProposedDeviceValues proposal, DeviceSettings? existing, ConfigDeviceResidual settings)
     {
@@ -144,8 +144,9 @@ internal static class OptimizationCycle
         var scoreDevices = optimization.DeviceWeight > 0 && evalSet.Any(s => s.DeviceWindows.Count > 0);
         var minDeviceNodes = optimization.DeviceResidual.EffectiveMinNodes;
         var noDevices = (Total: DeviceEvaluation.None, PerSnapshot: Enumerable.Repeat(DeviceEvaluation.None, evalSet.Count).ToArray());
+        Func<DeviceWindow, double>? deviceRef = null; // each device's learned rssi@1m, once the optimizers have fitted
         (DeviceEvaluation Total, DeviceEvaluation[] PerSnapshot) ScoreDevices(OptimizationResults results) =>
-            scoreDevices ? results.EvaluateDevices(evalSet, Frozen, minDeviceNodes) : noDevices;
+            scoreDevices ? results.EvaluateDevices(evalSet, Frozen, minDeviceNodes, deviceRef) : noDevices;
         double WithDevices(double composite, DeviceEvaluation device) =>
             scoreDevices && device.HasData ? composite + DeviceTerm(device, optimization) : composite;
         OptimizerDeviceScore? DeviceScore(DeviceEvaluation device) =>
@@ -153,24 +154,46 @@ internal static class OptimizationCycle
 
         var baselineResults = new OptimizationResults();
         var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
-        var baselineDevices = ScoreDevices(baselineResults);
-        var bestScore = WithDevices(Composite(bestCorr, bestRmse, optimization), baselineDevices.Total);
-        var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples) { Device = DeviceScore(baselineDevices.Total) };
-        var deviceWindows = os.DeviceWindows.Count + evalSet.Sum(s => s.DeviceWindows.Count) > 0
-            ? new OptimizerDeviceWindows(os.DeviceWindows.Count, evalSet.Sum(s => s.DeviceWindows.Count))
-            : null;
+        var evalDeviceWindows = evalSet.SelectMany(s => s.DeviceWindows).ToList();
 
         if (baselineSamples < optimization.MinSamples)
         {
-            var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
+            var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings,
+                new OptimizerScore(Composite(bestCorr, bestRmse, optimization), bestCorr, bestRmse, baselineSamples),
                 Array.Empty<OptimizerProposalReport>(), null, false,
                 $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).")
-            { DeviceWindows = deviceWindows };
+            {
+                DeviceWindows = os.DeviceWindows.Count + evalDeviceWindows.Count > 0 ? new OptimizerDeviceWindows(os.DeviceWindows.Count, evalDeviceWindows.Count, 0) : null
+            };
             return new OptimizationCycleResult(skipped, null, null, null, baselineSamples) { Incumbent = frozen };
         }
 
         // Optimizers get their own copies so nothing they do can touch the frozen incumbent.
         var currentSettings = os.GetNodeIds().ToDictionary(id => id, id => Frozen(id).Clone());
+
+        // Every optimizer fits before anything is scored: the device term needs the rssi@1m the device_residual
+        // optimizer learned for each device.
+        var fitted = optimizers.Select(o => (Optimizer: o, Results: o.Optimize(os, currentSettings).QuantizeForApplication())).ToList();
+        var learned = new Dictionary<string, ProposedDeviceValues>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (_, results) in fitted)
+            foreach (var (id, proposal) in results.Devices)
+                learned[id] = proposal;
+
+        // Held-out device windows are scored with each device's learned rssi@1m, the same for the baseline and every
+        // proposal, rather than the one it was ranged with. The device term exists to judge node calibration. Ranged
+        // with their own rssi@1m, windows mostly measure how wrong those are (live, a phone and a tag 7-15 dB off,
+        // solver scale 1.38 held out against 1.01 in training), which no node proposal can fix (their rxAdj
+        // changes are centred) and which stays wrong while learned values are not written (apply_device_ref off,
+        // or a device that never passes its guards). A device the optimizers learned nothing for keeps its own.
+        if (learned.Count > 0)
+            deviceRef = w => learned.TryGetValue(w.DeviceId, out var p) ? p.RefRssi : w.RefRssi;
+
+        var baselineDevices = ScoreDevices(baselineResults);
+        var bestScore = WithDevices(Composite(bestCorr, bestRmse, optimization), baselineDevices.Total);
+        var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples) { Device = DeviceScore(baselineDevices.Total) };
+        var deviceWindows = os.DeviceWindows.Count + evalDeviceWindows.Count > 0
+            ? new OptimizerDeviceWindows(os.DeviceWindows.Count, evalDeviceWindows.Count, evalDeviceWindows.Count(w => learned.ContainsKey(w.DeviceId)))
+            : null;
 
         // Each eval snapshot's incumbent score, for the every-snapshot gate; the same for every proposal.
         var baselinePerSnapshot = evalSet.Count > 1
@@ -178,9 +201,8 @@ internal static class OptimizationCycle
             : null;
 
         var scored = new List<(IOptimizer Optimizer, OptimizationResults Results, OptimizerScore Score, OptimizerGates Gates, OptimizerGateDecision Decision)>();
-        foreach (var optimizer in optimizers)
+        foreach (var (optimizer, results) in fitted)
         {
-            var results = optimizer.Optimize(os, currentSettings).QuantizeForApplication();
             var (corr, rmse, samples) = Score(optimizer.Name, results);
             var devices = ScoreDevices(results);
             var composite = WithDevices(Composite(corr, rmse, optimization), devices.Total);
@@ -252,10 +274,6 @@ internal static class OptimizationCycle
         }).ToList();
 
         // Learned device rssi@1m: decided on their own guards whichever node proposal (if any) is selected.
-        var learned = new Dictionary<string, ProposedDeviceValues>(StringComparer.OrdinalIgnoreCase);
-        foreach (var s in scored)
-            foreach (var (id, proposal) in s.Results.Devices)
-                learned[id] = proposal;
         var deviceReferences = learned.Count == 0 ? null : learned
             .Where(d => d.Value.Windows >= optimization.DeviceResidual.MinWindows)
             .OrderByDescending(d => d.Value.Windows).ThenBy(d => d.Key, StringComparer.Ordinal)

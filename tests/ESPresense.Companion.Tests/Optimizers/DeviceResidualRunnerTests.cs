@@ -79,10 +79,11 @@ public class DeviceResidualRunnerTests
     /// A training snapshot holding the older 60% of the device windows and three held-out snapshots holding a
     /// third of the rest each; every snapshot also has its own node-to-node measures.
     /// </summary>
+    /// <param name="trueRef">Each walker's real rssi@1m, by index; by default -59, the rssi@1m every window is ranged with.</param>
     private static (OptimizationSnapshot Training, List<OptimizationSnapshot> Eval) Scenario(
-        Func<string, double> nodeToNodeBias, Func<string, double> deviceBias, double walker2Offset = 0)
+        Func<string, double> nodeToNodeBias, Func<string, double> deviceBias, double walker2Offset = 0, Func<int, double>? trueRef = null)
     {
-        var walkers = Enumerable.Range(0, 5).Select(i => Walker($"walker{i}", 400 + i, -59 + (i == 2 ? walker2Offset : 0))).ToList();
+        var walkers = Enumerable.Range(0, 5).Select(i => Walker($"walker{i}", 400 + i, trueRef?.Invoke(i) ?? -59 + (i == 2 ? walker2Offset : 0))).ToList();
         var windows = Windows(walkers, 240, deviceBias).OrderBy(w => w.End).ToList();
         var geometry = Geometry();
         var cut = windows.Count * 6 / 10;
@@ -144,15 +145,19 @@ public class DeviceResidualRunnerTests
     }
 
     /// <summary>
-    /// A node that hears only devices hot (node-to-node it is fine): node-to-node scoring prefers leaving it, so
-    /// the device-facing value only wins once the device term is weighted enough. On this house the spec's
-    /// default weight (1) stops at the node-to-node optimum; 3 reaches the device-facing value.
+    /// A node that hears devices 10 dB hot (and node-to-node 0 or 5 dB hot), with PerNodeAbsorptionRxTx competing.
+    /// The first 5 dB step (the per-cycle cap) is taken once the device term is weighted enough: at device_weight 1
+    /// only when node-to-node partly agrees, at 3 either way. The rest is not taken at any weight: it is worth only
+    /// about 0.13 dB of held-out device residual, and the every-snapshot gate refuses it because a fix to one node
+    /// only shows in the snapshots where devices were near that node. This pins that limit; the testnet found the
+    /// same gate stopping both proposals ("not on 1 of 7 snapshots").
     /// </summary>
-    [TestCase(1.0, 0.0, 0.0)]
-    [TestCase(3.0, 0.0, 8.5)]
-    [TestCase(1.0, 5.0, 4.5)]
-    [TestCase(3.0, 5.0, 8.5)]
-    public async Task CompetingOptimizers_DeviceWeightDecidesHowFarTheDeviceFacingValueGets(double weight, double nodeToNode, double atLeast)
+    [TestCase(1.0, 0.0, 0.0, 0.0)]
+    [TestCase(3.0, 0.0, 4.5, 7.0)]
+    [TestCase(1.0, 5.0, 4.5, 7.0)]
+    [TestCase(3.0, 5.0, 4.5, 7.0)]
+    [TestCase(10.0, 0.0, 4.5, 7.0)]
+    public async Task CompetingOptimizers_DeviceFacingValue_FirstStepOnly(double weight, double nodeToNode, double atLeast, double atMost)
     {
         var (training, eval) = Scenario(id => id == "n03" ? nodeToNode : 0, id => id == "n03" ? 10 : 0);
         var optimizers = new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance), NewOptimizer() };
@@ -166,8 +171,10 @@ public class DeviceResidualRunnerTests
         }
 
         TestContext.Out.WriteLine($"device_weight {weight}, n03 {nodeToNode} dB hot node-to-node and 10 dB to devices: n03 relative rxAdj per cycle {string.Join(" -> ", trail.Select(t => t.ToString("0.0")))}");
-        Assert.That(trail[^1], Is.GreaterThanOrEqualTo(atLeast));
-        Assert.That(trail[^1], Is.LessThanOrEqualTo(11.5));
+        Assert.That(trail[^1], Is.InRange(atLeast, atMost));
+        if (weight >= 10)
+            Assert.That(_runner.LastCycle!.Report.Proposals.Single(p => p.Optimizer == "Device Residual").Decision, Is.EqualTo(OptimizerGateDecision.EverySnapshot),
+                "the second step wins on the aggregate and is stopped by the every-snapshot gate");
     }
 
     [Test]
@@ -334,5 +341,67 @@ public class DeviceResidualRunnerTests
         _mqtt.Verify(x => x.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
         Assert.That(_state.OptimizerState.DeviceResidual, Is.Null);
         Assert.That(runner.LastCycle, Is.Null);
+    }
+
+    /// <summary>
+    /// Devices whose rssi@1m is off by -4 to +15 dB, as on a real house, with apply_device_ref off so the learned
+    /// values are never written: every window is still ranged with -59.
+    /// </summary>
+    private static double WrongRef(int walker) => -59 + new[] { 7.0, 6, 8, 15, -4 }[walker];
+
+    private static ConfigOptimization NotApplyingDeviceRef(double deviceWeight)
+    {
+        var optimization = Optimization(deviceWeight);
+        optimization.DeviceResidual.ApplyDeviceRef = false;
+        return optimization;
+    }
+
+    /// <summary>
+    /// Ranged with the rssi@1m they were received with, held-out windows of devices that are louder than that say so
+    /// (solver scale well above 1), whatever the node calibration; scored with the learned rssi@1m, the same for the
+    /// baseline and every proposal, they judge the nodes.
+    /// </summary>
+    [Test]
+    public async Task HeldOutDeviceWindows_AreScoredWithTheLearnedRssiAt1m()
+    {
+        var (training, eval) = Scenario(_ => 0, _ => 0, trueRef: WrongRef);
+        var optimizer = NewOptimizer();
+        for (int c = 0; c < 3; c++) optimizer.Optimize(training, new Dictionary<string, NodeSettings>()); // learned, as a running house has
+
+        await _runner.RunCycleAsync(training, eval, NotApplyingDeviceRef(1.0), new List<IOptimizer> { optimizer });
+
+        var report = _runner.LastCycle!.Report;
+        var asRanged = new OptimizationResults().EvaluateDevices(eval, _nss.Get, 8).Total;
+        var learned = report.Baseline.Device!;
+        TestContext.Out.WriteLine($"baseline held out: ranged with -59 {asRanged.DeviceRmse:0.00} dB, scale {asRanged.Scale:0.000}; with learned rssi@1m {learned.DeviceRmse:0.00} dB, scale {learned.Scale:0.000}");
+        Assert.That(report.DeviceWindows!.EvalRangedWithLearned, Is.EqualTo(report.DeviceWindows.Eval));
+        Assert.That(asRanged.Scale, Is.GreaterThan(1.2), "precondition: the rssi@1m windows were ranged with is wrong");
+        Assert.That(learned.Scale, Is.EqualTo(1).Within(0.1));
+        Assert.That(learned.DeviceRmse, Is.LessThan(asRanged.DeviceRmse - 0.5));
+    }
+
+    /// <summary>
+    /// The case the house is in: a node hot to devices, devices whose rssi@1m is wrong and is not being written.
+    /// Ranged with their own rssi@1m, the held-out devices scored the device-facing fix as making them worse
+    /// (8.80 to 8.86 dB, scale 1.97 to 2.01): the error that dominated was one no node proposal can fix. Scored with
+    /// the learned rssi@1m, the device term sees the fix for what it is.
+    /// </summary>
+    [Test]
+    public async Task DeviceFacingProposal_DeviceTermSeesTheFix_WhenDevicesRssiAt1mIsWrongAndNotWritten()
+    {
+        var (training, eval) = Scenario(id => id == "n03" ? 5 : 0, id => id == "n03" ? 10 : 0, trueRef: WrongRef);
+        var optimizer = NewOptimizer();
+        for (int c = 0; c < 3; c++) optimizer.Optimize(training, new Dictionary<string, NodeSettings>());
+
+        await _runner.RunCycleAsync(training, eval, NotApplyingDeviceRef(1.0), new List<IOptimizer> { optimizer });
+
+        var report = _runner.LastCycle!.Report;
+        var baseline = report.Baseline.Device!;
+        var proposal = report.Proposals.Single().Score.Device!;
+        TestContext.Out.WriteLine($"held-out device residual {baseline.DeviceRmse:0.00} -> {proposal.DeviceRmse:0.00} dB, scale {baseline.Scale:0.000} -> {proposal.Scale:0.000}");
+        Assert.That(proposal.DeviceRmse, Is.LessThan(baseline.DeviceRmse - 0.1), "fixing a node 10 dB hot to devices must make the devices better");
+        Assert.That(baseline.Scale, Is.EqualTo(1).Within(0.1));
+        Assert.That(_nss.Get("n03").Calibration.RxAdjRssi, Is.GreaterThanOrEqualTo(4), "the device-residual proposal should have been applied");
+        Assert.That(_mqtt.Invocations.Count(i => i.Arguments[0] is string t && t.StartsWith("espresense/settings/")), Is.Zero, "apply_device_ref is off");
     }
 }

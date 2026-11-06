@@ -155,11 +155,13 @@ public class OptimizationResults
     /// Scores this proposal on the located devices in <paramref name="oss"/>: re-solves every device window with
     /// the proposed rxAdj and absorption (the incumbent's where the proposal has none) and averages each node's
     /// |leave-one-out residual|. Node-to-node scoring cannot see what a device-facing rxAdj fixes; this can.
-    /// Each window keeps the rssi@1m it was ranged with, so like the device frame of <see cref="Evaluate(List{OptimizationSnapshot}, Func{string, NodeSettings}, bool)"/>
+    /// Each window is ranged with the rssi@1m <paramref name="refRssi"/> gives it (by default the one it was ranged
+    /// with), so like the device frame of <see cref="Evaluate(List{OptimizationSnapshot}, Func{string, NodeSettings}, bool)"/>
     /// it judges rxAdj in absolute terms, and txRef proposals do not enter at all. Every node gets the same solver
     /// weight, as in the locators. Returns the total and the score of each snapshot's windows on their own.
     /// </summary>
-    public (DeviceEvaluation Total, DeviceEvaluation[] PerSnapshot) EvaluateDevices(IReadOnlyList<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, int minNodes)
+    public (DeviceEvaluation Total, DeviceEvaluation[] PerSnapshot) EvaluateDevices(IReadOnlyList<OptimizationSnapshot> oss, Func<string, NodeSettings> getSettings, int minNodes,
+        Func<DeviceWindow, double>? refRssi = null)
     {
         var perSnapshot = Enumerable.Repeat(DeviceEvaluation.None, oss.Count).ToArray();
         var geometry = oss.LastOrDefault(s => s.Geometry != null && s.DeviceWindows.Count > 0)?.Geometry;
@@ -182,7 +184,8 @@ public class OptimizationResults
             absorption[n] = pv?.Absorption ?? settings.Calibration.Absorption ?? DeviceResidualModel.DefaultAbsorption;
         }
 
-        var pass = DeviceResidualModel.Run(solver, windows, rxAdj, absorption, w => w.Source.RefRssi, weights, leaveOneOut: true);
+        var pass = DeviceResidualModel.Run(solver, windows, rxAdj, absorption,
+            refRssi == null ? w => w.Source.RefRssi : w => refRssi(w.Source), weights, leaveOneOut: true);
 
         var sumAbs = new double[oss.Count];
         var residuals = new long[oss.Count];

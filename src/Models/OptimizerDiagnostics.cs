@@ -111,7 +111,11 @@ public sealed record OptimizerCycleReport(
     public IReadOnlyList<OptimizerDeviceReference>? Devices { get; init; }
 }
 
-public sealed record OptimizerDeviceWindows(int Training, int Eval);
+/// <summary>
+/// Device windows the optimizers trained on and the proposals were scored on. <see cref="EvalRangedWithLearned"/> of
+/// the held-out ones were scored with their device's learned rssi@1m (the rest with the one they were ranged with).
+/// </summary>
+public sealed record OptimizerDeviceWindows(int Training, int Eval, int EvalRangedWithLearned);
 
 /// <summary>Why a learned rssi@1m is or is not written. Checked in this order; the first that applies is the decision.</summary>
 public enum OptimizerDeviceReferenceDecision
@@ -197,7 +201,7 @@ public sealed record OptimizerImprovementGate(double Composite, double Baseline,
 
 /// <summary>
 /// The proposal scored with every transmitter's txRef held at its current value. Passed when the composite beats the
-/// baseline. The device term, when there is one, is the proposal's own: device windows keep their rssi@1m either way.
+/// baseline. The device term, when there is one, is the proposal's own: txRef does not enter it in either frame.
 /// </summary>
 public sealed record OptimizerDeviceFrameGate(double Composite, double R, double Rmse, double Baseline, bool Passed);
 

@@ -330,9 +330,11 @@ internal class OptimizationRunner : BackgroundService
     /// (the device_residual optimizer's) could lose on a metric blind to it, and node-to-node fits would keep
     /// undoing it. When the eval snapshots hold device windows, every composite above, the per-snapshot one
     /// included, adds device_weight x (1 - e / (1 + e)), e the mean |leave-one-out residual| (dB) of the
-    /// devices re-solved with the proposal (<see cref="OptimizationResults.EvaluateDevices"/>). Device windows
-    /// keep their rssi@1m, so the term judges in the device frame already. With device_weight 0, or no device
-    /// windows, scoring is exactly node-to-node as before.
+    /// devices re-solved with the proposal (<see cref="OptimizationResults.EvaluateDevices"/>). Every device is
+    /// ranged with the rssi@1m the cycle learned for it, the same for the baseline and every proposal, so the term
+    /// judges node calibration rather than how wrong the devices' own rssi@1m are, and no txRef proposal enters
+    /// it (it judges in the device frame already). With device_weight 0, or no device windows, scoring is exactly
+    /// node-to-node as before.
     ///
     /// Device rssi@1m: learned values are not part of the composite; they are written to device settings on
     /// their own guards (<see cref="OptimizationCycle.DecideDeviceReference"/>), whichever node proposal wins.
