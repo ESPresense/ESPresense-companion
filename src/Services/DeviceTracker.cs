@@ -216,25 +216,22 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
 
         if (!isNode)
         {
-            if (rx.HasLocation)
+            // Fingerprinting matches raw rssi per node and needs no node coordinates, so a receiver that
+            // was never placed on the map (rx.HasLocation false) is still a feature, not noise. Ranging
+            // locators restrict their candidate nodes to ones placed on the target floor (BaseMultilateralizer
+            // filters on Node.Floors; MultiFloor and NearestNode check HasLocation), so they still ignore it.
+            tele.IncrementMessages();
+            var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
             {
-                tele.IncrementMessages();
-                var device = state.Devices.GetOrAdd(arg.DeviceId, id =>
-                {
-                    var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), _discoveryLogger) { Check = true };
-                    d.KalmanFilter.Settings = state.KalmanSettings;
-                    state.BuildScenarios(d);
-                    return d;
-                });
-                tele.UpdateDevicesCount(state.Devices.Count);
-                var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
-                if (moved) tele.IncrementMoved();
-                _toProcess.Mark(device.Id);
-            }
-            else
-            {
-                tele.IncrementSkipped();
-            }
+                var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), _discoveryLogger) { Check = true };
+                d.KalmanFilter.Settings = state.KalmanSettings;
+                state.BuildScenarios(d);
+                return d;
+            });
+            tele.UpdateDevicesCount(state.Devices.Count);
+            var moved = device.Nodes.GetOrAdd(arg.NodeId, f => new DeviceToNode(device, rx)).ReadMessage(arg.Payload);
+            if (moved) tele.IncrementMoved();
+            _toProcess.Mark(device.Id);
         }
         return Task.CompletedTask;
     }
