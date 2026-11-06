@@ -85,9 +85,9 @@ internal static class OptimizationCycle
         }
 
         var baselineResults = new OptimizationResults();
-        var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
+        var (bestCorr, bestRmse, baselineSamples, bestDistRmse) = Score(IncumbentScenario, baselineResults);
         var bestScore = Composite(bestCorr, bestRmse, optimization);
-        var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples);
+        var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples, double.IsNaN(bestDistRmse) ? null : bestDistRmse);
 
         if (baselineSamples < optimization.MinSamples)
         {
@@ -109,9 +109,9 @@ internal static class OptimizationCycle
         foreach (var optimizer in optimizers)
         {
             var results = optimizer.Optimize(os, currentSettings).QuantizeForApplication();
-            var (corr, rmse, samples) = Score(optimizer.Name, results);
+            var (corr, rmse, samples, distRmse) = Score(optimizer.Name, results);
             var composite = Composite(corr, rmse, optimization);
-            var score = new OptimizerScore(composite, corr, rmse, samples);
+            var score = new OptimizerScore(composite, corr, rmse, samples, double.IsNaN(distRmse) ? null : distRmse);
 
             var minSamples = new OptimizerMinSamplesGate(samples, optimization.MinSamples, samples >= optimization.MinSamples);
             var improvement = new OptimizerImprovementGate(composite, bestScore, optimization.MinimumImprovement,
@@ -124,10 +124,9 @@ internal static class OptimizationCycle
             var movesTxRef = results.Nodes.Values.Any(r => r.TxRefRssi != null);
             if (movesTxRef)
             {
-                var (dCorr, dRmse, _) = Score(DeviceFrameScenario(optimizer.Name), results, deviceFrame: true);
+                var (dCorr, dRmse, _, dDistRmse) = Score(DeviceFrameScenario(optimizer.Name), results, deviceFrame: true);
                 var deviceComposite = Composite(dCorr, dRmse, optimization);
-                deviceFrame = new OptimizerDeviceFrameGate(deviceComposite, dCorr, dRmse, bestScore,
-                    IsFinite(deviceComposite) && !(deviceComposite <= bestScore));
+                deviceFrame = new OptimizerDeviceFrameGate(deviceComposite, dCorr, dRmse, bestScore, IsFinite(deviceComposite) && !(deviceComposite <= bestScore), double.IsNaN(dDistRmse) ? null : dDistRmse);
             }
 
             // On a home that has not changed, successive snapshots differ only by noise, and rxAdj and
@@ -140,8 +139,8 @@ internal static class OptimizationCycle
             {
                 var losesOn = evalSet.Where((snap, i) =>
                 {
-                    var (bc, br, bs) = baselinePerSnapshot[i];
-                    var (pc, pr, ps) = results.Evaluate(new List<OptimizationSnapshot> { snap }, Frozen);
+                    var (bc, br, bs, _) = baselinePerSnapshot[i];
+                    var (pc, pr, ps, _) = results.Evaluate(new List<OptimizationSnapshot> { snap }, Frozen);
                     if (bs < optimization.MinSamples || ps < optimization.MinSamples) return false;
                     var propOne = Composite(pc, pr, optimization);
                     return double.IsNaN(propOne) || propOne <= Composite(bc, br, optimization);

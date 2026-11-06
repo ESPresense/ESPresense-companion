@@ -54,7 +54,8 @@ public sealed record OptimizerGateSettings(
 }
 
 /// <summary>Fit quality on the eval set: composite score, Pearson R and RMSE (dB) over <see cref="Samples"/> measures.</summary>
-public sealed record OptimizerScore(double Composite, double R, double Rmse, int Samples);
+/// <param name="DistanceRmse">Held-out RMSE in metres between the measured-RSSI-implied distance under this calibration and the map distance. Additive and optional so older payloads stay readable; null when the eval set has no usable measures. Lower is better. Not part of <see cref="Composite"/> in round 1 (see issue #1868).</param>
+public sealed record OptimizerScore(double Composite, double R, double Rmse, int Samples, double? DistanceRmse = null);
 
 /// <summary>
 /// One optimization cycle: the incumbent's score on the eval set and every proposal with the gate's verdict.
@@ -119,7 +120,7 @@ public sealed record OptimizerMinSamplesGate(int Samples, int Required, bool Pas
 public sealed record OptimizerImprovementGate(double Composite, double Baseline, double MinimumImprovement, bool Passed);
 
 /// <summary>The proposal scored with every transmitter's txRef held at its current value. Passed when the composite beats the baseline.</summary>
-public sealed record OptimizerDeviceFrameGate(double Composite, double R, double Rmse, double Baseline, bool Passed);
+public sealed record OptimizerDeviceFrameGate(double Composite, double R, double Rmse, double Baseline, bool Passed, double? DistanceRmse = null);
 
 /// <summary>On how many of the eval snapshots, each scored by itself, the proposal did not beat the incumbent.</summary>
 public sealed record OptimizerEverySnapshotGate(int LostOn, int Of, bool Passed);

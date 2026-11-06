@@ -389,8 +389,10 @@ public class OptimizationRunnerTests
 
         Assert.That(ran, Is.True);
         Assert.That(_nss.Get("rx").Calibration.Absorption, Is.EqualTo(3.0));
-        // 31 snapshots of 5 measurements, 20% (7 snapshots) held out
-        Assert.That(_state.OptimizerState.TrainingSamples, Is.EqualTo(24 * 5));
+        // 31 snapshots of 5 measurements, 20% (7 snapshots) held out; the 24 training snapshots are
+        // pooled into one measure per (tx, rx, rxAdj) link (issue #1868), and TimedSnapshots reuses
+        // the same links, so training is 5 averaged measures, not 120 raw ones.
+        Assert.That(_state.OptimizerState.TrainingSamples, Is.EqualTo(5));
         Assert.That(_state.OptimizerState.ValidationSamples, Is.EqualTo(7 * 5));
     }
 

@@ -304,7 +304,7 @@ internal class OptimizationRunner : BackgroundService
             return;
         }
 
-        var (bestScore, bestCorr, bestRmse, _) = report.Baseline;
+        var (bestScore, bestCorr, bestRmse, _, _) = report.Baseline;
         if (double.IsNaN(_previousBestCorr) || double.IsNaN(_previousBestRmse) || Math.Abs(bestCorr - _previousBestCorr) > 0.001 || Math.Abs(bestRmse - _previousBestRmse) > 0.001)
         {
             _logger.LogInformation("Baseline metrics: Composite={Composite:0.000} (R={R:0.000}, RMSE={RMSE:0.000})", bestScore, bestCorr, bestRmse);
@@ -378,7 +378,7 @@ internal class OptimizationRunner : BackgroundService
 
     private void LogDecision(OptimizerProposalReport p, double bestScore, IReadOnlyDictionary<string, NodeSettings> incumbent)
     {
-        var (composite, corr, rmse, samples) = p.Score;
+        var (composite, corr, rmse, samples, _) = p.Score;
         switch (p.Decision)
         {
             case OptimizerGateDecision.MinSamples:

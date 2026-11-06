@@ -97,8 +97,17 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         bool anchored = measures.Any(t => t.m.HeldTxRef != null);
         double TxPriorCentre(Vector<double> x) => anchored && txIds.Count > 0 ? txIds.Average(id => x[txIndex[id]] - txPriorRef[id]) : 0;
 
-        // Inverse-variance weights, normalised to mean 1 so the priors keep their meaning.
-        var weights = measures.Select(t => t.m.RssiVar > 0 ? 1.0 / Math.Max(t.m.RssiVar.Value, 0.1) : 1.0).ToArray();
+        // Inverse-variance weights, capped so a stuck low-variance multipath link cannot dominate the fit
+        // (issue #1868): floor the variance at its 25th percentile, cap raw weights at 3x the median, then
+        // normalise to mean 1 so the priors keep their meaning.
+        var rawVars = measures.Select(t => t.m.RssiVar is > 0 ? t.m.RssiVar.Value : double.NaN).ToArray();
+        var finiteVars = rawVars.Where(double.IsFinite).OrderBy(v => v).ToArray();
+        var varFloor = finiteVars.Length > 0 ? Math.Max(finiteVars[finiteVars.Length / 4], 0.1) : 0.1;
+        var rawWeights = measures.Select((t, i) => double.IsFinite(rawVars[i]) ? 1.0 / Math.Max(rawVars[i], varFloor) : 1.0).ToArray();
+        var sortedW = rawWeights.OrderBy(w => w).ToArray();
+        var medianW = sortedW.Length > 0 ? sortedW[sortedW.Length / 2] : 1.0;
+        var weightCap = 3.0 * (medianW > 0 ? medianW : 1.0);
+        var weights = rawWeights.Select(w => Math.Min(w, weightCap)).ToArray();
         var weightSum = weights.Sum();
         for (int i = 0; i < weights.Length; i++) weights[i] = weights[i] / weightSum * weights.Length;
 
