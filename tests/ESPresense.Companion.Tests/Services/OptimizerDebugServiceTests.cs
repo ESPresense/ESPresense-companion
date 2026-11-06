@@ -554,4 +554,25 @@ public class OptimizerDebugServiceTests
         Assert.That(m.Tx.IsAnchor, Is.True);
         Assert.That(m.Rx.IsAnchor, Is.False);
     }
+
+    [Test]
+    public void ReadMeasures_SkipsNonStationaryReceivers()
+    {
+        var fixedNode = new Node("node-a", NodeSourceType.Config);
+        fixedNode.Update(_configLoader.Config!, new ConfigNode { Name = "A", Point = new[] { 0.0, 0, 1 } }, Enumerable.Empty<Floor>());
+        var car = new Node("car", NodeSourceType.Config);
+        car.Update(_configLoader.Config!, new ConfigNode { Name = "Car", Point = new[] { -2.0, 15, 0.5 }, Stationary = false }, Enumerable.Empty<Floor>());
+        _state.Nodes[fixedNode.Id] = fixedNode;
+        _state.Nodes[car.Id] = car;
+        var device = new Device("anchor-1", null, TimeSpan.FromSeconds(30)) { Name = "Anchor" };
+        device.SetAnchor(new DeviceAnchor(new Point3D(2, 0, 1), null, null));
+        device.Nodes[fixedNode.Id] = new DeviceToNode(device, fixedNode) { Distance = 2, Rssi = -60, RefRssi = -59, LastHit = DateTime.UtcNow };
+        device.Nodes[car.Id] = new DeviceToNode(device, car) { Distance = 10, Rssi = -90, RefRssi = -59, LastHit = DateTime.UtcNow };
+        _state.Devices[device.Id] = device;
+
+        var measures = _state.ReadMeasures().Measures;
+
+        Assert.That(measures.Select(m => m.Rx.Id), Is.EqualTo(new[] { "node-a" }),
+            "a node that moves (stationary: false) has no fixed distance to the anchor, so it is not fitted");
+    }
 }
