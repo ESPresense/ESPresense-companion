@@ -71,7 +71,52 @@ public class KalmanLocationTests
         kalman.Update(new Point3D(10, 5, 0));
 
         var velocity = kalman.Velocity;
-        Assert.That(velocity.Length, Is.LessThanOrEqualTo(0.5 + 1e-6));
+        Assert.That(velocity.Length, Is.LessThanOrEqualTo(KalmanFilterSettings.Default.MaxVelocity + 1e-6));
+    }
+
+    [Test]
+    public void Update_WalkingPace_KeepsUp()
+    {
+        // A person walking 1.4 m/s, one exact fix a second: the default filter has to follow, not trail behind
+        var kalman = new KalmanLocation();
+        var t0 = new DateTime(2026, 11, 2, 0, 0, 0, DateTimeKind.Utc);
+        for (var s = 0; s <= 20; s++)
+            kalman.Update(new Point3D(1.4 * s, 0, 0), t0.AddSeconds(s));
+
+        Assert.That(kalman.Location.X, Is.EqualTo(28).Within(0.5));
+    }
+
+    [Test]
+    public void Update_WalkingPaceWithNoisyFixes_DoesNotTrail()
+    {
+        // Fixes alternate a metre either side of the walker. A jump judged against the last estimate also counts the
+        // walking, so noisy fixes look like jumps, get distrusted, and the estimate falls behind.
+        var kalman = new KalmanLocation();
+        var t0 = new DateTime(2026, 11, 2, 0, 0, 0, DateTimeKind.Utc);
+        var lag = 0.0;
+        for (var s = 0; s <= 30; s++)
+        {
+            var truth = 1.4 * s;
+            kalman.Update(new Point3D(truth + (s % 2 == 1 ? 1 : -1), 0, 0), t0.AddSeconds(s));
+            if (s > 20) lag += (truth - kalman.Location.X) / 10;
+        }
+
+        Assert.That(lag, Is.LessThan(0.3));
+    }
+
+    [Test]
+    public void Update_AfterLongGap_StartsOverAtTheFix()
+    {
+        var kalman = new KalmanLocation();
+        var t0 = new DateTime(2026, 11, 2, 0, 0, 0, DateTimeKind.Utc);
+        for (var s = 0; s <= 5; s++)
+            kalman.Update(new Point3D(s, 0, 0), t0.AddSeconds(s)); // walking +x
+
+        var fix = new Point3D(2, 8, 0);
+        kalman.Update(fix, t0.AddMinutes(5)); // back after five minutes away
+
+        Assert.That(kalman.Location.DistanceTo(fix), Is.LessThan(1e-6));
+        Assert.That(kalman.Velocity.Length, Is.EqualTo(0).Within(1e-6));
     }
 
     private static void SetLastLocationUpdate(KalmanLocation kalman, DateTime value)

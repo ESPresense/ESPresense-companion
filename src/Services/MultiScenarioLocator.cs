@@ -32,6 +32,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
         {
             device.LastCalculated = now;
             device.BestScenario = null;
+            device.Hold.Reset();
             // Becoming anchored (best_scenario turns "Anchored") or moving the anchor changes what HA shows.
             var reported = publisher.Reported(device);
             locationChanged = reported.Location != anchor.Location || reported.BestScenario != DeviceReport.AnchoredScenario;
