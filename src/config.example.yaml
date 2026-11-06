@@ -46,7 +46,10 @@ optimization:
   validation_fraction: 0.2        # Newest fraction of the history held out to validate proposals (default: 0.2)
   minimum_improvement: 0          # How far a proposal's score (0-1) must beat the current calibration's (default: 0)
   min_samples: 5          # Minimum measurements an optimizer result must be evaluated on before it is applied (default: 5)
-  optimizer: per_node_absorption # The only mode (default: per_node_absorption); legacy and global_absorption were removed and fall back to it
+  optimizer: per_node_absorption # per_node_absorption (default) or device_residual; legacy and global_absorption were removed and fall back to per_node_absorption
+  # device_residual also learns from located devices: how each node hears devices in the room (which
+  # node-to-node links cannot show) and each device's rssi@1m, with node positions as the ground truth.
+  # It competes with per_node_absorption; proposals are then also scored on held-out device windows.
   limits:
     absorption_min: 2.5
     absorption_max: 3.5
@@ -59,6 +62,16 @@ optimization:
     correlation: 0.5
     # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5)
     rmse: 0.5
+  # Weight of the device term in a proposal's score (device_residual only): device_weight * (1 - e / (1 + e)),
+  # e the mean |leave-one-out residual| in dB of located devices re-solved with the proposal. Higher favours
+  # how nodes hear devices over node-to-node agreement; 0 scores node-to-node only (default: 1.0)
+  device_weight: 1.0
+  device_residual:
+    window_secs: 10        # A device's readings are pooled per node over this many seconds (default: 10)
+    min_nodes: 8           # Windows heard by fewer stationary, positioned nodes are not used (default: 8)
+    history_hours: 24      # How long windows are kept for training (default: 24)
+    min_windows: 50        # Windows a device needs before its learned rssi@1m is written (default: 50)
+    apply_device_ref: true # Write learned rssi@1m to device settings once it has held still for two cycles (default: true)
 
 
 locators:

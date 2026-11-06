@@ -48,13 +48,35 @@ public sealed record OptimizerGateSettings(
     int SampleIntervalSecs,
     int OptimizationIntervalSecs)
 {
+    /// <summary>Weight of the device-residual term in the composite (device_weight); null outside the device_residual mode, which has no such term.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? DeviceWeight { get; init; }
+
     public static OptimizerGateSettings From(ConfigOptimization o) => new(
         o.MinSamples, o.MinimumImprovement, o.CorrelationWeight, o.RmseWeight, o.EffectiveValidationFraction,
-        o.EffectiveTrainingWindowMins, o.EffectiveSampleIntervalSecs, o.EffectiveOptimizationIntervalSecs);
+        o.EffectiveTrainingWindowMins, o.EffectiveSampleIntervalSecs, o.EffectiveOptimizationIntervalSecs)
+    {
+        DeviceWeight = o.DeviceResidualMode ? o.DeviceWeight : null,
+    };
 }
 
-/// <summary>Fit quality on the eval set: composite score, Pearson R and RMSE (dB) over <see cref="Samples"/> measures.</summary>
-public sealed record OptimizerScore(double Composite, double R, double Rmse, int Samples);
+/// <summary>
+/// Fit quality on the eval set: composite score, Pearson R and RMSE (dB) over <see cref="Samples"/> measures.
+/// With device windows to score, <see cref="Composite"/> includes <see cref="Device"/>'s term.
+/// </summary>
+public sealed record OptimizerScore(double Composite, double R, double Rmse, int Samples)
+{
+    /// <summary>The device-residual part of the score; null when there is no device term (device_weight 0 or no held-out device windows).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerDeviceScore? Device { get; init; }
+}
+
+/// <summary>
+/// How a calibration places located devices on the held-out device windows: mean |leave-one-out residual| (dB),
+/// mean solver scale (fitted / measured distance, near 1 when right), the windows scored, and the term added to
+/// the composite: device_weight x (1 - e / (1 + e)).
+/// </summary>
+public sealed record OptimizerDeviceScore(double DeviceRmse, double Scale, int Windows, double Term);
 
 /// <summary>
 /// One optimization cycle: the incumbent's score on the eval set and every proposal with the gate's verdict.
@@ -75,7 +97,61 @@ public sealed record OptimizerCycleReport(
     bool Applied,
     string Outcome,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null)
+{
+    /// <summary>Device windows the optimizers trained on and the proposals were scored on; null when there were none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerDeviceWindows? DeviceWindows { get; init; }
+
+    /// <summary>
+    /// Learned device rssi@1m values for devices with at least min_windows windows, and whether each is written
+    /// (<see cref="OptimizerDeviceReference.Applied"/>, live cycles only). Decided on their own guards, not the composite.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<OptimizerDeviceReference>? Devices { get; init; }
+}
+
+/// <summary>
+/// Device windows the optimizers trained on and the proposals were scored on. <see cref="EvalRangedWithLearned"/> of
+/// the held-out ones were scored with their device's learned rssi@1m (the rest with the one they were ranged with).
+/// </summary>
+public sealed record OptimizerDeviceWindows(int Training, int Eval, int EvalRangedWithLearned);
+
+/// <summary>Why a learned rssi@1m is or is not written. Checked in this order; the first that applies is the decision.</summary>
+public enum OptimizerDeviceReferenceDecision
+{
+    /// <summary>Passed every guard: written (or, in a dry run, would be).</summary>
+    Apply,
+    /// <summary>device_residual.apply_device_ref is off.</summary>
+    Disabled,
+    /// <summary>Fewer windows than device_residual.min_windows.</summary>
+    TooFewWindows,
+    /// <summary>Mobility below 0.3: a device that sits still cannot tell its loudness from its spot's quirks.</summary>
+    SitsStill,
+    /// <summary>Has not yet held within 1 dB for two cycles.</summary>
+    NotYetStable,
+    /// <summary>Anchored: its settings are ground truth.</summary>
+    Anchored,
+    /// <summary>Outside -100..-20 dBm.</summary>
+    OutOfRange,
+    /// <summary>Within 1 dB of (or rounds to) the current value.</summary>
+    Unchanged,
+}
+
+/// <summary>
+/// A device's learned rssi@1m (dBm, <see cref="Learned"/>; <see cref="RefRssi"/> is it as written, whole dB) next to
+/// the one it is ranged with now, and what the guards decided.
+/// </summary>
+public sealed record OptimizerDeviceReference(
+    string Device,
+    int RefRssi,
+    double Learned,
+    double Current,
+    int Windows,
+    double Mobility,
+    int StableCycles,
+    OptimizerDeviceReferenceDecision Decision,
+    bool Applied);
 
 /// <summary>Where a proposal stopped. Gates are checked in this order; the first one failed is the decision.</summary>
 public enum OptimizerGateDecision
@@ -100,7 +176,12 @@ public sealed record OptimizerProposalReport(
     OptimizerGateDecision Decision,
     bool Applied,
     OptimizerGates Gates,
-    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes);
+    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes)
+{
+    /// <summary>What the device_residual optimizer learned on its training windows (residual and scale before and after, per-node trust); null for other optimizers.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DeviceResidualState? DeviceResidual { get; init; }
+}
 
 /// <summary>
 /// The numbers behind each gate. All are computed for every proposal, so a proposal stopped early still shows
@@ -118,10 +199,16 @@ public sealed record OptimizerMinSamplesGate(int Samples, int Required, bool Pas
 /// <summary>Passed when <see cref="Composite"/> &gt; <see cref="Baseline"/> + <see cref="MinimumImprovement"/>.</summary>
 public sealed record OptimizerImprovementGate(double Composite, double Baseline, double MinimumImprovement, bool Passed);
 
-/// <summary>The proposal scored with every transmitter's txRef held at its current value. Passed when the composite beats the baseline.</summary>
+/// <summary>
+/// The proposal scored with every transmitter's txRef held at its current value. Passed when the composite beats the
+/// baseline. The device term, when there is one, is the proposal's own: txRef does not enter it in either frame.
+/// </summary>
 public sealed record OptimizerDeviceFrameGate(double Composite, double R, double Rmse, double Baseline, bool Passed);
 
-/// <summary>On how many of the eval snapshots, each scored by itself, the proposal did not beat the incumbent.</summary>
+/// <summary>
+/// On how many of the eval snapshots, each scored by itself, the proposal did not beat the incumbent. With a device
+/// term, each snapshot's composite includes the term of that snapshot's own device windows.
+/// </summary>
 public sealed record OptimizerEverySnapshotGate(int LostOn, int Of, bool Passed);
 
 /// <summary>A proposed value for one node, as it would be applied (absorption to 2 decimals, rxAdj and txRef to whole dB). Null means unchanged.</summary>

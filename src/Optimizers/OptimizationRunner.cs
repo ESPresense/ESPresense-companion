@@ -17,6 +17,7 @@ internal class OptimizationRunner : BackgroundService
     private readonly ConfigLoader _cfg;
     private readonly ILeaseService _leaseService;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly DeviceSettingsStore? _deviceSettings;
     private IList<IOptimizer> _optimizers;
     private readonly object _optimizersLock = new();
     private string? _lastOptimizerMode;
@@ -26,9 +27,11 @@ internal class OptimizationRunner : BackgroundService
     /// <summary>The measurement history the optimizers train and validate on.</summary>
     internal OptimizationSnapshotStore Snapshots { get; } = new();
 
-    public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger, ConfigLoader cfg, ILeaseService leaseService, ILoggerFactory loggerFactory)
+    /// <param name="deviceSettings">Where learned device rssi@1m values are written; without it they are only reported.</param>
+    public OptimizationRunner(State state, NodeSettingsStore nsd, ILogger<OptimizationRunner> logger, ConfigLoader cfg, ILeaseService leaseService, ILoggerFactory loggerFactory, DeviceSettingsStore? deviceSettings = null)
     {
         _loggerFactory = loggerFactory;
+        _deviceSettings = deviceSettings;
         _state = state;
         _nsd = nsd;
         _logger = logger;
@@ -45,6 +48,7 @@ internal class OptimizationRunner : BackgroundService
                     return;
                 _optimizers = BuildOptimizers(optimizerMode);
                 _lastOptimizerMode = optimizerMode;
+                _state.OptimizerState.DeviceResidual = null; // the last device_residual cycle no longer describes anything
                 _logger.LogInformation("Optimizer mode changed to {Mode}", optimizerMode);
             }
         };
@@ -54,8 +58,18 @@ internal class OptimizationRunner : BackgroundService
         _lastOptimizerMode = initialMode;
     }
 
-    /// <summary>The only optimizer mode, and what an unset <c>optimization.optimizer</c> means.</summary>
+    /// <summary>The default optimizer mode, and what an unset, removed or unknown <c>optimization.optimizer</c> runs.</summary>
     internal const string DefaultMode = "per_node_absorption";
+
+    /// <summary>
+    /// per_node_absorption plus <see cref="DeviceResidualOptimizer"/>, competing under a composite with a device term:
+    /// learns from located devices' residuals (#1860).
+    /// </summary>
+    internal const string DeviceResidualMode = "device_residual";
+
+    private static readonly HashSet<string> Modes = new(StringComparer.Ordinal) { DefaultMode, DeviceResidualMode };
+
+    private static string EffectiveMode(string configured) => Modes.Contains(configured) ? configured : DefaultMode;
 
     /// <summary>
     /// Modes that used to exist. Each was weaker by construction than the per-node joint fit:
@@ -73,20 +87,25 @@ internal class OptimizationRunner : BackgroundService
         get { lock (_optimizersLock) return _optimizers.ToList(); }
     }
 
-    /// <summary>Applies the configured mode: always <see cref="DefaultMode"/>, with a warning when the config names anything else.</summary>
+    /// <summary>Applies the configured mode, falling back to <see cref="DefaultMode"/> with a warning when the config names a removed or unknown one.</summary>
     private IList<IOptimizer> BuildOptimizers(string mode)
     {
         if (RemovedModes.Contains(mode))
             _logger.LogWarning("Optimizer mode {Mode} has been removed; using {DefaultMode}. Remove optimization.optimizer from the config (or set it to per_node_absorption) to silence this warning", mode, DefaultMode);
-        else if (mode != DefaultMode)
+        else if (!Modes.Contains(mode))
             _logger.LogWarning("Unknown optimizer mode {Mode}; using {DefaultMode}", mode, DefaultMode);
 
-        return CreateOptimizers();
+        return CreateOptimizers(EffectiveMode(mode));
     }
 
-    /// <summary>Fresh optimizer instances for the one mode, without the mode warnings (dry runs build these too).</summary>
-    private IList<IOptimizer> CreateOptimizers() =>
-        new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, _loggerFactory.CreateLogger<PerNodeAbsorptionRxTx>()) };
+    /// <summary>Fresh optimizer instances for <paramref name="mode"/>, without the mode warnings (dry runs build these too).</summary>
+    private IList<IOptimizer> CreateOptimizers(string mode)
+    {
+        var optimizers = new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, _loggerFactory.CreateLogger<PerNodeAbsorptionRxTx>()) };
+        if (mode == DeviceResidualMode)
+            optimizers.Add(new DeviceResidualOptimizer(_state, _loggerFactory.CreateLogger<DeviceResidualOptimizer>()));
+        return optimizers;
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -214,14 +233,32 @@ internal class OptimizationRunner : BackgroundService
             return false;
         }
 
+        AddDeviceHistory(split, optimization);
+
         _state.OptimizerState.Optimizers = string.Join(", ", currentOptimizers.Select(o => o.Name));
         _state.OptimizerState.TrainingSamples = split.Training.Measures.Count;
-        SetStatus("Optimizing", $"Training on {split.Training.Measures.Count} measurements and validating newer holdout data.");
+        SetStatus("Optimizing", split.Training.DeviceWindows.Count > 0
+            ? $"Training on {split.Training.Measures.Count} measurements and {split.Training.DeviceWindows.Count} device windows and validating newer holdout data."
+            : $"Training on {split.Training.Measures.Count} measurements and validating newer holdout data.");
 
         await RunCycleAsync(split.Training, split.Validation, optimization, currentOptimizers);
         _state.OptimizerState.LastRunAt = DateTime.UtcNow;
         return true;
     }
+
+    /// <summary>
+    /// Device windows are kept far longer (history_hours) than snapshots (training_window_mins): train on all of them
+    /// up to the split, so the held-out snapshots' windows stay held out.
+    /// </summary>
+    private void AddDeviceHistory(OptimizationDataSplit split, ConfigOptimization optimization)
+    {
+        if (!optimization.CollectsDeviceWindows) return;
+        var history = _state.DeviceResiduals.Windows(null, split.Training.Timestamp, DateTime.UtcNow);
+        if (history.Count > split.Training.DeviceWindows.Count) split.Training.DeviceWindows = history;
+        split.Training.Geometry ??= DeviceGeometry.From(_state);
+    }
+
+    private DeviceSettings? ReadDeviceSettings(string id) => _deviceSettings?.Get(id);
 
     private void SetStatus(string phase, string message, string? optimizers = null)
     {
@@ -288,11 +325,24 @@ internal class OptimizationRunner : BackgroundService
     /// Best of: proposals are all scored against the same incumbent and only the best is applied, rather
     /// than applied greedily in list order, which let an absorption-only proposal land on top of another
     /// optimizer's rxAdj: a pair nobody fitted.
+    ///
+    /// Device term: node-to-node scoring cannot see how a node hears devices, so a proposal that fixes that
+    /// (the device_residual optimizer's) could lose on a metric blind to it, and node-to-node fits would keep
+    /// undoing it. When the eval snapshots hold device windows, every composite above, the per-snapshot one
+    /// included, adds device_weight x (1 - e / (1 + e)), e the mean |leave-one-out residual| (dB) of the
+    /// devices re-solved with the proposal (<see cref="OptimizationResults.EvaluateDevices"/>). Every device is
+    /// ranged with the rssi@1m the cycle learned for it, the same for the baseline and every proposal, so the term
+    /// judges node calibration rather than how wrong the devices' own rssi@1m are, and no txRef proposal enters
+    /// it (it judges in the device frame already). With device_weight 0, or no device windows, scoring is exactly
+    /// node-to-node as before.
+    ///
+    /// Device rssi@1m: learned values are not part of the composite; they are written to device settings on
+    /// their own guards (<see cref="OptimizationCycle.DecideDeviceReference"/>), whichever node proposal wins.
     /// </summary>
     internal async Task RunCycleAsync(OptimizationSnapshot os, IReadOnlyList<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
     {
         // The decision is made without access to the store's writers; only the selected proposal is applied below.
-        var cycle = OptimizationCycle.Evaluate(os, oss, optimization, optimizers, _nsd.Get, dryRun: false, DateTime.UtcNow);
+        var cycle = OptimizationCycle.Evaluate(os, oss, optimization, optimizers, _nsd.Get, dryRun: false, DateTime.UtcNow, ReadDeviceSettings);
         LastCycle = cycle;
         var report = cycle.Report;
 
@@ -315,14 +365,35 @@ internal class OptimizationRunner : BackgroundService
         _state.OptimizerState.BestR = bestCorr;
         _state.OptimizerState.BestRMSE = bestRmse;
 
+        if (report.Baseline.Device is { } baselineDevice)
+            _logger.LogInformation("Baseline device residual: {DeviceRmse:0.00} dB mean |leave-one-out residual| over {Windows} held-out device windows (scale {Scale:0.000})",
+                baselineDevice.DeviceRmse, baselineDevice.Windows, baselineDevice.Scale);
+
         foreach (var p in report.Proposals)
+        {
+            if (p.Score.Device is { } device && report.Baseline.Device is { } baseDevice)
+                _logger.LogInformation("Optimizer {Optimizer,-24} device residual: {DeviceRmse:0.00} dB (baseline {Baseline:0.00} dB), scale {Scale:0.000} (baseline {BaselineScale:0.000})",
+                    p.Optimizer, device.DeviceRmse, baseDevice.DeviceRmse, device.Scale, baseDevice.Scale);
             LogDecision(p, bestScore, cycle.Incumbent);
+            if (p.DeviceResidual != null) _state.OptimizerState.DeviceResidual = p.DeviceResidual;
+        }
 
-        if (cycle.Selected == null || cycle.SelectedResults == null)
-            return;
+        if (cycle.Selected != null && cycle.SelectedResults != null)
+            await ApplySelectedAsync(cycle, optimization);
 
-        var chosen = cycle.Selected;
-        var chosenResults = cycle.SelectedResults;
+        var written = await WriteDeviceReferencesAsync(LastCycle!.Report.Devices);
+        if (written.Count > 0)
+        {
+            LastCycle = LastCycle.WithDevicesApplied(written);
+            _state.OptimizerState.LastOutcome = LastCycle.Report.Outcome;
+        }
+    }
+
+    private async Task ApplySelectedAsync(OptimizationCycleResult cycle, ConfigOptimization optimization)
+    {
+        var report = cycle.Report;
+        var chosen = cycle.Selected!;
+        var chosenResults = cycle.SelectedResults!;
         var chosenScore = report.Proposals.First(p => p.Decision == OptimizerGateDecision.Selected).Score;
         _logger.LogInformation("Applying {Optimizer} (Composite={Composite:0.000}, R={R:0.000}, RMSE={RMSE:0.000})", chosen.Name, chosenScore.Composite, chosenScore.R, chosenScore.Rmse);
         _state.OptimizerState.BestR = chosenScore.R;
@@ -348,6 +419,50 @@ internal class OptimizationRunner : BackgroundService
             $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenScore.R:0.000}, RMSE={chosenScore.Rmse:0.000}).");
         LastCycle = applied;
         _state.OptimizerState.LastOutcome = applied.Report.Outcome;
+    }
+
+    /// <summary>
+    /// Writes the learned rssi@1m of every device <see cref="OptimizationCycle.DecideDeviceReference"/> passed, through
+    /// <see cref="DeviceSettingsStore"/> under the device's original id (it refuses writes to an alias). Returns the
+    /// devices written; none without a device settings store.
+    /// </summary>
+    private async Task<IReadOnlySet<string>> WriteDeviceReferencesAsync(IEnumerable<OptimizerDeviceReference>? decided)
+    {
+        var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (decided == null || _deviceSettings == null) return written;
+
+        foreach (var d in decided.Where(d => d.Decision == OptimizerDeviceReferenceDecision.Apply))
+        {
+            // Copy, as Set clears OriginalId on what it is given.
+            var existing = _deviceSettings.Get(d.Device);
+            var target = existing?.OriginalId ?? d.Device;
+            var update = existing == null
+                ? new DeviceSettings { Id = d.Device }
+                : new DeviceSettings { Id = existing.Id, Name = existing.Name, X = existing.X, Y = existing.Y, Z = existing.Z };
+            update.RefRssi = d.RefRssi;
+            try
+            {
+                await _deviceSettings.Set(target, update);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning("Not applying learned rssi@1m to {DeviceId}: {Message}", d.Device, ex.Message);
+                continue;
+            }
+            written.Add(d.Device);
+            _logger.LogInformation("Applied rssi@1m {DeviceId,-24}: {Current:0} -> {RefRssi} dBm ({Windows} windows, mobility {Mobility:0.00}, stable {Stable} cycles)",
+                d.Device, d.Current, d.RefRssi, d.Windows, d.Mobility, d.StableCycles);
+        }
+
+        if (_state.OptimizerState.DeviceResidual is { } summary) summary.DevicesApplied = written.Count;
+        return written;
+    }
+
+    /// <summary>Decides (<see cref="OptimizationCycle.DecideDeviceReference"/>) and writes learned device rssi@1m values; how many were written.</summary>
+    internal async Task<int> ApplyDeviceReferencesAsync(IReadOnlyDictionary<string, ProposedDeviceValues> proposals, ConfigOptimization optimization)
+    {
+        var decided = proposals.Select(p => OptimizationCycle.DecideDeviceReference(p.Key, p.Value, ReadDeviceSettings(p.Key), optimization.DeviceResidual));
+        return (await WriteDeviceReferencesAsync(decided)).Count;
     }
 
     private async Task ApplyAsync(OptimizationResults chosenResults, ConfigOptimization optimization, Action nodeWritten)
@@ -421,8 +536,8 @@ internal class OptimizationRunner : BackgroundService
         get { lock (_optimizersLock) return _optimizers.Select(o => o.Name).ToList(); }
     }
 
-    /// <summary>The optimizer mode that runs. per_node_absorption is the only one, whatever the config says.</summary>
-    internal string Mode => DefaultMode;
+    /// <summary>The optimizer mode that runs: device_residual when configured, otherwise per_node_absorption.</summary>
+    internal string Mode => EffectiveMode(ConfiguredMode);
 
     /// <summary>
     /// The optimizer mode as configured, lower-cased; it differs from <see cref="Mode"/> when the config still names a
@@ -450,7 +565,21 @@ internal class OptimizationRunner : BackgroundService
     }
 
     /// <summary>Every optimizer a dry run can be asked for by name.</summary>
-    internal IReadOnlyList<string> KnownOptimizerNames => CreateOptimizers().Select(o => o.Name).ToList();
+    internal IReadOnlyList<string> KnownOptimizerNames => CreateOptimizers(Mode).Select(o => o.Name).ToList();
+
+    /// <summary>
+    /// Fresh optimizers for a dry run. The device_residual optimizer carries what it learned across cycles (each
+    /// device's rssi@1m and how long it has held), so the fresh one starts from a copy of the live one's, and a dry
+    /// run shows what a live cycle now would decide without advancing the live optimizer.
+    /// </summary>
+    private IList<IOptimizer> CreateDryRunOptimizers()
+    {
+        DeviceResidualOptimizer? live;
+        lock (_optimizersLock) live = _optimizers.OfType<DeviceResidualOptimizer>().FirstOrDefault();
+        return CreateOptimizers(Mode)
+            .Select(o => o is DeviceResidualOptimizer && live != null ? live.Fork() : o)
+            .ToList();
+    }
 
     private readonly SemaphoreSlim _dryRunGate = new(1, 1);
 
@@ -471,11 +600,11 @@ internal class OptimizationRunner : BackgroundService
         IList<IOptimizer> optimizers;
         if (string.IsNullOrWhiteSpace(optimizer))
         {
-            optimizers = CreateOptimizers();
+            optimizers = CreateDryRunOptimizers();
         }
         else
         {
-            var match = CreateOptimizers().FirstOrDefault(o => string.Equals(o.Name, optimizer.Trim(), StringComparison.OrdinalIgnoreCase));
+            var match = CreateDryRunOptimizers().FirstOrDefault(o => string.Equals(o.Name, optimizer.Trim(), StringComparison.OrdinalIgnoreCase));
             if (match == null)
                 throw new UnknownOptimizerException($"Unknown optimizer '{optimizer}'. Known: {string.Join(", ", KnownOptimizerNames)}.");
             optimizers = new List<IOptimizer> { match };
@@ -495,13 +624,14 @@ internal class OptimizationRunner : BackgroundService
         if (string.IsNullOrWhiteSpace(optimizer) && ConfiguredMode != Mode)
             notes.Add(RemovedModes.Contains(ConfiguredMode)
                 ? $"The configured optimizer mode '{ConfiguredMode}' has been removed, so {DefaultMode} runs."
-                : $"The configured optimizer mode '{ConfiguredMode}' is not {DefaultMode}, the only mode, so {DefaultMode} runs.");
+                : $"The configured optimizer mode '{ConfiguredMode}' is not {DefaultMode} or {DeviceResidualMode}, so {DefaultMode} runs.");
         var note = notes.Count > 0 ? string.Join(" ", notes) : null;
 
         await _dryRunGate.WaitAsync(cancellationToken);
         try
         {
-            var result = await Task.Run(() => OptimizationCycle.Evaluate(split.Training, split.Validation, optimization, optimizers, _nsd.Get, dryRun: true, DateTime.UtcNow), cancellationToken);
+            AddDeviceHistory(split, optimization);
+            var result = await Task.Run(() => OptimizationCycle.Evaluate(split.Training, split.Validation, optimization, optimizers, _nsd.Get, dryRun: true, DateTime.UtcNow, ReadDeviceSettings), cancellationToken);
             return note == null ? result : result with { Report = result.Report with { Note = note } };
         }
         finally

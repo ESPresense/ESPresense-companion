@@ -165,7 +165,7 @@ namespace ESPresense.Models
     public partial class ConfigOptimization
     {
         [YamlMember(Alias = "enabled")] public bool Enabled { get; set; } = false;
-        [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "per_node_absorption"; // The only mode; the removed legacy and global_absorption modes fall back to it
+        [YamlMember(Alias = "optimizer")] public string Optimizer { get; set; } = "per_node_absorption"; // per_node_absorption (default) or device_residual; the removed legacy and global_absorption modes fall back to per_node_absorption
         [YamlMember(Alias = "sample_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? SampleIntervalSecs { get; set; }
         [YamlMember(Alias = "training_window_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? TrainingWindowMins { get; set; }
         [YamlMember(Alias = "optimization_interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? OptimizationIntervalSecs { get; set; }
@@ -193,6 +193,50 @@ namespace ESPresense.Models
 
         [YamlIgnore] public double CorrelationWeight => Weights.TryGetValue("correlation", out var val) ? val : 0.5;
         [YamlIgnore] public double RmseWeight => Weights.TryGetValue("rmse", out var val) ? val : 0.5;
+
+        /// <summary>
+        /// Weight of the device-residual term in a proposal's composite score: device_weight x (1 - e / (1 + e)),
+        /// e the mean |leave-one-out residual| in dB over held-out device windows. 0 scores node-to-node only.
+        /// </summary>
+        [YamlMember(Alias = "device_weight")] public double DeviceWeight { get; set; } = 1.0;
+
+        /// <summary>Settings for the device_residual optimizer and the device windows it trains on.</summary>
+        [YamlMember(Alias = "device_residual")] public ConfigDeviceResidual DeviceResidual { get; set; } = new();
+
+        /// <summary>
+        /// Whether located devices' readings are being windowed for the device_residual optimizer. Only that
+        /// optimizer uses them, so other modes keep no device windows and score exactly as before.
+        /// </summary>
+        [YamlIgnore] public bool CollectsDeviceWindows => Enabled && DeviceResidualMode;
+
+        /// <summary>Whether the configured optimizer mode is device_residual.</summary>
+        [YamlIgnore] public bool DeviceResidualMode => string.Equals(Optimizer?.Trim(), "device_residual", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// How located devices' readings are turned into training windows for the device_residual optimizer
+    /// (see <c>DeviceResidualStore</c>), and when a learned device rssi@1m is written back.
+    /// </summary>
+    public partial class ConfigDeviceResidual
+    {
+        /// <summary>Readings from one device are pooled per node over this many seconds; each node's median is one sample.</summary>
+        [YamlMember(Alias = "window_secs")] public int WindowSecs { get; set; } = 10;
+
+        /// <summary>A window is kept only if at least this many stationary, positioned nodes heard the device in it.</summary>
+        [YamlMember(Alias = "min_nodes")] public int MinNodes { get; set; } = 8;
+
+        /// <summary>How long windows are kept for training.</summary>
+        [YamlMember(Alias = "history_hours")] public double HistoryHours { get; set; } = 24;
+
+        /// <summary>A device's learned rssi@1m is only applied once it has this many windows and moves around.</summary>
+        [YamlMember(Alias = "min_windows")] public int MinWindows { get; set; } = 50;
+
+        /// <summary>Write learned per-device rssi@1m values to device settings; false only reports them.</summary>
+        [YamlMember(Alias = "apply_device_ref")] public bool ApplyDeviceRef { get; set; } = true;
+
+        [YamlIgnore] public TimeSpan Window => TimeSpan.FromSeconds(Math.Clamp(WindowSecs, 1, 3600));
+        [YamlIgnore] public int EffectiveMinNodes => Math.Max(4, MinNodes);
+        [YamlIgnore] public TimeSpan History => TimeSpan.FromHours(Math.Clamp(HistoryHours, 0.1, 24 * 7));
     }
 
     public partial class ConfigHistory
