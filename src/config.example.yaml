@@ -68,7 +68,7 @@ optimization:
   device_weight: 1.0
   device_residual:
     window_secs: 10        # A device's readings are pooled per node over this many seconds (default: 10)
-    min_nodes: 8           # Windows heard by fewer positioned nodes are not used (default: 8)
+    min_nodes: 8           # Windows heard by fewer stationary, positioned nodes are not used (default: 8)
     history_hours: 24      # How long windows are kept for training (default: 24)
     min_windows: 50        # Windows a device needs before its learned rssi@1m is written (default: 50)
     apply_device_ref: true # Write learned rssi@1m to device settings once it has held still for two cycles (default: true)

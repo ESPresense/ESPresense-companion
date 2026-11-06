@@ -107,7 +107,7 @@ public class DeviceResidualOptimizer : IOptimizer
 
         if (os.Geometry == null || os.DeviceWindows.Count == 0)
         {
-            _logger.LogInformation("Device residual: no device windows yet (each needs {MinNodes} positioned nodes hearing a located device)", settings.EffectiveMinNodes);
+            _logger.LogInformation("Device residual: no device windows yet (each needs {MinNodes} stationary, positioned nodes hearing a located device)", settings.EffectiveMinNodes);
             return or;
         }
 
@@ -128,7 +128,7 @@ public class DeviceResidualOptimizer : IOptimizer
         var all = DeviceResidualModel.Prepare(os.DeviceWindows.OrderBy(w => w.End).Select(w => (w, 0)), solver, settings.EffectiveMinNodes, DeviceIndex);
         if (all.Count == 0)
         {
-            _logger.LogInformation("Device residual: none of {Windows} device windows has {MinNodes} positioned nodes", os.DeviceWindows.Count, settings.EffectiveMinNodes);
+            _logger.LogInformation("Device residual: none of {Windows} device windows has {MinNodes} stationary, positioned nodes", os.DeviceWindows.Count, settings.EffectiveMinNodes);
             return or;
         }
 

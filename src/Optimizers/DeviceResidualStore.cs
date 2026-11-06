@@ -14,7 +14,8 @@ namespace ESPresense.Optimizers;
 /// the optimizer re-solves each window with the calibration it is evaluating.
 ///
 /// Anchored devices are excluded (their position is known; they reach the optimizers as node-to-node
-/// style measures already). Windows heard by fewer than min_nodes positioned nodes are dropped: a
+/// style measures already). Only stationary nodes with a configured point count, as for node-to-node links: a
+/// node that moves has no known position. Windows heard by fewer than min_nodes such nodes are dropped: a
 /// leave-one-out fit needs enough other nodes to place the device without the one being judged.
 /// Memory is bounded by history_hours and by <see cref="MaxWindows"/>.
 /// </summary>
@@ -77,7 +78,7 @@ public sealed class DeviceResidualStore
             foreach (var dn in device.Nodes.Values)
             {
                 var node = dn.Node;
-                if (node is not { HasLocation: true } || dn.LastHit is not { } hit) continue;
+                if (node is not { HasLocation: true, Stationary: true } || dn.LastHit is not { } hit) continue;
                 if (track.SeenHits.TryGetValue(node.Id, out var seen) && seen == dn.Hits) continue;
                 track.SeenHits[node.Id] = dn.Hits;
                 fresh.Add((hit, node.Id, dn.Rssi, dn.RssiRxAdj, dn.RefRssi));
@@ -98,7 +99,7 @@ public sealed class DeviceResidualStore
 
     /// <summary>
     /// Adds one reading. <paramref name="rssi"/> is what the node published (raw - rxAdj) and
-    /// <paramref name="rxAdj"/> the adjustment it applied. The caller passes positioned nodes only.
+    /// <paramref name="rxAdj"/> the adjustment it applied. The caller passes stationary, positioned nodes only.
     /// </summary>
     public void Add(string deviceId, DateTime time, string nodeId, double rssi, double? rxAdj, double refRssi, ConfigDeviceResidual settings)
     {

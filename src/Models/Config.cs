@@ -222,7 +222,7 @@ namespace ESPresense.Models
         /// <summary>Readings from one device are pooled per node over this many seconds; each node's median is one sample.</summary>
         [YamlMember(Alias = "window_secs")] public int WindowSecs { get; set; } = 10;
 
-        /// <summary>A window is kept only if at least this many positioned nodes heard the device in it.</summary>
+        /// <summary>A window is kept only if at least this many stationary, positioned nodes heard the device in it.</summary>
         [YamlMember(Alias = "min_nodes")] public int MinNodes { get; set; } = 8;
 
         /// <summary>How long windows are kept for training.</summary>

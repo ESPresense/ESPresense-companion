@@ -58,7 +58,7 @@ public sealed class DeviceGeometry
                     + "|" + string.Join(";", floors.Select(f => $"{f.Min.X:0.###},{f.Min.Y:0.###},{f.Min.Z:0.###}:{f.Max.X:0.###},{f.Max.Y:0.###},{f.Max.Z:0.###}"));
     }
 
-    /// <summary>Positioned nodes by id (case-insensitive ids, as <see cref="State.Nodes"/>).</summary>
+    /// <summary>Stationary nodes with a configured point, by id (case-insensitive ids, as <see cref="State.Nodes"/>).</summary>
     public IReadOnlyDictionary<string, Point3D> Nodes { get; }
 
     /// <summary>Each floor's bounding box.</summary>
@@ -67,10 +67,15 @@ public sealed class DeviceGeometry
     /// <summary>Identifies the geometry, so a solver built for it can be reused.</summary>
     public string Signature { get; }
 
+    /// <summary>
+    /// The geometry of <paramref name="state"/>'s stationary nodes. A node with <c>stationary: false</c> (a car, a
+    /// node carried around) may have a point configured, but it is only where the node sometimes is: every distance
+    /// to it would be wrong whenever it is elsewhere, so it has no place in the geometry, as in node-to-node links.
+    /// </summary>
     public static DeviceGeometry From(State state)
     {
         var nodes = state.Nodes.Values
-            .Where(n => n.HasLocation)
+            .Where(n => n is { HasLocation: true, Stationary: true })
             .ToDictionary(n => n.Id, n => n.Location, StringComparer.OrdinalIgnoreCase);
         var floors = state.Floors.Values
             .Where(f => f.Bounds is { Length: >= 2 })

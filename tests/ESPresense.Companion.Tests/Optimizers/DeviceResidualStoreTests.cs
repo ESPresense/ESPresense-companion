@@ -108,10 +108,10 @@ public class DeviceResidualStoreTests
         Assert.That(tv[0].End, Is.LessThan(T0.AddSeconds(10 * busy * 0.05)), "the history still reaches back to the start");
     }
 
-    private static Node PlacedNode(string id, double x)
+    private static Node PlacedNode(string id, double x, bool stationary = true)
     {
         var node = new Node(id, NodeSourceType.Config);
-        node.Update(new Config(), new ConfigNode { Name = id, Point = new[] { x, 0, 1 } }, Enumerable.Empty<Floor>());
+        node.Update(new Config(), new ConfigNode { Name = id, Point = new[] { x, 0, 1 }, Stationary = stationary }, Enumerable.Empty<Floor>());
         return node;
     }
 
@@ -160,6 +160,25 @@ public class DeviceResidualStoreTests
         store.Observe(device, T0.AddSeconds(1), Settings);
 
         Assert.That(store.Windows(null, null, T0.AddMinutes(1)), Is.Empty, "seven positioned nodes are fewer than min_nodes");
+    }
+
+    /// <summary>A node with stationary: false (a car) may have a point configured, but it is not where the node is, so its readings are not used.</summary>
+    [Test]
+    public void Observe_SkipsNodesThatMove()
+    {
+        var store = new DeviceResidualStore();
+        var car = PlacedNode("car", -2, stationary: false);
+        var device = DeviceHeardBy(EightNodes.Select((id, i) => PlacedNode(id, i)).Append(car), -70, T0.AddSeconds(1));
+
+        store.Observe(device, T0.AddSeconds(1), Settings);
+
+        var window = store.Windows(null, null, T0.AddMinutes(1)).Single();
+        Assert.That(window.Readings.Select(r => r.NodeId), Is.EquivalentTo(EightNodes));
+
+        var withoutCar = DeviceHeardBy(EightNodes.Take(7).Select((id, i) => PlacedNode(id, i)).Append(car), -70, T0.AddSeconds(1));
+        var other = new DeviceResidualStore();
+        other.Observe(withoutCar, T0.AddSeconds(1), Settings);
+        Assert.That(other.Windows(null, null, T0.AddMinutes(1)), Is.Empty, "seven stationary nodes and a car are fewer than min_nodes");
     }
 
     [Test]
@@ -228,6 +247,24 @@ public class DeviceWindowSnapshotTests
 
         Assert.That(os.DeviceWindows, Has.Count.EqualTo(expected));
         Assert.That(os.Geometry != null, Is.EqualTo(expected > 0));
+    }
+
+    [Test]
+    public void Geometry_LeavesOutNodesThatMove()
+    {
+        Collect(true, "device_residual");
+        foreach (var (id, stationary) in new[] { ("kitchen", true), ("car", false) })
+        {
+            var node = new Node(id, NodeSourceType.Config);
+            node.Update(_state.Config!, new ConfigNode { Name = id, Point = new[] { 1.0, 2, 1 }, Stationary = stationary }, Enumerable.Empty<Floor>());
+            _state.Nodes[id] = node;
+        }
+        AddWindowEndingBefore(DateTime.UtcNow);
+
+        var geometry = _state.ReadMeasures(DateTime.UtcNow.AddMinutes(-5)).Geometry!;
+
+        Assert.That(geometry.Nodes.Keys, Does.Contain("kitchen"));
+        Assert.That(geometry.Nodes.Keys, Does.Not.Contain("car"), "a node that moves has no known position");
     }
 
     [Test]
