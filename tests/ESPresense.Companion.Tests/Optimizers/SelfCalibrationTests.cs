@@ -320,7 +320,7 @@ public class SelfCalibrationTests
         TestContext.WriteLine($"mode per_node_absorption: cycle applied calibration to {applied.Count} receivers (absorption/rxAdj)");
         foreach (var id in applied) TestContext.WriteLine($"  {id,-6} {Describe(nss, id)}");
         TestContext.WriteLine($"\nheld-out median |range error|: before cycle {before:0.00} m, after {after:0.00} m " +
-                              $"(nodes' own reported distances: {reported:0.00} m)");
+                              $"(at firmware defaults: {reported:0.00} m)");
 
         Assert.That(applied, Is.Not.Empty, $"a calibration cycle (per_node_absorption) applied nothing on cold-start defaults");
         Assert.That(after, Is.LessThanOrEqualTo(before * maxRatio),
@@ -489,13 +489,17 @@ public class SelfCalibrationTests
         public Dictionary<string, Meas> M { get; set; } = new();
     }
 
+    /// <summary>
+    /// The fixture keeps the raw radio reading only (published rssi + rxAdj): nothing the live
+    /// optimizer sets is recorded, so RxAdj is absent (0) and Dist is what a node at firmware defaults
+    /// (rssi@1m -59, absorption 2.7) would report.
+    /// </summary>
     private sealed class Meas
     {
-        /// <summary>As published: the node subtracts its rxAdj before reporting (BleFingerprint.cpp), so raw = Rssi + RxAdj.</summary>
         public double Rssi { get; set; }
-        public double Dist { get; set; }
         public double Sd { get; set; }
-        /// <summary>The node's rxAdj at capture, when the fixture records it; without it proposals are relative to that unknown.</summary>
         public double? RxAdj { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public double Dist => Math.Pow(10, (TxRef - Rssi) / (10 * 2.7));
     }
 }

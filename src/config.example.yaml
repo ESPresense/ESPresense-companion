@@ -131,6 +131,38 @@ locators:
     enabled: true
     max_distance: 10 # Don't fall back to a node more than 10 m from the device (leave out or 0 for no limit)
 
+  # Matches a device's raw RSSI per node against a survey of known spots instead of ranging.
+  # Needs a fingerprint file beside this config: {"fingerprints": [{"floor": "first", "x": 1.0,
+  # "y": 2.0, "z": 1.0, "rssi": {"node_a": -71.2, "node_b": -80.5, "node_c": -88.0}}]},
+  # rssi = published rssi + rxAdj.
+  # To collect samples: choose "I'm here" on a device map (or open its Calibrate page),
+  # place the marker at its actual position, and Collect sample. Keep still for 15 seconds.
+  # The same sample offers an optional device calibration update.
+  # Samples append to the file below; enable this locator to use them for positioning.
+  # Survey at the height devices are carried (about 1 m): node geometry changes with height.
+  # Every node the survey heard is used, including nodes on other floors or not placed on the map.
+  fingerprint:
+    enabled: false
+    floors: ["first", "second"]
+    file: fingerprints.json
+    mode: continuous     # or knn: average the k closest fingerprints
+    bandwidth: 0.6       # continuous: smoothing radius in metres, about 0.8x the survey spacing
+    top: 20              # continuous: how many best-matching surface points to average
+    k: 3
+    min_common: 3
+    missing_rssi: -100   # assumed for a node heard on one side only (continuous mode treats null as -100)
+                         # knn mode only: an explicit null compares shared nodes only
+    reading_window_secs: 15  # match the mean of each node's reports over this window (0 = latest report only)
+    sigma_floor: 2.0         # smallest per-node spread (dB) the surface claims; repeat visits can raise it
+    prior: false             # regress placed nodes over a log-distance prior: trims the worst errors (p90 1.95 -> 1.76 m), costs the median 0.05 m
+    priority: true           # report the fingerprint fix whenever it is current and confident; ranging stands in elsewhere
+    min_confidence: 20
+    tracker:                 # grid filter carrying the fix from report to report; see FingerprintTracker
+      enabled: false         # on the robot survey it locates no better than the plain locator; it gives a fix that does not jump
+      speed: 0.7             # m/s the belief may spread per second between reports
+      temper: 0.5            # how much of an independent sample each report is worth (fading on nearby reports is correlated)
+      silent_weight: 1.0     # a known node's silence relative to a heard node's report
+
 filtering:
   # Kalman Filter Parameters
   process_noise: 0.01      # Controls how quickly the filter adapts to change. Lower = smoother but more lag.
@@ -362,3 +394,37 @@ devices:
 # Devices to NOT track
 exclude_devices:
   - id: "iBeacon:e5ca1ade-f007-ba11-0000-000000000000-*" # These are junk, we alias them to node:*
+
+# Opt in to Home Assistant room correction and per-device room learning.
+room_learning:
+  enabled: false
+
+# Survey the fingerprint map with a robot that knows where it is; see docs/robot-survey.md.
+survey:
+  robot:
+    enabled: false
+    device: "node:calibrate"           # the beacon riding on the robot, as Companion names it
+    floor: first
+    height: 0.15                       # beacon height above the floor (m)
+    pose:
+      entity: camera.p10_pro_ultra_map # Home Assistant entity whose attributes carry the pose; or POST /api/survey/pose
+      attribute: vacuum_position       # {x, y, a}
+      poll_secs: 2
+    transform:                         # robot frame -> floorplan metres: rotate(scale * (x, flip_y ? -y : y)) + offset
+      scale: 0.001
+      rotation_deg: 0
+      offset: [0, 0]
+      flip_y: false
+    stationary_m: 0.2
+    dwell_secs: 6
+    max_dwell_secs: 90
+    moving: true
+    max_speed: 1.0
+    max_fingerprints: 20000
+
+# Held-out accuracy of the fingerprint locator, published to espresense/companion/accuracy and as sensors; see docs/accuracy.md.
+accuracy:
+  enabled: true
+  interval_secs: 60              # anchored devices located as if unknown and compared to their anchors
+  holdout_interval_mins: 15      # the survey re-scored by leaving spots out, when it changed
+  holdout_spots: 40

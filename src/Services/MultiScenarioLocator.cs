@@ -18,12 +18,14 @@ public class MultiScenarioLocator(DeviceTracker dl,
                                    IDeviceHistoryWriter history,
                                    GlobalEventDispatcher globalEventDispatcher,
                                    ILeaseService leaseService,
-                                   ILogger<MultiScenarioLocator> logger) : BackgroundService
+                                   ILogger<MultiScenarioLocator> logger,
+                                   RoomLearningService? roomLearning = null) : BackgroundService
 {
     private const string LocatingLeaseName = "locating";
 
     internal async Task ProcessDevice(Device device, CancellationToken ct = default)
     {
+        state.RefreshScenarios(device);
         var config = state.Config;
         var now = DateTime.UtcNow;
 
@@ -31,6 +33,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
         bool locationChanged;
         if (device.Anchor is { } anchor)
         {
+            if (roomLearning != null) await roomLearning.UpdateAsync(device);
             device.LastCalculated = now;
             device.BestScenario = null;
             // Becoming anchored (best_scenario turns "Anchored") or moving the anchor changes what HA shows.
@@ -39,12 +42,15 @@ public class MultiScenarioLocator(DeviceTracker dl,
         }
         else
         {
-            var fusion = ScenarioFusion.Update(device, config?.Filtering ?? new ConfigFiltering(), now);
+            var fusion = ScenarioFusion.Update(device, config?.Filtering ?? new ConfigFiltering(), now, config?.Locators?.Fingerprint);
             best = fusion.Best;
             if (config?.Optimization is { CollectsDeviceWindows: true } optimization)
                 state.DeviceResiduals.Observe(device, now, optimization.DeviceResidual);
+            // A taught room (room learning) counts as a move when it changes what HA shows.
+            var previousRoom = device.Room;
+            if (roomLearning != null) await roomLearning.UpdateAsync(device);
             // A locator reporting a new position; the Kalman output drifts every pass, so it isn't compared.
-            locationChanged = fusion.Moved > 0;
+            locationChanged = fusion.Moved > 0 || previousRoom != device.Room;
         }
 
         var report = DeviceReport.From(device, best, config?.Gps);
@@ -84,6 +90,7 @@ public class MultiScenarioLocator(DeviceTracker dl,
 
                 await using (lease)
                 {
+                    roomLearning?.ReloadTraining();
                     logger.LogInformation("Acquired lease '{LeaseName}'", LocatingLeaseName);
 
                     await foreach (var device in dl.GetConsumingEnumerable(stoppingToken))
