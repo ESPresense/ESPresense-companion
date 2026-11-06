@@ -11,13 +11,15 @@ namespace ESPresense.Services;
 /// </summary>
 public class DeviceService
 {
+    private readonly RoomLearningService? _roomLearning;
     private readonly State _state;
     private readonly IMqttCoordinator _mqtt;
     private readonly GlobalEventDispatcher _events;
     private readonly ILogger<DeviceService> _logger;
 
-    public DeviceService(State state, IMqttCoordinator mqtt, GlobalEventDispatcher events, ILogger<DeviceService> logger)
+    public DeviceService(State state, IMqttCoordinator mqtt, GlobalEventDispatcher events, ILogger<DeviceService> logger, RoomLearningService? roomLearning = null)
     {
+        _roomLearning = roomLearning;
         _state = state;
         _mqtt = mqtt;
         _events = events;
@@ -152,6 +154,7 @@ public class DeviceService
     {
         try
         {
+            if (_roomLearning != null) await _roomLearning.RemoveAsync(device, true);
             // Clean up Home Assistant auto-discovery entries
             foreach (var ad in device.HassAutoDiscovery)
             {

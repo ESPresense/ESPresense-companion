@@ -23,6 +23,8 @@ public class McpResources
     private readonly NodeStateMapper _mapper;
     private readonly CalibrationService _calibration;
     private readonly DeviceEnricher _enricher;
+    private readonly AccuracyService? _accuracy;
+    private readonly RobotSurveyService? _survey;
     private readonly JsonSerializerOptions _jsonOptions;
 
     public McpResources(
@@ -35,10 +37,14 @@ public class McpResources
         FirmwareUpdateJobService firmwareUpdateJobs,
         FirmwareCatalogService firmwareCatalog,
         NodeStateMapper mapper,
-        CalibrationService calibration)
+        CalibrationService calibration,
+        AccuracyService? accuracy = null,
+        RobotSurveyService? survey = null)
     {
         _enricher = enricher;
         _calibration = calibration;
+        _accuracy = accuracy;
+        _survey = survey;
         _state = state;
         _config = config;
         _nsd = nsd;
@@ -127,6 +133,20 @@ public class McpResources
     {
         var c = _calibration.Calculate();
         return Task.FromResult(JsonSerializer.Serialize(c, _jsonOptions));
+    }
+
+    [McpServerTool(Name = "get_accuracy", ReadOnly = true)]
+    [Description("Held-out accuracy of the fingerprint locator in metres: survey spots located from the rest of the map (median/p90), the robot beacon's fix against the robot's own pose during survey runs, and anchored devices located as if unknown. Null sections have no data yet.")]
+    public Task<string> GetAccuracyTool()
+    {
+        return Task.FromResult(JsonSerializer.Serialize(_accuracy?.Snapshot(), _jsonOptions));
+    }
+
+    [McpServerTool(Name = "get_survey_status", ReadOnly = true)]
+    [Description("Status of the robot fingerprint survey: pose source and freshness, samples taken this run, fingerprints appended and pruned, warnings.")]
+    public Task<string> GetSurveyStatusTool()
+    {
+        return Task.FromResult(JsonSerializer.Serialize(_survey?.Status(), _jsonOptions));
     }
 
     [McpServerTool(Name = "get_node_settings")]

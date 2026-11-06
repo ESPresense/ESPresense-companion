@@ -23,10 +23,45 @@ namespace ESPresense.Models
                 ExcludeDevices = ExcludeDevices.Select(d => d.Clone()).ToArray(),
                 History = History.Clone(),
                 Locators = Locators.Clone(),
+                RoomLearning = new RoomLearningConfig { Enabled = RoomLearning.Enabled },
                 Optimization = Optimization.Clone(),
-                Filtering = Filtering?.Clone()! // a null section stays null; consumers default it
+                Filtering = Filtering?.Clone()!, // a null section stays null; consumers default it
+                Survey = Survey.Clone(),
+                Accuracy = Accuracy.Clone()
             };
         }
+    }
+
+    public partial class ConfigSurvey
+    {
+        public ConfigSurvey Clone() => new() { Robot = Robot.Clone() };
+    }
+
+    public partial class RobotSurveyConfig
+    {
+        public RobotSurveyConfig Clone() => new()
+        {
+            Enabled = Enabled, Device = Device, Floor = Floor, Height = Height,
+            Pose = new RobotPoseConfig { Entity = Pose.Entity, Attribute = Pose.Attribute, MapAttribute = Pose.MapAttribute, PollSecs = Pose.PollSecs },
+            Transform = new RobotTransformConfig { Scale = Transform.Scale, RotationDeg = Transform.RotationDeg, Offset = Transform.Offset?.ToArray() ?? new[] { 0.0, 0.0 }, FlipY = Transform.FlipY },
+            StationaryM = StationaryM, DwellSecs = DwellSecs, MaxDwellSecs = MaxDwellSecs, Moving = Moving, MaxSpeed = MaxSpeed, MaxFingerprints = MaxFingerprints,
+        };
+    }
+
+    public partial class ConfigAccuracy
+    {
+        public ConfigAccuracy Clone() => new() { Enabled = Enabled, IntervalSecs = IntervalSecs, HoldoutIntervalMins = HoldoutIntervalMins, HoldoutSpots = HoldoutSpots };
+    }
+
+    public partial class FingerprintConfig
+    {
+        public FingerprintConfig Clone() => new()
+        {
+            Enabled = Enabled, Floors = Floors?.ToArray(), File = File, Mode = Mode, Bandwidth = Bandwidth, Top = Top, K = K,
+            MinCommon = MinCommon, MissingRssi = MissingRssi, ReadingWindowSecs = ReadingWindowSecs, SigmaFloor = SigmaFloor, Prior = Prior,
+            Priority = Priority, MinConfidence = MinConfidence,
+            Tracker = new FingerprintTrackerConfig { Enabled = Tracker.Enabled, Speed = Tracker.Speed, Temper = Tracker.Temper, SilentWeight = Tracker.SilentWeight },
+        };
     }
 
     public partial class ConfigLocators
@@ -40,7 +75,8 @@ namespace ESPresense.Models
                 Bfgs = Bfgs.Clone(),
                 Mle = Mle.Clone(),
                 MultiFloor = MultiFloor.Clone(),
-                NearestNode = NearestNode.Clone()
+                NearestNode = NearestNode.Clone(),
+                Fingerprint = Fingerprint.Clone()
             };
         }
     }

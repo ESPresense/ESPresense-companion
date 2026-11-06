@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace ESPresense.Services;
 
 /// <param name="loggerFactory">Supplied by DI. Also logs the discovery entries of the devices this tracker creates.</param>
-public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore, ILoggerFactory loggerFactory) : BackgroundService
+public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore, ILoggerFactory loggerFactory, RoomLearningService? roomLearning = null) : BackgroundService
 {
     /// <summary>For tests and tools that build a DeviceTracker by hand: its loggers discard everything.</summary>
     public DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService tele, GlobalEventDispatcher globalEventDispatcher, DeviceSettingsStore deviceSettingsStore)
@@ -91,11 +91,16 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         };
 
         // Start background tasks to process devices asynchronously
+        // A room correction re-locates the device at once so the taught room shows without waiting for the next report.
+        if (roomLearning != null) roomLearning.CorrectionRequested += QueueForLocation;
         var processTask = ProcessDevicesAsync(stoppingToken);
         var idleCheckTask = CheckIdleDevicesAsync(stoppingToken);
 
-        await Task.WhenAll(processTask, idleCheckTask);
+        try { await Task.WhenAll(processTask, idleCheckTask); }
+        finally { if (roomLearning != null) roomLearning.CorrectionRequested -= QueueForLocation; }
     }
+
+    private void QueueForLocation(Device device) => MarkForLocate(device.Id);
 
     /// <summary>
     /// Handles a Home Assistant discovery message previously published by the companion: creates a tracked
@@ -155,7 +160,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
         {
             var d = new Device(id, autoDiscover.DiscoveryId, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), _discoveryLogger) { Name = autoDiscover.Message?.Name, Track = true, Check = true, LastCalculated = DateTime.UtcNow };
             d.KalmanFilter.Settings = state.KalmanSettings;
-            foreach (var scenario in state.ScenarioFactory.Create(d)) d.Scenarios.Add(scenario);
+            state.BuildScenarios(d);
             _logger.LogInformation("[+] Track: {Device} (disc)", d);
             return d;
         });
@@ -218,7 +223,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 {
                     var d = new Device(id, null, TimeSpan.FromSeconds(state.Config?.Timeout ?? 30), _discoveryLogger) { Check = true };
                     d.KalmanFilter.Settings = state.KalmanSettings;
-                    foreach (var scenario in state.ScenarioFactory.Create(d)) d.Scenarios.Add(scenario);
+                    state.BuildScenarios(d);
                     return d;
                 });
                 tele.UpdateDevicesCount(state.Devices.Count);
@@ -325,6 +330,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
             else
             {
                 _logger.LogInformation("[-] Track {Device}", device);
+                if (roomLearning != null) await roomLearning.RemoveAsync(device, false);
                 foreach (var ad in device.HassAutoDiscovery)
                 {
                     RememberSelfClear(ad.DiscoveryId);

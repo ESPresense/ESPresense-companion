@@ -53,6 +53,7 @@ public class MqttTopicsTests
             "espresense/rooms/+/+",
             "espresense/rooms/*/+/set",
             "homeassistant/device_tracker/+/config",
+            "espresense/companion/+/room/set",
             "espresense/companion/+/attributes",
             "espresense/companion/lease/+",
         }));

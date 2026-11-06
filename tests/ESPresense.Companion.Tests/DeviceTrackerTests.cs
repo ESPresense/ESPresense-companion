@@ -1,4 +1,5 @@
 using System.Reflection;
+using Newtonsoft.Json;
 using ESPresense.Controllers;
 using ESPresense.Events;
 using ESPresense.Locators;
@@ -7,14 +8,11 @@ using ESPresense.Services;
 using ESPresense.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Newtonsoft.Json;
 
 namespace ESPresense.Companion.Tests;
 
 public class DeviceTrackerTests
 {
-    private IList<TestData> testDatas = new List<TestData>();
-
     private string _configDir = null!;
     private ConfigLoader _configLoader = null!;
     private Mock<MqttCoordinator> _mockMqttCoordinator = null!;
@@ -25,18 +23,8 @@ public class DeviceTrackerTests
     private readonly List<string> _removedDeviceIds = new();
 
     [SetUp]
-    public async Task Setup()
+    public void Setup()
     {
-        await using var example = Assembly.GetExecutingAssembly().GetManifestResourceStream("ESPresense.Companion.Tests.TestData.stationary.jsonp") ?? throw new Exception("Could not find embedded stationary.jsonp");
-        using var sr = new StreamReader(example);
-        while (true)
-        {
-            var line = await sr.ReadLineAsync();
-            if (line == null) break;
-            var testData = JsonConvert.DeserializeObject<TestData>(line);
-            if (testData!=null) testDatas.Add(testData);
-        }
-
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
 

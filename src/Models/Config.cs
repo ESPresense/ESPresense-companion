@@ -1,4 +1,4 @@
-﻿using TextExtensions;
+using TextExtensions;
 using YamlDotNet.Serialization;
 using ESPresense.Extensions;
 
@@ -31,8 +31,17 @@ namespace ESPresense.Models
         [YamlMember(Alias = "optimization")]
         public ConfigOptimization Optimization { get; set; } = new();
 
+        [YamlMember(Alias = "room_learning")]
+        public RoomLearningConfig RoomLearning { get; set; } = new();
+
         [YamlMember(Alias = "locators")]
         public ConfigLocators Locators { get; set; } = new();
+
+        [YamlMember(Alias = "survey")]
+        public ConfigSurvey Survey { get; set; } = new();
+
+        [YamlMember(Alias = "accuracy")]
+        public ConfigAccuracy Accuracy { get; set; } = new();
 
         [YamlMember(Alias = "filtering")]
         public ConfigFiltering Filtering { get; set; } = new();
@@ -51,6 +60,130 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "exclude_devices")]
         public ConfigDevice[] ExcludeDevices { get; set; } = Array.Empty<ConfigDevice>();
+    }
+
+    public class RoomLearningConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+    }
+
+    /// <summary>Automatic fingerprint surveying; see RobotSurveyService.</summary>
+    public partial class ConfigSurvey
+    {
+        [YamlMember(Alias = "robot")]
+        public RobotSurveyConfig Robot { get; set; } = new();
+    }
+
+    /// <summary>
+    /// A beacon riding on a robot that knows where it is (a LiDAR vacuum). Every pose the robot reports
+    /// while the beacon is heard becomes survey data: a complete fingerprint where it paused, a sparse
+    /// time bin where it drove in a straight line.
+    /// </summary>
+    public partial class RobotSurveyConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        /// <summary>The beacon as Companion knows it, e.g. "node:calibrate" for an ESPresense node used as a beacon.</summary>
+        [YamlMember(Alias = "device")]
+        public string? Device { get; set; }
+
+        /// <summary>Floor the robot surveys.</summary>
+        [YamlMember(Alias = "floor")]
+        public string? Floor { get; set; }
+
+        /// <summary>Beacon height above the floor (m).</summary>
+        [YamlMember(Alias = "height")]
+        public double Height { get; set; } = 0.15;
+
+        [YamlMember(Alias = "pose")]
+        public RobotPoseConfig Pose { get; set; } = new();
+
+        [YamlMember(Alias = "transform")]
+        public RobotTransformConfig Transform { get; set; } = new();
+
+        /// <summary>Poses within this distance (m) over <see cref="DwellSecs"/> count as standing still.</summary>
+        [YamlMember(Alias = "stationary_m")]
+        public double StationaryM { get; set; } = 0.2;
+
+        /// <summary>How long (s) the robot must stand still for a complete fingerprint, and how often a long pause yields another.</summary>
+        [YamlMember(Alias = "dwell_secs")]
+        public double DwellSecs { get; set; } = 6;
+
+        /// <summary>After standing still this long (s) the robot is parked, and nothing more is recorded until it moves.</summary>
+        [YamlMember(Alias = "max_dwell_secs")]
+        public double MaxDwellSecs { get; set; } = 90;
+
+        /// <summary>Also record one-second bins while the robot drives a straight line, as sparse fingerprints.</summary>
+        [YamlMember(Alias = "moving")]
+        public bool Moving { get; set; } = true;
+
+        /// <summary>Fastest (m/s) the robot may be moving for a bin to be placed by interpolating its poses.</summary>
+        [YamlMember(Alias = "max_speed")]
+        public double MaxSpeed { get; set; } = 1.0;
+
+        /// <summary>Oldest robot samples are dropped past this many fingerprints; taught samples are never dropped.</summary>
+        [YamlMember(Alias = "max_fingerprints")]
+        public int MaxFingerprints { get; set; } = 20000;
+    }
+
+    /// <summary>Where the robot's pose comes from: a Home Assistant entity attribute (polled), or POST /api/survey/pose.</summary>
+    public partial class RobotPoseConfig
+    {
+        /// <summary>Entity whose attributes carry the pose, e.g. the vacuum's map camera.</summary>
+        [YamlMember(Alias = "entity")]
+        public string? Entity { get; set; }
+
+        /// <summary>Attribute holding {x, y, a}; a is the heading in degrees when present.</summary>
+        [YamlMember(Alias = "attribute")]
+        public string Attribute { get; set; } = "vacuum_position";
+
+        /// <summary>Attribute naming the robot's map; when it changes from what was first seen, surveying pauses: the poses are in another frame.</summary>
+        [YamlMember(Alias = "map_attribute")]
+        public string? MapAttribute { get; set; }
+
+        [YamlMember(Alias = "poll_secs")]
+        public double PollSecs { get; set; } = 2;
+    }
+
+    /// <summary>
+    /// Robot frame to floorplan metres: floor = rotate(scale * (x, flip_y ? -y : y), rotation_deg) + offset.
+    /// Fit it from geometry (park under two nodes you can see), never from the radio.
+    /// </summary>
+    public partial class RobotTransformConfig
+    {
+        /// <summary>Metres per robot unit (0.001 for millimetres).</summary>
+        [YamlMember(Alias = "scale")]
+        public double Scale { get; set; } = 0.001;
+
+        [YamlMember(Alias = "rotation_deg")]
+        public double RotationDeg { get; set; }
+
+        [YamlMember(Alias = "offset")]
+        public double[] Offset { get; set; } = { 0, 0 };
+
+        [YamlMember(Alias = "flip_y")]
+        public bool FlipY { get; set; }
+    }
+
+    /// <summary>The ruler: held-out accuracy of the fingerprint locator, published as sensors; see AccuracyService.</summary>
+    public partial class ConfigAccuracy
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>How often (s) anchored devices are re-located as if unknown and compared to their anchors.</summary>
+        [YamlMember(Alias = "interval_secs")]
+        public int IntervalSecs { get; set; } = 60;
+
+        /// <summary>How often (min), at most, the survey is scored by leaving spots out; also only when it changed.</summary>
+        [YamlMember(Alias = "holdout_interval_mins")]
+        public int HoldoutIntervalMins { get; set; } = 15;
+
+        /// <summary>How many surveyed spots are held out and located from the rest.</summary>
+        [YamlMember(Alias = "holdout_spots")]
+        public int HoldoutSpots { get; set; } = 40;
     }
 
     public partial class ConfigLocators
@@ -72,6 +205,106 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "nearest_node")]
         public NearestNodeConfig NearestNode { get; set; } = new();
+
+        [YamlMember(Alias = "fingerprint")]
+        public FingerprintConfig Fingerprint { get; set; } = new();
+    }
+
+    public partial class FingerprintConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        [YamlMember(Alias = "floors")]
+        public string[]? Floors { get; set; }
+
+        /// <summary>Fingerprint survey file, relative to the config directory.</summary>
+        [YamlMember(Alias = "file")]
+        public string File { get; set; } = "fingerprints.json";
+
+        /// <summary>
+        /// "continuous" (default) matches against the survey smoothed over position, so devices between
+        /// surveyed spots are located between them; "knn" averages the k closest fingerprints.
+        /// </summary>
+        [YamlMember(Alias = "mode")]
+        public string Mode { get; set; } = "continuous";
+
+        /// <summary>Smoothing radius (m) of the continuous surface; about 0.8x the survey spacing.</summary>
+        [YamlMember(Alias = "bandwidth")]
+        public double Bandwidth { get; set; } = 0.6;
+
+        /// <summary>How many best-matching surface points to average (continuous mode).</summary>
+        [YamlMember(Alias = "top")]
+        public int Top { get; set; } = 20;
+
+        /// <summary>How many closest fingerprints to average (knn mode).</summary>
+        [YamlMember(Alias = "k")]
+        public int K { get; set; } = 3;
+
+        /// <summary>Fewest nodes a reading and a fingerprint must share to be compared.</summary>
+        [YamlMember(Alias = "min_common")]
+        public int MinCommon { get; set; } = 3;
+
+        /// <summary>
+        /// RSSI assumed for a node heard on only one side of a comparison (roughly the hearing limit);
+        /// null compares shared nodes only (knn mode only; continuous mode treats null as -100). On the robot survey -100 cut the worst errors sharply.
+        /// </summary>
+        [YamlMember(Alias = "missing_rssi")]
+        public double? MissingRssi { get; set; } = -100;
+
+        /// <summary>
+        /// Seconds of reports averaged per node before matching (0 = latest report only). The survey averaged
+        /// a dwell of tens of seconds; a device that has stayed put this long matches it the same way.
+        /// </summary>
+        [YamlMember(Alias = "reading_window_secs")]
+        public double ReadingWindowSecs { get; set; } = 15;
+
+        /// <summary>Smallest per-node spread (dB) the surface will claim; single reports carry about this much fading noise.</summary>
+        [YamlMember(Alias = "sigma_floor")]
+        public double SigmaFloor { get; set; } = 2.0;
+
+        /// <summary>
+        /// Regress each placed node's rssi as a residual over a log-distance prior from its position. On the robot
+        /// survey this trimmed the worst errors (p90 1.95 to 1.76 m) and cost the median 0.05 m (0.69 to 0.74), so it is off.
+        /// </summary>
+        [YamlMember(Alias = "prior")]
+        public bool Prior { get; set; }
+
+        /// <summary>
+        /// When a fingerprint fix is current with at least <see cref="MinConfidence"/>, it is reported and the
+        /// ranging locators only stand in where the survey has no support.
+        /// </summary>
+        [YamlMember(Alias = "priority")]
+        public bool Priority { get; set; } = true;
+
+        [YamlMember(Alias = "min_confidence")]
+        public int MinConfidence { get; set; } = 20;
+
+        [YamlMember(Alias = "tracker")]
+        public FingerprintTrackerConfig Tracker { get; set; } = new();
+    }
+
+    /// <summary>
+    /// The filter that carries a fingerprint fix from report to report; see FingerprintTracker. Off by default:
+    /// on the robot survey it locates no better than the plain locator, which is already smoothed; it gives a
+    /// fix that does not jump and a confidence from the spread of its belief.
+    /// </summary>
+    public partial class FingerprintTrackerConfig
+    {
+        [YamlMember(Alias = "enabled")]
+        public bool Enabled { get; set; }
+
+        /// <summary>How far (m) the belief spreads per second without evidence; about a walking pace's uncertainty.</summary>
+        [YamlMember(Alias = "speed")]
+        public double Speed { get; set; } = 0.7;
+
+        /// <summary>How much of an independent sample each report is worth (fading on nearby reports is correlated).</summary>
+        [YamlMember(Alias = "temper")]
+        public double Temper { get; set; } = 0.5;
+
+        /// <summary>Weight of a known node's silence relative to a heard node's report.</summary>
+        [YamlMember(Alias = "silent_weight")]
+        public double SilentWeight { get; set; } = 1.0;
     }
 
     public partial class NadarayaWatsonConfig
