@@ -67,6 +67,7 @@ internal static class MqttTopics
         "espresense/rooms/+/+",
         "espresense/rooms/*/+/set",
         DeviceTrackerDiscoveryFilter(discoveryTopic),
+        "espresense/companion/+/room/set",
         "espresense/companion/+/attributes",
         CompanionLeasePrefix + "+",
     ];

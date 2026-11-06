@@ -1,7 +1,13 @@
-﻿namespace ESPresense.Models;
+namespace ESPresense.Models;
 
 public class DeviceToNode(Device device, Node node)
 {
+    /// <summary>Raw rssi reports kept per node for windowed matching; at one report per ~4 s this spans several minutes.</summary>
+    private const int HistoryLength = 64;
+
+    private readonly (DateTime At, double Raw)[] _history = new (DateTime, double)[HistoryLength];
+    private int _historyCount, _historyNext;
+
     public Device Device { get; } = device;
     public Node Node { get; } = node;
 
@@ -46,6 +52,9 @@ public class DeviceToNode(Device device, Node node)
             };
     }
 
+    /// <summary>What the node's radio heard, before its rxAdj: the quantity fingerprints are recorded in.</summary>
+    public double RawRssi => Rssi + (RssiRxAdj ?? 0);
+
     public bool ReadMessage(DeviceMessage payload)
     {
         bool moved;
@@ -61,10 +70,37 @@ public class DeviceToNode(Device device, Node node)
             DistVar = payload.DistVar;
             LastHit = DateTime.UtcNow;
             Hits++;
+            lock (_history)
+            {
+                _history[_historyNext] = (LastHit.Value, RawRssi);
+                _historyNext = (_historyNext + 1) % HistoryLength;
+                if (_historyCount < HistoryLength) _historyCount++;
+            }
         }
         NewName(payload.Name);
         Device?.ReadingArrived(); // last, so a snapshot taken after reading the version can't miss these fields
         return moved;
+    }
+
+    /// <summary>
+    /// Mean raw rssi of the reports received in the last <paramref name="window"/>, with how many there were.
+    /// A single report has a few dB of fading noise on it; a device that stays put for 15-30 s averages most of
+    /// that away, which is what the fingerprint survey it is matched against did too.
+    /// </summary>
+    public (double Mean, int Count) RawRssiOver(TimeSpan window)
+    {
+        var since = DateTime.UtcNow - window;
+        double sum = 0; var n = 0;
+        lock (_history)
+        {
+            for (var i = 0; i < _historyCount; i++)
+            {
+                var (at, raw) = _history[i];
+                if (at < since) continue;
+                sum += raw; n++;
+            }
+        }
+        return n == 0 ? (RawRssi, 0) : (sum / n, n);
     }
 
     private void NewName(string? name)

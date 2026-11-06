@@ -1,4 +1,5 @@
 using System.Reflection;
+using Newtonsoft.Json;
 using ESPresense.Controllers;
 using ESPresense.Events;
 using ESPresense.Locators;
@@ -7,14 +8,11 @@ using ESPresense.Services;
 using ESPresense.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Newtonsoft.Json;
 
 namespace ESPresense.Companion.Tests;
 
 public class DeviceTrackerTests
 {
-    private IList<TestData> testDatas = new List<TestData>();
-
     private string _configDir = null!;
     private ConfigLoader _configLoader = null!;
     private Mock<MqttCoordinator> _mockMqttCoordinator = null!;
@@ -25,18 +23,8 @@ public class DeviceTrackerTests
     private readonly List<string> _removedDeviceIds = new();
 
     [SetUp]
-    public async Task Setup()
+    public void Setup()
     {
-        await using var example = Assembly.GetExecutingAssembly().GetManifestResourceStream("ESPresense.Companion.Tests.TestData.stationary.jsonp") ?? throw new Exception("Could not find embedded stationary.jsonp");
-        using var sr = new StreamReader(example);
-        while (true)
-        {
-            var line = await sr.ReadLineAsync();
-            if (line == null) break;
-            var testData = JsonConvert.DeserializeObject<TestData>(line);
-            if (testData!=null) testDatas.Add(testData);
-        }
-
         _configDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_configDir);
 
@@ -199,6 +187,92 @@ public class DeviceTrackerTests
         Assert.That(_state.Devices.ContainsKey("phone"), Is.True);
         Assert.That(_state.Devices["phone"].Nodes.Count, Is.EqualTo(3), "each node that heard the device is recorded");
         Assert.That(_deviceTracker.PendingProcessCount, Is.EqualTo(1), "five messages coalesce into a single pending entry");
+    }
+
+    [Test]
+    public async Task OnDeviceMessageReceived_UnplacedReceiver_FeedsFingerprintingButNotRanging()
+    {
+        var floor = new Floor();
+        floor.Update(new Config(), new ConfigFloor { Id = "first", Name = "first" });
+
+        var placed1 = new Node("placed1", NodeSourceType.Config);
+        placed1.Update(new Config(), new ConfigNode { Name = "placed1", Point = new[] { 2.0, 3.0, 0.0 } }, new[] { floor });
+        _state.Nodes["placed1"] = placed1;
+
+        var placed2 = new Node("placed2", NodeSourceType.Config);
+        placed2.Update(new Config(), new ConfigNode { Name = "placed2", Point = new[] { 5.0, 0.0, 0.0 } }, new[] { floor });
+        _state.Nodes["placed2"] = placed2;
+
+        // "spare" is never configured with a point or floor, so DeviceTracker discovers it on the fly the
+        // same way it would any other unknown node: Discovered source type, no location, no floor. It
+        // reports the shortest distance, so an unfiltered NearestNode would pick it over either placed
+        // receiver and report its (0, 0, 0) default location.
+        foreach (var (nodeId, distance) in new[] { ("placed1", 2.0), ("placed2", 2.0), ("spare", 1.0) })
+        {
+            await _deviceTracker.OnDeviceMessageReceivedAsync(new DeviceMessageEventArgs
+            {
+                DeviceId = "phone",
+                NodeId = nodeId,
+                Payload = new DeviceMessage { Distance = distance, Rssi = -65, RefRssi = -59 }
+            });
+        }
+
+        var device = _state.Devices["phone"];
+        Assert.That(device.Nodes.Count, Is.EqualTo(3), "the unplaced receiver's reading is recorded alongside the placed ones");
+
+        // Fingerprinting needs no node coordinates, so the unplaced receiver is a feature, not noise.
+        var mapPath = Path.Combine(_configDir, "fingerprints.json");
+        await File.WriteAllTextAsync(mapPath, "{\"fingerprints\": [{\"floor\": \"first\", \"x\": 1, \"y\": 0, \"z\": 0, \"rssi\": {\"placed1\": -60, \"placed2\": -70, \"spare\": -65}}]}");
+        var map = new FingerprintMap(mapPath);
+        var fingerprintConfig = new FingerprintConfig { Enabled = true, Mode = "knn", K = 1 };
+        var fingerprintScenario = new Scenario(new Config(), new FingerprintLocator(device, floor, map, fingerprintConfig), "fingerprint");
+        fingerprintScenario.Locate();
+        Assert.That(fingerprintScenario.Fixes, Is.EqualTo(3), "the fingerprint locator matches against all three receivers, including the unplaced one");
+
+        // Ranging locators must still ignore it: they only consider nodes with a known location on the floor.
+        var rangingScenario = new Scenario(new Config(), new GaussNewtonMultilateralizer(device, floor, _state), "gaussnewton");
+        rangingScenario.Locate();
+        Assert.That(rangingScenario.Fixes, Is.EqualTo(2), "ranging locators only see the two placed receivers");
+
+        // MultiFloor and NearestNode don't filter on Node.Floors like BaseMultilateralizer does, so they
+        // need their own HasLocation check: build a placed-only device and confirm the unplaced receiver
+        // changes neither locator's result.
+        var placedOnlyDevice = new Device("phone-placed-only", null, TimeSpan.FromSeconds(30));
+        foreach (var nodeId in new[] { "placed1", "placed2" })
+            placedOnlyDevice.Nodes[nodeId] = new DeviceToNode(placedOnlyDevice, _state.Nodes[nodeId]) { Distance = 2.0, Rssi = -65, LastHit = DateTime.UtcNow };
+
+        var multiFloorScenario = new Scenario(new Config(), new MultiFloorMultilateralizer(device, _state), "multifloor");
+        multiFloorScenario.Locate();
+        var multiFloorPlacedOnly = new Scenario(new Config(), new MultiFloorMultilateralizer(placedOnlyDevice, _state), "multifloor");
+        multiFloorPlacedOnly.Locate();
+        Assert.That(multiFloorScenario.Location, Is.EqualTo(multiFloorPlacedOnly.Location), "the unplaced receiver must not pull the multifloor solve toward the origin");
+
+        var nearestScenario = new Scenario(new Config(), new NearestNode(device, _state), "nearestnode");
+        nearestScenario.Locate();
+        var nearestPlacedOnly = new Scenario(new Config(), new NearestNode(placedOnlyDevice, _state), "nearestnode");
+        nearestPlacedOnly.Locate();
+        Assert.That(nearestScenario.Location, Is.EqualTo(nearestPlacedOnly.Location), "the unplaced receiver must not win nearest-node and report its (0,0,0) location");
+
+        // A device heard only by receivers that are all unplaced: fingerprinting needs no node
+        // coordinates, so it can still use them, but MultiFloor and NearestNode -- which do need a
+        // location -- must report no fix at all rather than something anchored at the origin.
+        var unplacedOnlyDevice = new Device("phone-unplaced-only", null, TimeSpan.FromSeconds(30));
+        foreach (var nodeId in new[] { "spare1", "spare2" })
+            unplacedOnlyDevice.Nodes[nodeId] = new DeviceToNode(unplacedOnlyDevice, new Node(nodeId, NodeSourceType.Discovered)) { Distance = 2.0, Rssi = -65, LastHit = DateTime.UtcNow };
+
+        var unplacedMapPath = Path.Combine(_configDir, "fingerprints-unplaced.json");
+        await File.WriteAllTextAsync(unplacedMapPath, "{\"fingerprints\": [{\"floor\": \"first\", \"x\": 1, \"y\": 0, \"z\": 0, \"rssi\": {\"spare1\": -60, \"spare2\": -70}}]}");
+        var unplacedMap = new FingerprintMap(unplacedMapPath);
+        var unplacedFingerprintConfig = new FingerprintConfig { Enabled = true, Mode = "knn", K = 1, MinCommon = 2 };
+        var unplacedFingerprintScenario = new Scenario(new Config(), new FingerprintLocator(unplacedOnlyDevice, floor, unplacedMap, unplacedFingerprintConfig), "fingerprint");
+        Assert.That(unplacedFingerprintScenario.Locate(), Is.True, "fingerprinting needs no node coordinates, so receivers that are all unplaced are still usable");
+        Assert.That(unplacedFingerprintScenario.Fixes, Is.EqualTo(2));
+
+        var unplacedMultiFloor = new Scenario(new Config(), new MultiFloorMultilateralizer(unplacedOnlyDevice, _state), "multifloor");
+        Assert.That(unplacedMultiFloor.Locate(), Is.False, "MultiFloor has no placed receiver to solve against");
+
+        var unplacedNearest = new Scenario(new Config(), new NearestNode(unplacedOnlyDevice, _state), "nearestnode");
+        Assert.That(unplacedNearest.Locate(), Is.False, "NearestNode must not report an unplaced receiver's (0,0,0) location");
     }
 
     // ---------------------------------------------------------------------

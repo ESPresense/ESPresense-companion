@@ -1,3 +1,4 @@
+using MathNet.Spatial.Euclidean;
 using System.Collections.Concurrent;
 using ESPresense.Extensions;
 using ESPresense.Services;
@@ -12,6 +13,27 @@ public class State
     private readonly object _calibrationMetricsLock = new();
     private double? _bestCalibrationRMSE;
     private double? _bestCalibrationR;
+
+    private readonly string _configDir;
+    private readonly ILogger<State> _logger;
+    private string? _locatorsJson;
+
+    /// <summary>Goes up whenever the locators config changes; see <see cref="RefreshScenarios"/>.</summary>
+    public int LocatorsVersion { get; private set; }
+    private FingerprintMap? _fingerprints;
+
+    /// <summary>The fingerprint survey named by locators.fingerprint.file, re-created if the name changes.</summary>
+    public FingerprintMap FingerprintMapFor(FingerprintConfig fc) => Fingerprints(fc);
+
+    /// <summary>Where a placed node is, for the fingerprint surface's path-loss prior; null for unplaced nodes.</summary>
+    public MathNet.Spatial.Euclidean.Point3D? NodeLocation(string id) => Nodes.TryGetValue(id, out var n) && n.HasLocation ? n.Location : null;
+
+    private FingerprintMap Fingerprints(FingerprintConfig fc)
+    {
+        var path = Path.Combine(_configDir, fc.File);
+        if (_fingerprints?.Path != path) _fingerprints = new FingerprintMap(path, _loggerFactory.CreateLogger<FingerprintMap>());
+        return _fingerprints;
+    }
 
     /// <summary>For tests and tools that build a State by hand: its loggers discard everything.</summary>
     public State(ConfigLoader cl, NodeTelemetryStore nts) : this(cl, nts, NullLoggerFactory.Instance)
@@ -28,6 +50,8 @@ public class State
     public State(ConfigLoader cl, NodeTelemetryStore nts, ILoggerFactory loggerFactory)
     {
         _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<State>();
+        _configDir = cl.ConfigDirectory;
         ScenarioFactory = new ScenarioFactory(this, nts, _loggerFactory);
         cl.ConfigChanged += (_, args) => Apply(args);
         if (cl.Config != null) Apply(cl.Config);
@@ -59,6 +83,13 @@ public class State
             {
                 device.KalmanFilter.Settings = KalmanSettings;
             }
+        }
+
+        var locatorsJson = System.Text.Json.JsonSerializer.Serialize(c?.Locators);
+        if (locatorsJson != _locatorsJson)
+        {
+            _locatorsJson = locatorsJson;
+            LocatorsVersion++;
         }
 
         foreach (var device in Devices.Values) device.Check = true;
@@ -202,6 +233,23 @@ public class State
 
     /// <summary>Whether <paramref name="device"/> should be tracked. Pure: the configured name is not applied.</summary>
     public bool ShouldTrack(Device device) => TrackingRules.ShouldTrack(device.Id, device.Name).Track;
+
+    /// <summary>Builds a new device's scenarios from the locators config.</summary>
+    public void BuildScenarios(Device device) => device.ReplaceScenarios(GetScenarios(device), LocatorsVersion);
+
+    /// <summary>
+    /// Rebuilds the scenarios of a device built by <see cref="BuildScenarios"/> if the locators config
+    /// changed since. Without this, enabling or retuning a locator in config.yaml only took effect for
+    /// devices first seen after a restart.
+    /// </summary>
+    public bool RefreshScenarios(Device device)
+    {
+        var version = LocatorsVersion;
+        if (device.LocatorsVersion < 0 || device.LocatorsVersion == version) return false;
+        _logger.LogDebug("Locators config changed, rebuilding scenarios for {Device}", device);
+        device.ReplaceScenarios(GetScenarios(device), version);
+        return true;
+    }
 
     /// <inheritdoc cref="DeviceTrackingRules.IsExcluded"/>
     public bool IsExcluded(string? id, string? name) => TrackingRules.IsExcluded(id, name);

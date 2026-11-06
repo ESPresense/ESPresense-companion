@@ -52,6 +52,20 @@ public class McpCalibrationTests
     }
 
     [Test]
+    public async Task GetCalibrationTool_LeavesOutNodeToNodePairsThatMove()
+    {
+        var mcp = JsonDocument.Parse(await _f.CreateMcp().GetCalibrationTool()).RootElement;
+
+        var matrix = mcp.GetProperty("matrix");
+        Assert.That(matrix.EnumerateObject().Select(p => p.Name), Does.Not.Contain("Delta"),
+            "Delta is on a car (stationary: false): its outgoing node-to-node pairs are noise, not a row");
+
+        var alphaRow = matrix.GetProperty("Alpha");
+        Assert.That(alphaRow.EnumerateObject().Select(p => p.Name), Does.Not.Contain("Delta"),
+            "Delta has no fixed distance to Alpha either, so it does not get a cell as a receiver");
+    }
+
+    [Test]
     public async Task CalibrationResource_MatchesTool()
     {
         var mcp = _f.CreateMcp();

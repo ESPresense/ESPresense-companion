@@ -26,6 +26,8 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
     private readonly ILogger<MLEMultilateralizer> _mleLogger = loggers.CreateLogger<MLEMultilateralizer>();
     private readonly ILogger<MultiFloorMultilateralizer> _multiFloorLogger = loggers.CreateLogger<MultiFloorMultilateralizer>();
     private readonly ILogger<NadarayaWatsonMultilateralizer> _nadarayaWatsonLogger = loggers.CreateLogger<NadarayaWatsonMultilateralizer>();
+    private readonly ILogger<FingerprintLocator> _fingerprintLogger = loggers.CreateLogger<FingerprintLocator>();
+    private readonly ILogger<FingerprintTracker> _fingerprintTrackerLogger = loggers.CreateLogger<FingerprintTracker>();
 
     /// <summary>
     /// Every locator, in scenario order. The order is load-bearing: MultiScenarioLocator breaks
@@ -34,8 +36,15 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
     public IReadOnlyList<LocatorDescriptor> All(Config? c)
     {
         var l = c?.Locators;
+        var fp = l?.Fingerprint;
         return
         [
+            // Fingerprint first: with locators.fingerprint.priority its fixes are reported over ranging, and ties go to
+            // the earlier scenario. One section, one descriptor: locators.fingerprint.tracker.enabled swaps the plain
+            // surface match for the grid-filter tracker, which carries a belief between fixes.
+            new("Fingerprint", fp?.Enabled ?? false, true, fp?.Floors, (d, f, s) => fp!.Tracker.Enabled
+                ? (ILocate)new FingerprintTracker(d, f!, s.FingerprintMapFor(fp), fp, fp.Prior ? s.NodeLocation : null, s.LocatorsVersion, clock: null, _fingerprintTrackerLogger)
+                : new FingerprintLocator(d, f!, s.FingerprintMapFor(fp), fp, fp.Prior ? s.NodeLocation : null, s.LocatorsVersion, _fingerprintLogger)),
             NelderMead(l?.NelderMead?.Enabled ?? false, l?.NelderMead?.Floors),
             new("Bfgs", l?.Bfgs?.Enabled ?? false, true, l?.Bfgs?.Floors, (d, f, s) => new BfgsMultilateralizer(d, f!, s, _bfgsLogger)),
             new("Mle", l?.Mle?.Enabled ?? false, true, l?.Mle?.Floors, (d, f, s) => new MLEMultilateralizer(d, f!, s, _mleLogger)),
