@@ -42,6 +42,16 @@ public class McpCalibrationTests
     }
 
     [Test]
+    public async Task GetCalibrationTool_LeavesOutReceiversThatMove()
+    {
+        var mcp = JsonDocument.Parse(await _f.CreateMcp().GetCalibrationTool()).RootElement;
+
+        var row = mcp.GetProperty("matrix").GetProperty("Anchor One");
+        Assert.That(row.EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "Alpha", "Bravo" }),
+            "Delta is on a car (stationary: false): no fixed distance to the anchor, so no cell and no R/RMSE pair");
+    }
+
+    [Test]
     public async Task CalibrationResource_MatchesTool()
     {
         var mcp = _f.CreateMcp();
