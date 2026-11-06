@@ -53,6 +53,27 @@ public class DeviceResidualStoreTests
     }
 
     [Test]
+    public void Observe_SkipsNodesThatMove()
+    {
+        var config = new Config();
+        Node Make(string id, bool stationary)
+        {
+            var n = new Node(id, NodeSourceType.Config);
+            n.Update(config, new ConfigNode { Name = id, Point = new[] { 0.0, 0, 1 }, Stationary = stationary }, Enumerable.Empty<Floor>());
+            return n;
+        }
+        var store = new DeviceResidualStore();
+        var device = new Device("phone", null, TimeSpan.FromSeconds(30));
+        foreach (var n in EightNodes.Select(id => Make(id, true)).Append(Make("car", false)))
+            device.Nodes[n.Id] = new DeviceToNode(device, n) { Rssi = -70, RefRssi = -59, LastHit = T0.AddSeconds(1), Hits = 1 };
+
+        store.Observe(device, T0.AddSeconds(1), Settings);
+
+        var readings = store.Windows(null, null, T0.AddSeconds(30)).Single().Readings;
+        Assert.That(readings.Select(r => r.NodeId), Is.EquivalentTo(EightNodes), "a node on a car (stationary: false) has no fixed place to learn an rxAdj for");
+    }
+
+    [Test]
     public void WindowHeardByTooFewNodes_IsDropped()
     {
         var store = new DeviceResidualStore();

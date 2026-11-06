@@ -77,7 +77,8 @@ public sealed class DeviceResidualStore
             foreach (var dn in device.Nodes.Values)
             {
                 var node = dn.Node;
-                if (node is not { HasLocation: true } || dn.LastHit is not { } hit) continue;
+                // A node that moves (stationary: false) has no fixed place to learn an rxAdj for.
+                if (node is not { HasLocation: true, Stationary: true } || dn.LastHit is not { } hit) continue;
                 if (track.SeenHits.TryGetValue(node.Id, out var seen) && seen == dn.Hits) continue;
                 track.SeenHits[node.Id] = dn.Hits;
                 fresh.Add((hit, node.Id, dn.Rssi, dn.RssiRxAdj, dn.RefRssi));
@@ -98,7 +99,7 @@ public sealed class DeviceResidualStore
 
     /// <summary>
     /// Adds one reading. <paramref name="rssi"/> is what the node published (raw - rxAdj) and
-    /// <paramref name="rxAdj"/> the adjustment it applied. The caller passes positioned nodes only.
+    /// <paramref name="rxAdj"/> the adjustment it applied. The caller passes positioned, stationary nodes only.
     /// </summary>
     public void Add(string deviceId, DateTime time, string nodeId, double rssi, double? rxAdj, double refRssi, ConfigDeviceResidual settings)
     {
