@@ -92,6 +92,9 @@ public class RobotSurveyService(ConfigLoader configLoader, State state, IMqttCoo
 
     private void Reconfigure(RobotSurveyConfig cfg)
     {
+        // The map guard re-baselines with the config: a changed map_attribute (or a changed robot) must not
+        // be compared against the value the previous attribute had.
+        _mapSeen = null;
         lock (_lock)
         {
             if (ReferenceEquals(cfg, _active) && _ingest != null) return;
