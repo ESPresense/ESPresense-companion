@@ -138,7 +138,7 @@ public class OptimizerDebugServiceTests
         Assert.That(report, Is.Not.Null);
         Assert.That(report.DryRun, Is.False);
         Assert.That(report.EvalSnapshots, Is.EqualTo(7), "20% of 31 held out");
-        Assert.That(report.TrainingMeasures, Is.EqualTo(24 * 6));
+        Assert.That(report.TrainingMeasures, Is.EqualTo(6), "training is pooled to one averaged measure per link (issue #1868); 6 links in the fixture");
         Assert.That(report.Baseline.Samples, Is.EqualTo(7 * 6));
         Assert.That(report.Baseline.Rmse, Is.GreaterThan(0), "the 2.7 default does not fit an absorption of 3.0");
 
@@ -367,12 +367,15 @@ public class OptimizerDebugServiceTests
         Assert.That(report.From, Is.EqualTo(start));
         Assert.That(report.To, Is.EqualTo(start.AddMinutes(2)));
         Assert.That(report.Names, Is.EqualTo(new Dictionary<string, string?> { ["anchor-1"] = "Anchor", ["node-a"] = "A" }));
-        var cell = report.Cells.Single();
-        Assert.That(cell.Tx, Is.EqualTo("anchor-1"));
+        // rxAdj changed mid-window, so pooling averages per (tx, rx, rxAdj): cell 1 is the rxAdj=0
+        // snapshot, cell 2 the rxAdj=3 ones. This is the correct per-link averaging (issue #1868).
+        // One cell per (tx, rx); the two rxAdj groups are averaged into it, so Samples is 2
+        // (two pooled measures), mean Rssi is -61.5, and RxAdj lists both values seen.
+        Assert.That(report.Cells, Has.Count.EqualTo(1));
+        var cell = report.Cells[0];
         Assert.That(cell.TxAnchor, Is.True);
-        Assert.That(cell.Samples, Is.EqualTo(3));
-        Assert.That(cell.Rssi, Is.EqualTo(-61));
-        Assert.That(cell.RssiSd, Is.EqualTo(1));
+        Assert.That(cell.Samples, Is.EqualTo(2));
+        Assert.That(cell.Rssi, Is.EqualTo(-61.25)); // (-60 + -61.5)/2, cell mean of the two pooled measures
         Assert.That(cell.RxAdj, Is.EqualTo(new double?[] { 0, 3 }));
         Assert.That(cell.MapDistance, Is.EqualTo(2));
         Assert.That(cell.Distance, Is.EqualTo(2.5));
@@ -401,7 +404,7 @@ public class OptimizerDebugServiceTests
         Assert.That(status.MeasurementCount, Is.EqualTo(31 * 6));
         Assert.That(status.SpanMins, Is.EqualTo(15).Within(0.01));
         Assert.That(status.SufficientHistory, Is.True);
-        Assert.That(status.Split, Is.EqualTo(new OptimizerSplitSizes(24, 24 * 6, 7, 7 * 6)));
+        Assert.That(status.Split, Is.EqualTo(new OptimizerSplitSizes(24, 6, 7, 7 * 6)), "training pooled per link; 6 links in the fixture");
         Assert.That(status.Settings.MinSamples, Is.EqualTo(5));
     }
 
