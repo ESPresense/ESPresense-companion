@@ -22,6 +22,7 @@ public class PerNodeLinkWeightTests
     private ConfigLoader _configLoader = null!;
     private string _configDir = null!;
 
+    /// <summary>A fresh State whose config enables optimization, so the optimizer reads its default limits.</summary>
     [SetUp]
     public void Setup()
     {
@@ -32,6 +33,7 @@ public class PerNodeLinkWeightTests
         _state.Apply(new Config { Optimization = new ConfigOptimization { Enabled = true } });
     }
 
+    /// <summary>Stops the config loader and removes the test's config directory.</summary>
     [TearDown]
     public async Task TearDown()
     {
@@ -73,6 +75,7 @@ public class PerNodeLinkWeightTests
         return os;
     }
 
+    /// <summary>The rxAdj the per-node optimizer fits for <paramref name="node"/>, starting every node at rxAdj 0 and absorption 3.</summary>
     private double FittedRxAdj(OptimizationSnapshot os, string node)
     {
         var settings = Layout.ToDictionary(n => n.Id, n => new NodeSettings(n.Id) { Calibration = { RxAdjRssi = 0, Absorption = 3 } });
