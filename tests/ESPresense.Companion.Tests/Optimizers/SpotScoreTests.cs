@@ -99,10 +99,30 @@ public class SpotScoreTests
         var spots = SpotScore.FromAnchors(new[] { s1, s2 });
 
         var spot = spots.Single();
-        Assert.That(spot.Id, Is.EqualTo("anchor-1"));
+        Assert.That(spot.Id, Does.StartWith("anchor-1@"));
         Assert.That(spot.Location, Is.EqualTo(anchor.Location));
         var raw = spot.Readings.ToDictionary(r => r.RxId, r => r.RawRssi);
         Assert.That(raw, Is.EqualTo(new Dictionary<string, double> { ["rx-a"] = -67, ["rx-b"] = -75, ["rx-c"] = -74 }));
+    }
+
+    [Test]
+    public void FromAnchors_AnAnchorMovedDuringTheWindow_IsTwoSpots()
+    {
+        // Each snapshot carries its own OptNode, so an anchor moved between snapshots shows up at a different location.
+        var before = new OptNode { Id = "anchor-1", Location = new Point3D(1, 1, 0.5), IsAnchor = true };
+        var after = new OptNode { Id = "anchor-1", Location = new Point3D(5, 4, 0.5), IsAnchor = true };
+        OptNode Rx(int i) => new() { Id = Receivers[i].Id, Location = Receivers[i].At };
+        var s1 = new OptimizationSnapshot(); var s2 = new OptimizationSnapshot();
+        for (var i = 0; i < 3; i++)
+        {
+            s1.Measures.Add(new Measure { Tx = before, Rx = Rx(i), Rssi = -60 - i, RssiRxAdj = 0 });
+            s2.Measures.Add(new Measure { Tx = after, Rx = Rx(i), Rssi = -70 - i, RssiRxAdj = 0 });
+        }
+
+        var spots = SpotScore.FromAnchors(new[] { s1, s2 });
+
+        Assert.That(spots.Select(s => s.Location), Is.EquivalentTo(new[] { before.Location, after.Location }));
+        Assert.That(spots.Single(s => s.Location == before.Location).Readings.Select(r => r.RawRssi), Is.EquivalentTo(new[] { -60.0, -61, -62 }));
     }
 
     [Test]
