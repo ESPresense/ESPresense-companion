@@ -524,9 +524,9 @@
 </svelte:head>
 
 <div class="h-full overflow-y-auto">
-	<div class="w-full px-4 py-3 space-y-4">
+	<div class="w-full max-w-6xl mx-auto px-4 py-3 space-y-4">
 		<header class="flex items-center justify-between">
-			<h1 class="text-2xl font-bold text-surface-900-100">Device Calibration</h1>
+			<h1 class="text-xl font-bold text-surface-900-100">Device Calibration</h1>
 		</header>
 
 		<div class="card preset-tonal">
@@ -550,10 +550,11 @@
 		</div>
 
 		{#if $config?.floors}
-			<div class="grid grid-cols-1 gap-4">
-				<div>
-					<label class="label font-medium mb-1" for="floor-select">Select Floor</label>
-					<select id="floor-select" bind:value={selectedFloorId} class="select w-full">
+			<!-- One row at any column width: the select gives way down from 16rem, the height field stays 7rem. -->
+			<div class="card preset-tonal p-3 grid grid-cols-[minmax(0,16rem)_7rem] items-end gap-3">
+				<div class="min-w-0">
+					<label class="label text-sm font-medium mb-1 block" for="floor-select">Floor</label>
+					<select id="floor-select" bind:value={selectedFloorId} class="select w-full text-base py-2 pl-3 pr-10 appearance-none bg-no-repeat cursor-pointer" style="background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a0a8b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E&quot;); background-position: right 0.75rem center;">
 						{#each $config?.floors as { id, name }}
 							<option value={id}>{name}</option>
 						{/each}
@@ -562,11 +563,8 @@
 
 				{#if calibrationSpot}
 					<div>
-						<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
-						<div class="flex">
-							<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input rounded-r-none" />
-							<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}>Set</button>
-						</div>
+						<label class="label text-sm font-medium mb-1 block" for="height-input" title="Height from floor">Height (m)</label>
+						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input w-full text-base py-2" />
 					</div>
 				{/if}
 			</div>
