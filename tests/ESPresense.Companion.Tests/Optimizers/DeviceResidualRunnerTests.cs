@@ -191,6 +191,23 @@ public class DeviceResidualRunnerTests
         Assert.That(_runner.LastCycle!.Report.Proposals.Single().Score.Device, Is.Null);
     }
 
+    /// <summary>
+    /// After switching away from device_residual, snapshots taken before the switch still carry device windows. The
+    /// device term must not apply in the other mode, whatever device_weight says.
+    /// </summary>
+    [Test]
+    public async Task OtherMode_LeftoverDeviceWindows_AreNotScored()
+    {
+        var (training, eval) = Scenario(_ => 0, id => id == "n03" ? 10 : 0);
+        var optimization = Optimization(3.0);
+        optimization.Optimizer = "per_node_absorption";
+
+        await _runner.RunCycleAsync(training, eval, optimization, new List<IOptimizer> { new PerNodeAbsorptionRxTx(_state, NullLogger<PerNodeAbsorptionRxTx>.Instance) });
+
+        Assert.That(_runner.LastCycle!.Report.Baseline.Device, Is.Null);
+        Assert.That(_runner.LastCycle!.Report.Proposals.Single().Score.Device, Is.Null);
+    }
+
     /// <summary>With device_weight 0, a cycle over snapshots that carry device windows ends exactly as one without them.</summary>
     [Test]
     public async Task DeviceWeightZero_DeviceWindowsChangeNothing()
