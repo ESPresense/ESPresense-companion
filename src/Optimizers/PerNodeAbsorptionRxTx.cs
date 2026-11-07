@@ -33,6 +33,13 @@ public class PerNodeAbsorptionRxTx : IOptimizer
     private readonly State _state;
     private readonly ILogger<PerNodeAbsorptionRxTx> _logger;
 
+    /// <summary>
+    /// Variance (dB²) of a link's own error, added to its reported RSSI variance in the fit's weights. About 4 dB
+    /// per link remains on anchored devices whatever the node settings, so a reading's steadiness alone says little
+    /// about how far it is from the model.
+    /// </summary>
+    internal const double LinkErrorVariance = 16;
+
     /// <summary>Residuals beyond this many dB count linearly rather than quadratically.</summary>
     private const double HuberDb = 6;
 
@@ -97,8 +104,11 @@ public class PerNodeAbsorptionRxTx : IOptimizer
         bool anchored = measures.Any(t => t.m.HeldTxRef != null);
         double TxPriorCentre(Vector<double> x) => anchored && txIds.Count > 0 ? txIds.Average(id => x[txIndex[id]] - txPriorRef[id]) : 0;
 
-        // Inverse-variance weights, normalised to mean 1 so the priors keep their meaning.
-        var weights = measures.Select(t => t.m.RssiVar > 0 ? 1.0 / Math.Max(t.m.RssiVar.Value, 0.1) : 1.0).ToArray();
+        // Inverse-variance weights, normalised to mean 1 so the priors keep their meaning. A link's error is its
+        // reported RSSI variance (noise over time) plus the error of the link itself that no node setting can remove
+        // (multipath, walls, antenna aspect), which the reported variance cannot see. Without that term a link that
+        // reads steadily but wrong outweighs a typical one up to a hundredfold.
+        var weights = measures.Select(t => 1.0 / ((t.m.RssiVar is > 0 and var v && double.IsFinite(v) ? v : LinkErrorVariance) + LinkErrorVariance)).ToArray();
         var weightSum = weights.Sum();
         for (int i = 0; i < weights.Length; i++) weights[i] = weights[i] / weightSum * weights.Length;
 
