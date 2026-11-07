@@ -29,17 +29,19 @@ public class TaughtSpotsTests
         ["rx-a"] = new Point3D(0, 0, 1), ["rx-b"] = new Point3D(6, 0, 1), ["rx-c"] = new Point3D(0, 5, 1),
     };
 
-    private static Point3D? At(string id) => Placed.TryGetValue(id, out var p) ? p : null;
+    /// <summary>rx-c serves only the upper floor; the rest list no floors, so count on every floor.</summary>
+    private static (Point3D, IReadOnlyCollection<string>)? At(string id) =>
+        Placed.TryGetValue(id, out var p) ? (p, id == "rx-c" ? new[] { "f2" } : Array.Empty<string>()) : null;
 
     [Test]
     public void RepeatSamplesAtOnePlace_AreOneSpot_AndUnplacedReceiversAreLeftOut()
     {
         File.WriteAllText(Path, """
             {"fingerprints": [
-              {"floor": "f1", "x": 2.0, "y": 2.0, "z": 0.3, "rssi": {"rx-a": -60, "rx-b": -70, "rx-c": -66, "rx-unplaced": -50}},
-              {"floor": "f1", "x": 2.1, "y": 1.95, "z": 0.3, "rssi": {"rx-a": -62, "rx-b": -72, "rx-c": -64}},
-              {"floor": "f1", "x": 4.0, "y": 3.0, "rssi": {"rx-a": -70, "rx-b": -65, "rx-c": -68}},
-              {"floor": "f1", "x": 5.0, "y": 4.0, "rssi": {"rx-a": -70, "rx-unplaced": -60}}
+              {"floor": "f2", "x": 2.0, "y": 2.0, "z": 0.3, "rssi": {"rx-a": -60, "rx-b": -70, "rx-c": -66, "rx-unplaced": -50}},
+              {"floor": "f2", "x": 2.1, "y": 1.95, "z": 0.3, "rssi": {"rx-a": -62, "rx-b": -72, "rx-c": -64}},
+              {"floor": "f2", "x": 4.0, "y": 3.0, "rssi": {"rx-a": -70, "rx-b": -65, "rx-c": -68}},
+              {"floor": "f2", "x": 5.0, "y": 4.0, "rssi": {"rx-a": -70, "rx-unplaced": -60}}
             ]}
             """);
 
@@ -51,6 +53,22 @@ public class TaughtSpotsTests
             Is.EqualTo(new Dictionary<string, double> { ["rx-a"] = -61, ["rx-b"] = -71, ["rx-c"] = -65 }));
         Assert.That(merged.Location.X, Is.EqualTo(2.05).Within(1e-9));
         Assert.That(merged.Readings.Single(r => r.RxId == "rx-b").RxLocation, Is.EqualTo(Placed["rx-b"]));
+    }
+
+    [Test]
+    public void AReceiverOnAnotherFloor_DoesNotCount()
+    {
+        // rx-c serves f2 only: on an f1 spot it is heard through the floor, which says nothing about its calibration.
+        File.WriteAllText(Path, """
+            {"fingerprints": [
+              {"floor": "f1", "x": 2, "y": 2, "rssi": {"rx-a": -60, "rx-b": -70, "rx-c": -66}},
+              {"floor": "f2", "x": 2, "y": 2, "rssi": {"rx-a": -61, "rx-b": -71, "rx-c": -64}}
+            ]}
+            """);
+
+        var spots = new TaughtSpots(Path).Read(At);
+
+        Assert.That(spots.Single().Id, Does.Contain("f2"), "the f1 spot is left with two receivers, too few");
     }
 
     [Test]
@@ -78,7 +96,7 @@ public class TaughtSpotsTests
         File.WriteAllText(Path, """{"fingerprints": []}""");
         Assert.That(taught.Read(At), Is.Empty);
 
-        File.WriteAllText(Path, """{"fingerprints": [{"floor": "f1", "x": 1, "y": 1, "rssi": {"rx-a": -60, "rx-b": -70, "rx-c": -66}}]}""");
+        File.WriteAllText(Path, """{"fingerprints": [{"floor": "f2", "x": 1, "y": 1, "rssi": {"rx-a": -60, "rx-b": -70, "rx-c": -66}}]}""");
         File.SetLastWriteTimeUtc(Path, DateTime.UtcNow.AddSeconds(5));
 
         Assert.That(taught.Read(At), Has.Count.EqualTo(1));
