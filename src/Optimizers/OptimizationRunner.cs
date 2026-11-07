@@ -428,8 +428,8 @@ internal class OptimizationRunner : BackgroundService
             case OptimizerGateDecision.SpotsNotBetter:
             case OptimizerGateDecision.LinksWorse:
             case OptimizerGateDecision.GaugeShift:
-                _logger.LogInformation("Optimizer {Optimizer,-24} rejected ({Decision}): better on {Better} and worse on {Worse} of {Spots} spots, spot RMS gain {GainDb:0.00} dB, node-link RMSE {LinkLossDb:+0.00;-0.00} dB, mean rxAdj shift {GaugeShiftDb:+0.0;-0.0} dB",
-                    p.Optimizer, p.Decision, p.Gates.Spots!.Better, p.Gates.Spots.Worse, p.Gates.Spots.Spots, p.Gates.Spots.GainDb, p.Gates.Spots.LinkLossDb, p.Gates.Spots.GaugeShiftDb);
+                _logger.LogInformation("Optimizer {Optimizer,-24} rejected ({Decision}): better on {Better} and worse on {Worse} of {Spots} spots (z {SignZ:0.0}), spot RMS gain {GainDb:0.00} dB, node-link RMSE {LinkLossDb:+0.00;-0.00} dB, mean rxAdj shift {GaugeShiftDb:+0.0;-0.0} dB",
+                    p.Optimizer, p.Decision, p.Gates.Spots!.Better, p.Gates.Spots.Worse, p.Gates.Spots.Spots, p.Gates.Spots.SignZ, p.Gates.Spots.GainDb, p.Gates.Spots.LinkLossDb, p.Gates.Spots.GaugeShiftDb);
                 break;
             default:
                 _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",

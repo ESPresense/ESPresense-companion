@@ -115,6 +115,27 @@ public class SpotJudgeTests
         Assert.That(p.Decision, Is.EqualTo(OptimizerGateDecision.GaugeShift));
     }
 
+    /// <summary>
+    /// The sign test, not a fixed gain per cycle: a capped step that is better on most spots passes even when it gains
+    /// little (the first soak's case: 37 of 52 better, +0.23 dB), and a large gain on too few or mixed spots does not.
+    /// </summary>
+    [TestCase(52, 37, 15, 0.23, true, TestName = "Consistent small step (soak case) passes")]
+    [TestCase(4, 4, 0, 0.8, true, TestName = "4 of 4 spots passes")]
+    [TestCase(4, 3, 1, 1.5, false, TestName = "3 of 4 spots is not enough evidence")]
+    [TestCase(52, 30, 22, 0.6, false, TestName = "Big but inconsistent gain fails")]
+    [TestCase(52, 45, 7, 0.05, false, TestName = "Consistent but negligible gain fails")]
+    public void SpotJudge_UsesTheSignTest(int spots, int better, int worse, double gainDb, bool passes)
+    {
+        var baseline = new OptimizerSpotScore(spots, spots * 8, 5.0);
+        var proposal = new OptimizerSpotScore(spots, spots * 8, 5.0 - gainDb) { Better = better, Worse = worse };
+        var score = new OptimizerScore(0.5, 0.8, 5.5, 400);
+
+        var gate = OptimizationCycle.SpotGate(proposal, baseline, score, score, new OptimizationResults(), id => new NodeSettings(id));
+
+        Assert.That(gate.SignZ, Is.EqualTo((better - worse) / Math.Sqrt(better + worse)).Within(1e-9));
+        Assert.That(gate.Passed, Is.EqualTo(passes));
+    }
+
     [Test]
     public void TaughtSpots_AloneAreEnoughToJudge()
     {
