@@ -17,7 +17,9 @@
 	import CalibrationSpot from './CalibrationSpot.svelte';
 	import FixEllipse from './FixEllipse.svelte';
 	import NodePairs from './NodePairs.svelte';
+	import HistoryTrail from './HistoryTrail.svelte';
 	import type { LinkDirection } from './nodeLinks';
+	import type { HistoryView } from './history';
 
 	let svg: SVGElement | undefined = $state();
 	let transform = $state(zoomIdentity);
@@ -33,10 +35,12 @@
 		calibrationSpot?: { x: number; y: number } | null;
 		/** Draw node-to-node links coloured by measured vs real distance; hovering a node isolates its links. */
 		links?: { nearest: number | null; direction: LinkDirection } | null;
+		/** A device's recorded path up to the moment shown. While it shows the past (not live) the live marker hides and a ghost stands at the stored position. */
+		history?: HistoryView | null;
 		onselected?: ((item: Device | Node) => void) | undefined;
 	}
 
-	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), explanation = null, exclusive = false, embedded = false, calibrationSpot = $bindable(null), links = null, onselected = undefined }: Props = $props();
+	let { floorId = $bindable(null), deviceId = $bindable(null), nodeId = $bindable(null), explanation = null, exclusive = false, embedded = false, calibrationSpot = $bindable(null), links = null, history = null, onselected = undefined }: Props = $props();
 
 	function makeSquareBounds(bounds: number[][]): number[][] {
 		const maxDim = Math.max(bounds[1][0], bounds[1][1]);
@@ -237,7 +241,12 @@
 			{#if explanation?.uncertainty}
 				<FixEllipse {transform} ellipse={explanation.uncertainty} />
 			{/if}
-			<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
+			{#if history}
+				<HistoryTrail {transform} view={history} floorId={floor?.id} />
+			{/if}
+			{#if !history || history.live}
+				<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
+			{/if}
 			{#if calibrationSpot}
 				<CalibrationSpot {transform} {bounds} bind:position={calibrationSpot} />
 			{/if}

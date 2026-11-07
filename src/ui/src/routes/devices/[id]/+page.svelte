@@ -8,10 +8,17 @@
 	import Map from '#lib/Map.svelte';
 	import DeviceBreadcrumb from '#lib/DeviceBreadcrumb.svelte';
 	import DeviceExplain from '#lib/DeviceExplain.svelte';
+	import DeviceHistoryPanel from '#lib/DeviceHistoryPanel.svelte';
+	import type { HistoryView } from '#lib/history.js';
 
 	let { data = {} }: { data: { settings?: DeviceSetting } } = $props();
 
 	let device = $derived($devices?.find((d) => d.id === data.settings?.id));
+
+	let history = $state.raw<HistoryView | null>(null);
+	// Showing the past: the map follows the stored fix's floor, and the explanation (which describes the present) comes off.
+	let scrubbing = $derived(history != null && !history.live);
+	let floorId = $derived(scrubbing && history?.floor ? history.floor.id : device?.floor?.id);
 
 	$effect(() => {
 		includedDevice.set(data.settings?.id ?? null);
@@ -51,8 +58,11 @@
 		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView="map" />
 
 		<div class="grid flex-1 min-h-0">
-			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} explanation={$explanation} exclusive={true} />
+			<Map deviceId={data.settings?.id} {floorId} explanation={scrubbing ? null : $explanation} exclusive={true} {history} />
 		</div>
+		{#if data.settings?.id}
+			<DeviceHistoryPanel deviceId={data.settings.id} onview={(view) => (history = view)} />
+		{/if}
 	</div>
 	<div class="w-80 flex-shrink-0 bg-surface-100-800 border-l border-surface-300-700 overflow-auto">
 		<Accordion value={accordionValue} onValueChange={({ value }) => (accordionValue = value)}>
