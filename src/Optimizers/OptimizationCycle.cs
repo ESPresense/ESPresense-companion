@@ -220,7 +220,7 @@ internal static class OptimizationCycle
             var s = scored[sel];
             chosen = s.Optimizer;
             chosenResults = s.Results;
-            outcome = $"{(dryRun ? "Would apply" : "Applying")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes (held-out R={s.Score.R:0.000}, RMSE={s.Score.Rmse:0.000}).";
+            outcome = $"{(dryRun ? "Would apply" : "Applying")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes ({Evidence(s.Score, s.Gates.Spots, baselineSpotScore, s.Spots)}).";
         }
         else if (optimization.JudgeOnSpots && scored.Count > 0 && scored.All(s => s.Decision is OptimizerGateDecision.NotEnoughSpots or OptimizerGateDecision.MinSamples))
         {
@@ -237,6 +237,15 @@ internal static class OptimizationCycle
             proposals, chosen?.Name, false, outcome) { BaselineSpots = baselineSpotScore };
         return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples) { Incumbent = frozen };
     }
+
+    /// <summary>
+    /// What the outcome cites for an applied proposal: the evidence that accepted it. On the spot judge that is the
+    /// held-out spots it won and the spot RMS; on the links judge, the held-out node-to-node R and RMSE.
+    /// </summary>
+    internal static string Evidence(OptimizerScore score, OptimizerSpotGate? gate, OptimizerSpotScore? baseline, OptimizerSpotScore? proposal) =>
+        gate != null && baseline != null && proposal != null
+            ? $"better on {gate.Better} of {gate.Better + gate.Worse} held-out spots, spot RMS {baseline.Rms:0.00} -> {proposal.Rms:0.00} dB"
+            : $"held-out R={score.R:0.000}, RMSE={score.Rmse:0.000}";
 
     /// <summary>The spot judge needs this many spots: with fewer, it picks the better calibration too rarely (#1868).</summary>
     internal const int SpotGateMinSpots = 4;
