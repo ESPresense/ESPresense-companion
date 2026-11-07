@@ -78,7 +78,7 @@ public class SpotScoreTests
     }
 
     [Test]
-    public void FromAnchors_AveragesRawRssiPerReceiver_AndSkipsNodesAndThinSpots()
+    public void FromAnchors_AveragesRawRssiPerReceiver_AndSkipsNodesThinSpotsAndUnknownRxAdj()
     {
         var anchor = new OptNode { Id = "anchor-1", Location = new Point3D(3, 2, 0.5), IsAnchor = true };
         var lonely = new OptNode { Id = "anchor-2", Location = new Point3D(1, 1, 0.5), IsAnchor = true };
@@ -90,7 +90,8 @@ public class SpotScoreTests
         // Published rssi includes the receiver's rxAdj at the time: raw = rssi + rxAdj, so -70 with rxAdj 4 is raw -66.
         s1.Measures.Add(new Measure { Tx = anchor, Rx = Rx(0), Rssi = -70, RssiRxAdj = 4 });
         s2.Measures.Add(new Measure { Tx = anchor, Rx = Rx(0), Rssi = -68, RssiRxAdj = 0 }); // raw -68: a later rxAdj change
-        s1.Measures.Add(new Measure { Tx = anchor, Rx = Rx(1), Rssi = -75 });                // no rxAdj recorded: taken as 0
+        s1.Measures.Add(new Measure { Tx = anchor, Rx = Rx(1), Rssi = -75, RssiRxAdj = 0 });
+        s1.Measures.Add(new Measure { Tx = anchor, Rx = Rx(3), Rssi = -71 });                // rxAdj unknown: raw unknown, skipped
         s1.Measures.Add(new Measure { Tx = anchor, Rx = Rx(2), Rssi = -72, RssiRxAdj = -2 });
         s1.Measures.Add(new Measure { Tx = lonely, Rx = Rx(0), Rssi = -60 });                // heard by one receiver only
         s1.Measures.Add(new Measure { Tx = node, Rx = Rx(0), Rssi = -65 });                  // node-to-node: not a spot

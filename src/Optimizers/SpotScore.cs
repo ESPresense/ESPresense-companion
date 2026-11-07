@@ -26,19 +26,21 @@ internal static class SpotScore
     /// <summary>
     /// Every anchored device in <paramref name="snapshots"/> as one spot, each receiver's raw RSSI averaged. An anchor
     /// without a usable rssi@1m counts too: the fit has to drop it (<see cref="Measure.IsUnusableAnchor"/>), but the
-    /// spot's level is fitted here, so its position is all this needs.
+    /// spot's level is fitted here, so its position is all this needs. Readings without the rxAdj they were taken with are skipped.
     /// </summary>
     public static List<KnownPositionSpot> FromAnchors(IEnumerable<OptimizationSnapshot> snapshots)
     {
         return snapshots
             .SelectMany(s => s.Measures)
-            .Where(m => m.Tx?.IsAnchor == true && m.Rx?.Id != null && m.Tx.Id != null && double.IsFinite(m.Rssi))
+            // Without the rxAdj a reading was taken with, its raw RSSI is unknown: re-basing it would turn that
+            // receiver's applied adjustment into an apparent calibration error. Leave it out, as the fit does.
+            .Where(m => m.Tx?.IsAnchor == true && m.Rx?.Id != null && m.Tx.Id != null && double.IsFinite(m.Rssi) && m.RssiRxAdj != null)
             .GroupBy(m => m.Tx.Id, StringComparer.Ordinal)
             .Select(g => new KnownPositionSpot(
                 g.Key,
                 g.Last().Tx.Location,
                 g.GroupBy(m => m.Rx.Id, StringComparer.Ordinal)
-                    .Select(r => new SpotReading(r.Key, r.Last().Rx.Location, r.Average(m => m.Rssi + (m.RssiRxAdj ?? 0))))
+                    .Select(r => new SpotReading(r.Key, r.Last().Rx.Location, r.Average(m => m.Rssi + m.RssiRxAdj!.Value)))
                     .ToList()))
             .Where(s => s.Readings.Count >= MinReceivers)
             .OrderBy(s => s.Id, StringComparer.Ordinal)
