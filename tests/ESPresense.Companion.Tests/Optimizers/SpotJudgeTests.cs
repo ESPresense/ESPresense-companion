@@ -80,6 +80,8 @@ public class SpotJudgeTests
         Assert.That(gate.LinkLossDb, Is.LessThan(0), "the node links improve too: the offset is the receiver's");
         Assert.That(gate.GaugeShiftDb, Is.EqualTo(1.5), "rx-b +6 over four receivers");
         Assert.That(result.Selected?.Name, Is.EqualTo("FixRxB"));
+        Assert.That(result.Report.Outcome, Does.Contain("better on 5 of 5 held-out spots, spot RMS").And.Not.Contain("R="),
+            "the outcome cites the evidence that accepted it");
     }
 
     [Test]
