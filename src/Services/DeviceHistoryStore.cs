@@ -113,13 +113,25 @@ public class DeviceHistoryStore
     public async Task<IList<DeviceHistory>?> List(string id)
     {
         if (!await Ready()) return null;
-        return await _sqliteConnection!.Table<DeviceHistory>().Where(x => x.Id == id).OrderBy(x => x.When).ToListAsync();
+        return AsUtc(await _sqliteConnection!.Table<DeviceHistory>().Where(x => x.Id == id).OrderBy(x => x.When).ToListAsync());
     }
 
-    public async Task<IList<DeviceHistory>?> List(string id, DateTime start, DateTime end)
+    /// <summary>Rows between <paramref name="start"/> and <paramref name="end"/> inclusive, oldest first; <paramref name="bestOnly"/> keeps just the best scenario's row of each cycle.</summary>
+    public async Task<IList<DeviceHistory>?> List(string id, DateTime start, DateTime end, bool bestOnly = false)
     {
         if (!await Ready()) return null;
-        // Query for records within the specified time range and order by time
-        return await _sqliteConnection!.Table<DeviceHistory>().Where(x => x.Id == id && x.When >= start && x.When <= end).OrderBy(x => x.When).ToListAsync();
+        var query = _sqliteConnection!.Table<DeviceHistory>().Where(x => x.Id == id && x.When >= start && x.When <= end);
+        if (bestOnly) query = query.Where(x => x.Best == true);
+        return AsUtc(await query.OrderBy(x => x.When).ToListAsync());
+    }
+
+    // Rows are written with DateTime.UtcNow, but sqlite-net reads the stored ticks back as DateTimeKind.Unspecified.
+    // Serialized like that the stamps carry no Z, and a browser would then read them as local time.
+    private static IList<DeviceHistory> AsUtc(IList<DeviceHistory> rows)
+    {
+        foreach (var row in rows)
+            if (row.When is { Kind: not DateTimeKind.Utc } when)
+                row.When = DateTime.SpecifyKind(when, DateTimeKind.Utc);
+        return rows;
     }
 }
