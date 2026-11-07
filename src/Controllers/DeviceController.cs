@@ -91,7 +91,7 @@ namespace ESPresense.Controllers
         public ActionResult<CaptureStatus> GetCapture(string id)
         {
             var status = _captureService.GetStatus(id);
-            return status == null ? NotFound() : status;
+            return status == null ? NoContent() : status;
         }
 
         [HttpDelete("{id}/capture")]

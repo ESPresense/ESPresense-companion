@@ -231,7 +231,8 @@
 	async function refreshCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture`);
+			// 204 (nothing captured for this device) comes back as undefined.
+			capture = (await apiFetch<CaptureStatus | undefined>(`/api/device/${deviceSettings.id}/capture`)) ?? null;
 		} catch {
 			capture = null;
 		}
