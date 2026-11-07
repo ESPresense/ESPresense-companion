@@ -87,8 +87,6 @@ namespace ESPresense.Controllers
             return status == null ? NotFound() : status;
         }
 
-        // 204 rather than 404 when nothing is being captured: the calibration page polls this
-        // every second, and browsers log every 404 to the console.
         [HttpGet("{id}/capture")]
         public ActionResult<CaptureStatus> GetCapture(string id)
         {
