@@ -139,9 +139,10 @@ internal static class OptimizationCycle
             return OptimizationResults.Score(predictions);
         }
 
-        // The device term (#1860) exists only when there are held-out device windows and a weight to give them.
-        // Without it every composite below is exactly the node-to-node one.
-        var scoreDevices = optimization.DeviceWeight > 0 && evalSet.Any(s => s.DeviceWindows.Count > 0);
+        // The device term (#1860) exists only in device_residual mode, with held-out device windows and a weight to
+        // give them. Snapshots taken before a switch to another mode still carry windows, so the mode is checked, not
+        // just the windows. Without it every composite below is exactly the node-to-node one.
+        var scoreDevices = optimization.DeviceResidualMode && optimization.DeviceWeight > 0 && evalSet.Any(s => s.DeviceWindows.Count > 0);
         var minDeviceNodes = optimization.DeviceResidual.EffectiveMinNodes;
         var noDevices = (Total: DeviceEvaluation.None, PerSnapshot: Enumerable.Repeat(DeviceEvaluation.None, evalSet.Count).ToArray());
         Func<DeviceWindow, double>? deviceRef = null; // each device's learned rssi@1m, once the optimizers have fitted
