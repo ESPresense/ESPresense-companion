@@ -55,6 +55,11 @@ builder.Services.AddSingleton<DeviceService>();
 builder.Services.AddSingleton<DeviceCaptureService>();
 builder.Services.AddSingleton<IDeviceStatePublisher, DeviceStatePublisher>();
 builder.Services.AddSingleton<IDeviceHistoryWriter, DeviceHistoryWriter>();
+builder.Services.AddSingleton<FingerprintCollectionService>();
+builder.Services.AddSingleton<RoomLearningService>();
+builder.Services.AddSingleton<HomeAssistantClient>();
+builder.Services.AddSingleton<AccuracyService>();
+builder.Services.AddSingleton<RobotSurveyService>();
 builder.Services.AddSingleton<LeaseService>();
 builder.Services.AddSingleton<ILeaseService>(provider => provider.GetRequiredService<LeaseService>());
 
@@ -68,6 +73,8 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeSe
 builder.Services.AddHostedService(provider => provider.GetRequiredService<NodeTelemetryStore>());
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TelemetryService>());
 builder.Services.AddHostedService<DeviceCleanupService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<AccuracyService>());
+builder.Services.AddHostedService(provider => provider.GetRequiredService<RobotSurveyService>());
 builder.Services.AddSingleton<State>();
 builder.Services.AddSingleton<CalibrationService>();
 builder.Services.AddSingleton(provider => new OptimizerDebugService(provider.GetRequiredService<OptimizationRunner>(), provider.GetRequiredService<State>()));

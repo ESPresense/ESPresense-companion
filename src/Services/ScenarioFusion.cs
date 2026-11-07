@@ -19,13 +19,22 @@ public sealed record FusionResult(Scenario? Best, int Moved);
 /// </summary>
 public static class ScenarioFusion
 {
-    public static FusionResult Update(Device device, ConfigFiltering filtering, DateTime now)
+    /// <param name="fingerprint">When enabled with priority, a current fingerprint fix above min_confidence is reported over ranging.</param>
+    public static FusionResult Update(Device device, ConfigFiltering filtering, DateTime now, FingerprintConfig? fingerprint = null)
     {
         device.LastCalculated = now;
         var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
 
-        var kalmanSource = device.Scenarios
-            .Where(s => s.Current)
+        // Fingerprint fixes come from what the radio actually does at each spot; ranging comes from a model
+        // walls break. When the survey covers where the device is, the fingerprint fix is the one to report,
+        // and ranging only stands in outside the survey, where no fingerprint scenario is current.
+        IEnumerable<Scenario> candidates = device.Scenarios.Where(s => s.Current);
+        if (fingerprint is { Enabled: true, Priority: true } &&
+            candidates.Any(s => s.IsFingerprint && (s.Confidence ?? 0) >= fingerprint.MinConfidence))
+            candidates = candidates.Where(s => s.IsFingerprint);
+        var pool = candidates.ToList();
+
+        var kalmanSource = pool
             .OrderByDescending(s => s.Confidence)
             .FirstOrDefault();
 
@@ -68,8 +77,7 @@ public static class ScenarioFusion
             }
         }
 
-        var best = device.Scenarios
-            .Where(s => s.Current)
+        var best = pool
             .OrderByDescending(s => s.Probability)
             .ThenByDescending(s => s.Confidence)
             .ThenBy(s => device.Scenarios.IndexOf(s))

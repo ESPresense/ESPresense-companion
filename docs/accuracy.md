@@ -215,3 +215,25 @@ on libm differences across runners, on .NET SDK patch revs, and on any
 unrelated optimizer change inside `MathNet.Numerics`. The locker we want
 is "did we move the public number", not "did we change a digit somewhere
 deep in the output".
+
+## Live measurement on a real home
+
+The simulated baseline above says what the solvers can do; it does not say what *your* home does.
+Companion also measures the fingerprint locator on the live map, continuously, and publishes the
+result, so that every change to nodes, survey or settings shows up as metres:
+
+| measurement | what it is | when |
+|---|---|---|
+| **survey** | up to `accuracy.holdout_spots` surveyed spots held out of the fingerprint map in turn and located from the rest, scored per spot as the median of its visits (the robot-survey test's leave-one-spot-out, on the live map) | when the map changes, at most every `accuracy.holdout_interval_mins` |
+| **robot** | during a robot survey run ([robot-survey.md](robot-survey.md)), the beacon's own fix against the robot's LiDAR pose: the whole pipeline, end to end | every pose |
+| **anchors** | anchored devices located as if they were unknown and compared to their anchors | every `accuracy.interval_secs` |
+
+Each gives a median and a 90th percentile in metres. They are published retained to
+`espresense/companion/accuracy` and discovered in Home Assistant as diagnostic sensors
+(`Fingerprint accuracy Survey holdout median`, and so on), returned by `GET /api/state/accuracy` and the
+`get_accuracy` MCP tool; `POST /api/state/accuracy/holdout` re-scores the survey now.
+
+Read them with their limits in mind. The survey holdout measures the survey beacon at the survey's
+height and headings: a phone in a pocket, body-shadowed and turning, does worse, and the anchors figure
+(fixed-orientation devices) is the better guide to that. The robot figure includes whatever lag the
+locator has while the robot drives.

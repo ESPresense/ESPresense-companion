@@ -56,16 +56,21 @@ public class Scenario(Config? config, ILocate locator, string? name)
         MultiFloorMultilateralizer => "MultiFloor",
         NearestNode => "Nearest Node",
         AnchorLocator => "Anchored",
+        FingerprintLocator => "Fingerprint",
+        FingerprintTracker => "Fingerprint Tracker",
         _ => Locator.GetType().Name
     };
 
     internal bool IsNearestNode => Locator is NearestNode;
 
+    /// <summary>Located from the fingerprint survey rather than by ranging.</summary>
+    public bool IsFingerprint => Locator is FingerprintLocator or FingerprintTracker;
+
     /// <summary>
     /// Locator and floor together: <see cref="Name"/> alone is the floor, shared by every locator on
     /// it. Name stays as it is because it's published as best_scenario and stored in history.
     /// </summary>
-    public string Label => Locator is BaseMultilateralizer or NadarayaWatsonMultilateralizer
+    public string Label => Locator is BaseMultilateralizer or NadarayaWatsonMultilateralizer or FingerprintLocator or FingerprintTracker
         ? $"{LocatorName} ({Name})"
         : LocatorName;
 
