@@ -55,19 +55,21 @@
 		const id = deviceId;
 		const keep = retention;
 		let cancelled = false;
-		let fetchedTo = 0;
+		// Newest stored timestamp seen so far (server clock): the next poll starts just before it, so a browser clock
+		// that runs ahead of the server's can't skip rows. Null until the first fetch has answered.
+		let newest: number | null = null;
 		fixes = [];
 		loading = true;
 		error = null;
 
 		async function poll() {
 			const t = Date.now();
-			const initial = fetchedTo === 0;
+			const initial = newest === null;
 			try {
-				const got = await fetchFixes(id, initial ? t - keep : fetchedTo - 1000, t + 60_000, initial ? sampleEverySeconds(keep) : 1);
+				const got = await fetchFixes(id, initial ? t - keep : newest! - 1000, t + 60_000, initial ? sampleEverySeconds(keep) : 1);
 				if (cancelled) return;
 				fixes = mergeFixes(fixes, got, t - keep);
-				fetchedTo = t;
+				newest = fixes.length ? fixes[fixes.length - 1].t : (newest ?? t - keep);
 				error = null;
 			} catch (e) {
 				if (!cancelled) error = e instanceof Error ? e.message : String(e);

@@ -15,7 +15,8 @@ export interface TrailPoint {
 	fix: HistoryFix;
 	/** 0 at the moment shown, 1 at the far end of the trail window. */
 	age: number;
-	/** The room the fix fell in, on the floor its height puts it on. */
+	/** The floor the fix's height puts it on, and the room there it fell in. */
+	floor: Floor | null;
 	room: Room | null;
 }
 
@@ -131,7 +132,10 @@ export function advance(cursor: number, dtMs: number, speed: number, end: number
 export function viewAt(config: Config | null | undefined, fixes: HistoryFix[], cursor: number, trailMs: number, live: boolean): HistoryView {
 	const current = fixAt(fixes, cursor);
 	const floor = current ? floorAt(config, current.z) : null;
-	const trail = trailBefore(fixes, cursor, trailMs).map((p) => ({ ...p, room: roomAt(floorAt(config, p.fix.z), p.fix.x, p.fix.y) }));
+	const trail = trailBefore(fixes, cursor, trailMs).map((p) => {
+		const onFloor = floorAt(config, p.fix.z);
+		return { ...p, floor: onFloor, room: roomAt(onFloor, p.fix.x, p.fix.y) };
+	});
 	return { live, cursor, current, trail, floor, room: current && floor ? roomAt(floor, current.x, current.y) : null };
 }
 

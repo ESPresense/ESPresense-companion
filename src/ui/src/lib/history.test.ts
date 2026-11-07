@@ -187,13 +187,15 @@ describe('viewAt', () => {
 		expect(view.floor?.id).toBe('first');
 		expect(view.room?.id).toBe('den');
 		expect(view.trail.map((p) => p.room?.id)).toEqual(['kitchen', 'den']);
+		expect(view.trail.map((p) => p.floor?.id)).toEqual(['first', 'first']);
 		expect(view.live).toBe(false);
 	});
 
-	it('follows a fix to another floor', () => {
+	it("follows a fix to another floor, and the trail keeps each point's own floor", () => {
 		const view = viewAt(config, fixes, T0 + 20_000, 60_000, true);
 		expect(view.floor?.id).toBe('second');
 		expect(view.room?.id).toBe('office');
+		expect(view.trail.map((p) => p.floor?.id)).toEqual(['first', 'first', 'second']);
 	});
 
 	it('has no fix, floor or room when the device was quiet', () => {

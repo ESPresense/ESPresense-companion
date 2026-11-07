@@ -242,7 +242,7 @@
 				<FixEllipse {transform} ellipse={explanation.uncertainty} />
 			{/if}
 			{#if history}
-				<HistoryTrail {transform} view={history} />
+				<HistoryTrail {transform} view={history} floorId={floor?.id} />
 			{/if}
 			{#if !history || history.live}
 				<Devices {transform} {floorId} {deviceId} {exclusive} onselected={selectedDevice} onhovered={hoveredDevice} />
