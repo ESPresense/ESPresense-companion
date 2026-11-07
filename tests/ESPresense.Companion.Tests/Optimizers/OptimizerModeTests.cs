@@ -9,8 +9,9 @@ using Moq;
 namespace ESPresense.Companion.Tests.Optimizers;
 
 /// <summary>
-/// per_node_absorption is the only optimizer mode. The legacy chain and global_absorption were removed, so a
-/// config that still names one, or names nothing, must run per_node_absorption rather than nothing.
+/// per_node_absorption is the default optimizer mode; device_residual adds the device-residual optimizer to it. The
+/// legacy chain and global_absorption were removed, so a config that still names one, or names nothing, must run
+/// per_node_absorption rather than nothing.
 /// </summary>
 [FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
 public class OptimizerModeTests
@@ -68,6 +69,20 @@ public class OptimizerModeTests
         var runner = MakeRunner();
 
         Assert.That(runner.CurrentOptimizers.Select(o => o.GetType()), Is.EqualTo(new[] { typeof(PerNodeAbsorptionRxTx) }));
+        Assert.That(Warnings(), Is.Empty);
+    }
+
+    [TestCase("device_residual")]
+    [TestCase("Device_Residual")]
+    public async Task DeviceResidual_BuildsPerNodeAbsorptionAndDeviceResidual_WithoutWarning(string optimizer)
+    {
+        await WriteConfigAsync(optimizer, DateTime.UtcNow);
+
+        var runner = MakeRunner();
+
+        Assert.That(runner.CurrentOptimizers.Select(o => o.GetType()), Is.EqualTo(new[] { typeof(PerNodeAbsorptionRxTx), typeof(DeviceResidualOptimizer) }));
+        Assert.That(runner.Mode, Is.EqualTo("device_residual"));
+        Assert.That(runner.KnownOptimizerNames, Does.Contain("Device Residual"));
         Assert.That(Warnings(), Is.Empty);
     }
 
