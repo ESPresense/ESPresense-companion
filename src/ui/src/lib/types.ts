@@ -76,6 +76,17 @@ export interface Config {
 	devices: Device[];
 	gps?: ConfigGps | null;
 	map: MapConfig;
+	history?: ConfigHistory | null;
+}
+
+// Mirrors ConfigHistory in src/Models/Config.cs
+export interface ConfigHistory {
+	enabled: boolean;
+	path?: string | null;
+	/** As written in config.yaml, e.g. "24h" */
+	expireAfter: string;
+	/** The same as a .NET TimeSpan, e.g. "1.00:00:00" */
+	expireAfterTimeSpan: string;
 }
 
 export type NodeSetting = {

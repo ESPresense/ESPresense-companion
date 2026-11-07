@@ -62,6 +62,42 @@ history:
         Assert.That(history![0].X, Is.EqualTo(1));
     }
 
+    // sqlite-net hands back stored ticks as DateTimeKind.Unspecified; the JSON would then carry no Z and browsers would read it as local time.
+    [Test]
+    public async Task List_ReturnsWhenAsUtc()
+    {
+        // SQLiteAsyncConnection pools ":memory:" by connection string, so the tests here share one database: each uses its own id.
+        var cfg = await LoadConfig(historyEnabled: true);
+        var store = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), cfg);
+        var when = new DateTime(2026, 11, 7, 10, 30, 0, DateTimeKind.Utc);
+
+        await store.Add(new DeviceHistory { Id = "utc-dev", When = when, Best = true });
+
+        var row = (await store.List("utc-dev"))![0];
+        Assert.That(row.When!.Value.Kind, Is.EqualTo(DateTimeKind.Utc));
+        Assert.That(row.When, Is.EqualTo(when));
+        var ranged = (await store.List("utc-dev", when.AddMinutes(-1), when.AddMinutes(1)))![0];
+        Assert.That(ranged.When!.Value.Kind, Is.EqualTo(DateTimeKind.Utc));
+    }
+
+    [Test]
+    public async Task ListRange_BestOnly_LeavesOutTheOtherScenarios()
+    {
+        var cfg = await LoadConfig(historyEnabled: true);
+        var store = new DeviceHistoryStore(new SQLiteAsyncConnection(":memory:"), cfg);
+        var when = new DateTime(2026, 11, 7, 10, 30, 0, DateTimeKind.Utc);
+
+        await store.Add(new DeviceHistory { Id = "best-dev", When = when, Scenario = "MultiFloor", Best = true, X = 1 });
+        await store.Add(new DeviceHistory { Id = "best-dev", When = when, Scenario = "NearestNode", Best = false, X = 2 });
+        await store.Add(new DeviceHistory { Id = "best-dev", When = when.AddSeconds(1), Scenario = "NearestNode", Best = true, X = 3 });
+
+        var all = await store.List("best-dev", when.AddMinutes(-1), when.AddMinutes(1));
+        var best = await store.List("best-dev", when.AddMinutes(-1), when.AddMinutes(1), bestOnly: true);
+
+        Assert.That(all, Has.Count.EqualTo(3));
+        Assert.That(best!.Select(r => r.X), Is.EqualTo(new double?[] { 1, 3 }));
+    }
+
     [Test]
     public async Task HistoryPath_IsResolvedUnderTheStorageDir()
     {
