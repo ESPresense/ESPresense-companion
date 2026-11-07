@@ -54,6 +54,7 @@ internal static class OptimizationCycle
     /// <param name="os">The (pooled) snapshot the optimizers fit.</param>
     /// <param name="oss">The held-out snapshots proposals are scored on. <paramref name="os"/> itself is excluded unless it is all there is.</param>
     /// <param name="readSettings">Reads a node's current settings. Called once per node; the cycle scores against that frozen view.</param>
+    /// <param name="knownSpots">Devices at known positions to report the spot score on besides the anchors in the eval set (for taught spots).</param>
     public static OptimizationCycleResult Evaluate(
         OptimizationSnapshot os,
         IReadOnlyList<OptimizationSnapshot> oss,
@@ -61,7 +62,8 @@ internal static class OptimizationCycle
         IEnumerable<IOptimizer> optimizers,
         Func<string, NodeSettings> readSettings,
         bool dryRun,
-        DateTime at)
+        DateTime at,
+        IReadOnlyList<KnownPositionSpot>? knownSpots = null)
     {
         var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
         if (evalSet.Count == 0) evalSet = oss.ToList();
@@ -84,7 +86,18 @@ internal static class OptimizationCycle
             return OptimizationResults.Score(predictions);
         }
 
+        // Devices at known positions, scored with each spot's level fitted (#1868). Report-only: no gate reads it.
+        var spots = SpotScore.FromAnchors(evalSet).Concat(knownSpots ?? Array.Empty<KnownPositionSpot>()).ToList();
+        Dictionary<string, (double Sse, int Readings)> SpotsUnder(OptimizationResults results) => SpotScore.Evaluate(spots, id =>
+        {
+            results.Nodes.TryGetValue(id, out var pv);
+            var cal = Frozen(id).Calibration;
+            return (pv?.RxAdjRssi ?? cal.RxAdjRssi ?? 0, pv?.Absorption ?? cal.Absorption ?? 2.7);
+        });
+
         var baselineResults = new OptimizationResults();
+        var baselineSpots = SpotsUnder(baselineResults);
+        OptimizerSpotScore? baselineSpotScore = baselineSpots.Count > 0 ? SpotScore.Report(baselineSpots) : null;
         var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
         var bestScore = Composite(bestCorr, bestRmse, optimization);
         var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples);
@@ -93,7 +106,8 @@ internal static class OptimizationCycle
         {
             var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
                 Array.Empty<OptimizerProposalReport>(), null, false,
-                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).");
+                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).")
+                { BaselineSpots = baselineSpotScore };
             return new OptimizationCycleResult(skipped, null, null, null, baselineSamples) { Incumbent = frozen };
         }
 
@@ -105,7 +119,7 @@ internal static class OptimizationCycle
             ? evalSet.Select(snap => baselineResults.Evaluate(new List<OptimizationSnapshot> { snap }, Frozen)).ToList()
             : null;
 
-        var scored = new List<(IOptimizer Optimizer, OptimizationResults Results, OptimizerScore Score, OptimizerGates Gates, OptimizerGateDecision Decision)>();
+        var scored = new List<(IOptimizer Optimizer, OptimizationResults Results, OptimizerScore Score, OptimizerGates Gates, OptimizerGateDecision Decision, OptimizerSpotScore? Spots)>();
         foreach (var optimizer in optimizers)
         {
             var results = optimizer.Optimize(os, currentSettings).QuantizeForApplication();
@@ -149,14 +163,32 @@ internal static class OptimizationCycle
                 everySnapshot = new OptimizerEverySnapshotGate(losesOn, evalSet.Count, losesOn == 0);
             }
 
-            var decision =
-                !minSamples.Passed ? OptimizerGateDecision.MinSamples :
-                !improvement.Passed ? OptimizerGateDecision.NotBetter :
-                deviceFrame is { Passed: false } ? OptimizerGateDecision.DeviceFrame :
-                everySnapshot is { Passed: false } ? OptimizerGateDecision.EverySnapshot :
-                OptimizerGateDecision.Passed;
+            var spotScore = baselineSpots.Count > 0 ? SpotScore.Report(SpotsUnder(results), baselineSpots) : null;
+            var gates = new OptimizerGates(minSamples, improvement, deviceFrame, everySnapshot);
+            OptimizerGateDecision decision;
+            if (optimization.JudgeOnSpots)
+            {
+                var spotGate = SpotGate(spotScore, baselineSpotScore, score, baseline, results, Frozen);
+                gates = gates with { Spots = spotGate };
+                decision =
+                    !minSamples.Passed ? OptimizerGateDecision.MinSamples :
+                    spotGate.Spots < spotGate.RequiredSpots ? OptimizerGateDecision.NotEnoughSpots :
+                    !(spotGate.GainDb >= spotGate.MinGainDb) || !(spotGate.SignZ >= spotGate.MinSignZ) ? OptimizerGateDecision.SpotsNotBetter :
+                    !(spotGate.LinkLossDb <= spotGate.MaxLinkLossDb) ? OptimizerGateDecision.LinksWorse :
+                    !(Math.Abs(spotGate.GaugeShiftDb) <= spotGate.MaxGaugeShiftDb) ? OptimizerGateDecision.GaugeShift :
+                    OptimizerGateDecision.Passed;
+            }
+            else
+            {
+                decision =
+                    !minSamples.Passed ? OptimizerGateDecision.MinSamples :
+                    !improvement.Passed ? OptimizerGateDecision.NotBetter :
+                    deviceFrame is { Passed: false } ? OptimizerGateDecision.DeviceFrame :
+                    everySnapshot is { Passed: false } ? OptimizerGateDecision.EverySnapshot :
+                    OptimizerGateDecision.Passed;
+            }
 
-            scored.Add((optimizer, results, score, new OptimizerGates(minSamples, improvement, deviceFrame, everySnapshot), decision));
+            scored.Add((optimizer, results, score, gates, decision, spotScore));
         }
 
         // Every optimizer is scored against the same incumbent and only the best passing proposal is
@@ -164,7 +196,9 @@ internal static class OptimizationCycle
         // absorption-only proposal land on top of another optimizer's rxAdj: a pair nobody fitted.
         int? selected = null;
         for (var i = 0; i < scored.Count; i++)
-            if (scored[i].Decision == OptimizerGateDecision.Passed && (selected == null || scored[i].Score.Composite > scored[selected.Value].Score.Composite))
+            if (scored[i].Decision == OptimizerGateDecision.Passed && (selected == null || (optimization.JudgeOnSpots
+                    ? scored[i].Spots!.Rms < scored[selected.Value].Spots!.Rms
+                    : scored[i].Score.Composite > scored[selected.Value].Score.Composite)))
                 selected = i;
 
         var proposals = scored.Select((s, i) => new OptimizerProposalReport(
@@ -173,7 +207,10 @@ internal static class OptimizationCycle
             i == selected ? OptimizerGateDecision.Selected : s.Decision,
             false,
             s.Gates,
-            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))).ToList();
+            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))
+            {
+                Spots = s.Spots
+            }).ToList();
 
         string outcome;
         IOptimizer? chosen = null;
@@ -183,16 +220,67 @@ internal static class OptimizationCycle
             var s = scored[sel];
             chosen = s.Optimizer;
             chosenResults = s.Results;
-            outcome = $"{(dryRun ? "Would apply" : "Applying")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes (held-out R={s.Score.R:0.000}, RMSE={s.Score.Rmse:0.000}).";
+            outcome = $"{(dryRun ? "Would apply" : "Applying")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes ({Evidence(s.Score, s.Gates.Spots, baselineSpotScore, s.Spots)}).";
+        }
+        else if (optimization.JudgeOnSpots && scored.Count > 0 && scored.All(s => s.Decision is OptimizerGateDecision.NotEnoughSpots or OptimizerGateDecision.MinSamples))
+        {
+            outcome = $"Holding: judging on spots needs at least {SpotGateMinSpots} devices at known positions (anchors or taught locations); there {(baselineSpots.Count == 1 ? "is" : "are")} {baselineSpots.Count}.";
         }
         else
         {
-            outcome = "No proposal beat the current calibration on the held-out data.";
+            outcome = optimization.JudgeOnSpots
+                ? "No proposal beat the current calibration on the devices at known positions."
+                : "No proposal beat the current calibration on the held-out data.";
         }
 
         var report = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
-            proposals, chosen?.Name, false, outcome);
+            proposals, chosen?.Name, false, outcome) { BaselineSpots = baselineSpotScore };
         return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples) { Incumbent = frozen };
+    }
+
+    /// <summary>
+    /// What the outcome cites for an applied proposal: the evidence that accepted it. On the spot judge that is the
+    /// held-out spots it won and the spot RMS; on the links judge, the held-out node-to-node R and RMSE.
+    /// </summary>
+    internal static string Evidence(OptimizerScore score, OptimizerSpotGate? gate, OptimizerSpotScore? baseline, OptimizerSpotScore? proposal) =>
+        gate != null && baseline != null && proposal != null
+            ? $"better on {gate.Better} of {gate.Better + gate.Worse} held-out spots, spot RMS {baseline.Rms:0.00} -> {proposal.Rms:0.00} dB"
+            : $"held-out R={score.R:0.000}, RMSE={score.Rmse:0.000}";
+
+    /// <summary>The spot judge needs this many spots: with fewer, it picks the better calibration too rarely (#1868).</summary>
+    internal const int SpotGateMinSpots = 4;
+    /// <summary>
+    /// A proposal must be better on spots consistently, not just on average: the sign test over the spots it wins and
+    /// loses (ties left out), z = (better − worse) / √(better + worse), at least this. It scales with the evidence: 4
+    /// spots need all 4, 52 need about 33. A fixed gain per cycle would instead fight the step cap a fit applies
+    /// (SpotFitOptimizer): a capped step gains little each cycle even when it is clearly right.
+    /// </summary>
+    internal const double SpotGateMinSignZ = 2.0;
+
+    /// <summary>The spot RMS must also drop by this much, so a sign-consistent change too small to matter is not applied.</summary>
+    internal const double SpotGateMinGainDb = 0.1;
+    internal const double SpotGateMaxLinkLossDb = 1.0;
+    internal const double SpotGateMaxGaugeShiftDb = 2.0;
+
+    /// <summary>
+    /// The spot judge's numbers for one proposal. Gain is the drop in spot RMS; link loss is how much worse the
+    /// node-to-node RMSE gets (a floor, not the judge); the gauge shift is the mean change of rxAdj over the receivers
+    /// the proposal sets, which the spot score cannot see because it fits each spot's level.
+    /// </summary>
+    internal static OptimizerSpotGate SpotGate(OptimizerSpotScore? proposal, OptimizerSpotScore? baseline, OptimizerScore score,
+        OptimizerScore baselineScore, OptimizationResults results, Func<string, NodeSettings> frozen)
+    {
+        var shifts = results.Nodes.Where(kv => kv.Value.RxAdjRssi != null)
+            .Select(kv => kv.Value.RxAdjRssi!.Value - (frozen(kv.Key).Calibration.RxAdjRssi ?? 0)).ToList();
+        var gaugeShift = shifts.Count > 0 ? shifts.Average() : 0;
+        var gain = proposal != null && baseline != null ? baseline.Rms - proposal.Rms : double.NaN;
+        var spots = baseline?.Spots ?? 0;
+        int better = proposal?.Better ?? 0, worse = proposal?.Worse ?? 0;
+        var signZ = better + worse > 0 ? (better - worse) / Math.Sqrt(better + worse) : 0;
+        var passed = spots >= SpotGateMinSpots && gain >= SpotGateMinGainDb && signZ >= SpotGateMinSignZ
+                     && score.Rmse - baselineScore.Rmse <= SpotGateMaxLinkLossDb && Math.Abs(gaugeShift) <= SpotGateMaxGaugeShiftDb;
+        return new OptimizerSpotGate(spots, SpotGateMinSpots, better, worse, signZ, SpotGateMinSignZ, gain, SpotGateMinGainDb,
+            score.Rmse - baselineScore.Rmse, SpotGateMaxLinkLossDb, gaugeShift, SpotGateMaxGaugeShiftDb, passed);
     }
 
     /// <summary>Per node, per role, per scenario: count, sum and sum of squares of the residuals.</summary>

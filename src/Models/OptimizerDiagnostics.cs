@@ -75,7 +75,15 @@ public sealed record OptimizerCycleReport(
     bool Applied,
     string Outcome,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null)
+{
+    /// <summary>
+    /// The incumbent scored on devices at known positions (see <see cref="OptimizerSpotScore"/>). Report-only:
+    /// no gate reads it. Null when no spot has enough receivers.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerSpotScore? BaselineSpots { get; init; }
+}
 
 /// <summary>Where a proposal stopped. Gates are checked in this order; the first one failed is the decision.</summary>
 public enum OptimizerGateDecision
@@ -92,6 +100,14 @@ public enum OptimizerGateDecision
     DeviceFrame,
     /// <summary>Better on the aggregate but not on every eval snapshot by itself.</summary>
     EverySnapshot,
+    /// <summary>judge: spots, and there are too few devices at known positions to judge on.</summary>
+    NotEnoughSpots,
+    /// <summary>judge: spots, and not better on enough spots or by enough.</summary>
+    SpotsNotBetter,
+    /// <summary>judge: spots, better on spots but much worse on the node-to-node links.</summary>
+    LinksWorse,
+    /// <summary>judge: spots, and it shifts every receiver's rxAdj together by more than the spots can vouch for.</summary>
+    GaugeShift,
 }
 
 public sealed record OptimizerProposalReport(
@@ -100,7 +116,24 @@ public sealed record OptimizerProposalReport(
     OptimizerGateDecision Decision,
     bool Applied,
     OptimizerGates Gates,
-    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes);
+    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes)
+{
+    /// <summary>The proposal scored on devices at known positions, with how many spots it wins and loses against the incumbent. Report-only.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerSpotScore? Spots { get; init; }
+}
+
+/// <summary>
+/// A calibration scored on devices at known positions (anchors; later, taught spots), #1868. Each spot's level is
+/// fitted, so this is the RMS (dB) of how the receivers disagree about each spot: their calibration relative to each
+/// other, which is what moves a trilaterated position, without the guess in a device's rssi@1m. <see cref="Better"/>
+/// and <see cref="Worse"/> count spots against the incumbent and are null on the incumbent itself.
+/// </summary>
+public sealed record OptimizerSpotScore(int Spots, int Readings, double Rms)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Better { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Worse { get; init; }
+}
 
 /// <summary>
 /// The numbers behind each gate. All are computed for every proposal, so a proposal stopped early still shows
@@ -111,7 +144,24 @@ public sealed record OptimizerGates(
     OptimizerMinSamplesGate MinSamples,
     OptimizerImprovementGate Improvement,
     OptimizerDeviceFrameGate? DeviceFrame,
-    OptimizerEverySnapshotGate? EverySnapshot);
+    OptimizerEverySnapshotGate? EverySnapshot)
+{
+    /// <summary>The spot judge's numbers (judge: spots); null when the links judge decides.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerSpotGate? Spots { get; init; }
+}
+
+/// <summary>
+/// The spot judge (#1868). Passed when there are at least <see cref="RequiredSpots"/> spots, the proposal is better on
+/// them consistently (sign test: <see cref="SignZ"/> = (better − worse) / √(better + worse) at least
+/// <see cref="MinSignZ"/>), its spot RMS is at least <see cref="MinGainDb"/> lower, the
+/// node-to-node RMSE is at most <see cref="MaxLinkLossDb"/> worse, and the mean rxAdj moves by at most
+/// <see cref="MaxGaugeShiftDb"/>: the spot score fits each spot's level, so a common shift of every receiver is
+/// invisible to it and must not ride along.
+/// </summary>
+public sealed record OptimizerSpotGate(
+    int Spots, int RequiredSpots, int Better, int Worse, double SignZ, double MinSignZ, double GainDb, double MinGainDb,
+    double LinkLossDb, double MaxLinkLossDb, double GaugeShiftDb, double MaxGaugeShiftDb, bool Passed);
 
 public sealed record OptimizerMinSamplesGate(int Samples, int Required, bool Passed);
 

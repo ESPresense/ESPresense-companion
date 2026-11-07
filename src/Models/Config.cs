@@ -176,6 +176,10 @@ namespace ESPresense.Models
         [YamlMember(Alias = "interval_secs", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? IntervalSecs { get; set; }
         [YamlMember(Alias = "keep_snapshot_mins", DefaultValuesHandling = DefaultValuesHandling.OmitNull)] public int? KeepSnapshotMins { get; set; }
         [YamlMember(Alias = "min_samples")] public int MinSamples { get; set; } = 5; // Minimum holdout measurements a candidate must be evaluated on before it can be applied
+        // What decides whether a proposal is applied: "links" (held-out node-to-node links; the default) or "spots"
+        // (devices at known positions, each spot's level fitted; see OptimizationCycle and #1868)
+        [YamlMember(Alias = "judge")] public string Judge { get; set; } = "links";
+        [YamlIgnore] public bool JudgeOnSpots => string.Equals(Judge?.Trim(), "spots", StringComparison.OrdinalIgnoreCase);
         [YamlMember(Alias = "limits")] public Dictionary<string, double> Limits { get; set; } = new();
         [YamlMember(Alias = "weights")] public Dictionary<string, double> Weights { get; set; } = new();
 
