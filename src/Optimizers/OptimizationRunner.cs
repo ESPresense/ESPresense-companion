@@ -397,13 +397,23 @@ internal class OptimizationRunner : BackgroundService
                 _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better on the aggregate (Composite={Composite:0.000} > Best={Best:0.000}) but not on {LosesOn} of {Snapshots} snapshots on their own; treating the gain as noise",
                     p.Optimizer, composite, bestScore, p.Gates.EverySnapshot!.LostOn, p.Gates.EverySnapshot.Of);
                 break;
+            case OptimizerGateDecision.NotEnoughSpots:
+                _logger.LogInformation("Optimizer {Optimizer,-24} held: judging on spots needs {Required} devices at known positions, there are {Spots}",
+                    p.Optimizer, p.Gates.Spots!.RequiredSpots, p.Gates.Spots.Spots);
+                break;
+            case OptimizerGateDecision.SpotsNotBetter:
+            case OptimizerGateDecision.LinksWorse:
+            case OptimizerGateDecision.GaugeShift:
+                _logger.LogInformation("Optimizer {Optimizer,-24} rejected ({Decision}): better on {Better} and worse on {Worse} of {Spots} spots (z {SignZ:0.0}), spot RMS gain {GainDb:0.00} dB, node-link RMSE {LinkLossDb:+0.00;-0.00} dB, mean rxAdj shift {GaugeShiftDb:+0.0;-0.0} dB",
+                    p.Optimizer, p.Decision, p.Gates.Spots!.Better, p.Gates.Spots.Worse, p.Gates.Spots.Spots, p.Gates.Spots.SignZ, p.Gates.Spots.GainDb, p.Gates.Spots.LinkLossDb, p.Gates.Spots.GaugeShiftDb);
+                break;
             default:
                 _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
                     p.Optimizer, composite, bestScore, corr, rmse);
                 break;
         }
 
-        if (p.Decision is OptimizerGateDecision.MinSamples or OptimizerGateDecision.NotBetter or OptimizerGateDecision.DeviceFrame or OptimizerGateDecision.EverySnapshot)
+        if (p.Decision is not (OptimizerGateDecision.Selected or OptimizerGateDecision.Passed))
             LogRejectedProposal(p, incumbent);
     }
 
