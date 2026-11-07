@@ -11,6 +11,10 @@ namespace ESPresense.Optimizers;
 /// Samples taken at the same place (same floor, position rounded to <see cref="GridM"/>) are one spot, each node's
 /// RSSI averaged: counting repeat samples as separate spots would let one place outvote the rest of the house, which
 /// is the pseudo-replication #1868 found in the snapshot split. A missing, unreadable or malformed file is no spots.
+///
+/// A receiver only counts for spots on a floor it serves. Heard through a floor or a stairwell, a spot says how much
+/// that floor attenuates, not how the receiver is calibrated; fitted or judged on it, rxAdj would absorb the floor
+/// loss and be right for one floor and wrong for the other.
 /// </summary>
 internal sealed class TaughtSpots(string path, ILogger? logger = null)
 {
@@ -23,8 +27,12 @@ internal sealed class TaughtSpots(string path, ILogger? logger = null)
 
     public string Path { get; } = path;
 
-    /// <summary>The taught spots whose receivers have a known position; <paramref name="receiverAt"/> is null for any other.</summary>
-    public IReadOnlyList<KnownPositionSpot> Read(Func<string, Point3D?> receiverAt)
+    /// <summary>
+    /// The taught spots, with the receivers that have a known position and serve the spot's floor.
+    /// <paramref name="receiver"/> gives a receiver's position and floor ids, or null for one without a position;
+    /// a receiver with no floors listed counts on every floor.
+    /// </summary>
+    public IReadOnlyList<KnownPositionSpot> Read(Func<string, (Point3D At, IReadOnlyCollection<string> Floors)?> receiver)
     {
         List<(string Floor, Point3D At, Dictionary<string, double> Rssi)> samples;
         lock (_lock) samples = Load();
@@ -36,9 +44,9 @@ internal sealed class TaughtSpots(string path, ILogger? logger = null)
                 var at = new Point3D(g.Average(s => s.At.X), g.Average(s => s.At.Y), g.Average(s => s.At.Z));
                 var readings = g.SelectMany(s => s.Rssi)
                     .GroupBy(kv => kv.Key, StringComparer.Ordinal)
-                    .Select(n => (Id: n.Key, Raw: n.Average(kv => kv.Value), At: receiverAt(n.Key)))
-                    .Where(n => n.At != null)
-                    .Select(n => new SpotReading(n.Id, n.At!.Value, n.Raw))
+                    .Select(n => (Id: n.Key, Raw: n.Average(kv => kv.Value), Rx: receiver(n.Key)))
+                    .Where(n => n.Rx is { } rx && (rx.Floors.Count == 0 || g.Key.Floor.Length == 0 || rx.Floors.Contains(g.Key.Floor)))
+                    .Select(n => new SpotReading(n.Id, n.Rx!.Value.At, n.Raw))
                     .OrderBy(r => r.RxId, StringComparer.Ordinal)
                     .ToList();
                 return new KnownPositionSpot($"taught:{g.Key.Floor}:{at.X:0.00},{at.Y:0.00}", at, readings);
