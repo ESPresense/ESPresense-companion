@@ -35,10 +35,12 @@ internal static class SpotScore
             // Without the rxAdj a reading was taken with, its raw RSSI is unknown: re-basing it would turn that
             // receiver's applied adjustment into an apparent calibration error. Leave it out, as the fit does.
             .Where(m => m.Tx?.IsAnchor == true && m.Rx?.Id != null && m.Tx.Id != null && double.IsFinite(m.Rssi) && m.RssiRxAdj != null)
-            .GroupBy(m => m.Tx.Id, StringComparer.Ordinal)
+            // One spot per anchor per position: an anchor moved during the window is two spots, not one scored
+            // at its last position with readings from both.
+            .GroupBy(m => (m.Tx.Id, m.Tx.Location))
             .Select(g => new KnownPositionSpot(
-                g.Key,
-                g.Last().Tx.Location,
+                $"{g.Key.Id}@{g.Key.Location.X:0.00},{g.Key.Location.Y:0.00},{g.Key.Location.Z:0.00}",
+                g.Key.Location,
                 g.GroupBy(m => m.Rx.Id, StringComparer.Ordinal)
                     .Select(r => new SpotReading(r.Key, r.Last().Rx.Location, r.Average(m => m.Rssi + m.RssiRxAdj!.Value)))
                     .ToList()))
