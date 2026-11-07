@@ -75,7 +75,15 @@ public sealed record OptimizerCycleReport(
     bool Applied,
     string Outcome,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null)
+{
+    /// <summary>
+    /// The incumbent scored on devices at known positions (see <see cref="OptimizerSpotScore"/>). Report-only:
+    /// no gate reads it. Null when no spot has enough receivers.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerSpotScore? BaselineSpots { get; init; }
+}
 
 /// <summary>Where a proposal stopped. Gates are checked in this order; the first one failed is the decision.</summary>
 public enum OptimizerGateDecision
@@ -100,7 +108,24 @@ public sealed record OptimizerProposalReport(
     OptimizerGateDecision Decision,
     bool Applied,
     OptimizerGates Gates,
-    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes);
+    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes)
+{
+    /// <summary>The proposal scored on devices at known positions, with how many spots it wins and loses against the incumbent. Report-only.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerSpotScore? Spots { get; init; }
+}
+
+/// <summary>
+/// A calibration scored on devices at known positions (anchors; later, taught spots), #1868. Each spot's level is
+/// fitted, so this is the RMS (dB) of how the receivers disagree about each spot: their calibration relative to each
+/// other, which is what moves a trilaterated position, without the guess in a device's rssi@1m. <see cref="Better"/>
+/// and <see cref="Worse"/> count spots against the incumbent and are null on the incumbent itself.
+/// </summary>
+public sealed record OptimizerSpotScore(int Spots, int Readings, double Rms)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Better { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Worse { get; init; }
+}
 
 /// <summary>
 /// The numbers behind each gate. All are computed for every proposal, so a proposal stopped early still shows

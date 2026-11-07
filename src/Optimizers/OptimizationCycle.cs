@@ -54,6 +54,7 @@ internal static class OptimizationCycle
     /// <param name="os">The (pooled) snapshot the optimizers fit.</param>
     /// <param name="oss">The held-out snapshots proposals are scored on. <paramref name="os"/> itself is excluded unless it is all there is.</param>
     /// <param name="readSettings">Reads a node's current settings. Called once per node; the cycle scores against that frozen view.</param>
+    /// <param name="knownSpots">Devices at known positions to report the spot score on besides the anchors in the eval set (for taught spots).</param>
     public static OptimizationCycleResult Evaluate(
         OptimizationSnapshot os,
         IReadOnlyList<OptimizationSnapshot> oss,
@@ -61,7 +62,8 @@ internal static class OptimizationCycle
         IEnumerable<IOptimizer> optimizers,
         Func<string, NodeSettings> readSettings,
         bool dryRun,
-        DateTime at)
+        DateTime at,
+        IReadOnlyList<KnownPositionSpot>? knownSpots = null)
     {
         var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
         if (evalSet.Count == 0) evalSet = oss.ToList();
@@ -84,7 +86,18 @@ internal static class OptimizationCycle
             return OptimizationResults.Score(predictions);
         }
 
+        // Devices at known positions, scored with each spot's level fitted (#1868). Report-only: no gate reads it.
+        var spots = SpotScore.FromAnchors(evalSet).Concat(knownSpots ?? Array.Empty<KnownPositionSpot>()).ToList();
+        Dictionary<string, (double Sse, int Readings)> SpotsUnder(OptimizationResults results) => SpotScore.Evaluate(spots, id =>
+        {
+            results.Nodes.TryGetValue(id, out var pv);
+            var cal = Frozen(id).Calibration;
+            return (pv?.RxAdjRssi ?? cal.RxAdjRssi ?? 0, pv?.Absorption ?? cal.Absorption ?? 2.7);
+        });
+
         var baselineResults = new OptimizationResults();
+        var baselineSpots = SpotsUnder(baselineResults);
+        OptimizerSpotScore? baselineSpotScore = baselineSpots.Count > 0 ? SpotScore.Report(baselineSpots) : null;
         var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
         var bestScore = Composite(bestCorr, bestRmse, optimization);
         var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples);
@@ -93,7 +106,8 @@ internal static class OptimizationCycle
         {
             var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
                 Array.Empty<OptimizerProposalReport>(), null, false,
-                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).");
+                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).")
+                { BaselineSpots = baselineSpotScore };
             return new OptimizationCycleResult(skipped, null, null, null, baselineSamples) { Incumbent = frozen };
         }
 
@@ -173,7 +187,10 @@ internal static class OptimizationCycle
             i == selected ? OptimizerGateDecision.Selected : s.Decision,
             false,
             s.Gates,
-            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))).ToList();
+            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))
+            {
+                Spots = baselineSpots.Count > 0 ? SpotScore.Report(SpotsUnder(s.Results), baselineSpots) : null
+            }).ToList();
 
         string outcome;
         IOptimizer? chosen = null;
@@ -191,7 +208,7 @@ internal static class OptimizationCycle
         }
 
         var report = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
-            proposals, chosen?.Name, false, outcome);
+            proposals, chosen?.Name, false, outcome) { BaselineSpots = baselineSpotScore };
         return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples) { Incumbent = frozen };
     }
 
