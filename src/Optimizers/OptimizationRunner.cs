@@ -17,6 +17,7 @@ internal class OptimizationRunner : BackgroundService
     private readonly ConfigLoader _cfg;
     private readonly ILeaseService _leaseService;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly TaughtSpots _taughtSpots;
     private IList<IOptimizer> _optimizers;
     private readonly object _optimizersLock = new();
     private string? _lastOptimizerMode;
@@ -33,6 +34,7 @@ internal class OptimizationRunner : BackgroundService
         _nsd = nsd;
         _logger = logger;
         _cfg = cfg;
+        _taughtSpots = new TaughtSpots(System.IO.Path.Combine(cfg.ConfigDirectory, "fingerprints.json"), logger);
         _leaseService = leaseService;
         _optimizers = new List<IOptimizer>();
 
@@ -292,7 +294,7 @@ internal class OptimizationRunner : BackgroundService
     internal async Task RunCycleAsync(OptimizationSnapshot os, IReadOnlyList<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
     {
         // The decision is made without access to the store's writers; only the selected proposal is applied below.
-        var cycle = OptimizationCycle.Evaluate(os, oss, optimization, optimizers, _nsd.Get, dryRun: false, DateTime.UtcNow);
+        var cycle = OptimizationCycle.Evaluate(os, oss, optimization, optimizers, _nsd.Get, dryRun: false, DateTime.UtcNow, TaughtSpotsNow());
         LastCycle = cycle;
         var report = cycle.Report;
 
@@ -376,6 +378,10 @@ internal class OptimizationRunner : BackgroundService
             nodeWritten();
         }
     }
+
+    /// <summary>Taught locations (fingerprints.json) as spots, with the receivers that have a configured, stationary position.</summary>
+    private IReadOnlyList<KnownPositionSpot> TaughtSpotsNow() =>
+        _taughtSpots.Read(id => _state.Nodes.TryGetValue(id, out var n) && n.HasLocation && n.Stationary ? n.Location : null);
 
     private void LogDecision(OptimizerProposalReport p, double bestScore, IReadOnlyDictionary<string, NodeSettings> incumbent)
     {
@@ -512,7 +518,7 @@ internal class OptimizationRunner : BackgroundService
         await _dryRunGate.WaitAsync(cancellationToken);
         try
         {
-            var result = await Task.Run(() => OptimizationCycle.Evaluate(split.Training, split.Validation, optimization, optimizers, _nsd.Get, dryRun: true, DateTime.UtcNow), cancellationToken);
+            var result = await Task.Run(() => OptimizationCycle.Evaluate(split.Training, split.Validation, optimization, optimizers, _nsd.Get, dryRun: true, DateTime.UtcNow, TaughtSpotsNow()), cancellationToken);
             return note == null ? result : result with { Report = result.Report with { Note = note } };
         }
         finally
