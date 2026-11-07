@@ -326,7 +326,8 @@ internal class OptimizationRunner : BackgroundService
 
         var chosen = cycle.Selected;
         var chosenResults = cycle.SelectedResults;
-        var chosenScore = report.Proposals.First(p => p.Decision == OptimizerGateDecision.Selected).Score;
+        var chosenProposal = report.Proposals.First(p => p.Decision == OptimizerGateDecision.Selected);
+        var chosenScore = chosenProposal.Score;
         _logger.LogInformation("Applying {Optimizer} (Composite={Composite:0.000}, R={R:0.000}, RMSE={RMSE:0.000})", chosen.Name, chosenScore.Composite, chosenScore.R, chosenScore.Rmse);
         _state.OptimizerState.BestR = chosenScore.R;
         _state.OptimizerState.BestRMSE = chosenScore.Rmse;
@@ -348,7 +349,7 @@ internal class OptimizationRunner : BackgroundService
         }
 
         var applied = cycle.WithApplication(true,
-            $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenScore.R:0.000}, RMSE={chosenScore.Rmse:0.000}).");
+            $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes ({OptimizationCycle.Evidence(chosenScore, chosenProposal.Gates.Spots, report.BaselineSpots, chosenProposal.Spots)}).");
         LastCycle = applied;
         _state.OptimizerState.LastOutcome = applied.Report.Outcome;
     }
