@@ -553,7 +553,7 @@
 			<div class="card preset-tonal p-3 grid grid-cols-[minmax(0,16rem)_7rem] items-end gap-3">
 				<div class="min-w-0">
 					<label class="label text-sm font-medium mb-1 block" for="floor-select">Floor</label>
-					<select id="floor-select" bind:value={selectedFloorId} class="select w-full text-base py-2">
+					<select id="floor-select" bind:value={selectedFloorId} class="select w-full text-base py-2 pl-3 pr-10 appearance-none bg-no-repeat cursor-pointer" style="background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a0a8b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E&quot;); background-position: right 0.75rem center;">
 						{#each $config?.floors as { id, name }}
 							<option value={id}>{name}</option>
 						{/each}

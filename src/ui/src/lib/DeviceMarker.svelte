@@ -21,16 +21,20 @@
 
 	const r = spring(5, { stiffness: 0.15, damping: 0.3 });
 	const s = tweened(1, { duration: 500, easing: cubicOut });
-	const x = spring(d?.location?.x);
-	const y = spring(d?.location?.y);
+	// Springs must never be set to undefined: that yields NaN screen coordinates (SVG "Expected length, NaN"),
+	// including while the marker fades out after losing its location. Keep the last known position instead.
+	const x = spring(d?.location?.x ?? 0);
+	const y = spring(d?.location?.y ?? 0);
+	let placed = d?.location?.x != null && d?.location?.y != null;
 	// tweened() sets an initial undefined value without interpolating, so the fallback never runs
 	const c = tweened<string | undefined>(undefined, { duration: 1000, easing: cubicOut, interpolate: (a, b) => interpolateLab(a ?? '#000', b ?? '#000') });
 
 	$effect(() => {
-		x.set(d?.location?.x);
+		if (d?.location?.x != null) x.set(d.location.x, { hard: !placed });
 	});
 	$effect(() => {
-		y.set(d?.location?.y);
+		if (d?.location?.y != null) y.set(d.location.y, { hard: !placed });
+		if (d?.location?.x != null && d?.location?.y != null) placed = true;
 	});
 	$effect(() => {
 		c.set(visible && d?.room?.id ? getRoomColor($config, d?.room?.id) : '#000');
