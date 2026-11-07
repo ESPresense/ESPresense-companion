@@ -523,9 +523,9 @@
 </svelte:head>
 
 <div class="h-full overflow-y-auto">
-	<div class="w-full px-4 py-3 space-y-4">
+	<div class="w-full max-w-6xl mx-auto px-4 py-3 space-y-4">
 		<header class="flex items-center justify-between">
-			<h1 class="text-2xl font-bold text-surface-900-100">Device Calibration</h1>
+			<h1 class="text-xl font-bold text-surface-900-100">Device Calibration</h1>
 		</header>
 
 		<div class="card preset-tonal">
@@ -549,10 +549,10 @@
 		</div>
 
 		{#if $config?.floors}
-			<div class="grid grid-cols-1 gap-4">
-				<div>
-					<label class="label font-medium mb-1" for="floor-select">Select Floor</label>
-					<select id="floor-select" bind:value={selectedFloorId} class="select w-full">
+			<div class="card preset-tonal p-3 flex flex-wrap items-end gap-4">
+				<div class="w-full sm:w-64">
+					<label class="label text-sm font-medium mb-1 block" for="floor-select">Floor</label>
+					<select id="floor-select" bind:value={selectedFloorId} class="select w-full text-base py-2">
 						{#each $config?.floors as { id, name }}
 							<option value={id}>{name}</option>
 						{/each}
@@ -560,12 +560,9 @@
 				</div>
 
 				{#if calibrationSpot}
-					<div>
-						<label class="label font-medium mb-1" for="height-input">Height from Floor (m)</label>
-						<div class="flex">
-							<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input rounded-r-none" />
-							<button type="button" class="btn preset-filled-primary-500 rounded-l-none" onclick={() => (calibrationSpotHeight = calibrationSpotHeight)}>Set</button>
-						</div>
+					<div class="w-full sm:w-44">
+						<label class="label text-sm font-medium mb-1 block" for="height-input">Height from floor (m)</label>
+						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input w-full text-base py-2" />
 					</div>
 				{/if}
 			</div>
