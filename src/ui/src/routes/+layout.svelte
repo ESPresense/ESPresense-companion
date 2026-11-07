@@ -31,6 +31,12 @@
 		if (updated.current && !willUnload && to?.url) location.href = to.url.href;
 	});
 
+	// Pages like device calibration stay open for a long time without navigating, and would keep running
+	// the old bundle against a restarted server. Reload as soon as the poll sees the newer build.
+	$effect(() => {
+		if (updated.current) location.reload();
+	});
+
 	// `resolve()` is typed per route, so each href is resolved individually.
 	const resolvedRoutes = [
 		{ resolved: resolve('/'), name: 'map', icon: map, alt: 'Map' },
