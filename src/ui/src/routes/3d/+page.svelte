@@ -1,78 +1,16 @@
 <script lang="ts">
 	// Page to display the 3D map for ALL devices
-	import { onMount, onDestroy } from 'svelte';
-	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
-	import { devices, nodes, config } from '#lib/stores.js';
-	import Map3D from '#lib/Map3D.svelte'; // Import the new component
+	import { devices, nodes, config, showAllFloors } from '#lib/stores.js';
+	import FloorTabs from '#lib/FloorTabs.svelte';
+	import Map3D from '#lib/Map3D.svelte';
+	import Map3DControls from '#lib/Map3DControls.svelte';
 
-	// --- State for GUI Controls ---
-	let guiInstance: GUI | null = null;
+	// Local state, not a prop: SvelteKit route components only receive `data` and `form`.
+	let floorId: string | null = $state(null);
 	let showNodes = $state(true);
 	let showDevices = $state(true);
-	let zRotationSpeed = $state(0.002);
-
-	const effectController = $state({
-		zRotationSpeed: 0.002,
-		showNodes: true,
-		showDevices: true
-	});
-
-	// --- Reactive synchronization ---
-	$effect(() => {
-		if (effectController && effectController.zRotationSpeed !== zRotationSpeed) {
-			effectController.zRotationSpeed = zRotationSpeed;
-		}
-	});
-
-	$effect(() => {
-		if (effectController && effectController.showNodes !== showNodes) {
-			effectController.showNodes = showNodes;
-		}
-	});
-
-	$effect(() => {
-		if (effectController && effectController.showDevices !== showDevices) {
-			effectController.showDevices = showDevices;
-		}
-	});
-
-	// --- Lifecycle ---
-	onMount(() => {
-		doGuiSetup();
-
-		return () => {
-			guiInstance?.destroy();
-		};
-	});
-
-	// --- GUI Setup ---
-	function doGuiSetup() {
-		guiInstance?.destroy(); // Ensure previous instance is removed
-		guiInstance = new GUI({ title: 'Visualization Settings' });
-
-		guiInstance
-			.add(effectController, 'zRotationSpeed', 0, Math.PI / 2, 0.01)
-			.name('Rotation Speed')
-			.onChange((value: number) => {
-				zRotationSpeed = value; // Update the reactive variable passed as prop
-			});
-
-		guiInstance
-			.add(effectController, 'showNodes')
-			.name('Show Nodes')
-			.onChange((value: boolean) => {
-				showNodes = value; // Update the reactive variable passed as prop
-			});
-
-		guiInstance
-			.add(effectController, 'showDevices')
-			.name('Show Devices')
-			.onChange((value: boolean) => {
-				showDevices = value; // Update the reactive variable passed as prop
-			});
-
-		guiInstance.close(); // Start closed
-	}
+	let autoRotate = $state(false);
+	let map: ReturnType<typeof Map3D> | undefined = $state.raw();
 </script>
 
 <svelte:head>
@@ -80,8 +18,10 @@
 </svelte:head>
 
 <div class="w-full h-full relative bg-surface-50-950">
+	<FloorTabs bind:floorId />
+	<Map3DControls bind:showNodes bind:showDevices bind:autoRotate onview={(preset) => map?.frameView(preset)} />
 	{#if $config && $devices && $nodes}
-		<Map3D devicesToShow={$devices} nodesToShow={$nodes} config={$config} bind:showNodes bind:showDevices bind:zRotationSpeed showHistoryPath={false} historyData={[]} />
+		<Map3D bind:this={map} devicesToShow={$devices} nodesToShow={$nodes} config={$config} {floorId} showAllFloors={$showAllFloors} {showNodes} {showDevices} bind:autoRotate showHistoryPath={false} historyData={[]} />
 	{:else}
 		<div class="absolute inset-0 flex items-center justify-center text-white">Loading map data...</div>
 	{/if}

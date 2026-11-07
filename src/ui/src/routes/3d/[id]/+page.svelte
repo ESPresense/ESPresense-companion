@@ -1,47 +1,42 @@
 <script lang="ts">
 	// Page to display the 3D map for a SINGLE device and its history
-	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/state'; // To get route params
-	import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
-	import { devices, nodes, config } from '#lib/stores.js';
+	import { devices, nodes, config, showAllFloors } from '#lib/stores.js';
+	import FloorTabs from '#lib/FloorTabs.svelte';
 	import Map3D from '#lib/Map3D.svelte';
-	import type { Device, Node, Config, DeviceHistory } from '#lib/types.js';
+	import Map3DControls from '#lib/Map3DControls.svelte';
+	import SlideToggle from '#lib/SlideToggle.svelte';
+	import type { DeviceHistory } from '#lib/types.js';
 	import { apiFetch } from '#lib/api.js';
 
 	// --- Route Param ---
 	let deviceId = $derived(page.params.id ?? null); // Get device ID from URL
 
-	// --- Data Stores & Derived State ---
 	// Find the specific device based on the route ID
 	let currentDevice = $derived($devices.find((d) => d.id === deviceId) || null);
 
 	// --- State for this page ---
-	let guiInstance: GUI | null = null;
-	let historyDurationMinutes: number = $state(60);
+	let floorId: string | null = $state(null);
+	let showNodes = $state(true);
+	let autoRotate = $state(false);
+	let showHistory = $state(false);
+	let historyDurationMinutes = $state(60);
 	let deviceHistoryData: DeviceHistory[] = $state([]);
-	let displayMode: 'current' | 'history' = $state('current'); // Control what's shown
-	let showNodes = $state(true); // Separate control for nodes on this page
-	let zRotationSpeed = $state(0.002); // Separate control for rotation
-	let historyDurationControl: any = $state(); // Reference to the GUI control
+	let map: ReturnType<typeof Map3D> | undefined = $state.raw();
 
-	// Reactive controller for GUI
-	const effectController = {
-		displayMode: 'current',
-		historyDurationMinutes: 60,
-		showNodes: true,
-		zRotationSpeed: 0.002
-	};
+	const historyOptions = [
+		{ minutes: 15, label: '15 min' },
+		{ minutes: 60, label: '1 hour' },
+		{ minutes: 360, label: '6 hours' },
+		{ minutes: 1440, label: '24 hours' }
+	];
 
-	// --- Lifecycle ---
-	onMount(() => {
-		doGuiSetup();
-		// Fetch history initially if mode is 'history' (though default is 'current')
-		if (displayMode === 'history') {
-			fetchDeviceHistory();
-		}
-		return () => {
-			guiInstance?.destroy();
-		};
+	// Open on the device's own floor. Set once, so the floor tabs stay in charge afterwards.
+	let floorPinned = false;
+	$effect(() => {
+		if (floorPinned || !currentDevice) return;
+		floorPinned = true;
+		floorId = currentDevice.floor?.id ?? $config?.floors?.[0]?.id ?? null;
 	});
 
 	// --- Data Fetching ---
@@ -55,71 +50,19 @@
 		const startTime = new Date(endTime.getTime() - historyDurationMinutes * 60 * 1000);
 
 		try {
-			console.log(`Fetching history for ${deviceId} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
 			const data = await apiFetch<{ history: DeviceHistory[] }>(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
 			deviceHistoryData = data.history || [];
-			console.log(`Fetched ${deviceHistoryData.length} history points.`);
 		} catch (error) {
 			console.error('Failed to fetch device history:', error);
 			deviceHistoryData = []; // Clear data on error
 		}
 	}
 
-	// --- GUI Setup ---
-	function doGuiSetup() {
-		guiInstance?.destroy();
-		guiInstance = new GUI({ title: 'Device View Settings' });
-
-		// Display Mode (Current vs. History)
-		guiInstance
-			.add(effectController, 'displayMode', ['current', 'history'])
-			.name('Display')
-			.onChange((value: string) => {
-				// Assert the type before assigning, as lil-gui provides string
-				if (value === 'current' || value === 'history') {
-					displayMode = value;
-				}
-				// No need to fetch here, reactive statement handles it
-			});
-
-		// History Duration (only relevant when displayMode is 'history')
-		historyDurationControl = guiInstance
-			.add(effectController, 'historyDurationMinutes', 5, 1440, 5)
-			.name('History (min)')
-			.onChange((value: number) => {
-				historyDurationMinutes = value;
-				// No need to fetch here, reactive statement handles it
-			});
-
-		// General Visualization
-		const vizFolder = guiInstance.addFolder('Visualization');
-		vizFolder
-			.add(effectController, 'zRotationSpeed', 0, Math.PI / 2, 0.01)
-			.name('Rotation Speed')
-			.onChange((value: number) => {
-				zRotationSpeed = value;
-			});
-
-		vizFolder
-			.add(effectController, 'showNodes')
-			.name('Show Nodes')
-			.onChange((value: boolean) => {
-				showNodes = value;
-			});
-
-		guiInstance.close();
-	}
 	// Refetch history when relevant parameters change. One effect, not one per input:
 	// fetchDeviceHistory() reads both deviceId and historyDurationMinutes synchronously,
 	// so both are tracked here, and it already bails out on a missing id or duration.
 	$effect(() => {
-		if (displayMode === 'history') fetchDeviceHistory();
-	});
-	// Show/Hide duration control based on mode
-	$effect(() => {
-		if (historyDurationControl) {
-			historyDurationControl.domElement.style.display = displayMode === 'history' ? '' : 'none';
-		}
+		if (showHistory) fetchDeviceHistory();
 	});
 </script>
 
@@ -128,8 +71,24 @@
 </svelte:head>
 
 <div class="w-full h-full relative">
-	{#if $config && currentDevice && $nodes}
-		<Map3D devicesToShow={displayMode === 'current' ? [currentDevice] : []} nodesToShow={$nodes} config={$config} historyData={displayMode === 'history' ? deviceHistoryData : []} showDevices={displayMode === 'current'} showHistoryPath={displayMode === 'history'} bind:showNodes bind:zRotationSpeed />
+	{#if $config && currentDevice && $nodes && floorId}
+		<FloorTabs bind:floorId />
+		<Map3DControls bind:showNodes bind:autoRotate hideDevicesToggle onview={(preset) => map?.frameView(preset)}>
+			<SlideToggle name="show-history" bind:checked={showHistory} size="sm">
+				<span>History</span>
+			</SlideToggle>
+			{#if showHistory}
+				<label class="flex items-center justify-between gap-2">
+					<span>Last</span>
+					<select class="select w-28 py-0.5" bind:value={historyDurationMinutes} aria-label="History duration">
+						{#each historyOptions as option (option.minutes)}
+							<option value={option.minutes}>{option.label}</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
+		</Map3DControls>
+		<Map3D bind:this={map} devicesToShow={[currentDevice]} nodesToShow={$nodes} config={$config} {floorId} showAllFloors={$showAllFloors} historyData={showHistory ? deviceHistoryData : []} showHistoryPath={showHistory} {showNodes} bind:autoRotate />
 	{:else if !currentDevice && $devices}
 		<div class="absolute inset-0 flex items-center justify-center text-white">
 			Device with ID '{deviceId}' not found.
