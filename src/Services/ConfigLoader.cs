@@ -12,6 +12,7 @@ public class ConfigLoader : BackgroundService
     private readonly IDeserializer _deserializer;
     private readonly ILogger<ConfigLoader> _logger;
     private readonly string _configPath;
+
     private readonly SemaphoreSlim _loadLock = new(1, 1);
     private readonly TaskCompletionSource<Config> _firstLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DateTime _lastModified;

@@ -195,6 +195,7 @@ namespace ESPresense.Models
                 IntervalSecs = IntervalSecs,
                 KeepSnapshotMins = KeepSnapshotMins,
                 MinSamples = MinSamples,
+                Judge = Judge,
                 Limits = new Dictionary<string, double>(Limits),
                 Weights = new Dictionary<string, double>(Weights),
                 DeviceWeight = DeviceWeight,

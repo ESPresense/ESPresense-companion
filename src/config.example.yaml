@@ -46,6 +46,7 @@ optimization:
   validation_fraction: 0.2        # Newest fraction of the history held out to validate proposals (default: 0.2)
   minimum_improvement: 0          # How far a proposal's score (0-1) must beat the current calibration's (default: 0)
   min_samples: 5          # Minimum measurements an optimizer result must be evaluated on before it is applied (default: 5)
+  judge: links            # What accepts a proposal: links (held-out node-to-node links) or spots (devices at known positions: anchors and taught locations; needs at least 4) (default: links)
   optimizer: per_node_absorption # per_node_absorption (default) or device_residual; legacy and global_absorption were removed and fall back to per_node_absorption
   # device_residual also learns from located devices: how each node hears devices in the room (which
   # node-to-node links cannot show) and each device's rssi@1m, with node positions as the ground truth.

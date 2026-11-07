@@ -18,6 +18,7 @@ internal class OptimizationRunner : BackgroundService
     private readonly ILeaseService _leaseService;
     private readonly ILoggerFactory _loggerFactory;
     private readonly DeviceSettingsStore? _deviceSettings;
+    private readonly TaughtSpots _taughtSpots;
     private IList<IOptimizer> _optimizers;
     private readonly object _optimizersLock = new();
     private string? _lastOptimizerMode;
@@ -36,6 +37,7 @@ internal class OptimizationRunner : BackgroundService
         _nsd = nsd;
         _logger = logger;
         _cfg = cfg;
+        _taughtSpots = new TaughtSpots(System.IO.Path.Combine(cfg.ConfigDirectory, "fingerprints.json"), logger);
         _leaseService = leaseService;
         _optimizers = new List<IOptimizer>();
 
@@ -342,7 +344,8 @@ internal class OptimizationRunner : BackgroundService
     internal async Task RunCycleAsync(OptimizationSnapshot os, IReadOnlyList<OptimizationSnapshot> oss, ConfigOptimization optimization, IList<IOptimizer> optimizers)
     {
         // The decision is made without access to the store's writers; only the selected proposal is applied below.
-        var cycle = OptimizationCycle.Evaluate(os, oss, optimization, optimizers, _nsd.Get, dryRun: false, DateTime.UtcNow, ReadDeviceSettings);
+        var (cycleOptimizers, judgeSpots) = WithSpotFit(optimization, optimizers);
+        var cycle = OptimizationCycle.Evaluate(os, oss, optimization, cycleOptimizers, _nsd.Get, dryRun: false, DateTime.UtcNow, ReadDeviceSettings, judgeSpots);
         LastCycle = cycle;
         var report = cycle.Report;
 
@@ -491,6 +494,27 @@ internal class OptimizationRunner : BackgroundService
         }
     }
 
+    /// <summary>
+    /// The optimizers for one cycle and the taught spots to judge on. With judge: spots and enough taught spots, a
+    /// <see cref="SpotFitOptimizer"/> joins the cycle, fitted on two thirds of them, and only the other third is judged,
+    /// so its proposal is never scored on what it was fitted to. Otherwise every taught spot is reported on.
+    /// </summary>
+    private (IList<IOptimizer> Optimizers, IReadOnlyList<KnownPositionSpot> JudgeSpots) WithSpotFit(ConfigOptimization optimization, IList<IOptimizer> optimizers)
+    {
+        var taught = TaughtSpotsNow();
+        if (!optimization.JudgeOnSpots) return (optimizers, taught);
+        var (fit, judge) = SpotFitOptimizer.SplitForJudging(taught);
+        return fit.Count >= SpotFitOptimizer.MinSpots
+            ? (optimizers.Append(new SpotFitOptimizer(fit, optimization)).ToList(), judge)
+            : (optimizers, judge);
+    }
+
+    /// <summary>Taught locations (fingerprints.json) as spots, with the receivers that have a configured, stationary position and serve the spot's floor.</summary>
+    private IReadOnlyList<KnownPositionSpot> TaughtSpotsNow() =>
+        _taughtSpots.Read(id => _state.Nodes.TryGetValue(id, out var n) && n.HasLocation && n.Stationary
+            ? (n.Location, (IReadOnlyCollection<string>)(n.Floors ?? Array.Empty<Floor>()).Select(f => f.Id).OfType<string>().ToList())
+            : null);
+
     private void LogDecision(OptimizerProposalReport p, double bestScore, IReadOnlyDictionary<string, NodeSettings> incumbent)
     {
         var (composite, corr, rmse, samples) = p.Score;
@@ -512,13 +536,23 @@ internal class OptimizationRunner : BackgroundService
                 _logger.LogInformation("Optimizer {Optimizer,-24} rejected: better on the aggregate (Composite={Composite:0.000} > Best={Best:0.000}) but not on {LosesOn} of {Snapshots} snapshots on their own; treating the gain as noise",
                     p.Optimizer, composite, bestScore, p.Gates.EverySnapshot!.LostOn, p.Gates.EverySnapshot.Of);
                 break;
+            case OptimizerGateDecision.NotEnoughSpots:
+                _logger.LogInformation("Optimizer {Optimizer,-24} held: judging on spots needs {Required} devices at known positions, there are {Spots}",
+                    p.Optimizer, p.Gates.Spots!.RequiredSpots, p.Gates.Spots.Spots);
+                break;
+            case OptimizerGateDecision.SpotsNotBetter:
+            case OptimizerGateDecision.LinksWorse:
+            case OptimizerGateDecision.GaugeShift:
+                _logger.LogInformation("Optimizer {Optimizer,-24} rejected ({Decision}): better on {Better} and worse on {Worse} of {Spots} spots (z {SignZ:0.0}), spot RMS gain {GainDb:0.00} dB, node-link RMSE {LinkLossDb:+0.00;-0.00} dB, mean rxAdj shift {GaugeShiftDb:+0.0;-0.0} dB",
+                    p.Optimizer, p.Decision, p.Gates.Spots!.Better, p.Gates.Spots.Worse, p.Gates.Spots.Spots, p.Gates.Spots.SignZ, p.Gates.Spots.GainDb, p.Gates.Spots.LinkLossDb, p.Gates.Spots.GaugeShiftDb);
+                break;
             default:
                 _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
                     p.Optimizer, composite, bestScore, corr, rmse);
                 break;
         }
 
-        if (p.Decision is OptimizerGateDecision.MinSamples or OptimizerGateDecision.NotBetter or OptimizerGateDecision.DeviceFrame or OptimizerGateDecision.EverySnapshot)
+        if (p.Decision is not (OptimizerGateDecision.Selected or OptimizerGateDecision.Passed))
             LogRejectedProposal(p, incumbent);
     }
 
@@ -565,7 +599,7 @@ internal class OptimizationRunner : BackgroundService
     }
 
     /// <summary>Every optimizer a dry run can be asked for by name.</summary>
-    internal IReadOnlyList<string> KnownOptimizerNames => CreateOptimizers(Mode).Select(o => o.Name).ToList();
+    internal IReadOnlyList<string> KnownOptimizerNames => CreateOptimizers(Mode).Select(o => o.Name).Append(SpotFitName).ToList();
 
     /// <summary>
     /// Fresh optimizers for a dry run. The device_residual optimizer carries what it learned across cycles (each
@@ -580,6 +614,8 @@ internal class OptimizationRunner : BackgroundService
             .Select(o => o is DeviceResidualOptimizer && live != null ? live.Fork() : o)
             .ToList();
     }
+
+    private const string SpotFitName = "Spot Fit";
 
     private readonly SemaphoreSlim _dryRunGate = new(1, 1);
 
@@ -597,17 +633,27 @@ internal class OptimizationRunner : BackgroundService
     {
         var optimization = _state.Config?.Optimization ?? new ConfigOptimization();
 
-        IList<IOptimizer> optimizers;
+        IList<IOptimizer> dryOptimizers;
+        IReadOnlyList<KnownPositionSpot> dryJudgeSpots;
         if (string.IsNullOrWhiteSpace(optimizer))
         {
-            optimizers = CreateDryRunOptimizers();
+            (dryOptimizers, dryJudgeSpots) = WithSpotFit(optimization, CreateDryRunOptimizers());
+        }
+        else if (string.Equals(optimizer.Trim(), SpotFitName, StringComparison.OrdinalIgnoreCase))
+        {
+            // Asked for by name it runs alone on the same split, whatever the judge, so it can be tried before switching.
+            var (fit, judge) = SpotFitOptimizer.SplitForJudging(TaughtSpotsNow());
+            if (fit.Count < SpotFitOptimizer.MinSpots)
+                throw new OptimizerUnavailableException($"Spot Fit needs at least {SpotFitOptimizer.MinSpots} taught spots to fit on; it has {fit.Count} of {fit.Count + judge.Count} (a third are kept for judging).");
+            (dryOptimizers, dryJudgeSpots) = (new List<IOptimizer> { new SpotFitOptimizer(fit, optimization) }, judge);
         }
         else
         {
             var match = CreateDryRunOptimizers().FirstOrDefault(o => string.Equals(o.Name, optimizer.Trim(), StringComparison.OrdinalIgnoreCase));
             if (match == null)
                 throw new UnknownOptimizerException($"Unknown optimizer '{optimizer}'. Known: {string.Join(", ", KnownOptimizerNames)}.");
-            optimizers = new List<IOptimizer> { match };
+            dryOptimizers = new List<IOptimizer> { match };
+            dryJudgeSpots = WithSpotFit(optimization, Array.Empty<IOptimizer>()).JudgeSpots;
         }
 
         var snapshots = Snapshots.ToArray();
@@ -631,7 +677,7 @@ internal class OptimizationRunner : BackgroundService
         try
         {
             AddDeviceHistory(split, optimization);
-            var result = await Task.Run(() => OptimizationCycle.Evaluate(split.Training, split.Validation, optimization, optimizers, _nsd.Get, dryRun: true, DateTime.UtcNow, ReadDeviceSettings), cancellationToken);
+            var result = await Task.Run(() => OptimizationCycle.Evaluate(split.Training, split.Validation, optimization, dryOptimizers, _nsd.Get, dryRun: true, DateTime.UtcNow, ReadDeviceSettings, dryJudgeSpots), cancellationToken);
             return note == null ? result : result with { Report = result.Report with { Note = note } };
         }
         finally
