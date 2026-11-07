@@ -100,6 +100,14 @@ public enum OptimizerGateDecision
     DeviceFrame,
     /// <summary>Better on the aggregate but not on every eval snapshot by itself.</summary>
     EverySnapshot,
+    /// <summary>judge: spots, and there are too few devices at known positions to judge on.</summary>
+    NotEnoughSpots,
+    /// <summary>judge: spots, and not better on enough spots or by enough.</summary>
+    SpotsNotBetter,
+    /// <summary>judge: spots, better on spots but much worse on the node-to-node links.</summary>
+    LinksWorse,
+    /// <summary>judge: spots, and it shifts every receiver's rxAdj together by more than the spots can vouch for.</summary>
+    GaugeShift,
 }
 
 public sealed record OptimizerProposalReport(
@@ -136,7 +144,23 @@ public sealed record OptimizerGates(
     OptimizerMinSamplesGate MinSamples,
     OptimizerImprovementGate Improvement,
     OptimizerDeviceFrameGate? DeviceFrame,
-    OptimizerEverySnapshotGate? EverySnapshot);
+    OptimizerEverySnapshotGate? EverySnapshot)
+{
+    /// <summary>The spot judge's numbers (judge: spots); null when the links judge decides.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerSpotGate? Spots { get; init; }
+}
+
+/// <summary>
+/// The spot judge (#1868). Passed when there are at least <see cref="RequiredSpots"/> spots, the proposal is better on
+/// at least two thirds of those it is compared on, its spot RMS is at least <see cref="MinGainDb"/> lower, the
+/// node-to-node RMSE is at most <see cref="MaxLinkLossDb"/> worse, and the mean rxAdj moves by at most
+/// <see cref="MaxGaugeShiftDb"/>: the spot score fits each spot's level, so a common shift of every receiver is
+/// invisible to it and must not ride along.
+/// </summary>
+public sealed record OptimizerSpotGate(
+    int Spots, int RequiredSpots, int Better, int Worse, double GainDb, double MinGainDb,
+    double LinkLossDb, double MaxLinkLossDb, double GaugeShiftDb, double MaxGaugeShiftDb, bool Passed);
 
 public sealed record OptimizerMinSamplesGate(int Samples, int Required, bool Passed);
 
