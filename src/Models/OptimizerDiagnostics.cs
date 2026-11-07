@@ -153,13 +153,14 @@ public sealed record OptimizerGates(
 
 /// <summary>
 /// The spot judge (#1868). Passed when there are at least <see cref="RequiredSpots"/> spots, the proposal is better on
-/// at least two thirds of those it is compared on, its spot RMS is at least <see cref="MinGainDb"/> lower, the
+/// them consistently (sign test: <see cref="SignZ"/> = (better − worse) / √(better + worse) at least
+/// <see cref="MinSignZ"/>), its spot RMS is at least <see cref="MinGainDb"/> lower, the
 /// node-to-node RMSE is at most <see cref="MaxLinkLossDb"/> worse, and the mean rxAdj moves by at most
 /// <see cref="MaxGaugeShiftDb"/>: the spot score fits each spot's level, so a common shift of every receiver is
 /// invisible to it and must not ride along.
 /// </summary>
 public sealed record OptimizerSpotGate(
-    int Spots, int RequiredSpots, int Better, int Worse, double GainDb, double MinGainDb,
+    int Spots, int RequiredSpots, int Better, int Worse, double SignZ, double MinSignZ, double GainDb, double MinGainDb,
     double LinkLossDb, double MaxLinkLossDb, double GaugeShiftDb, double MaxGaugeShiftDb, bool Passed);
 
 public sealed record OptimizerMinSamplesGate(int Samples, int Required, bool Passed);
