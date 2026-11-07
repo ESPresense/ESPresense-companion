@@ -173,7 +173,7 @@ internal static class OptimizationCycle
                 decision =
                     !minSamples.Passed ? OptimizerGateDecision.MinSamples :
                     spotGate.Spots < spotGate.RequiredSpots ? OptimizerGateDecision.NotEnoughSpots :
-                    !(spotGate.GainDb >= spotGate.MinGainDb) || spotGate.Better * 3 < (spotGate.Better + spotGate.Worse) * 2 || spotGate.Better == 0 ? OptimizerGateDecision.SpotsNotBetter :
+                    !(spotGate.GainDb >= spotGate.MinGainDb) || !(spotGate.SignZ >= spotGate.MinSignZ) ? OptimizerGateDecision.SpotsNotBetter :
                     !(spotGate.LinkLossDb <= spotGate.MaxLinkLossDb) ? OptimizerGateDecision.LinksWorse :
                     !(Math.Abs(spotGate.GaugeShiftDb) <= spotGate.MaxGaugeShiftDb) ? OptimizerGateDecision.GaugeShift :
                     OptimizerGateDecision.Passed;
@@ -240,7 +240,16 @@ internal static class OptimizationCycle
 
     /// <summary>The spot judge needs this many spots: with fewer, it picks the better calibration too rarely (#1868).</summary>
     internal const int SpotGateMinSpots = 4;
-    internal const double SpotGateMinGainDb = 0.3;
+    /// <summary>
+    /// A proposal must be better on spots consistently, not just on average: the sign test over the spots it wins and
+    /// loses (ties left out), z = (better − worse) / √(better + worse), at least this. It scales with the evidence: 4
+    /// spots need all 4, 52 need about 33. A fixed gain per cycle would instead fight the step cap a fit applies
+    /// (SpotFitOptimizer): a capped step gains little each cycle even when it is clearly right.
+    /// </summary>
+    internal const double SpotGateMinSignZ = 2.0;
+
+    /// <summary>The spot RMS must also drop by this much, so a sign-consistent change too small to matter is not applied.</summary>
+    internal const double SpotGateMinGainDb = 0.1;
     internal const double SpotGateMaxLinkLossDb = 1.0;
     internal const double SpotGateMaxGaugeShiftDb = 2.0;
 
@@ -249,7 +258,7 @@ internal static class OptimizationCycle
     /// node-to-node RMSE gets (a floor, not the judge); the gauge shift is the mean change of rxAdj over the receivers
     /// the proposal sets, which the spot score cannot see because it fits each spot's level.
     /// </summary>
-    private static OptimizerSpotGate SpotGate(OptimizerSpotScore? proposal, OptimizerSpotScore? baseline, OptimizerScore score,
+    internal static OptimizerSpotGate SpotGate(OptimizerSpotScore? proposal, OptimizerSpotScore? baseline, OptimizerScore score,
         OptimizerScore baselineScore, OptimizationResults results, Func<string, NodeSettings> frozen)
     {
         var shifts = results.Nodes.Where(kv => kv.Value.RxAdjRssi != null)
@@ -257,10 +266,11 @@ internal static class OptimizationCycle
         var gaugeShift = shifts.Count > 0 ? shifts.Average() : 0;
         var gain = proposal != null && baseline != null ? baseline.Rms - proposal.Rms : double.NaN;
         var spots = baseline?.Spots ?? 0;
-        var passed = spots >= SpotGateMinSpots && gain >= SpotGateMinGainDb && proposal!.Better > 0
-                     && proposal.Better * 3 >= (proposal.Better + proposal.Worse) * 2
+        int better = proposal?.Better ?? 0, worse = proposal?.Worse ?? 0;
+        var signZ = better + worse > 0 ? (better - worse) / Math.Sqrt(better + worse) : 0;
+        var passed = spots >= SpotGateMinSpots && gain >= SpotGateMinGainDb && signZ >= SpotGateMinSignZ
                      && score.Rmse - baselineScore.Rmse <= SpotGateMaxLinkLossDb && Math.Abs(gaugeShift) <= SpotGateMaxGaugeShiftDb;
-        return new OptimizerSpotGate(spots, SpotGateMinSpots, proposal?.Better ?? 0, proposal?.Worse ?? 0, gain, SpotGateMinGainDb,
+        return new OptimizerSpotGate(spots, SpotGateMinSpots, better, worse, signZ, SpotGateMinSignZ, gain, SpotGateMinGainDb,
             score.Rmse - baselineScore.Rmse, SpotGateMaxLinkLossDb, gaugeShift, SpotGateMaxGaugeShiftDb, passed);
     }
 
