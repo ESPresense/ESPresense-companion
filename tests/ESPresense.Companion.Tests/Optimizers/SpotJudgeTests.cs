@@ -41,13 +41,14 @@ public class SpotJudgeTests
         return s;
     }
 
-    private static OptimizationCycleResult Run(IOptimizer optimizer, int anchors, string judge = "spots", bool usableAnchorRef = true)
+    private static OptimizationCycleResult Run(IOptimizer optimizer, int anchors, string judge = "spots", bool usableAnchorRef = true,
+        IReadOnlyList<KnownPositionSpot>? taught = null)
     {
         var t0 = DateTime.UtcNow;
         OptimizationSnapshot At(int min) => Snap(t0.AddMinutes(min), anchors, usableAnchorRef);
         var held = new List<OptimizationSnapshot> { At(-2), At(-1), At(0) };
         return OptimizationCycle.Evaluate(At(-10), held, new ConfigOptimization { Enabled = true, Judge = judge },
-            new List<IOptimizer> { optimizer }, id => new NodeSettings(id), dryRun: true, t0);
+            new List<IOptimizer> { optimizer }, id => new NodeSettings(id), dryRun: true, t0, taught);
     }
 
     /// <summary>Sets rxAdj per receiver (absorption as generated); optionally every node's txRef too.</summary>
@@ -133,6 +134,20 @@ public class SpotJudgeTests
 
         Assert.That(gate.SignZ, Is.EqualTo((better - worse) / Math.Sqrt(better + worse)).Within(1e-9));
         Assert.That(gate.Passed, Is.EqualTo(passes));
+    }
+
+    [Test]
+    public void TaughtSpots_AloneAreEnoughToJudge()
+    {
+        // No anchors at all: the evidence is five taught locations, raw RSSI with rx-b 6 dB hot, as anyone can collect.
+        var taught = AnchorSpots.Select((at, i) => new KnownPositionSpot($"taught:{i}", at,
+            Receivers.Select(r => new SpotReading(r.Id, r.At, -60 + Hot(r.Id) - 10 * Absorption * Math.Log10(r.At.DistanceTo(at)))).ToList())).ToList();
+
+        var result = Run(FixRxB, anchors: 0, taught: taught);
+
+        var p = result.Report.Proposals.Single();
+        Assert.That(result.Report.BaselineSpots!.Spots, Is.EqualTo(5));
+        Assert.That(p.Decision, Is.EqualTo(OptimizerGateDecision.Selected));
     }
 
     [Test]

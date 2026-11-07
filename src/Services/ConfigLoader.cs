@@ -12,6 +12,9 @@ public class ConfigLoader : BackgroundService
     private readonly IDeserializer _deserializer;
     private readonly ILogger<ConfigLoader> _logger;
     private readonly string _configPath;
+
+    /// <summary>The directory config.yaml lives in, where the files beside it (such as fingerprints.json) are read from.</summary>
+    public string ConfigDirectory { get; }
     private readonly SemaphoreSlim _loadLock = new(1, 1);
     private readonly TaskCompletionSource<Config> _firstLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DateTime _lastModified;
@@ -36,6 +39,7 @@ public class ConfigLoader : BackgroundService
     public ConfigLoader(string configDir, ILogger<ConfigLoader> logger)
     {
         _logger = logger;
+        ConfigDirectory = configDir;
         _configPath = Path.Combine(configDir, "config.yaml");
         _deserializer = new DeserializerBuilder()
             .IgnoreUnmatchedProperties()
