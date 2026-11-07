@@ -48,7 +48,7 @@
 <div class="flex h-full min-h-0">
 	<div class="flex flex-col flex-grow min-h-0">
 		<!-- Breadcrumb Navigation -->
-		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView="map" />
+		<DeviceBreadcrumb deviceId={data.settings?.id} deviceName={device?.name || device?.id || 'Unknown Device'} currentView="map" />
 
 		<div class="grid flex-1 min-h-0">
 			<Map deviceId={data.settings?.id} floorId={device?.floor?.id} explanation={$explanation} exclusive={true} />

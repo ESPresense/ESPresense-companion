@@ -30,13 +30,6 @@ export function gotoDetail3d(deviceId: string | null) {
 	goto(resolve(`3d/${deviceId ?? ''}`));
 }
 
-/**
- * Navigate to a device's calibration view.
- *
- * If `d` is null or `d.id` is undefined, the generated URL will include `undefined` in place of the device id.
- *
- * @param d - The device to calibrate (may be `null`); navigation occurs as a side effect.
- */
 export function gotoMap() {
 	goto(resolve('/'));
 }
@@ -49,6 +42,12 @@ export function gotoNodes() {
 	goto(resolve('nodes'));
 }
 
+/** Navigate to a device's map page. */
+export function gotoDevice(deviceId: string) {
+	goto(resolve(`devices/${encodeURIComponent(deviceId)}`));
+}
+
+/** Navigate to a device's calibration page, or the calibration overview when no device is given. */
 export function gotoCalibration(target?: Device | string | null) {
 	const id = typeof target === 'string' ? target : target?.id;
 	goto(id ? resolve(`calibration/devices/${id}`) : resolve('/calibration'));

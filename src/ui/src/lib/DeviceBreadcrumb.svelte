@@ -1,12 +1,21 @@
 <script lang="ts">
-	import { gotoCalibration, gotoMap } from '#lib/urls.js';
+	import { gotoCalibration, gotoDevice, gotoMap } from '#lib/urls.js';
 
 	interface Props {
+		deviceId?: string | null;
 		deviceName?: string;
 		currentView?: 'map' | 'calibration';
 	}
 
-	let { deviceName = 'Unknown Device', currentView = 'map' }: Props = $props();
+	let { deviceId, deviceName = 'Unknown Device', currentView = 'map' }: Props = $props();
+
+	// The two device pages link to each other: the map page explains the current fix,
+	// the calibration page's Details panel has the solver and per-node fields for debugging.
+	function navigateToOtherView() {
+		if (!deviceId) return;
+		if (currentView === 'calibration') gotoDevice(deviceId);
+		else gotoCalibration(deviceId);
+	}
 
 	function getDisplayName(name: string) {
 		if (!name || name === 'Unknown Device') return 'Unknown Device';
@@ -39,4 +48,10 @@
 	<span class="text-surface-900-100 font-medium" title={deviceName}>
 		{getDisplayName(deviceName)}
 	</span>
+
+	{#if deviceId}
+		<button class="ml-auto hover:text-primary-500 transition-colors" onclick={navigateToOtherView}>
+			{currentView === 'calibration' ? 'View on map' : 'Calibration & details'}
+		</button>
+	{/if}
 </div>
