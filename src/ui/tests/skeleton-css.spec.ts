@@ -19,19 +19,25 @@ test.describe('Skeleton CSS layer', () => {
 		await page.goto('/calibration/devices/dev-1');
 
 		const heightInput = page.locator('#height-input');
-		const setButton = page.getByRole('button', { name: 'Set', exact: true });
-		await setButton.waitFor();
+		const floorSelect = page.locator('#floor-select');
+		const anchorButton = page.getByRole('button', { name: 'Anchor here', exact: true });
+		await heightInput.waitFor();
+		await anchorButton.waitFor();
 
 		// btn + preset-filled-* must actually paint; unresolved presets leave it transparent.
-		await expect(setButton).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+		await expect(anchorButton).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
-		// The height field and its Set button are a single flush control: same row,
-		// no gap. This is what Skeleton v4's `input-group` used to provide.
+		// card + preset-tonal is the surface the floor/height controls sit on.
+		const controlsCard = page.locator('.card.preset-tonal').filter({ has: floorSelect });
+		await expect(controlsCard).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
+		// The floor select and the height input share one compact row, bottoms aligned
+		// (flex-wrap + items-end), with the select to the left of the input.
+		const select = await floorSelect.boundingBox();
 		const field = await heightInput.boundingBox();
-		const button = await setButton.boundingBox();
+		expect(select).not.toBeNull();
 		expect(field).not.toBeNull();
-		expect(button).not.toBeNull();
-		expect(Math.abs(field!.y - button!.y)).toBeLessThan(2);
-		expect(Math.abs(field!.x + field!.width - button!.x)).toBeLessThan(2);
+		expect(Math.abs(select!.y + select!.height - (field!.y + field!.height))).toBeLessThan(2);
+		expect(select!.x + select!.width).toBeLessThanOrEqual(field!.x);
 	});
 });

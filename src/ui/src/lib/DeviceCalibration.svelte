@@ -549,8 +549,9 @@
 		</div>
 
 		{#if $config?.floors}
-			<div class="card preset-tonal p-3 flex flex-wrap items-end gap-4">
-				<div class="w-full sm:w-64">
+			<!-- One row at any column width: the select gives way down from 16rem, the height field stays 7rem. -->
+			<div class="card preset-tonal p-3 grid grid-cols-[minmax(0,16rem)_7rem] items-end gap-3">
+				<div class="min-w-0">
 					<label class="label text-sm font-medium mb-1 block" for="floor-select">Floor</label>
 					<select id="floor-select" bind:value={selectedFloorId} class="select w-full text-base py-2">
 						{#each $config?.floors as { id, name }}
@@ -560,8 +561,8 @@
 				</div>
 
 				{#if calibrationSpot}
-					<div class="w-full sm:w-44">
-						<label class="label text-sm font-medium mb-1 block" for="height-input">Height from floor (m)</label>
+					<div>
+						<label class="label text-sm font-medium mb-1 block" for="height-input" title="Height from floor">Height (m)</label>
 						<input id="height-input" type="number" min="0" max="5" step="0.1" bind:value={calibrationSpotHeight} class="input w-full text-base py-2" />
 					</div>
 				{/if}
