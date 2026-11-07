@@ -35,8 +35,12 @@
 	let floorPinned = false;
 	$effect(() => {
 		if (floorPinned || !currentDevice) return;
+		// Wait for a real floor: pinning on null would leave the page on "Loading" for good,
+		// since the floor tabs that could pick one only render once there is a floor.
+		const initialFloorId = currentDevice.floor?.id ?? $config?.floors?.[0]?.id ?? null;
+		if (!initialFloorId) return;
 		floorPinned = true;
-		floorId = currentDevice.floor?.id ?? $config?.floors?.[0]?.id ?? null;
+		floorId = initialFloorId;
 	});
 
 	// --- Data Fetching ---

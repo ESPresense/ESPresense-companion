@@ -4,7 +4,7 @@
 
 <script lang="ts">
 	// Component to render the 3D map scene
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import * as THREE from 'three';
 	import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
@@ -48,6 +48,7 @@
 	let animationFrameId: number;
 	let lastTime: number | null = null;
 	let planCenter = new THREE.Vector3(0, 0, 0);
+	let builtConfig: Config | null = null; // the config the rooms on screen were built from
 	let raycaster = new THREE.Raycaster();
 	let mouse = new THREE.Vector2();
 	let pointerDown: { x: number; y: number } | null = null;
@@ -509,6 +510,7 @@
 	function setupRooms() {
 		if (!config?.floors || !contentGroup) return;
 
+		builtConfig = config;
 		cleanupRooms();
 		clearDeviceMaterials(); // room colours may have changed
 		const newRoomGroup = new THREE.Group();
@@ -966,7 +968,12 @@
 	function cleanupRooms() {
 		if (roomGroup) {
 			roomGroup.traverse((object) => {
-				if (object instanceof CSS2DObject) object.element?.remove();
+				if (object instanceof CSS2DObject) {
+					object.element?.remove();
+				} else if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+					object.geometry?.dispose();
+					(Array.isArray(object.material) ? object.material : [object.material]).forEach((m) => m?.dispose());
+				}
 			});
 			contentGroup?.remove(roomGroup);
 			roomGroup = null;
@@ -997,8 +1004,14 @@
 	}
 
 	// --- Lifecycle ---
+	// Rebuild the rooms only when the config changes. setupRooms() reads the floor in focus through
+	// applyFloorPresence(), so untrack it or every floor-tab click would rebuild every room.
 	$effect(() => {
-		if (ready && config) setupRooms();
+		if (!ready || !config || config === builtConfig) return;
+		untrack(() => {
+			setupRooms();
+			updateSceneObjects(); // room colours may have changed, and the device materials with them
+		});
 	});
 	$effect(() => {
 		if (ready) updateSceneObjects();
