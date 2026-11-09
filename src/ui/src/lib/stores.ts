@@ -87,6 +87,7 @@ export const devices = readable<Device[]>([], function start(set) {
 	let deviceMap = new Map<string, Device>();
 	let pollTimer: NodeJS.Timeout;
 	let isPolling = false;
+	let refreshPending = false;
 
 	function deviceFilter() {
 		const include = get(includedDevice);
@@ -98,9 +99,13 @@ export const devices = readable<Device[]>([], function start(set) {
 	}
 
 	async function fetchDevices() {
-		if (isPolling) return;
+		if (isPolling) {
+			refreshPending = true;
+			return;
+		}
 
 		isPolling = true;
+		refreshPending = false;
 		const filter = deviceFilter();
 		try {
 			const devices = await apiFetch<Device[]>(`/api/state/devices?${filter}`);
@@ -114,7 +119,7 @@ export const devices = readable<Device[]>([], function start(set) {
 			isPolling = false;
 		}
 		// The filter changed while this poll was out, so its answer is for the old one
-		if (filter !== deviceFilter()) fetchDevices();
+		if (refreshPending || filter !== deviceFilter()) fetchDevices();
 	}
 
 	fetchDevices();
@@ -172,8 +177,12 @@ export const devices = readable<Device[]>([], function start(set) {
 		fetchDevices();
 	});
 
-	// The server-side filter is per-connection, so it must be re-sent after a reconnect
-	const unsubscribeOpen = wsManager.onOpen(sendFilter);
+	// Reapply the filter and refresh state that may have changed during a disconnect.
+	const unsubscribeOpen = wsManager.onOpen(() => {
+		sendFilter();
+		fetchDevices();
+		getConfig();
+	});
 
 	return () => {
 		clearInterval(pollTimer);
