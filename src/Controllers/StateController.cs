@@ -1,17 +1,7 @@
-using System.Collections.Concurrent;
-using System.Net.WebSockets;
-using System.IO;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
-using Nito.AsyncEx;
-using ESPresense.Events;
-using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace ESPresense.Controllers;
 
@@ -24,7 +14,6 @@ public class StateController : ControllerBase
     private readonly NodeSettingsStore _nsd;
     private readonly DeviceSettingsStore _dss;
     private readonly NodeStateMapper _mapper;
-    private readonly GlobalEventDispatcher _eventDispatcher;
     private readonly CalibrationService _calibration;
     private readonly DeviceEnricher _enricher;
 
@@ -38,7 +27,6 @@ public class StateController : ControllerBase
         _nsd = nsd;
         _dss = dss;
         _mapper = mapper;
-        _eventDispatcher = eventDispatcher;
     }
 
     // GET: api/rooms
@@ -119,162 +107,15 @@ public class StateController : ControllerBase
     [Route("/ws")]
     public async Task Get([FromQuery] bool showAll = false)
     {
-        string? include = null; // set by the changeFilter command
         if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
         }
 
-        AsyncAutoResetEvent newMessage = new AsyncAutoResetEvent();
-        ConcurrentQueue<string> changes = new ConcurrentQueue<string>();
-
-        ConcurrentDictionary<string, bool> deviceSubscriptions = new ConcurrentDictionary<string, bool>();
-        void EnqueueAndSignal<T>(T value)
-        {
-            changes.Enqueue(JsonSerializer.Serialize(value, JsonDefaults.WebSocket));
-            newMessage.Set();
-        }
-        void OnConfigChanged(object? sender, Config e) => EnqueueAndSignal(new { type = "configChanged" });
-        void OnCalibrationChanged(object? sender, CalibrationEventArgs e) => EnqueueAndSignal(new { type = "calibrationChanged", data = e.Calibration });
-        void OnNodeStateChanged(object? sender, NodeStateEventArgs e) => EnqueueAndSignal(new { type = "nodeStateChanged", data = e.NodeState });
-        void OnDeviceRemoved(object? sender, DeviceRemovedEventArgs e) => EnqueueAndSignal(new { type = "deviceRemoved", deviceId = e.DeviceId });
-        void OnLocatorStateChanged(object? sender, LocatorStateEventArgs e) => EnqueueAndSignal(new { type = "locatorStateChanged", data = e.LocatorState });
-        void OnDeviceChanged(object? sender, DeviceEventArgs e)
-        {
-            if (showAll || (e.Device?.Track ?? false) || e.TrackChanged || IsIncluded(e.Device?.Id, include))
-            {
-                // Enrich device with ConfiguredRefRssi before sending
-                if (e.Device != null)
-                    _enricher.Enrich(e.Device);
-                EnqueueAndSignal(new { type = "deviceChanged", data = e.Device });
-            }
-        }
-
-        void OnDeviceMessageReceived(object? sender, DeviceMessageEventArgs args)
-        {
-            if (deviceSubscriptions.TryGetValue(args.DeviceId, out var isSubscribed) && isSubscribed)
-            {
-                EnqueueAndSignal(new
-                {
-                    type = "deviceMessage",
-                    deviceId = args.DeviceId,
-                    nodeId = args.NodeId,
-                    data = args.Payload
-                });
-            }
-        }
-
-        _config.ConfigChanged += OnConfigChanged;
-        _eventDispatcher.CalibrationChanged += OnCalibrationChanged;
-        _eventDispatcher.NodeStateChanged += OnNodeStateChanged;
-        _eventDispatcher.DeviceStateChanged += OnDeviceChanged;
-        _eventDispatcher.DeviceMessageReceived += OnDeviceMessageReceived;
-        _eventDispatcher.DeviceRemoved += OnDeviceRemoved;
-        _eventDispatcher.LocatorStateChanged += OnLocatorStateChanged;
-
-        try
-        {
-            using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-
-            // Set up buffer for receiving messages
-            var buffer = new byte[1024 * 4];
-
-            var receiveTask = Task.Run(async () =>
-            {
-                while (webSocket.State == WebSocketState.Open)
-                {
-                    WebSocketReceiveResult result;
-                    using var ms = new MemoryStream();
-                    do
-                    {
-                        result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                        if (result.MessageType == WebSocketMessageType.Close)
-                            break;
-
-                        ms.Write(buffer, 0, result.Count);
-                    } while (!result.EndOfMessage);
-
-                    if (result.MessageType == WebSocketMessageType.Close)
-                        break;
-
-                    ms.Seek(0, SeekOrigin.Begin);
-
-                    // Process the command
-                    try
-                    {
-                        using var reader = new StreamReader(ms, Encoding.UTF8);
-                        var message = await reader.ReadToEndAsync();
-                        var command = JsonSerializer.Deserialize<WebSocketCommand>(message, JsonDefaults.WebSocket);
-
-                        if (command != null)
-                        {
-                            switch (command.Command?.ToLower())
-                            {
-                                case "changefilter":
-                                    if (command.Type == "showAll")
-                                        showAll = command.Value == "true";
-                                    else if (command.Type == "include")
-                                        include = command.Value;
-                                    break;
-                                case "subscribe":
-                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.Value))
-                                    {
-                                        deviceSubscriptions.AddOrUpdate(command.Value, true, (_, __) => true);
-                                        _logger.LogDebug("Client subscribed to device messages for {DeviceId}", command.Value);
-                                    }
-                                    break;
-
-                                case "unsubscribe":
-                                    if (command.Type == "deviceMessage" && !string.IsNullOrEmpty(command.Value))
-                                    {
-                                        deviceSubscriptions.TryRemove(command.Value, out _);
-                                        _logger.LogDebug("Client unsubscribed from device messages for {DeviceId}", command.Value);
-                                    }
-                                    break;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing WebSocket command");
-                    }
-                }
-            });
-
-            EnqueueAndSignal(new { type = "time", data = DateTime.UtcNow.RelativeMilliseconds() });
-
-            while (webSocket.State == WebSocketState.Open)
-            {
-                while (changes.TryDequeue(out var jsonEvent))
-                {
-                    try
-                    {
-                        await webSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(jsonEvent)), WebSocketMessageType.Text, true, CancellationToken.None);
-                    }
-                    catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.InvalidState)
-                    {
-                        _logger.LogDebug("WebSocket send failed as client disconnected: {CloseStatus}", webSocket.CloseStatus);
-                    }
-                }
-
-                if (webSocket.State == WebSocketState.Open)
-                    await newMessage.WaitAsync();
-            }
-
-            if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived)
-                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, webSocket.CloseStatusDescription, CancellationToken.None);
-        }
-        finally
-        {
-            _config.ConfigChanged -= OnConfigChanged;
-            _eventDispatcher.CalibrationChanged -= OnCalibrationChanged;
-            _eventDispatcher.NodeStateChanged -= OnNodeStateChanged;
-            _eventDispatcher.DeviceStateChanged -= OnDeviceChanged;
-            _eventDispatcher.DeviceMessageReceived -= OnDeviceMessageReceived;
-            _eventDispatcher.DeviceRemoved -= OnDeviceRemoved;
-            _eventDispatcher.LocatorStateChanged -= OnLocatorStateChanged;
-        }
+        using var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+        var session = HttpContext.RequestServices.GetRequiredService<StateWebSocketSession>();
+        await session.RunAsync(socket, showAll, HttpContext.RequestAborted);
     }
 
     /// <summary>

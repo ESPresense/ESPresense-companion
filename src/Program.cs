@@ -72,6 +72,7 @@ builder.Services.AddSingleton<State>();
 builder.Services.AddSingleton<CalibrationService>();
 builder.Services.AddSingleton(provider => new OptimizerDebugService(provider.GetRequiredService<OptimizationRunner>(), provider.GetRequiredService<State>()));
 builder.Services.AddSingleton<DeviceEnricher>();
+builder.Services.AddTransient<StateWebSocketSession>();
 builder.Services.AddControllersWithViews().AddJsonOptions(opt => JsonDefaults.ConfigureWeb(opt.JsonSerializerOptions));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o => o.SchemaFilter<CalibrationCellSchemaFilter>());
