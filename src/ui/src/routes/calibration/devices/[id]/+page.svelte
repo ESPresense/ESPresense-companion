@@ -42,7 +42,7 @@
 
 <div class="flex h-full min-h-0">
 	<div class="flex flex-col flex-grow min-h-0">
-		<DeviceBreadcrumb deviceName={device?.name || device?.id || 'Unknown Device'} currentView="calibration" />
+		<DeviceBreadcrumb deviceId={data.settings?.id} deviceName={device?.name || device?.id || 'Unknown Device'} currentView="calibration" />
 
 		{#if data.settings?.id}
 			<div class="flex-1 min-h-0 overflow-auto">
