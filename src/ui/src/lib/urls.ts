@@ -50,5 +50,5 @@ export function gotoDevice(deviceId: string) {
 /** Navigate to a device's calibration page, or the calibration overview when no device is given. */
 export function gotoCalibration(target?: Device | string | null) {
 	const id = typeof target === 'string' ? target : target?.id;
-	goto(id ? resolve(`calibration/devices/${id}`) : resolve('/calibration'));
+	goto(id ? resolve(`calibration/devices/${encodeURIComponent(id)}`) : resolve('/calibration'));
 }

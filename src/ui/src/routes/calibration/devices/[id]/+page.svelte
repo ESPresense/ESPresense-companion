@@ -18,10 +18,11 @@
 	const deviceDetails = readable<DeviceDetailItem[]>([], (set) => {
 		const deviceId = data.settings?.id;
 		if (!deviceId) return () => {};
+		const deviceUrl = `/api/device/${encodeURIComponent(deviceId)}`;
 
 		async function fetchAndSet() {
 			try {
-				const result = await apiFetch<{ details?: DeviceDetailItem[] }>(`/api/device/${deviceId}`);
+				const result = await apiFetch<{ details?: DeviceDetailItem[] }>(deviceUrl);
 				set(result.details || []);
 			} catch (ex) {
 				console.error(`Error fetching device details: ${ex instanceof Error ? ex.message : String(ex)}`);
