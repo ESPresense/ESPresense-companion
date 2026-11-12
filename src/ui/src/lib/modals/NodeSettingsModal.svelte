@@ -23,7 +23,7 @@
 		// Add any necessary validation or data transformation here if needed
 
 		try {
-			await apiFetch(`/api/node/${nodeSetting.id}`, {
+			await apiFetch(`/api/node/${encodeURIComponent(nodeSetting.id ?? '')}`, {
 				// Use original nodeSetting.id for the PUT request URL
 				method: 'PUT',
 				headers: {

@@ -48,7 +48,7 @@
 			}
 
 			const targetId = deviceSetting.originalId ?? deviceSetting.id;
-			await apiFetch(`/api/device/${targetId}`, {
+			await apiFetch(`/api/device/${encodeURIComponent(targetId)}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'

@@ -7,11 +7,12 @@ import { isNode, type Device, type Node, type SearchResult } from '#lib/types.js
  *
  * If `d` is a Node, navigates to `/nodes/{id}`; otherwise navigates to `/devices/{id}`.
  *
- * @param d - The target Device or Node. If `d` is `null` or has no `id`, the generated URL will include `undefined`.
+ * @param d - The target Device or Node. If `d` is `null` or has no `id`, navigates to the list page.
  */
 export function gotoDetail(d: Device | Node | null) {
-	if (isNode(d)) goto(resolve(`nodes/${d?.id ?? ''}`));
-	else goto(resolve(`devices/${d?.id ?? ''}`));
+	const id = encodeURIComponent(d?.id ?? '');
+	if (isNode(d)) goto(resolve(`nodes/${id}`));
+	else goto(resolve(`devices/${id}`));
 }
 
 /** Navigate to the page a search result leads to. */
@@ -24,10 +25,10 @@ export function gotoSearchResult(r: SearchResult) {
 /**
  * Navigate to the 3D view for the given device.
  *
- * @param deviceId - The device identifier to include in the path; if `null` the literal `"null"` will be placed in the URL (`.../3d/null`).
+ * @param deviceId - The device identifier to include in the path; if `null`, navigates to the 3D overview.
  */
 export function gotoDetail3d(deviceId: string | null) {
-	goto(resolve(`3d/${deviceId ?? ''}`));
+	goto(resolve(`3d/${encodeURIComponent(deviceId ?? '')}`));
 }
 
 export function gotoMap() {

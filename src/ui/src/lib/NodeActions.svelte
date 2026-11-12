@@ -21,7 +21,7 @@
 
 	async function onRestart(node: Node) {
 		try {
-			await apiFetch(`/api/node/${node.id}/restart`, { method: 'POST' });
+			await apiFetch(`/api/node/${encodeURIComponent(node.id)}/restart`, { method: 'POST' });
 
 			toastStore.trigger({
 				message: `${node.name || node.id} asked to reboot`,
@@ -106,7 +106,7 @@
 				}
 			}
 
-			await apiFetch(`/api/node/${node.id}/update`, {
+			await apiFetch(`/api/node/${encodeURIComponent(node.id)}/update`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -154,7 +154,7 @@
 		loadingEdit = true;
 
 		try {
-			const nodeSettingsDetails = await apiFetch<NodeSettingDetails>(`/api/node/${row.id}`);
+			const nodeSettingsDetails = await apiFetch<NodeSettingDetails>(`/api/node/${encodeURIComponent(row.id)}`);
 
 			if (!nodeSettingsDetails.settings) {
 				// Create default settings if none exist

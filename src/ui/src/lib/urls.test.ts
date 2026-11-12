@@ -1,41 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Device } from './types';
-import { gotoCalibration } from './urls';
+import type { Device, Node } from './types';
+import { gotoCalibration, gotoDetail, gotoDetail3d, gotoDevice } from './urls';
 
-const navigation = vi.hoisted(() => ({ base: '', goto: vi.fn() }));
+const navigation = vi.hoisted(() => ({ goto: vi.fn() }));
 
 vi.mock('$app/navigation', () => ({ goto: navigation.goto }));
-vi.mock('$app/paths', () => ({
-	resolve: (path: string) => `${navigation.base}/${path.replace(/^\//, '')}`
-}));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => `/base/${path.replace(/^\//, '')}` }));
 
-const ids = [
-	['name:tag#one', 'name%3Atag%23one'],
-	['name:tag?one', 'name%3Atag%3Fone'],
-	['name:tag%one', 'name%3Atag%25one'],
-	['name:tag/one', 'name%3Atag%2Fone'],
-	['name:tag%2Fone', 'name%3Atag%252Fone'],
-	['irk:aa:bb:cc', 'irk%3Aaa%3Abb%3Acc']
-];
+// Characters that would otherwise end the path segment, start a query or fragment, or be mis-decoded.
+const id = 'name:a/b#c?d%e';
+const encoded = 'name%3Aa%2Fb%23c%3Fd%25e';
 
-describe.each(['', '/ingress/companion'])('calibration navigation with base "%s"', (base) => {
-	beforeEach(() => {
-		navigation.base = base;
-		navigation.goto.mockClear();
+describe('device URLs keep the whole ID in one path segment', () => {
+	beforeEach(() => navigation.goto.mockClear());
+
+	it.each([
+		['gotoCalibration(string)', () => gotoCalibration(id), `/base/calibration/devices/${encoded}`],
+		['gotoCalibration(device)', () => gotoCalibration({ id } as Device), `/base/calibration/devices/${encoded}`],
+		['gotoDevice', () => gotoDevice(id), `/base/devices/${encoded}`],
+		['gotoDetail(device)', () => gotoDetail({ id } as Device), `/base/devices/${encoded}`],
+		['gotoDetail(node)', () => gotoDetail({ id, telemetry: {} } as unknown as Node), `/base/nodes/${encoded}`],
+		['gotoDetail3d', () => gotoDetail3d(id), `/base/3d/${encoded}`]
+	])('%s', (_name, go, expected) => {
+		go();
+		expect(navigation.goto).toHaveBeenCalledExactlyOnceWith(expected);
 	});
 
-	it.each(ids)('encodes the raw string ID %s as one path segment', (id, encoded) => {
-		gotoCalibration(id);
-		expect(navigation.goto).toHaveBeenCalledExactlyOnceWith(`${base}/calibration/devices/${encoded}`);
-	});
-
-	it.each(ids)('encodes the device object ID %s as one path segment', (id, encoded) => {
-		gotoCalibration({ id } as Device);
-		expect(navigation.goto).toHaveBeenCalledExactlyOnceWith(`${base}/calibration/devices/${encoded}`);
-	});
-
-	it.each([undefined, null, '', { id: '' } as Device, {} as Device])('opens the overview for an absent ID: %j', (target) => {
+	it.each([undefined, null, '', { id: '' } as Device])('gotoCalibration opens the overview without an ID: %j', (target) => {
 		gotoCalibration(target);
-		expect(navigation.goto).toHaveBeenCalledExactlyOnceWith(`${base}/calibration`);
+		expect(navigation.goto).toHaveBeenCalledExactlyOnceWith('/base/calibration');
 	});
 });
