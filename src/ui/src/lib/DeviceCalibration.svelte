@@ -47,7 +47,7 @@
 	// Function to fetch device settings based on deviceId
 	async function fetchDeviceSettings() {
 		try {
-			const response = await fetch(apiUrl(`/api/device/${deviceSettings.id}`));
+			const response = await fetch(apiUrl(`/api/device/${encodeURIComponent(deviceSettings.id ?? '')}`));
 			if (response.ok) {
 				deviceSettings = await response.json();
 				currentRefRssi = deviceSettings?.['rssi@1m'] || null;
@@ -64,7 +64,7 @@
 	// Function to fetch node settings
 	async function fetchNodeSettings(nodeId: string) {
 		try {
-			const data = await apiFetch<NodeSettingDetails>(`/api/node/${nodeId}`);
+			const data = await apiFetch<NodeSettingDetails>(`/api/node/${encodeURIComponent(nodeId)}`);
 			nodeSettings[nodeId] = data.settings;
 			// Force reactivity by creating a new object reference
 			nodeSettings = { ...nodeSettings };
@@ -188,7 +188,7 @@
 		});
 
 		try {
-			await apiFetch(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
+			await apiFetch(`/api/device/${encodeURIComponent(deviceSettings?.originalId || deviceSettings?.id || '')}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
@@ -206,7 +206,7 @@
 		if (!deviceSettings?.id && !deviceSettings?.originalId) return;
 		const payload = buildSettingsPayload({ x: null, y: null, z: null });
 		try {
-			await apiFetch(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`, {
+			await apiFetch(`/api/device/${encodeURIComponent(deviceSettings?.originalId || deviceSettings?.id || '')}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
@@ -232,7 +232,7 @@
 		if (!deviceSettings?.id) return;
 		try {
 			// 204 (nothing captured for this device) comes back as undefined.
-			capture = (await apiFetch<CaptureStatus | undefined>(`/api/device/${deviceSettings.id}/capture`)) ?? null;
+			capture = (await apiFetch<CaptureStatus | undefined>(`/api/device/${encodeURIComponent(deviceSettings.id)}/capture`)) ?? null;
 		} catch {
 			capture = null;
 		}
@@ -241,7 +241,7 @@
 	async function startCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/start`, { method: 'POST' });
+			capture = await apiFetch<CaptureStatus>(`/api/device/${encodeURIComponent(deviceSettings.id)}/capture/start`, { method: 'POST' });
 			lastSentPosition = null;
 			await sendCapturePosition();
 		} catch (error) {
@@ -253,7 +253,7 @@
 	async function stopCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/stop`, { method: 'POST' });
+			capture = await apiFetch<CaptureStatus>(`/api/device/${encodeURIComponent(deviceSettings.id)}/capture/stop`, { method: 'POST' });
 		} catch (error) {
 			console.error('Error stopping capture:', error);
 		}
@@ -262,7 +262,7 @@
 	async function discardCapture() {
 		if (!deviceSettings?.id) return;
 		try {
-			await fetch(apiUrl(`/api/device/${deviceSettings.id}/capture`), { method: 'DELETE' });
+			await fetch(apiUrl(`/api/device/${encodeURIComponent(deviceSettings.id)}/capture`), { method: 'DELETE' });
 			capture = null;
 		} catch (error) {
 			console.error('Error discarding capture:', error);
@@ -277,7 +277,7 @@
 		if (key === lastSentPosition) return;
 		lastSentPosition = key;
 		try {
-			capture = await apiFetch<CaptureStatus>(`/api/device/${deviceSettings.id}/capture/position`, {
+			capture = await apiFetch<CaptureStatus>(`/api/device/${encodeURIComponent(deviceSettings.id)}/capture/position`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(position)
@@ -381,7 +381,7 @@
 	async function saveCalibration() {
 		if (!calculatedRefRssi) return;
 		try {
-			const response = await fetch(apiUrl(`/api/device/${deviceSettings?.originalId || deviceSettings?.id}`), {
+			const response = await fetch(apiUrl(`/api/device/${encodeURIComponent(deviceSettings?.originalId || deviceSettings?.id || '')}`), {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ ...deviceSettings, 'rssi@1m': calculatedRefRssi })
@@ -512,7 +512,7 @@
 			calculatedRefRssi = calculateFinalRssi();
 		}
 	});
-	let exportUrl = $derived(deviceSettings?.id ? apiUrl(`/api/device/${deviceSettings.id}/capture/export`) : '');
+	let exportUrl = $derived(deviceSettings?.id ? apiUrl(`/api/device/${encodeURIComponent(deviceSettings.id)}/capture/export`) : '');
 	$effect(() => {
 		queueCapturePosition(calibrationSpot, calibrationSpotHeight, selectedFloorId);
 	});

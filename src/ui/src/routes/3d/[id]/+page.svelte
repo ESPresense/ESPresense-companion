@@ -54,7 +54,7 @@
 		const startTime = new Date(endTime.getTime() - historyDurationMinutes * 60 * 1000);
 
 		try {
-			const data = await apiFetch<{ history: DeviceHistory[] }>(`/api/history/${deviceId}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
+			const data = await apiFetch<{ history: DeviceHistory[] }>(`/api/history/${encodeURIComponent(deviceId)}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
 			deviceHistoryData = data.history || [];
 		} catch (error) {
 			console.error('Failed to fetch device history:', error);

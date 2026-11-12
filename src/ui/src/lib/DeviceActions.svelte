@@ -24,7 +24,7 @@
 	async function handleEdit() {
 		loadingEdit = true;
 		try {
-			const deviceSettingsDetails = await apiFetch<DeviceSettingsDetails>(`/api/device/${row.id}`);
+			const deviceSettingsDetails = await apiFetch<DeviceSettingsDetails>(`/api/device/${encodeURIComponent(row.id)}`);
 
 			if (!deviceSettingsDetails.settings) {
 				throw new Error('Device settings not found in API response.');
