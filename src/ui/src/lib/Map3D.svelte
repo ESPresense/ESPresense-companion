@@ -1130,10 +1130,12 @@
 	function onCanvasClick(event: MouseEvent) {
 		// A drag to orbit ends with a click too; only a tap counts
 		if (pointerDown && Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 4) return;
+		if (event.target !== renderer.domElement) return; // a click on the selection card is not a click on the map
 		select(pick(event, ['device'])?.id ?? null);
 	}
 
 	function onCanvasDoubleClick(event: MouseEvent) {
+		if (event.target !== renderer.domElement) return;
 		const hit = pick(event, ['device']);
 		if (hit) gotoDetail3d(hit.id);
 	}
