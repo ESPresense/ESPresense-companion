@@ -249,6 +249,7 @@
 			const texture = new THREE.CanvasTexture(canvas);
 			texture.colorSpace = THREE.SRGBColorSpace;
 			texture.anisotropy = 4; // the puck is usually seen at a slant
+			nodeLogoMaterial.map?.dispose();
 			nodeLogoMaterial.map = texture;
 			nodeLogoMaterial.needsUpdate = true;
 		};
@@ -1131,6 +1132,10 @@
 				}
 			}
 		});
+
+		// Material.dispose() doesn't touch the texture, so the logo canvas has to go explicitly
+		nodeLogoMaterial.map?.dispose();
+		nodeLogoMaterial.map = null;
 
 		cleanupRooms();
 		cleanupNodeGroup();
