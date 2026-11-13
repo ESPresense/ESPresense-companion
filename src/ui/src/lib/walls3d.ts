@@ -96,3 +96,15 @@ export function wallPosts(segments: WallSegment[]): WallPost[] {
 export function wallHeight(floorBase: number, floorCeiling: number): number {
 	return Math.max(0, floorCeiling - floorBase) * WALL_CUT_FRACTION;
 }
+
+/** How quickly a wall fades as it rises: 1 is a straight ramp, more clears the upper part sooner. */
+export const WALL_FADE_POWER = 1.6;
+
+/**
+ * A wall's opacity at a height, where `up` is 0 at the floor and 1 at the ceiling: `floor`
+ * (map.wall_opacity) at the bottom, easing to `top` (map.wall_opacity_top) at the ceiling.
+ */
+export function wallOpacityAt(up: number, floor: number, top: number): number {
+	const u = Math.max(0, Math.min(1, up));
+	return top + (floor - top) * Math.pow(1 - u, WALL_FADE_POWER);
+}

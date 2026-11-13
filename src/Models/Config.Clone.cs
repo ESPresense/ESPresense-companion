@@ -132,7 +132,8 @@ namespace ESPresense.Models
                 FlipY = FlipY,
                 WallThickness = WallThickness,
                 WallColor = WallColor,
-                WallOpacity = WallOpacity
+                WallOpacity = WallOpacity,
+                WallOpacityTop = WallOpacityTop
             };
         }
     }
