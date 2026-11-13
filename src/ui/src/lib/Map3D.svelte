@@ -45,6 +45,9 @@
 	let labelRenderer: CSS2DRenderer;
 	let controls: OrbitControls;
 	let contentGroup: THREE.Group; // plan coordinates, mirrored to match the 2D map
+	let sun: THREE.DirectionalLight;
+	let fog: THREE.Fog;
+	let planRadius = 10; // metres from the plan's centre to its farthest corner
 	let isAnimating = false;
 	let animationFrameId: number;
 	let lastTime: number | null = null;
@@ -63,6 +66,10 @@
 	const GHOST_OPACITY = 0.25;
 	const EASE_TAU = 0.2; // seconds: how quickly a device slides to a new fix
 	const TWEEN_MS = 700; // camera moves between floors and presets
+	const BACKGROUND = 0x1e293b; // slate-800
+	// Where the sun stands, seen from the plan: front-left and high, so walls shade one side and
+	// throw a short shadow into their rooms.
+	const SUN_DIRECTION = new THREE.Vector3(-0.35, -0.5, 1).normalize();
 	const CONTROLS_MIN_DISTANCE = 1;
 	const CONTROLS_MAX_DISTANCE = 40;
 	// Iso looks in from the front-left corner at about 37 degrees elevation; top is straight down
@@ -130,6 +137,7 @@
 		floor: Floor;
 		group: THREE.Group;
 		wallMaterials: THREE.MeshStandardMaterial[];
+		wallMeshes: THREE.Mesh[];
 		wallOpacity: number; // map.wall_opacity, what the walls have when the floor is in focus
 		slab: THREE.Mesh | null;
 		planes: THREE.Mesh[];
@@ -331,7 +339,9 @@
 		});
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.setSize(container.clientWidth, container.clientHeight);
-		renderer.setClearColor(0x1e293b, 1); // slate-800
+		renderer.setClearColor(BACKGROUND, 1);
+		renderer.toneMapping = THREE.ACESFilmicToneMapping;
+		renderer.toneMappingExposure = 1.0;
 		renderer.autoClear = true;
 		renderer.shadowMap.enabled = true;
 		renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -349,28 +359,29 @@
 		container.appendChild(labelRenderer.domElement);
 
 		scene = new THREE.Scene();
-		scene.background = new THREE.Color(0x1e293b);
+		scene.background = new THREE.Color(BACKGROUND);
 
 		camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
 		camera.up.set(0, 0, 1); // z is height: dragging sideways orbits around the vertical, not over the top
 		scene.add(camera);
 
-		const ambient = new THREE.AmbientLight(0xffffff, 0.2);
-		scene.add(ambient);
+		// Sky from above, a dim bounce from below, and one sun for shape and shadows. fitSun() aims
+		// the sun and sizes its shadow to the plan once the rooms are built.
+		scene.add(new THREE.HemisphereLight(0xdbeafe, 0x475569, 1.7));
+		sun = new THREE.DirectionalLight(0xfff4e5, 1.1);
+		sun.castShadow = true;
+		sun.shadow.mapSize.set(2048, 2048);
+		sun.shadow.bias = -0.0005;
+		sun.shadow.normalBias = 0.02;
+		sun.shadow.radius = 4; // soft edges
+		sun.shadow.intensity = 0.6; // shade, not black: labels and drop discs sit in it
+		scene.add(sun);
+		scene.add(sun.target);
 
-		const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-		dirLight.position.set(0, 0, 4);
-		dirLight.target.position.set(0, 0, -2);
-		dirLight.castShadow = true;
-		dirLight.shadow.mapSize.set(2048, 2048);
-		dirLight.shadow.camera.left = -25;
-		dirLight.shadow.camera.right = 25;
-		dirLight.shadow.camera.top = 25;
-		dirLight.shadow.camera.bottom = -25;
-		dirLight.shadow.camera.near = 0.1;
-		dirLight.shadow.camera.far = 8;
-		dirLight.shadow.bias = -0.0005;
-		scene.add(dirLight);
+		// A little fog so the far side of the plan and the edge of the grid fall back; animate() keeps
+		// it starting at whatever the camera is looking at.
+		fog = new THREE.Fog(BACKGROUND, 10, 100);
+		scene.fog = fog;
 
 		controls = new OrbitControls(camera, renderer.domElement);
 		controls.enableDamping = true;
@@ -564,7 +575,6 @@
 				plane.position.z = floor_base;
 				plane.renderOrder = -1; // over the slab, under everything standing on the floor
 				plane.receiveShadow = true;
-				plane.castShadow = true; // Floor casts shadows to occlude lower floors
 				floorGroup.add(plane);
 				planes.push(plane);
 
@@ -584,6 +594,8 @@
 				const slabMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, transparent: true, opacity: SLAB_OPACITY.active, roughness: 1.0, metalness: 0.0 });
 				slab = new THREE.Mesh(mergeGeometries(slabGeometries), slabMaterial);
 				slab.renderOrder = -2;
+				slab.receiveShadow = true;
+				slab.castShadow = true; // shades the floors below
 				floorGroup.add(slab);
 				slabGeometries.forEach((g) => g.dispose());
 			}
@@ -592,6 +604,7 @@
 			// map.wall_color that is one for the floor, without it each wall has its room's colour.
 			const height = wallHeight(floor_base, floor_ceiling);
 			const wallMaterials: THREE.MeshStandardMaterial[] = [];
+			const wallMeshes: THREE.Mesh[] = [];
 			if (height > 0) {
 				// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
 				const byColor = new Map<string, THREE.BufferGeometry[]>();
@@ -620,9 +633,11 @@
 				}
 				for (const [color, boxes] of byColor) {
 					const tint = new THREE.Color(color);
-					// The only light is overhead, so a little of the wall's own colour keeps its sides from going black
-					const material = new THREE.MeshStandardMaterial({ color: tint, emissive: tint, emissiveIntensity: 0.35, transparent: true, opacity: wallOpacity, depthWrite: wallOpacity >= 1, roughness: 0.9, metalness: 0.0 });
-					floorGroup.add(new THREE.Mesh(mergeGeometries(boxes), material));
+					const material = new THREE.MeshStandardMaterial({ color: tint, transparent: true, opacity: wallOpacity, depthWrite: wallOpacity >= 1, roughness: 0.9, metalness: 0.0 });
+					const wallMesh = new THREE.Mesh(mergeGeometries(boxes), material);
+					wallMesh.castShadow = wallMesh.receiveShadow = true;
+					wallMeshes.push(wallMesh);
+					floorGroup.add(wallMesh);
 					wallMaterials.push(material);
 					boxes.forEach((g) => g.dispose());
 				}
@@ -634,7 +649,7 @@
 			}
 			overallBounds.union(floorBounds);
 			newRoomGroup.add(floorGroup);
-			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallOpacity, slab, planes, labels, bounds: floorBounds });
+			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallMeshes, wallOpacity, slab, planes, labels, bounds: floorBounds });
 		});
 
 		// A 1 m grid under the house for a sense of scale, on whole metres of the plan
@@ -668,7 +683,26 @@
 		contentGroup.position.set(planCenter.x - flip.x * planCenter.x, planCenter.y - flip.y * planCenter.y, 0);
 		for (const v of nodeVisuals.values()) v.mesh.scale.set(flip.x, flip.y, 1);
 
+		fitSun(overallBounds);
 		applyFloorPresence();
+	}
+
+	/** Aim the sun at the plan and size its shadow to cover every floor, however large the house is. */
+	function fitSun(bounds: THREE.Box3) {
+		const sphere = new THREE.Sphere(planCenter.clone(), 10);
+		if (!bounds.isEmpty()) bounds.getBoundingSphere(sphere); // mirroring about the centre keeps the same sphere
+		planRadius = Math.max(sphere.radius, 1);
+		if (!sun) return;
+		const reach = planRadius + 1;
+		sun.target.position.copy(sphere.center);
+		sun.position.copy(sphere.center).addScaledVector(SUN_DIRECTION, reach * 2);
+		const shadowCamera = sun.shadow.camera;
+		shadowCamera.left = shadowCamera.bottom = -reach;
+		shadowCamera.right = shadowCamera.top = reach;
+		shadowCamera.near = 0.1;
+		shadowCamera.far = reach * 4;
+		shadowCamera.updateProjectionMatrix();
+		sun.shadow.needsUpdate = true;
 	}
 
 	function applyFloorPresence() {
@@ -686,10 +720,11 @@
 				const slabMaterial = fv.slab.material as THREE.MeshStandardMaterial;
 				slabMaterial.opacity = SLAB_OPACITY[p];
 				slabMaterial.depthWrite = p === 'active'; // a faint floor must not hide what is under it
+				fv.slab.castShadow = p === 'active'; // nor darken the one in focus
 			}
+			for (const mesh of fv.wallMeshes) mesh.castShadow = p === 'active';
 			for (const plane of fv.planes) {
 				(plane.material as THREE.MeshStandardMaterial).opacity = FLOOR_OPACITY[p];
-				plane.castShadow = p === 'active'; // a faint floor should not darken the one in focus
 			}
 			for (const label of fv.labels) label.visible = p === 'active';
 		}
@@ -1012,6 +1047,11 @@
 		}
 		controls?.update();
 		easeDevices(deltaTime);
+
+		// Fog starts just past what the camera is looking at, so zooming never fogs the subject
+		const focus = camera.position.distanceTo(controls.target);
+		fog.near = focus + planRadius * 0.25;
+		fog.far = focus + planRadius * 5;
 
 		renderer?.render(scene, camera);
 		labelRenderer?.render(scene, camera);
