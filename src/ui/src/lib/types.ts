@@ -59,6 +59,8 @@ export interface MapConfig {
 	wallThickness: number;
 	wallColor?: string;
 	wallOpacity?: number;
+	/** 3D view: wall opacity at the ceiling; walls fade from wallOpacity at the floor to this. Default 0. */
+	wallOpacityTop?: number;
 }
 
 export interface ConfigGps {

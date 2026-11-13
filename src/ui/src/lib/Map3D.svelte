@@ -13,7 +13,7 @@
 	import { gotoDetail3d } from '#lib/urls.js';
 	import { hexToThreeNumber, getRoomColor } from '#lib/colors.js';
 	import { floorRingRadius, nodeRangeColors } from '#lib/ranges3d.js';
-	import { wallSegments, wallPosts, wallHeight, MIN_WALL_THICKNESS } from '#lib/walls3d.js';
+	import { wallSegments, wallPosts, wallHeight, wallOpacityAt, MIN_WALL_THICKNESS } from '#lib/walls3d.js';
 	import logoSvg from '#lib/images/logo.svg?raw';
 
 	interface Props {
@@ -59,7 +59,6 @@
 
 	// --- Look ---
 	const DEFAULT_WALL_OPACITY = 0.35; // what the 2D map uses when map.wall_opacity is not set
-	const WALL_FADE_POWER = 1.6; // how quickly a wall fades as it rises: 1 is a straight ramp, more keeps the top clearer
 	const WALL_TOP_OPACITY = 0.6;
 	const WALL_FADE_STEPS = 8; // slices up each wall, so the curved fade has vertices to follow
 	const GHOST_WALL_FACTOR = 0.2; // walls of a faint floor, as a share of their configured opacity
@@ -142,7 +141,7 @@
 		wallMaterials: THREE.MeshStandardMaterial[];
 		wallMeshes: THREE.Mesh[]; // invisible shadow casters for the bottom of the walls
 		wallTops: THREE.LineSegments[]; // the line along the top of each wall
-		wallOpacity: number; // map.wall_opacity, what the walls have when the floor is in focus
+		wallOpacity: number; // the walls' strongest opacity (of map.wall_opacity and wall_opacity_top) when the floor is in focus
 		slab: THREE.Mesh | null;
 		planes: THREE.Mesh[];
 		labels: CSS2DObject[];
@@ -594,7 +593,12 @@
 
 		const wallThickness = Math.max(config.map?.wallThickness ?? 0.1, MIN_WALL_THICKNESS);
 		const wallColor = config.map?.wallColor;
-		const wallOpacity = Math.max(0, Math.min(1, config.map?.wallOpacity ?? DEFAULT_WALL_OPACITY));
+		// Walls fade from map.wall_opacity at the floor to map.wall_opacity_top at the ceiling. The material
+		// carries the stronger of the two and each vertex its share of it.
+		const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+		const wallOpacityFloor = clamp01(config.map?.wallOpacity ?? DEFAULT_WALL_OPACITY);
+		const wallOpacityTop = clamp01(config.map?.wallOpacityTop ?? 0);
+		const wallOpacity = Math.max(wallOpacityFloor, wallOpacityTop);
 
 		config.floors.forEach((floor) => {
 			const floor_base = floor.bounds[0][2];
@@ -668,7 +672,7 @@
 				const posts = wallPosts(segments);
 				/**
 				 * The walls between two heights, as one merged geometry per colour. Every vertex carries an
-				 * alpha that goes from 1 at the floor to nothing at the ceiling, so the wall fades out
+				 * alpha that goes from map.wall_opacity at the floor to map.wall_opacity_top at the ceiling, so the wall fades out
 				 * as it rises instead of stopping at a cut.
 				 */
 				const storey = floor_ceiling - floor_base;
@@ -676,8 +680,8 @@
 					const position = box.getAttribute('position');
 					const rgba = new Float32Array(position.count * 4);
 					for (let i = 0; i < position.count; i++) {
-						const up = Math.max(0, Math.min(1, (position.getZ(i) - floor_base) / storey));
-						rgba.set([1, 1, 1, Math.pow(1 - up, WALL_FADE_POWER)], i * 4);
+						const opacity = wallOpacityAt((position.getZ(i) - floor_base) / storey, wallOpacityFloor, wallOpacityTop);
+						rgba.set([1, 1, 1, wallOpacity > 0 ? opacity / wallOpacity : 0], i * 4);
 					}
 					box.setAttribute('color', new THREE.BufferAttribute(rgba, 4));
 				};
