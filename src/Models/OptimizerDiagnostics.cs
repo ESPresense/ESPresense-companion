@@ -78,11 +78,11 @@ public sealed record OptimizerCycleReport(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null)
 {
     /// <summary>
-    /// The incumbent scored on devices at known positions (see <see cref="OptimizerSpotScore"/>). Report-only:
-    /// no gate reads it. Null when no spot has enough receivers.
+    /// How well the incumbent fits the anchors (see <see cref="OptimizerAnchorFit"/>). Report-only: no gate reads it.
+    /// Null when no anchor has enough receivers.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public OptimizerSpotScore? BaselineSpots { get; init; }
+    public OptimizerAnchorFit? BaselineAnchors { get; init; }
 }
 
 /// <summary>Where a proposal stopped. Gates are checked in this order; the first one failed is the decision.</summary>
@@ -110,18 +110,18 @@ public sealed record OptimizerProposalReport(
     OptimizerGates Gates,
     IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes)
 {
-    /// <summary>The proposal scored on devices at known positions, with how many spots it wins and loses against the incumbent. Report-only.</summary>
+    /// <summary>How well the proposal fits the anchors, and on how many it beats or loses to the incumbent. Report-only.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public OptimizerSpotScore? Spots { get; init; }
+    public OptimizerAnchorFit? Anchors { get; init; }
 }
 
 /// <summary>
-/// A calibration scored on devices at known positions (anchors; later, taught spots), #1868. Each spot's level is
-/// fitted, so this is the RMS (dB) of how the receivers disagree about each spot: their calibration relative to each
-/// other, which is what moves a trilaterated position, without the guess in a device's rssi@1m. <see cref="Better"/>
-/// and <see cref="Worse"/> count spots against the incumbent and are null on the incumbent itself.
+/// How well a calibration fits the anchors, #1868. Each anchor's level is fitted, so this is the RMS (dB) of how the
+/// receivers disagree about each anchor: their calibration relative to each other, which is what moves a trilaterated
+/// position, without the guess in an anchor's rssi@1m. <see cref="Better"/> and <see cref="Worse"/> count anchors
+/// against the incumbent and are null on the incumbent itself.
 /// </summary>
-public sealed record OptimizerSpotScore(int Spots, int Readings, double Rms)
+public sealed record OptimizerAnchorFit(int Anchors, int Readings, double Rms)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Better { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Worse { get; init; }

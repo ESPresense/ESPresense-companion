@@ -54,7 +54,6 @@ internal static class OptimizationCycle
     /// <param name="os">The (pooled) snapshot the optimizers fit.</param>
     /// <param name="oss">The held-out snapshots proposals are scored on. <paramref name="os"/> itself is excluded unless it is all there is.</param>
     /// <param name="readSettings">Reads a node's current settings. Called once per node; the cycle scores against that frozen view.</param>
-    /// <param name="knownSpots">Devices at known positions to report the spot score on besides the anchors in the eval set (for taught spots).</param>
     public static OptimizationCycleResult Evaluate(
         OptimizationSnapshot os,
         IReadOnlyList<OptimizationSnapshot> oss,
@@ -62,8 +61,7 @@ internal static class OptimizationCycle
         IEnumerable<IOptimizer> optimizers,
         Func<string, NodeSettings> readSettings,
         bool dryRun,
-        DateTime at,
-        IReadOnlyList<KnownPositionSpot>? knownSpots = null)
+        DateTime at)
     {
         var evalSet = oss.Where(s => !ReferenceEquals(s, os)).ToList();
         if (evalSet.Count == 0) evalSet = oss.ToList();
@@ -86,9 +84,9 @@ internal static class OptimizationCycle
             return OptimizationResults.Score(predictions);
         }
 
-        // Devices at known positions, scored with each spot's level fitted (#1868). Report-only: no gate reads it.
-        var spots = SpotScore.FromAnchors(evalSet).Concat(knownSpots ?? Array.Empty<KnownPositionSpot>()).ToList();
-        Dictionary<string, (double Sse, int Readings)> SpotsUnder(OptimizationResults results) => SpotScore.Evaluate(spots, id =>
+        // How well each calibration fits the anchors, each anchor's level fitted (#1868). Report-only: no gate reads it.
+        var anchors = AnchorFit.FromSnapshots(evalSet);
+        Dictionary<string, (double Sse, int Readings)> AnchorsUnder(OptimizationResults results) => AnchorFit.Evaluate(anchors, id =>
         {
             results.Nodes.TryGetValue(id, out var pv);
             var cal = Frozen(id).Calibration;
@@ -96,8 +94,8 @@ internal static class OptimizationCycle
         });
 
         var baselineResults = new OptimizationResults();
-        var baselineSpots = SpotsUnder(baselineResults);
-        OptimizerSpotScore? baselineSpotScore = baselineSpots.Count > 0 ? SpotScore.Report(baselineSpots) : null;
+        var baselineFit = AnchorsUnder(baselineResults);
+        OptimizerAnchorFit? baselineAnchors = baselineFit.Count > 0 ? AnchorFit.Report(baselineFit) : null;
         var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
         var bestScore = Composite(bestCorr, bestRmse, optimization);
         var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples);
@@ -107,7 +105,7 @@ internal static class OptimizationCycle
             var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
                 Array.Empty<OptimizerProposalReport>(), null, false,
                 $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).")
-                { BaselineSpots = baselineSpotScore };
+                { BaselineAnchors = baselineAnchors };
             return new OptimizationCycleResult(skipped, null, null, null, baselineSamples) { Incumbent = frozen };
         }
 
@@ -189,7 +187,7 @@ internal static class OptimizationCycle
             s.Gates,
             s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))
             {
-                Spots = baselineSpots.Count > 0 ? SpotScore.Report(SpotsUnder(s.Results), baselineSpots) : null
+                Anchors = baselineFit.Count > 0 ? AnchorFit.Report(AnchorsUnder(s.Results), baselineFit) : null
             }).ToList();
 
         string outcome;
@@ -208,7 +206,7 @@ internal static class OptimizationCycle
         }
 
         var report = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
-            proposals, chosen?.Name, false, outcome) { BaselineSpots = baselineSpotScore };
+            proposals, chosen?.Name, false, outcome) { BaselineAnchors = baselineAnchors };
         return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples) { Incumbent = frozen };
     }
 
