@@ -60,6 +60,7 @@
 	// --- Look ---
 	const DEFAULT_WALL_OPACITY = 0.35; // what the 2D map uses when map.wall_opacity is not set
 	const WALL_FADE_POWER = 1.6; // how quickly a wall fades as it rises: 1 is a straight ramp, more keeps the top clearer
+	const WALL_TOP_OPACITY = 0.6;
 	const WALL_FADE_STEPS = 8; // slices up each wall, so the curved fade has vertices to follow
 	const GHOST_WALL_FACTOR = 0.2; // walls of a faint floor, as a share of their configured opacity
 	const SLAB_THICKNESS = 0.08; // metres of floor under each storey
@@ -140,6 +141,7 @@
 		group: THREE.Group;
 		wallMaterials: THREE.MeshStandardMaterial[];
 		wallMeshes: THREE.Mesh[]; // invisible shadow casters for the bottom of the walls
+		wallTops: THREE.LineSegments[]; // the line along the top of each wall
 		wallOpacity: number; // map.wall_opacity, what the walls have when the floor is in focus
 		slab: THREE.Mesh | null;
 		planes: THREE.Mesh[];
@@ -609,6 +611,7 @@
 			const height = wallHeight(floor_base, floor_ceiling);
 			const wallMaterials: THREE.MeshStandardMaterial[] = [];
 			const wallMeshes: THREE.Mesh[] = [];
+			const wallTops: THREE.LineSegments[] = [];
 			if (height > 0) {
 				const segments = wallSegments(floor.rooms ?? []);
 				const posts = wallPosts(segments);
@@ -670,6 +673,22 @@
 					floorGroup.add(wallMesh);
 					wallMaterials.push(material);
 				}
+				// A line along the top of every wall: where the fade ends, the ceiling still has an edge
+				// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
+				const topsByColor = new Map<string, number[]>();
+				for (const wall of segments) {
+					const color = wallColor ?? getRoomColor(config, wall.roomId);
+					const points = topsByColor.get(color) ?? [];
+					points.push(wall.a[0], wall.a[1], floor_ceiling, wall.b[0], wall.b[1], floor_ceiling);
+					topsByColor.set(color, points);
+				}
+				for (const [color, points] of topsByColor) {
+					const geometry = new THREE.BufferGeometry();
+					geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+					const top = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: WALL_TOP_OPACITY, depthWrite: false }));
+					wallTops.push(top);
+					floorGroup.add(top);
+				}
 				// Only the solid-looking bottom of a wall throws a shadow; this mesh is never drawn itself
 				for (const { geometry } of wallsBetween(floor_base, floor_base + height)) {
 					const caster = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
@@ -685,7 +704,7 @@
 			}
 			overallBounds.union(floorBounds);
 			newRoomGroup.add(floorGroup);
-			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallMeshes, wallOpacity, slab, planes, labels, bounds: floorBounds });
+			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallMeshes, wallTops, wallOpacity, slab, planes, labels, bounds: floorBounds });
 		});
 
 		// A 1 m grid under the house for a sense of scale, on whole metres of the plan
@@ -757,6 +776,7 @@
 				slabMaterial.depthWrite = p === 'active'; // a faint floor must not hide what is under it
 				fv.slab.castShadow = p === 'active'; // nor darken the one in focus
 			}
+			for (const top of fv.wallTops) top.visible = p === 'active';
 			for (const mesh of fv.wallMeshes) mesh.castShadow = p === 'active' && fv.wallOpacity > 0; // invisible walls cast nothing
 			for (const plane of fv.planes) {
 				(plane.material as THREE.MeshStandardMaterial).opacity = FLOOR_OPACITY[p];
