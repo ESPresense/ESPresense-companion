@@ -23,7 +23,8 @@ map:
   flip_y: true         # Set to true to use bottom-left origin, false for top-left origin (default: true)
   # Walls, on the 2D map and in the 3D view
   wall_thickness: 0.1  # Wall thickness in meters
-  wall_color: "#ddd"   # Optional wall color, if not set uses room color (a wall two rooms share takes the first room's)
+  wall_color: "#ddd"   # Optional wall color, if not set uses room color. In 3D a wall two rooms share takes the
+                       # first room's; in 2D each room strokes its own outline, so the later room's covers it
   wall_opacity: 0.35   # Optional wall opacity, if not set defaults to 0.35. In 3D this is the opacity at the floor:
                        # walls fade out towards the ceiling. 0 hides the walls
 
