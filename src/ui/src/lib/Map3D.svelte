@@ -12,6 +12,7 @@
 	import type { Device, Node, Config, DeviceHistory, Floor } from '#lib/types.js';
 	import { gotoDetail3d } from '#lib/urls.js';
 	import { hexToThreeNumber, getRoomColor } from '#lib/colors.js';
+	import { floorRingRadius, nodeRangeColors } from '#lib/ranges3d.js';
 	import { wallSegments, wallPosts, wallHeight, MIN_WALL_THICKNESS } from '#lib/walls3d.js';
 	import logoSvg from '#lib/images/logo.svg?raw';
 
@@ -156,6 +157,7 @@
 	type DeviceVisual = {
 		group: THREE.Group; // at (x, y, floor base), eased
 		sphere: THREE.Mesh;
+		outline: THREE.Mesh; // a white rim, shown while the device is selected
 		line: THREE.Line;
 		disc: THREE.Mesh;
 		label: CSS2DObject;
@@ -256,37 +258,80 @@
 		image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(logoSvg);
 	}
 
-	// --- Measured spheres (click a device) ---
-	let measuredSpheresGroup: THREE.Group | null = null;
-	let selectedDeviceId: string | null = null;
+	// --- Selection and range spheres (click a device) ---
+	// Clicking a device selects it: it gets an outline, the others dim, and every node that hears it
+	// shows its measured distance as a faint sphere, a ring where that sphere meets the device's floor,
+	// and a line to the device. Double-click (or the card's button) opens the device page.
+	let selectedDeviceId: string | null = $state(null);
+	let selectedDevice = $derived(selectedDeviceId ? (devicesToShow.find((d) => d.id === selectedDeviceId) ?? null) : null);
+	let rangeGroup: THREE.Group | null = null;
+	let rangeColors = $derived(nodeRangeColors(nodesToShow.map((n) => n.id)));
+	const unitRing = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 97 }, (_, i) => new THREE.Vector3(Math.cos((i / 96) * 2 * Math.PI), Math.sin((i / 96) * 2 * Math.PI), 0)));
+	type RangeMaterials = { sphere: THREE.MeshBasicMaterial; line: THREE.LineBasicMaterial };
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- plain cache of Three.js materials, never rendered from
+	const rangeMaterialCache = new Map<string, RangeMaterials>();
+	const outlineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide });
 
-	function showMeasuredSpheres(device: Device) {
-		if (!measuredSpheresGroup) {
-			measuredSpheresGroup = new THREE.Group();
-			measuredSpheresGroup.name = 'MeasuredSpheres';
-			// Nodes live in contentGroup (centred + mirrored); the spheres must too.
-			contentGroup?.add(measuredSpheresGroup);
+	function rangeMaterials(color: string): RangeMaterials {
+		let set = rangeMaterialCache.get(color);
+		if (!set) {
+			set = {
+				// Back faces only: one faint layer per sphere, and it still shows with the camera inside it
+				sphere: new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.BackSide }),
+				line: new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 })
+			};
+			rangeMaterialCache.set(color, set);
 		}
-		measuredSpheresGroup.clear();
-
-		Object.entries(device.nodes || {}).forEach(([nodeId, measurement]) => {
-			const node = nodesToShow?.find((n) => n.id === nodeId);
-			if (!node || !node.location) return;
-			if (presence(nodeFloorIds(node)) === 'hidden') return;
-			const distance = measurement.dist;
-			if (distance <= 0) return;
-
-			const sphereGeometry = new THREE.SphereGeometry(distance, 32, 24);
-			const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, opacity: 0.5, transparent: true });
-			const measureSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-			measureSphere.position.set(node.location.x, node.location.y, node.location.z);
-			measuredSpheresGroup?.add(measureSphere);
-		});
+		return set;
 	}
 
-	function hideMeasuredSpheres() {
-		measuredSpheresGroup?.clear();
-		selectedDeviceId = null;
+	/** What a selected device's ranges are: one entry per node that hears it and is on screen. */
+	let ranges = $derived.by(() => {
+		const device = selectedDevice;
+		if (!device?.location) return [];
+		return Object.entries(device.nodes || {})
+			.map(([nodeId, measurement]) => ({ node: nodesToShow.find((n) => n.id === nodeId), distance: measurement.dist }))
+			.filter((r): r is { node: Node; distance: number } => !!r.node?.location && r.distance > 0 && presence(nodeFloorIds(r.node)) !== 'hidden')
+			.map((r) => ({ ...r, color: rangeColors.get(r.node.id) ?? '#38bdf8' }));
+	});
+
+	function renderRanges() {
+		if (!contentGroup) return;
+		if (!rangeGroup) {
+			rangeGroup = new THREE.Group();
+			rangeGroup.name = 'Ranges';
+			contentGroup.add(rangeGroup); // nodes live in contentGroup (centred + mirrored); the ranges must too
+		}
+		for (const child of [...rangeGroup.children]) {
+			rangeGroup.remove(child);
+			if (child instanceof THREE.Line && child.geometry !== unitRing) child.geometry.dispose();
+		}
+		const device = selectedDevice;
+		if (!device?.location || !showDevices) return;
+		const floorZ = floorBaseZ(deviceFloorIds(device), device.location.z);
+
+		for (const { node, distance, color } of ranges) {
+			const mats = rangeMaterials(color);
+			const sphere = new THREE.Mesh(unitSphere, mats.sphere);
+			sphere.scale.setScalar(distance);
+			sphere.position.set(node.location.x, node.location.y, node.location.z);
+			rangeGroup.add(sphere);
+
+			const radius = floorRingRadius(distance, node.location.z - floorZ);
+			if (radius != null) {
+				const ring = new THREE.LineLoop(unitRing, mats.line);
+				ring.scale.setScalar(radius);
+				ring.position.set(node.location.x, node.location.y, floorZ + 0.02);
+				rangeGroup.add(ring);
+			}
+
+			const link = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(node.location.x, node.location.y, node.location.z), new THREE.Vector3(device.location.x, device.location.y, device.location.z)]), mats.line);
+			rangeGroup.add(link);
+		}
+	}
+
+	function select(id: string | null) {
+		selectedDeviceId = id;
 	}
 
 	// --- History path ---
@@ -305,6 +350,7 @@
 
 			container.addEventListener('pointerdown', onPointerDown);
 			container.addEventListener('click', onCanvasClick);
+			container.addEventListener('dblclick', onCanvasDoubleClick);
 			container.addEventListener('pointermove', onPointerMove);
 			container.addEventListener('pointerleave', onPointerLeave);
 		}
@@ -328,6 +374,7 @@
 			window.removeEventListener('resize', handleResize);
 			container?.removeEventListener('pointerdown', onPointerDown);
 			container?.removeEventListener('click', onCanvasClick);
+			container?.removeEventListener('dblclick', onCanvasDoubleClick);
 			container?.removeEventListener('pointermove', onPointerMove);
 			container?.removeEventListener('pointerleave', onPointerLeave);
 			cleanupScene();
@@ -512,6 +559,8 @@
 
 		if (showHistoryPath) renderHistoryPath(historyData);
 		else cleanupHistoryPath();
+
+		renderRanges();
 	}
 
 	// --- Room Rendering ---
@@ -916,10 +965,16 @@
 			v.target.set(device.location.x, device.location.y, device.location.z);
 			v.floorZ = floorBaseZ(deviceFloorIds(device), device.location.z);
 			v.sphere.scale.setScalar(deviceRadius(device.confidence || 0));
+			v.outline.scale.setScalar(deviceRadius(device.confidence || 0) + 0.03);
 
 			const p = presence(deviceFloorIds(device));
+			const selected = device.id === selectedDeviceId;
+			const dimmed = selectedDevice != null && !selected; // step back while another device is selected
 			v.group.visible = p !== 'hidden';
-			v.sphere.material = p === 'ghost' ? mats.ghost : mats.sphere;
+			v.sphere.material = p === 'ghost' || dimmed ? mats.ghost : mats.sphere;
+			v.sphere.castShadow = !dimmed;
+			v.outline.visible = selected;
+			v.labelElement.style.opacity = dimmed ? '0.35' : '';
 			v.line.material = mats.line;
 			v.disc.material = mats.disc;
 			v.line.visible = v.disc.visible = v.label.visible = p === 'active';
@@ -944,6 +999,10 @@
 		sphere.receiveShadow = true;
 		group.add(sphere);
 
+		const outline = new THREE.Mesh(unitSphere, outlineMaterial);
+		outline.visible = false;
+		group.add(outline);
+
 		const line = makeDropLine(mats.line);
 		group.add(line);
 
@@ -959,7 +1018,7 @@
 		label.name = device.id + '#label';
 		group.add(label);
 
-		return { group, sphere, line, disc, label, labelElement, current: new THREE.Vector3(), target: new THREE.Vector3(), floorZ: 0 };
+		return { group, sphere, outline, line, disc, label, labelElement, current: new THREE.Vector3(), target: new THREE.Vector3(), floorZ: 0 };
 	}
 
 	function removeDeviceVisual(v: DeviceVisual) {
@@ -973,6 +1032,7 @@
 		const height = v.current.z - v.floorZ;
 		v.group.position.set(v.current.x, v.current.y, v.floorZ);
 		v.sphere.position.z = height;
+		v.outline.position.z = height;
 		v.label.position.z = height;
 		setDropHeight(v.line, height);
 	}
@@ -1070,23 +1130,12 @@
 	function onCanvasClick(event: MouseEvent) {
 		// A drag to orbit ends with a click too; only a tap counts
 		if (pointerDown && Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 4) return;
+		select(pick(event, ['device'])?.id ?? null);
+	}
 
+	function onCanvasDoubleClick(event: MouseEvent) {
 		const hit = pick(event, ['device']);
-		if (!hit) {
-			hideMeasuredSpheres();
-			return;
-		}
-		if (selectedDeviceId === hit.id) {
-			// Clicking the same device again hides the spheres and opens it
-			hideMeasuredSpheres();
-			gotoDetail3d(hit.id);
-		} else {
-			const device = devicesToShow.find((d) => d.id === hit.id);
-			if (device) {
-				selectedDeviceId = hit.id;
-				showMeasuredSpheres(device);
-			}
-		}
+		if (hit) gotoDetail3d(hit.id);
 	}
 
 	// --- Animation Loop ---
@@ -1142,6 +1191,8 @@
 		cleanupDeviceGroup();
 		cleanupHistoryPath();
 		clearDeviceMaterials();
+		for (const set of rangeMaterialCache.values()) Object.values(set).forEach((m) => m.dispose());
+		rangeMaterialCache.clear();
 
 		renderer?.dispose();
 		renderer?.forceContextLoss(); // Important for WebGL context release
@@ -1200,6 +1251,10 @@
 	$effect(() => {
 		if (ready) updateSceneObjects();
 	});
+	// A selected device that left the list (timed out, or filtered away) is no longer selected
+	$effect(() => {
+		if (selectedDeviceId && !devicesToShow.some((d) => d.id === selectedDeviceId)) selectedDeviceId = null;
+	});
 	$effect(() => {
 		if (ready) applyFloorPresence();
 	});
@@ -1218,6 +1273,39 @@
 
 <div class="map3d w-full h-full relative" bind:this={container}>
 	<!-- Container for the 3D canvas and CSS2D labels -->
+	{#if selectedDevice}
+		<div class="absolute left-4 top-4 z-10 w-60 rounded bg-surface-100-900/90 p-3 text-xs shadow" data-testid="map3d-selection">
+			<div class="flex items-start justify-between gap-2">
+				<div class="min-w-0">
+					<div class="truncate text-sm font-semibold">{selectedDevice.name || selectedDevice.id}</div>
+					<div class="opacity-80">{[selectedDevice.room?.name, selectedDevice.floor?.name].filter(Boolean).join(' · ') || 'No room'}</div>
+					<div class="opacity-80">{selectedDevice.confidence}% confidence, {selectedDevice.fixes} fixes</div>
+				</div>
+				<button type="button" class="btn-icon btn-icon-sm preset-tonal" aria-label="Clear selection" onclick={() => select(null)}>✕</button>
+			</div>
+			{#if ranges.length}
+				<div class="mt-2 opacity-80">Measured distance from each node</div>
+				<ul class="mt-1 max-h-40 overflow-y-auto">
+					{#each [...ranges].sort((a, b) => a.distance - b.distance) as range (range.node.id)}
+						<li class="flex items-center gap-2">
+							<span class="inline-block h-2 w-2 shrink-0 rounded-full" style="background: {range.color}"></span>
+							<span class="min-w-0 flex-1 truncate">{range.node.name}</span>
+							<span class="tabular-nums">{range.distance.toFixed(1)} m</span>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<div class="mt-2 opacity-80">No node on screen hears this device.</div>
+			{/if}
+			<button type="button" class="btn btn-sm preset-filled mt-3 w-full" onclick={() => selectedDevice && gotoDetail3d(selectedDevice.id)}>Open device</button>
+		</div>
+	{/if}
+	<div class="pointer-events-none absolute bottom-16 left-4 z-10 rounded bg-surface-100-900/80 px-3 py-2 text-xs shadow" data-testid="map3d-legend">
+		<div class="flex items-center gap-2"><span class="inline-block h-2 w-2 rounded-full bg-sky-400"></span>Node online</div>
+		<div class="flex items-center gap-2"><span class="inline-block h-2 w-2 rounded-full bg-red-400"></span>Node offline</div>
+		<div class="flex items-center gap-2"><span class="inline-block h-2 w-2 rounded-full bg-white/70"></span>Device: colour is its room, size its confidence</div>
+		<div class="mt-1 opacity-70">Click a device for its ranges, double-click to open it</div>
+	</div>
 	{#if hover}
 		<div class="pointer-events-none absolute z-10 rounded bg-surface-100-900/90 px-2 py-1 text-xs shadow" style="left: {hover.x + 14}px; top: {hover.y + 14}px" role="tooltip" data-testid="map3d-tooltip">
 			<div class="font-semibold">{hover.title}</div>
