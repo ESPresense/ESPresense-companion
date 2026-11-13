@@ -21,9 +21,11 @@ gps:
 map:
   flip_x: false        # Set to true to flip X coordinates (default: false)
   flip_y: true         # Set to true to use bottom-left origin, false for top-left origin (default: true)
+  # Walls, on the 2D map and in the 3D view
   wall_thickness: 0.1  # Wall thickness in meters
-  wall_color: "#ddd"   # Optional wall color, if not set uses room color
-  wall_opacity: 0.35   # Optional wall opacity, if not set defaults to 0.35
+  wall_color: "#ddd"   # Optional wall color, if not set uses room color (a wall two rooms share takes the first room's)
+  wall_opacity: 0.35   # Optional wall opacity, if not set defaults to 0.35. In 3D this is the opacity at the floor:
+                       # walls fade out towards the ceiling. 0 hides the walls
 
 # How long before device considered stale
 timeout: 30
