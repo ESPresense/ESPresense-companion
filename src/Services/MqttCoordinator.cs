@@ -8,7 +8,6 @@ using ESPresense.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
 using MQTTnet;
 using MQTTnet.Diagnostics.Logger;
-using Newtonsoft.Json;
 
 namespace ESPresense.Services;
 
@@ -171,11 +170,6 @@ public class MqttCoordinator : IMqttCoordinator, IMqttEventSink, IDisposable
                 await InvokeAllAsync(MqttMessageReceivedAsync, arg, nameof(MqttMessageReceivedAsync));
             else
                 await _handlers.DispatchAsync(route, payload);
-        }
-        catch (JsonSerializationException ex)
-        {
-            _logger.LogError(ex, "JSON deserialization error for topic {Topic}. Payload: {Payload}", topic, payload);
-            MqttMessageMalformed?.Invoke(this, EventArgs.Empty);
         }
         catch (MqttMessageProcessingException ex)
         {

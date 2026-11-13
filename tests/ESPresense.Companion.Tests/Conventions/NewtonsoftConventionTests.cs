@@ -16,16 +16,6 @@ public class NewtonsoftConventionTests
         // Third-party contract: Flurl's Newtonsoft serializer reads the HA Supervisor API, whose numeric
         // "port" lands in a string member (Newtonsoft coerces it, System.Text.Json would throw).
         "Program.cs",
-
-        // TODO(#1854): MqttMessageHandlers parses device messages, node telemetry, device settings and device
-        // attributes with Newtonsoft; the models carry Newtonsoft attributes for that parse. The attributes
-        // arrive as Dictionary<string, object>, and DeviceTracker restores last_seen only when Newtonsoft has
-        // already made it a DateTime, so the parse moves to JsonDefaults.MqttRead with #1854.
-        "Services/Mqtt/MqttMessageHandlers.cs",
-        "Services/MqttCoordinator.cs",            // catches the JsonSerializationException that parse throws
-        "Models/DeviceMessage.cs",
-        "Models/NodeTelemetry.cs",
-        "Models/DeviceSettings.cs",
     };
 
     [Test]

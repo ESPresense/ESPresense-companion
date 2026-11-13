@@ -1,17 +1,17 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 
 namespace ESPresense.Models
 {
     public class DeviceMessage
     {
 
-        [JsonProperty("distance")]
+        [JsonPropertyName("distance")]
         public double Distance { get; set; }
 
-        [JsonProperty("var")]
+        [JsonPropertyName("var")]
         public double? DistVar { get; set; }
 
-        [JsonProperty("rssi")]
+        [JsonPropertyName("rssi")]
         public double Rssi { get; set; }
 
         // Firmware before v5.0.0 reports rxAdj (subtracted from the raw reading); v5 reports rawRssi
@@ -19,7 +19,7 @@ namespace ESPresense.Models
         // and code that un-applies a node's adjustment (rssi + rxAdj - candidate) works for both.
         private double? _rxAdj;
 
-        [JsonProperty("rxAdj")]
+        [JsonPropertyName("rxAdj")]
         public double? RssiRxAdj
         {
             get => _rxAdj ?? (RawRssi is { } raw ? raw - Rssi : null);
@@ -27,16 +27,16 @@ namespace ESPresense.Models
         }
 
         /// <summary>The node's smoothed RSSI before its receiver offset (v5 firmware).</summary>
-        [JsonProperty("rawRssi")]
+        [JsonPropertyName("rawRssi")]
         public double? RawRssi { get; set; }
 
-        [JsonProperty("rssiVar")]
+        [JsonPropertyName("rssiVar")]
         public double? RssiVar { get; set; }
 
-        [JsonProperty("rssi@1m")]
+        [JsonPropertyName("rssi@1m")]
         public double RefRssi { get; set; }
 
-        [JsonProperty("name")]
+        [JsonPropertyName("name")]
         public string? Name { get; set; }
     }
 }

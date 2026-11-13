@@ -54,13 +54,14 @@ Two rules, each enforced by a test under `tests/ESPresense.Companion.Tests/Conve
 | `JsonDefaults.WebSocket` | `/ws` events and commands |
 | `JsonDefaults.Mqtt` | what the Companion publishes to MQTT: HA discovery, telemetry, device settings |
 | `JsonDefaults.Verbatim` | the MQTT `last_seen` stamp and firmware-update progress frames |
-| `JsonDefaults.MqttRead` | reading JSON other publishers wrote to MQTT (HA discovery messages) |
+| `JsonDefaults.MqttRead` | reading JSON other publishers wrote to MQTT: node reports and telemetry, device settings, HA discovery, device attributes |
 
 They differ on purpose: each reproduces what its boundary has always sent (REST enums are strings, WebSocket enums are numbers). The MQTT ones reproduce Newtonsoft's output byte for byte, including its string escaping and its `2.0`-style doubles, through the converters in `Converters/NewtonsoftCompatible.cs`. Changing any of them is a wire-format change.
+
+`MqttRead` parses as leniently as Newtonsoft did (case-insensitive names, numbers in strings and strings in numbers, comments, trailing commas); `MqttReadCompatibilityTests` compares it with Newtonsoft over representative payloads, and can run over a `mosquitto_sub -v` capture of your own (`MQTT_CAPTURE=capture.txt`). Names a node sends that differ from the API's (`NodeTelemetry`: `ver`, `firm`, `memFrag`) are given with `[MqttName]`, which only `MqttRead` reads, so the REST and MCP output keeps `version`, `firmware` and `memoryFragmentation`.
 
 Newtonsoft.Json remains only here, and `NewtonsoftConventionTests` fails if it spreads:
 
 - **HA Supervisor API** (`Program.cs`: `FlurlHttp.Clients.UseNewtonsoft()`, used by `SupervisorConfigLoader`). A third-party contract: the Supervisor returns `port` as a number into a string member, which Newtonsoft coerces and System.Text.Json would reject.
-- **MQTT parsing in `Services/Mqtt/MqttMessageHandlers.cs`** (device messages, node telemetry, device settings, device attributes), the `JsonSerializationException` it throws that `MqttCoordinator` catches, and the Newtonsoft attributes on `DeviceMessage`, `NodeTelemetry` and `DeviceSettings` that parse depends on. The attributes arrive as `Dictionary<string, object>`, and `DeviceTracker` restores `last_seen` only when Newtonsoft has already turned it into a `DateTime`; an STJ `JsonElement` would be skipped. Deferred until #1844 changes `DeviceTracker`; `JsonDefaults.MqttRead` is the intended replacement, with the parse pinned first.
 
 Join us on discord for development talk: [https://discord.gg/jbqmn7V6n6]

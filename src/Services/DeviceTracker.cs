@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using ESPresense.Controllers;
 using ESPresense.Events;
 using ESPresense.Models;
@@ -64,20 +65,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
                 {
                     try
                     {
-                        DateTime? lastSeen = null;
-
-                        // Handle different formats of last_seen
-                        if (lastSeenObj is DateTime dateTime)
-                        {
-                            lastSeen = dateTime;
-                        }
-                        else if (lastSeenObj is string lastSeenStr && !string.IsNullOrEmpty(lastSeenStr))
-                        {
-                            if (DateTime.TryParse(lastSeenStr, out var parsedDate))
-                            {
-                                lastSeen = parsedDate;
-                            }
-                        }
+                        var lastSeen = ReadLastSeen(lastSeenObj);
 
                         if (device.LastSeen == null)
                         {
@@ -357,4 +345,21 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     internal int PendingProcessCount => _toProcess.Count;
 
     internal void MarkForLocate(string deviceId) => _toLocate.Mark(deviceId);
+
+    /// <summary>
+    /// The <c>last_seen</c> attribute the Companion published (an ISO 8601 string, see <see cref="DeviceReport.AttributesJson"/>),
+    /// as <see cref="DeviceAttributesHandler"/> hands it over: a <see cref="JsonElement"/>. An ISO string keeps its kind
+    /// (<c>Z</c> is UTC, an offset becomes local time, none is unspecified) as Newtonsoft's parse did; any other string
+    /// falls back to <see cref="DateTime.TryParse(string?, out DateTime)"/>. Anything else is null.
+    /// </summary>
+    internal static DateTime? ReadLastSeen(object? value)
+    {
+        if (value is JsonElement { ValueKind: JsonValueKind.String } element)
+        {
+            if (element.TryGetDateTime(out var iso)) return iso;
+            value = element.GetString();
+        }
+
+        return value is string text && DateTime.TryParse(text, out var parsed) ? parsed : null;
+    }
 }
