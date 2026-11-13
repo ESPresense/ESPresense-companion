@@ -160,6 +160,9 @@ namespace ESPresense.Models
 
         [YamlMember(Alias = "wall_opacity")]
         public double? WallOpacity { get; set; }  // Optional wall opacity, defaults to 0.35 if not set
+
+        [YamlMember(Alias = "wall_opacity_top")]
+        public double? WallOpacityTop { get; set; }  // Optional wall opacity at the ceiling in the 3D view, defaults to 0 (walls fade out) if not set
     }
 
     public partial class ConfigOptimization

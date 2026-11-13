@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wallHeight, wallPosts, wallSegments } from './walls3d';
+import { wallHeight, wallOpacityAt, wallPosts, wallSegments } from './walls3d';
 import type { Room } from './types';
 
 const room = (id: string, points: [number, number][]): Room => ({ id, name: id, points });
@@ -135,5 +135,29 @@ describe('wallHeight', () => {
 
 	it('is never negative', () => {
 		expect(wallHeight(3, 0)).toBe(0);
+	});
+});
+
+describe('wallOpacityAt', () => {
+	it('runs from the floor opacity to the top opacity', () => {
+		expect(wallOpacityAt(0, 0.35, 0)).toBeCloseTo(0.35);
+		expect(wallOpacityAt(1, 0.35, 0)).toBeCloseTo(0);
+		expect(wallOpacityAt(1, 0.35, 0.1)).toBeCloseTo(0.1);
+	});
+
+	it('is already past halfway to the top opacity at mid-height', () => {
+		const mid = wallOpacityAt(0.5, 0.4, 0);
+		expect(mid).toBeGreaterThan(0);
+		expect(mid).toBeLessThan(0.2);
+	});
+
+	it('does not fade when both ends are the same', () => {
+		for (const up of [0, 0.3, 1]) expect(wallOpacityAt(up, 0.5, 0.5)).toBeCloseTo(0.5);
+	});
+
+	it('can grow towards the ceiling, and clamps heights outside the storey', () => {
+		expect(wallOpacityAt(0.5, 0, 0.6)).toBeGreaterThan(0.3);
+		expect(wallOpacityAt(-1, 0.35, 0)).toBeCloseTo(0.35);
+		expect(wallOpacityAt(2, 0.35, 0)).toBeCloseTo(0);
 	});
 });
