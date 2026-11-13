@@ -13,6 +13,7 @@
 	import type { Device, Node, Config, DeviceHistory, Floor } from '#lib/types.js';
 	import { gotoDetail3d } from '#lib/urls.js';
 	import { hexToThreeNumber, getRoomColor } from '#lib/colors.js';
+	import { wallSegments, wallPosts, wallHeight, MIN_WALL_THICKNESS } from '#lib/walls3d.js';
 	import logoSvg from '#lib/images/logo.svg?raw';
 
 	interface Props {
@@ -54,7 +55,10 @@
 	let pointerDown: { x: number; y: number } | null = null;
 
 	// --- Look ---
-	const WALL_OPACITY = { active: 0.6, ghost: 0.12 };
+	const DEFAULT_WALL_OPACITY = 0.35; // what the 2D map uses when map.wall_opacity is not set
+	const GHOST_WALL_FACTOR = 0.2; // walls of a faint floor, as a share of their configured opacity
+	const SLAB_THICKNESS = 0.08; // metres of floor under each storey
+	const SLAB_OPACITY = { active: 0.85, ghost: 0.06 };
 	const FLOOR_OPACITY = { active: 0.2, ghost: 0.05 };
 	const GHOST_OPACITY = 0.25;
 	const EASE_TAU = 0.2; // seconds: how quickly a device slides to a new fix
@@ -125,7 +129,9 @@
 	type FloorVisual = {
 		floor: Floor;
 		group: THREE.Group;
-		wallMaterial: THREE.LineBasicMaterial;
+		wallMaterials: THREE.MeshStandardMaterial[];
+		wallOpacity: number; // map.wall_opacity, what the walls have when the floor is in focus
+		slab: THREE.Mesh | null;
 		planes: THREE.Mesh[];
 		labels: CSS2DObject[];
 		bounds: THREE.Box3; // plan coordinates
@@ -133,6 +139,7 @@
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Three.js bookkeeping, never rendered from
 	const floorVisuals = new Map<string, FloorVisual>();
 	let roomGroup: THREE.Group | null = null;
+	let groundGrid: THREE.GridHelper | null = null;
 
 	// --- Devices ---
 	type DeviceVisual = {
@@ -517,47 +524,29 @@
 		newRoomGroup.name = 'RoomGroup';
 		const overallBounds = new THREE.Box3();
 
+		const wallThickness = Math.max(config.map?.wallThickness ?? 0.1, MIN_WALL_THICKNESS);
+		const wallColor = config.map?.wallColor;
+		const wallOpacity = Math.max(0, Math.min(1, config.map?.wallOpacity ?? DEFAULT_WALL_OPACITY));
+
 		config.floors.forEach((floor) => {
 			const floor_base = floor.bounds[0][2];
 			const floor_ceiling = floor.bounds[1][2];
 			const floorGroup = new THREE.Group();
 			floorGroup.name = 'floor#' + floor.id;
-			const wallMaterial = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: WALL_OPACITY.active });
 			const floorBounds = new THREE.Box3();
 			const planes: THREE.Mesh[] = [];
 			const labels: CSS2DObject[] = [];
+			const slabGeometries: THREE.BufferGeometry[] = [];
 
 			floor.rooms?.forEach((room) => {
-				const points3d: THREE.Vector3[] = [];
 				const pointsFloor: THREE.Vector2[] = [];
 
 				room.points.forEach((points) => {
-					const vec3Base = new THREE.Vector3(points[0], points[1], floor_base);
-					const vec3Ceiling = new THREE.Vector3(points[0], points[1], floor_ceiling);
-					points3d.push(vec3Base, vec3Ceiling, vec3Base); // Base -> Ceiling -> Base (for vertical lines)
-					floorBounds.expandByPoint(vec3Base);
-					floorBounds.expandByPoint(vec3Ceiling);
+					floorBounds.expandByPoint(new THREE.Vector3(points[0], points[1], floor_base));
+					floorBounds.expandByPoint(new THREE.Vector3(points[0], points[1], floor_ceiling));
 					pointsFloor.push(new THREE.Vector2(points[0], points[1]));
 				});
-
-				// Connect back to the first point to close the floor loop
-				if (room.points.length > 0) {
-					const firstPoint = room.points[0];
-					points3d.push(new THREE.Vector3(firstPoint[0], firstPoint[1], floor_base));
-				}
-
-				// Ceiling loop
-				room.points.forEach((points) => {
-					points3d.push(new THREE.Vector3(points[0], points[1], floor_ceiling));
-				});
-				if (room.points.length > 0) {
-					const firstPoint = room.points[0];
-					points3d.push(new THREE.Vector3(firstPoint[0], firstPoint[1], floor_ceiling));
-				}
-
-				// Walls
-				const lines = new THREE.BufferGeometry().setFromPoints(points3d);
-				floorGroup.add(new THREE.Line(lines, wallMaterial));
+				if (pointsFloor.length < 3) return;
 
 				// Floor plane with unique color per room
 				const floorShape = new THREE.Shape(pointsFloor);
@@ -567,15 +556,22 @@
 					side: THREE.DoubleSide,
 					opacity: FLOOR_OPACITY.active,
 					transparent: true,
+					depthWrite: false, // the slab underneath holds the depth; the tint must not hide drop discs
 					roughness: 1.0,
 					metalness: 0.0
 				});
 				const plane = new THREE.Mesh(floorGeometry, floorMaterial);
 				plane.position.z = floor_base;
+				plane.renderOrder = -1; // over the slab, under everything standing on the floor
 				plane.receiveShadow = true;
 				plane.castShadow = true; // Floor casts shadows to occlude lower floors
 				floorGroup.add(plane);
 				planes.push(plane);
+
+				// The slab the room stands on, a hair below the tinted plane so the two never z-fight
+				const slabGeometry = new THREE.ExtrudeGeometry(floorShape, { depth: SLAB_THICKNESS, bevelEnabled: false });
+				slabGeometry.translate(0, 0, floor_base - SLAB_THICKNESS - 0.005);
+				slabGeometries.push(slabGeometry);
 
 				const label = createLabelForRoom(room.name, pointsFloor);
 				label.position.z = floor_base;
@@ -583,14 +579,79 @@
 				labels.push(label);
 			});
 
+			let slab: THREE.Mesh | null = null;
+			if (slabGeometries.length > 0) {
+				const slabMaterial = new THREE.MeshStandardMaterial({ color: 0x334155, transparent: true, opacity: SLAB_OPACITY.active, roughness: 1.0, metalness: 0.0 });
+				slab = new THREE.Mesh(mergeGeometries(slabGeometries), slabMaterial);
+				slab.renderOrder = -2;
+				floorGroup.add(slab);
+				slabGeometries.forEach((g) => g.dispose());
+			}
+
+			// Walls: a slab per room edge, cut low so the camera sees in. One mesh per colour: with
+			// map.wall_color that is one for the floor, without it each wall has its room's colour.
+			const height = wallHeight(floor_base, floor_ceiling);
+			const wallMaterials: THREE.MeshStandardMaterial[] = [];
+			if (height > 0) {
+				// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
+				const byColor = new Map<string, THREE.BufferGeometry[]>();
+				const add = (roomId: string, box: THREE.BufferGeometry) => {
+					const color = wallColor ?? getRoomColor(config, roomId);
+					const list = byColor.get(color);
+					if (list) list.push(box);
+					else byColor.set(color, [box]);
+				};
+				const segments = wallSegments(floor.rooms ?? []);
+				for (const wall of segments) {
+					const dx = wall.b[0] - wall.a[0];
+					const dy = wall.b[1] - wall.a[1];
+					// Each wall stops half a thickness short of its ends; the posts below fill the corners
+					const length = Math.hypot(dx, dy) - wallThickness;
+					if (length <= 0) continue;
+					const box = new THREE.BoxGeometry(length, wallThickness, height);
+					box.rotateZ(Math.atan2(dy, dx));
+					box.translate((wall.a[0] + wall.b[0]) / 2, (wall.a[1] + wall.b[1]) / 2, floor_base + height / 2);
+					add(wall.roomId, box);
+				}
+				for (const post of wallPosts(segments)) {
+					const box = new THREE.BoxGeometry(wallThickness, wallThickness, height);
+					box.translate(post.at[0], post.at[1], floor_base + height / 2);
+					add(post.roomId, box);
+				}
+				for (const [color, boxes] of byColor) {
+					const tint = new THREE.Color(color);
+					// The only light is overhead, so a little of the wall's own colour keeps its sides from going black
+					const material = new THREE.MeshStandardMaterial({ color: tint, emissive: tint, emissiveIntensity: 0.35, transparent: true, opacity: wallOpacity, depthWrite: wallOpacity >= 1, roughness: 0.9, metalness: 0.0 });
+					floorGroup.add(new THREE.Mesh(mergeGeometries(boxes), material));
+					wallMaterials.push(material);
+					boxes.forEach((g) => g.dispose());
+				}
+			}
+
 			if (floorBounds.isEmpty() && floor.bounds.length >= 2) {
 				const [lo, hi] = floor.bounds;
 				floorBounds.set(new THREE.Vector3(lo[0], lo[1], lo[2]), new THREE.Vector3(hi[0], hi[1], hi[2]));
 			}
 			overallBounds.union(floorBounds);
 			newRoomGroup.add(floorGroup);
-			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterial, planes, labels, bounds: floorBounds });
+			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallOpacity, slab, planes, labels, bounds: floorBounds });
 		});
+
+		// A 1 m grid under the house for a sense of scale, on whole metres of the plan
+		if (!overallBounds.isEmpty()) {
+			const size = overallBounds.getSize(new THREE.Vector3());
+			const center = overallBounds.getCenter(new THREE.Vector3());
+			const cells = 2 * Math.ceil(Math.max(size.x, size.y) / 2 + 2);
+			groundGrid = new THREE.GridHelper(cells, cells, 0x64748b, 0x475569);
+			groundGrid.rotation.x = Math.PI / 2; // GridHelper lies in XZ; here z is up
+			groundGrid.position.set(Math.round(center.x), Math.round(center.y), 0);
+			const gridMaterial = groundGrid.material as THREE.LineBasicMaterial;
+			gridMaterial.transparent = true;
+			gridMaterial.opacity = 0.35;
+			gridMaterial.depthWrite = false;
+			groundGrid.renderOrder = -3;
+			newRoomGroup.add(groundGrid);
+		}
 
 		contentGroup.add(newRoomGroup);
 		roomGroup = newRoomGroup;
@@ -611,16 +672,31 @@
 	}
 
 	function applyFloorPresence() {
+		let lowestShown = Infinity;
 		for (const fv of floorVisuals.values()) {
 			const p = presence([fv.floor.id]);
 			fv.group.visible = p !== 'hidden';
 			if (p === 'hidden') continue;
-			fv.wallMaterial.opacity = WALL_OPACITY[p];
+			lowestShown = Math.min(lowestShown, fv.floor.bounds[0][2]);
+			for (const material of fv.wallMaterials) {
+				material.opacity = p === 'active' ? fv.wallOpacity : fv.wallOpacity * GHOST_WALL_FACTOR;
+				material.depthWrite = p === 'active' && fv.wallOpacity >= 1;
+			}
+			if (fv.slab) {
+				const slabMaterial = fv.slab.material as THREE.MeshStandardMaterial;
+				slabMaterial.opacity = SLAB_OPACITY[p];
+				slabMaterial.depthWrite = p === 'active'; // a faint floor must not hide what is under it
+			}
 			for (const plane of fv.planes) {
 				(plane.material as THREE.MeshStandardMaterial).opacity = FLOOR_OPACITY[p];
 				plane.castShadow = p === 'active'; // a faint floor should not darken the one in focus
 			}
 			for (const label of fv.labels) label.visible = p === 'active';
+		}
+		// The grid lies under the lowest floor on screen, not metres below a lone upper floor
+		if (groundGrid) {
+			groundGrid.visible = Number.isFinite(lowestShown);
+			groundGrid.position.z = (Number.isFinite(lowestShown) ? lowestShown : 0) - SLAB_THICKNESS - 0.02;
 		}
 	}
 
@@ -978,6 +1054,7 @@
 			contentGroup?.remove(roomGroup);
 			roomGroup = null;
 		}
+		groundGrid = null;
 		floorVisuals.clear();
 	}
 
