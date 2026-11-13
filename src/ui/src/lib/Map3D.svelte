@@ -367,7 +367,9 @@
 
 		// Sky from above, a dim bounce from below, and one sun for shape and shadows. fitSun() aims
 		// the sun and sizes its shadow to the plan once the rooms are built.
-		scene.add(new THREE.HemisphereLight(0xdbeafe, 0x475569, 1.7));
+		const sky = new THREE.HemisphereLight(0xdbeafe, 0x475569, 1.7);
+		sky.position.set(0, 0, 1); // z is up here; the light's default sky direction is +y
+		scene.add(sky);
 		sun = new THREE.DirectionalLight(0xfff4e5, 1.1);
 		sun.castShadow = true;
 		sun.shadow.mapSize.set(2048, 2048);
@@ -722,7 +724,7 @@
 				slabMaterial.depthWrite = p === 'active'; // a faint floor must not hide what is under it
 				fv.slab.castShadow = p === 'active'; // nor darken the one in focus
 			}
-			for (const mesh of fv.wallMeshes) mesh.castShadow = p === 'active';
+			for (const mesh of fv.wallMeshes) mesh.castShadow = p === 'active' && fv.wallOpacity > 0; // invisible walls cast nothing
 			for (const plane of fv.planes) {
 				(plane.material as THREE.MeshStandardMaterial).opacity = FLOOR_OPACITY[p];
 			}
