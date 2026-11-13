@@ -1106,6 +1106,10 @@
 	}
 
 	function onPointerMove(event: PointerEvent) {
+		if (event.target !== renderer.domElement) {
+			onPointerLeave(); // over the selection card: no tooltip for whatever is behind it
+			return;
+		}
 		const hit = pick(event, ['device', 'node']);
 		const info = hit ? describe(hit) : null;
 		container.style.cursor = hit?.kind === 'device' ? 'pointer' : '';
