@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using ESPresense.Extensions;
 using ESPresense.Utils;
 using ESPresense.Models;
+using ESPresense.Optimizers;
 using ESPresense.Services;
 using Microsoft.AspNetCore.Mvc;
 using Nito.AsyncEx;
@@ -321,6 +322,11 @@ public class StateController : ControllerBase
             // Save a modified copy: the loaded Config is the instance State holds, and only a reload may replace it.
             var optimization = c.Optimization.Clone();
             optimization.Enabled = enable;
+            // The section is written back whole. A mode that was removed (legacy, global_absorption) runs
+            // per_node_absorption with a warning at every load, so replace it rather than copy it back. Anything
+            // else is kept as written: a valid mode must survive the save, and a typo should keep its warning.
+            if (OptimizationRunner.IsRemovedMode(optimization.Optimizer))
+                optimization.Optimizer = OptimizationRunner.DefaultMode;
             await _config.SaveSectionAsync("optimization", optimization);
             return Ok(new { autoOptimize = enable });
         }
