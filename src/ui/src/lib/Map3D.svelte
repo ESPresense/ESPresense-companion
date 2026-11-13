@@ -8,7 +8,6 @@
 	import * as THREE from 'three';
 	import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-	import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 	import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 	import type { Device, Node, Config, DeviceHistory, Floor } from '#lib/types.js';
 	import { gotoDetail3d } from '#lib/urls.js';
@@ -206,10 +205,11 @@
 
 	// --- Nodes ---
 	type NodeVisual = {
-		group: THREE.Group;
-		mesh: THREE.Mesh;
-		pick: THREE.Mesh; // invisible, easier to hover than the logo
-		line: THREE.Line;
+		group: THREE.Group; // at (x, y, floor base)
+		puck: THREE.Mesh;
+		logo: THREE.Mesh; // lies on top of the puck
+		pick: THREE.Mesh; // invisible, easier to hover than the puck
+		mast: THREE.Mesh; // from the floor up to the puck
 		disc: THREE.Mesh;
 		label: CSS2DObject;
 		labelElement: HTMLDivElement;
@@ -217,41 +217,43 @@
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Three.js bookkeeping, never rendered from
 	const nodeVisuals = new Map<string, NodeVisual>();
 	let nodeGroup: THREE.Group | null = null;
-	let nodeLogoGeometry: THREE.BufferGeometry | null = null;
 
-	type NodeMaterialSet = { mesh: THREE.Material; ghost: THREE.Material; line: THREE.LineBasicMaterial; disc: THREE.MeshBasicMaterial };
-	function nodeMaterialSet(color: number, baseColor: number): NodeMaterialSet {
+	const NODE_PUCK_RADIUS = 0.16; // metres: big enough to read as a thing, not a dot
+	const NODE_PUCK_HEIGHT = 0.06;
+	const NODE_PULSE_SECONDS = 2.4; // one slow breath of an offline node
+	const nodePuckGeometry = new THREE.CylinderGeometry(NODE_PUCK_RADIUS, NODE_PUCK_RADIUS, NODE_PUCK_HEIGHT, 32).rotateX(Math.PI / 2); // axis along z
+	const nodeMastGeometry = new THREE.CylinderGeometry(0.012, 0.012, 1, 8).rotateX(Math.PI / 2).translate(0, 0, 0.5); // unit height, standing on z=0
+
+	type NodeMaterialSet = { puck: THREE.MeshStandardMaterial; ghost: THREE.Material; mast: THREE.MeshBasicMaterial; disc: THREE.MeshBasicMaterial };
+	function nodeMaterialSet(color: number): NodeMaterialSet {
 		return {
-			mesh: new THREE.MeshPhongMaterial({ color: baseColor, emissive: color, emissiveIntensity: 1.5, shininess: 100, toneMapped: false, side: THREE.DoubleSide }),
-			ghost: new THREE.MeshBasicMaterial({ color, transparent: true, opacity: GHOST_OPACITY, depthWrite: false, side: THREE.DoubleSide }),
-			line: new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.4 }),
+			puck: new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.45, roughness: 0.5, metalness: 0.1 }),
+			ghost: new THREE.MeshBasicMaterial({ color, transparent: true, opacity: GHOST_OPACITY, depthWrite: false }),
+			mast: new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55 }),
 			disc: new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide })
 		};
 	}
-	const nodeMaterials = { online: nodeMaterialSet(0x00aaff, 0x001122), offline: nodeMaterialSet(0xff4444, 0x220011) };
+	// Soft cyan when online, red when offline (and slowly pulsing: see animate)
+	const nodeMaterials = { online: nodeMaterialSet(0x38bdf8), offline: nodeMaterialSet(0xf87171) };
 	const nodePickMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 
-	function getNodeLogoGeometry(): THREE.BufferGeometry {
-		if (nodeLogoGeometry) return nodeLogoGeometry;
-		const loader = new SVGLoader();
-		const svgData = loader.parse(logoSvg);
-		const extrudeSettings = { depth: 20, bevelEnabled: false };
-		const geometries: THREE.BufferGeometry[] = [];
-		svgData.paths.forEach((path) => {
-			// Skip white background circle
-			const style = path.userData?.style as { fill?: unknown } | undefined;
-			const fill = style?.fill;
-			if (fill && typeof fill === 'string' && fill.toLowerCase() === '#ffffff') return;
-			const shapes = path.toShapes();
-			shapes.forEach((shape) => {
-				geometries.push(new THREE.ExtrudeGeometry(shape, extrudeSettings));
-			});
-		});
-		nodeLogoGeometry = mergeGeometries(geometries);
-		nodeLogoGeometry.center();
-		const scale = 0.0008;
-		nodeLogoGeometry.scale(scale, scale, scale);
-		return nodeLogoGeometry;
+	// The logo as it is everywhere else (black on a white disc), drawn once into a texture for the top of every puck
+	const nodeLogoGeometry = new THREE.CircleGeometry(NODE_PUCK_RADIUS * 0.84, 32);
+	const nodeLogoMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+	function loadNodeLogo() {
+		const image = new Image();
+		image.onload = () => {
+			const canvas = document.createElement('canvas');
+			canvas.width = canvas.height = 256;
+			canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+			const texture = new THREE.CanvasTexture(canvas);
+			texture.colorSpace = THREE.SRGBColorSpace;
+			texture.anisotropy = 4; // the puck is usually seen at a slant
+			nodeLogoMaterial.map?.dispose();
+			nodeLogoMaterial.map = texture;
+			nodeLogoMaterial.needsUpdate = true;
+		};
+		image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(logoSvg);
 	}
 
 	// --- Measured spheres (click a device) ---
@@ -295,7 +297,7 @@
 	let hover: { title: string; lines: string[]; x: number; y: number } | null = $state(null);
 
 	onMount(() => {
-		getNodeLogoGeometry(); // Parse the SVG once, before the first node shows up
+		loadNodeLogo(); // once, before the first node shows up
 		if (container) {
 			initScene();
 			isAnimating = true;
@@ -736,7 +738,7 @@
 		const flip = getFlipScale();
 		contentGroup.scale.set(flip.x, flip.y, 1);
 		contentGroup.position.set(planCenter.x - flip.x * planCenter.x, planCenter.y - flip.y * planCenter.y, 0);
-		for (const v of nodeVisuals.values()) v.mesh.scale.set(flip.x, flip.y, 1);
+		for (const v of nodeVisuals.values()) v.logo.scale.set(flip.x, flip.y, 1);
 
 		fitSun(overallBounds);
 		applyFloorPresence();
@@ -821,19 +823,21 @@
 			const floorZ = floorBaseZ(nodeFloorIds(node), node.location.z);
 			const height = node.location.z - floorZ;
 			v.group.position.set(node.location.x, node.location.y, floorZ);
-			v.mesh.position.z = height;
-			v.mesh.scale.set(flip.x, flip.y, 1); // undo the plan mirroring so the logo isn't drawn mirror-image
+			v.puck.position.z = height;
+			v.logo.position.z = height + NODE_PUCK_HEIGHT / 2 + 0.002;
+			v.logo.scale.set(flip.x, flip.y, 1); // undo the plan mirroring so the logo isn't drawn mirror-image
 			v.pick.position.z = height;
 			v.label.position.z = height;
-			setDropHeight(v.line, height);
+			v.mast.scale.z = Math.max(height - NODE_PUCK_HEIGHT / 2, 0.001);
 
 			const mats = node.online ? nodeMaterials.online : nodeMaterials.offline;
 			const p = presence(nodeFloorIds(node));
 			v.group.visible = p !== 'hidden';
-			v.mesh.material = p === 'ghost' ? mats.ghost : mats.mesh;
-			v.line.material = mats.line;
+			v.puck.material = p === 'ghost' ? mats.ghost : mats.puck;
+			v.puck.castShadow = p === 'active';
+			v.mast.material = mats.mast;
 			v.disc.material = mats.disc;
-			v.line.visible = v.disc.visible = v.label.visible = p === 'active';
+			v.logo.visible = v.mast.visible = v.disc.visible = v.label.visible = p === 'active';
 			v.labelElement.textContent = node.name;
 			v.labelElement.className = `text-xs pointer-events-none ${node.online ? 'text-blue-400' : 'text-red-500'}`;
 			v.pick.userData = { kind: 'node', id: node.id };
@@ -850,17 +854,19 @@
 		const group = new THREE.Group();
 		group.name = 'node#' + node.id;
 
-		const mesh = new THREE.Mesh(getNodeLogoGeometry().clone(), nodeMaterials.online.mesh);
-		mesh.castShadow = true;
-		mesh.receiveShadow = true;
-		group.add(mesh);
+		const puck = new THREE.Mesh(nodePuckGeometry, nodeMaterials.online.puck);
+		puck.castShadow = true;
+		group.add(puck);
+
+		const logo = new THREE.Mesh(nodeLogoGeometry, nodeLogoMaterial);
+		group.add(logo);
 
 		const pick = new THREE.Mesh(unitSphere, nodePickMaterial);
-		pick.scale.setScalar(0.25);
+		pick.scale.setScalar(0.28);
 		group.add(pick);
 
-		const line = makeDropLine(nodeMaterials.online.line);
-		group.add(line);
+		const mast = new THREE.Mesh(nodeMastGeometry, nodeMaterials.online.mast);
+		group.add(mast);
 
 		const disc = new THREE.Mesh(unitDisc, nodeMaterials.online.disc);
 		disc.scale.setScalar(0.1);
@@ -868,19 +874,17 @@
 		group.add(disc);
 
 		const labelElement = document.createElement('div');
-		labelElement.style.marginTop = '-1em'; // Position above the node
+		labelElement.style.marginTop = '-1.4em'; // Position above the node
 		const label = new CSS2DObject(labelElement);
 		label.name = 'nodeLabel#' + node.id;
 		group.add(label);
 
-		return { group, mesh, pick, line, disc, label, labelElement };
+		return { group, puck, logo, pick, mast, disc, label, labelElement };
 	}
 
 	function removeNodeVisual(v: NodeVisual) {
 		v.labelElement.remove();
-		v.group.removeFromParent();
-		v.line.geometry.dispose();
-		v.mesh.geometry.dispose();
+		v.group.removeFromParent(); // geometries and materials are shared between nodes
 	}
 
 	// --- Device Rendering ---
@@ -1036,6 +1040,7 @@
 		const floors = (node.floors ?? []).map((id) => config?.floors.find((f) => f.id === id)?.name ?? id);
 		const lines = [node.online ? 'Online' : 'Offline'];
 		if (floors.length) lines.push(floors.join(', '));
+		if (node.telemetry?.version) lines.push(`Firmware ${node.telemetry.version}`);
 		if (node.location) lines.push(`${node.location.x}, ${node.location.y}, ${node.location.z} m`);
 		return { title: node.name, lines };
 	}
@@ -1103,6 +1108,9 @@
 		controls?.update();
 		easeDevices(deltaTime);
 
+		// Offline nodes breathe slowly so they catch the eye without flashing
+		nodeMaterials.offline.puck.emissiveIntensity = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin((currentTime / 1000 / NODE_PULSE_SECONDS) * 2 * Math.PI));
+
 		// Fog starts just past what the camera is looking at, so zooming never fogs the subject
 		const focus = camera.position.distanceTo(controls.target);
 		fog.near = focus + planRadius * 0.25;
@@ -1124,6 +1132,10 @@
 				}
 			}
 		});
+
+		// Material.dispose() doesn't touch the texture, so the logo canvas has to go explicitly
+		nodeLogoMaterial.map?.dispose();
+		nodeLogoMaterial.map = null;
 
 		cleanupRooms();
 		cleanupNodeGroup();
