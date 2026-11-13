@@ -13,28 +13,36 @@ export const WALL_CUT_FRACTION = 1 / 3;
 /** wall_thickness: 0 is a hairline on the 2D map; in 3D it still needs some body to be seen. */
 export const MIN_WALL_THICKNESS = 0.02;
 
-const ON_EDGE = 0.001; // metres: how close a corner must be to an edge to cut it
-const key = (p: [number, number]) => `${Math.round(p[0] * 1000)},${Math.round(p[1] * 1000)}`;
+const ON_EDGE = 0.001; // metres: corners this close are one corner, and a corner this close to an edge cuts it
+const key = (p: [number, number]) => `${p[0]},${p[1]}`;
 
 type Edge = { a: [number, number]; b: [number, number]; roomId: string };
 
 /**
  * The walls of one floor: every room's outline, cut wherever another outline's corner lands on it, with
  * each resulting piece kept once. So a wall two rooms share is one wall, not two on top of each other,
- * even when a long edge of one room runs past two shorter rooms. Points match to the millimetre.
+ * even when a long edge of one room runs past two shorter rooms. Points within a millimetre of each
+ * other count as the same corner (the first one listed stands for both).
  * Zero-length edges are dropped, which also covers an outline whose last point repeats its first.
  */
 export function wallSegments(rooms: Room[]): WallSegment[] {
 	const edges: Edge[] = [];
-	const corners = new Map<string, [number, number]>();
+	const corners: [number, number][] = [];
+	// The corner already known within a millimetre of p, else p itself as a new corner
+	const corner = (p: [number, number]): [number, number] => {
+		const known = corners.find((c) => Math.hypot(c[0] - p[0], c[1] - p[1]) < ON_EDGE);
+		if (known) return known;
+		const added: [number, number] = [p[0], p[1]];
+		corners.push(added);
+		return added;
+	};
 	for (const room of rooms) {
 		const points = room.points ?? [];
 		if (points.length < 2) continue;
 		for (let i = 0; i < points.length; i++) {
-			const a = points[i];
-			const b = points[(i + 1) % points.length];
-			corners.set(key(a), [a[0], a[1]]);
-			if (key(a) !== key(b)) edges.push({ a: [a[0], a[1]], b: [b[0], b[1]], roomId: room.id });
+			const a = corner(points[i]);
+			const b = corner(points[(i + 1) % points.length]);
+			if (a !== b) edges.push({ a, b, roomId: room.id });
 		}
 	}
 
@@ -49,7 +57,7 @@ export function wallSegments(rooms: Room[]): WallSegment[] {
 			{ t: 0, p: edge.a },
 			{ t: length, p: edge.b }
 		];
-		for (const p of corners.values()) {
+		for (const p of corners) {
 			const t = ((p[0] - edge.a[0]) * dx + (p[1] - edge.a[1]) * dy) / length;
 			if (t <= ON_EDGE || t >= length - ON_EDGE) continue;
 			const off = Math.abs((p[0] - edge.a[0]) * dy - (p[1] - edge.a[1]) * dx) / length;

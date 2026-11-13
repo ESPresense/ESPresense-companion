@@ -38,6 +38,25 @@ describe('wallSegments', () => {
 		expect(walls.filter((w) => w.a[0] === 4 && w.b[0] === 4)).toEqual([{ a: [4, 0], b: [4, 3], roomId: 'a' }]);
 	});
 
+	it('treats corners within a millimetre as one, even across a rounding boundary', () => {
+		const walls = wallSegments([
+			room('a', [
+				[0, 0],
+				[4.0004, 0],
+				[4.0004, 3],
+				[0, 3]
+			]),
+			room('b', [
+				[4.0006, 0],
+				[8, 0],
+				[8, 3],
+				[4.0006, 3]
+			])
+		]);
+		expect(walls).toHaveLength(7);
+		expect(walls.filter((w) => w.a[0] > 3.9 && w.a[0] < 4.1 && w.b[0] > 3.9 && w.b[0] < 4.1)).toHaveLength(1);
+	});
+
 	it('skips zero-length edges, such as an outline that repeats its first point', () => {
 		const walls = wallSegments([
 			room('a', [
