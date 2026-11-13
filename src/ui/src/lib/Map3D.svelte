@@ -59,6 +59,7 @@
 
 	// --- Look ---
 	const DEFAULT_WALL_OPACITY = 0.35; // what the 2D map uses when map.wall_opacity is not set
+	const CUT_AWAY_FACTOR = 0.15; // the cut-away upper part of a wall, as a share of its configured opacity
 	const GHOST_WALL_FACTOR = 0.2; // walls of a faint floor, as a share of their configured opacity
 	const SLAB_THICKNESS = 0.08; // metres of floor under each storey
 	const SLAB_OPACITY = { active: 0.85, ghost: 0.06 };
@@ -138,6 +139,7 @@
 		group: THREE.Group;
 		wallMaterials: THREE.MeshStandardMaterial[];
 		wallMeshes: THREE.Mesh[];
+		upperWalls: THREE.Mesh[]; // the cut-away part of the walls, up to the ceiling
 		wallOpacity: number; // map.wall_opacity, what the walls have when the floor is in focus
 		slab: THREE.Mesh | null;
 		planes: THREE.Mesh[];
@@ -607,41 +609,59 @@
 			const height = wallHeight(floor_base, floor_ceiling);
 			const wallMaterials: THREE.MeshStandardMaterial[] = [];
 			const wallMeshes: THREE.Mesh[] = [];
+			const upperWalls: THREE.Mesh[] = [];
 			if (height > 0) {
-				// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
-				const byColor = new Map<string, THREE.BufferGeometry[]>();
-				const add = (roomId: string, box: THREE.BufferGeometry) => {
-					const color = wallColor ?? getRoomColor(config, roomId);
-					const list = byColor.get(color);
-					if (list) list.push(box);
-					else byColor.set(color, [box]);
-				};
 				const segments = wallSegments(floor.rooms ?? []);
-				for (const wall of segments) {
-					const dx = wall.b[0] - wall.a[0];
-					const dy = wall.b[1] - wall.a[1];
-					// Each wall stops half a thickness short of its ends; the posts below fill the corners
-					const length = Math.hypot(dx, dy) - wallThickness;
-					if (length <= 0) continue;
-					const box = new THREE.BoxGeometry(length, wallThickness, height);
-					box.rotateZ(Math.atan2(dy, dx));
-					box.translate((wall.a[0] + wall.b[0]) / 2, (wall.a[1] + wall.b[1]) / 2, floor_base + height / 2);
-					add(wall.roomId, box);
-				}
-				for (const post of wallPosts(segments)) {
-					const box = new THREE.BoxGeometry(wallThickness, wallThickness, height);
-					box.translate(post.at[0], post.at[1], floor_base + height / 2);
-					add(post.roomId, box);
-				}
-				for (const [color, boxes] of byColor) {
-					const tint = new THREE.Color(color);
+				const posts = wallPosts(segments);
+				/** The walls between two heights, as one merged geometry per colour. */
+				const wallsBetween = (z0: number, z1: number) => {
+					// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
+					const byColor = new Map<string, THREE.BufferGeometry[]>();
+					const add = (roomId: string, box: THREE.BufferGeometry) => {
+						box.translate(0, 0, (z0 + z1) / 2);
+						const color = wallColor ?? getRoomColor(config, roomId);
+						const list = byColor.get(color);
+						if (list) list.push(box);
+						else byColor.set(color, [box]);
+					};
+					for (const wall of segments) {
+						const dx = wall.b[0] - wall.a[0];
+						const dy = wall.b[1] - wall.a[1];
+						// Each wall stops half a thickness short of its ends; the posts below fill the corners
+						const length = Math.hypot(dx, dy) - wallThickness;
+						if (length <= 0) continue;
+						const box = new THREE.BoxGeometry(length, wallThickness, z1 - z0);
+						box.rotateZ(Math.atan2(dy, dx));
+						box.translate((wall.a[0] + wall.b[0]) / 2, (wall.a[1] + wall.b[1]) / 2, 0);
+						add(wall.roomId, box);
+					}
+					for (const post of posts) {
+						const box = new THREE.BoxGeometry(wallThickness, wallThickness, z1 - z0);
+						box.translate(post.at[0], post.at[1], 0);
+						add(post.roomId, box);
+					}
+					return [...byColor].map(([color, boxes]) => {
+						const merged = mergeGeometries(boxes);
+						boxes.forEach((g) => g.dispose());
+						return { tint: new THREE.Color(color), geometry: merged };
+					});
+				};
+
+				for (const { tint, geometry } of wallsBetween(floor_base, floor_base + height)) {
 					const material = new THREE.MeshStandardMaterial({ color: tint, transparent: true, opacity: wallOpacity, depthWrite: wallOpacity >= 1, roughness: 0.9, metalness: 0.0 });
-					const wallMesh = new THREE.Mesh(mergeGeometries(boxes), material);
+					const wallMesh = new THREE.Mesh(geometry, material);
 					wallMesh.castShadow = wallMesh.receiveShadow = true;
 					wallMeshes.push(wallMesh);
 					floorGroup.add(wallMesh);
 					wallMaterials.push(material);
-					boxes.forEach((g) => g.dispose());
+				}
+				// The part of each wall that was cut away, barely there: enough to show how high the room
+				// goes, so a device near the ceiling reads as inside the room and not floating above it.
+				for (const { tint, geometry } of wallsBetween(floor_base + height, floor_ceiling)) {
+					const material = new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: wallOpacity * CUT_AWAY_FACTOR, depthWrite: false });
+					const upper = new THREE.Mesh(geometry, material);
+					upperWalls.push(upper);
+					floorGroup.add(upper);
 				}
 			}
 
@@ -651,7 +671,7 @@
 			}
 			overallBounds.union(floorBounds);
 			newRoomGroup.add(floorGroup);
-			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallMeshes, wallOpacity, slab, planes, labels, bounds: floorBounds });
+			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallMeshes, upperWalls, wallOpacity, slab, planes, labels, bounds: floorBounds });
 		});
 
 		// A 1 m grid under the house for a sense of scale, on whole metres of the plan
@@ -725,6 +745,7 @@
 				fv.slab.castShadow = p === 'active'; // nor darken the one in focus
 			}
 			for (const mesh of fv.wallMeshes) mesh.castShadow = p === 'active' && fv.wallOpacity > 0; // invisible walls cast nothing
+			for (const mesh of fv.upperWalls) mesh.visible = p === 'active';
 			for (const plane of fv.planes) {
 				(plane.material as THREE.MeshStandardMaterial).opacity = FLOOR_OPACITY[p];
 			}
