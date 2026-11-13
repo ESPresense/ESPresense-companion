@@ -776,7 +776,7 @@
 				slabMaterial.depthWrite = p === 'active'; // a faint floor must not hide what is under it
 				fv.slab.castShadow = p === 'active'; // nor darken the one in focus
 			}
-			for (const top of fv.wallTops) top.visible = p === 'active';
+			for (const top of fv.wallTops) top.visible = p === 'active' && fv.wallOpacity > 0; // no walls, no line
 			for (const mesh of fv.wallMeshes) mesh.castShadow = p === 'active' && fv.wallOpacity > 0; // invisible walls cast nothing
 			for (const plane of fv.planes) {
 				(plane.material as THREE.MeshStandardMaterial).opacity = FLOOR_OPACITY[p];
