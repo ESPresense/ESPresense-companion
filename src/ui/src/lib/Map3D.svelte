@@ -59,7 +59,8 @@
 
 	// --- Look ---
 	const DEFAULT_WALL_OPACITY = 0.35; // what the 2D map uses when map.wall_opacity is not set
-	const CUT_AWAY_FACTOR = 0.15; // the cut-away upper part of a wall, as a share of its configured opacity
+	const WALL_FADE_POWER = 1.6; // how quickly a wall fades as it rises: 1 is a straight ramp, more keeps the top clearer
+	const WALL_FADE_STEPS = 8; // slices up each wall, so the curved fade has vertices to follow
 	const GHOST_WALL_FACTOR = 0.2; // walls of a faint floor, as a share of their configured opacity
 	const SLAB_THICKNESS = 0.08; // metres of floor under each storey
 	const SLAB_OPACITY = { active: 0.85, ghost: 0.06 };
@@ -138,8 +139,7 @@
 		floor: Floor;
 		group: THREE.Group;
 		wallMaterials: THREE.MeshStandardMaterial[];
-		wallMeshes: THREE.Mesh[];
-		upperWalls: THREE.Mesh[]; // the cut-away part of the walls, up to the ceiling
+		wallMeshes: THREE.Mesh[]; // invisible shadow casters for the bottom of the walls
 		wallOpacity: number; // map.wall_opacity, what the walls have when the floor is in focus
 		slab: THREE.Mesh | null;
 		planes: THREE.Mesh[];
@@ -609,16 +609,30 @@
 			const height = wallHeight(floor_base, floor_ceiling);
 			const wallMaterials: THREE.MeshStandardMaterial[] = [];
 			const wallMeshes: THREE.Mesh[] = [];
-			const upperWalls: THREE.Mesh[] = [];
 			if (height > 0) {
 				const segments = wallSegments(floor.rooms ?? []);
 				const posts = wallPosts(segments);
-				/** The walls between two heights, as one merged geometry per colour. */
+				/**
+				 * The walls between two heights, as one merged geometry per colour. Every vertex carries an
+				 * alpha that goes from 1 at the floor to nothing at the ceiling, so the wall fades out
+				 * as it rises instead of stopping at a cut.
+				 */
+				const storey = floor_ceiling - floor_base;
+				const fade = (box: THREE.BufferGeometry) => {
+					const position = box.getAttribute('position');
+					const rgba = new Float32Array(position.count * 4);
+					for (let i = 0; i < position.count; i++) {
+						const up = Math.max(0, Math.min(1, (position.getZ(i) - floor_base) / storey));
+						rgba.set([1, 1, 1, Math.pow(1 - up, WALL_FADE_POWER)], i * 4);
+					}
+					box.setAttribute('color', new THREE.BufferAttribute(rgba, 4));
+				};
 				const wallsBetween = (z0: number, z1: number) => {
 					// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
 					const byColor = new Map<string, THREE.BufferGeometry[]>();
 					const add = (roomId: string, box: THREE.BufferGeometry) => {
 						box.translate(0, 0, (z0 + z1) / 2);
+						fade(box);
 						const color = wallColor ?? getRoomColor(config, roomId);
 						const list = byColor.get(color);
 						if (list) list.push(box);
@@ -630,13 +644,13 @@
 						// Each wall stops half a thickness short of its ends; the posts below fill the corners
 						const length = Math.hypot(dx, dy) - wallThickness;
 						if (length <= 0) continue;
-						const box = new THREE.BoxGeometry(length, wallThickness, z1 - z0);
+						const box = new THREE.BoxGeometry(length, wallThickness, z1 - z0, 1, 1, WALL_FADE_STEPS);
 						box.rotateZ(Math.atan2(dy, dx));
 						box.translate((wall.a[0] + wall.b[0]) / 2, (wall.a[1] + wall.b[1]) / 2, 0);
 						add(wall.roomId, box);
 					}
 					for (const post of posts) {
-						const box = new THREE.BoxGeometry(wallThickness, wallThickness, z1 - z0);
+						const box = new THREE.BoxGeometry(wallThickness, wallThickness, z1 - z0, 1, 1, WALL_FADE_STEPS);
 						box.translate(post.at[0], post.at[1], 0);
 						add(post.roomId, box);
 					}
@@ -647,21 +661,21 @@
 					});
 				};
 
-				for (const { tint, geometry } of wallsBetween(floor_base, floor_base + height)) {
-					const material = new THREE.MeshStandardMaterial({ color: tint, transparent: true, opacity: wallOpacity, depthWrite: wallOpacity >= 1, roughness: 0.9, metalness: 0.0 });
+				// One wall, floor to ceiling, solid at the bottom and fading out on the way up: the room's
+				// height still reads (a device near the ceiling is plainly inside), and the camera sees in.
+				for (const { tint, geometry } of wallsBetween(floor_base, floor_ceiling)) {
+					const material = new THREE.MeshStandardMaterial({ color: tint, vertexColors: true, transparent: true, opacity: wallOpacity, depthWrite: false, roughness: 0.9, metalness: 0.0 });
 					const wallMesh = new THREE.Mesh(geometry, material);
-					wallMesh.castShadow = wallMesh.receiveShadow = true;
-					wallMeshes.push(wallMesh);
+					wallMesh.receiveShadow = true;
 					floorGroup.add(wallMesh);
 					wallMaterials.push(material);
 				}
-				// The part of each wall that was cut away, barely there: enough to show how high the room
-				// goes, so a device near the ceiling reads as inside the room and not floating above it.
-				for (const { tint, geometry } of wallsBetween(floor_base + height, floor_ceiling)) {
-					const material = new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: wallOpacity * CUT_AWAY_FACTOR, depthWrite: false });
-					const upper = new THREE.Mesh(geometry, material);
-					upperWalls.push(upper);
-					floorGroup.add(upper);
+				// Only the solid-looking bottom of a wall throws a shadow; this mesh is never drawn itself
+				for (const { geometry } of wallsBetween(floor_base, floor_base + height)) {
+					const caster = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+					caster.castShadow = true;
+					wallMeshes.push(caster);
+					floorGroup.add(caster);
 				}
 			}
 
@@ -671,7 +685,7 @@
 			}
 			overallBounds.union(floorBounds);
 			newRoomGroup.add(floorGroup);
-			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallMeshes, upperWalls, wallOpacity, slab, planes, labels, bounds: floorBounds });
+			floorVisuals.set(floor.id, { floor, group: floorGroup, wallMaterials, wallMeshes, wallOpacity, slab, planes, labels, bounds: floorBounds });
 		});
 
 		// A 1 m grid under the house for a sense of scale, on whole metres of the plan
@@ -736,7 +750,6 @@
 			lowestShown = Math.min(lowestShown, fv.floor.bounds[0][2]);
 			for (const material of fv.wallMaterials) {
 				material.opacity = p === 'active' ? fv.wallOpacity : fv.wallOpacity * GHOST_WALL_FACTOR;
-				material.depthWrite = p === 'active' && fv.wallOpacity >= 1;
 			}
 			if (fv.slab) {
 				const slabMaterial = fv.slab.material as THREE.MeshStandardMaterial;
@@ -745,7 +758,6 @@
 				fv.slab.castShadow = p === 'active'; // nor darken the one in focus
 			}
 			for (const mesh of fv.wallMeshes) mesh.castShadow = p === 'active' && fv.wallOpacity > 0; // invisible walls cast nothing
-			for (const mesh of fv.upperWalls) mesh.visible = p === 'active';
 			for (const plane of fv.planes) {
 				(plane.material as THREE.MeshStandardMaterial).opacity = FLOOR_OPACITY[p];
 			}
