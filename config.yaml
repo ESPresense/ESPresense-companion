@@ -26,7 +26,7 @@ map:
   wall_color: "#ddd"   # Optional wall color, if not set uses room color. In 3D a wall two rooms share takes the
                        # first room's; in 2D each room strokes its own outline, so the later room's covers it
   wall_opacity: 0.35   # Optional wall opacity, if not set defaults to 0.35. In 3D this is the opacity at the floor
-  # wall_opacity_top: 0  # Optional, 3D only: wall opacity at the ceiling. Walls fade from wall_opacity at the floor
+  wall_opacity_top: 0  # Optional, 3D only: wall opacity at the ceiling. Walls fade from wall_opacity at the floor
                        # to this; the default 0 fades them out. Set it equal to wall_opacity for walls with no fade
 
 # How long before device considered stale
