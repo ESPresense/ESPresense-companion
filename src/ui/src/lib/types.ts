@@ -223,6 +223,30 @@ export interface OptimizerState {
 	leaseExpiresAt?: string;
 }
 
+/** How well a calibration fits the anchors: RMS (dB) of how the nodes disagree about each anchor's level. */
+export interface OptimizerAnchorFit {
+	anchors: number;
+	readings: number;
+	rms: number;
+	/** Against the current calibration; absent on the current calibration itself. */
+	better?: number;
+	worse?: number;
+}
+
+/** The parts of `/api/optimizer/last-cycle` the calibration page shows. */
+export interface OptimizerCycleReport {
+	at: string;
+	dryRun: boolean;
+	outcome: string;
+	baselineAnchors?: OptimizerAnchorFit;
+	proposals: {
+		optimizer: string;
+		decision: string;
+		applied: boolean;
+		anchors?: OptimizerAnchorFit;
+	}[];
+}
+
 export interface CalibrationResponse {
 	matrix: NodeCalibrationMatrix;
 	rmse?: number;
