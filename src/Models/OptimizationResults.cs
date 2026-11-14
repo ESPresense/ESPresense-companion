@@ -10,10 +10,10 @@ namespace ESPresense.Models;
 /// Outcome of <see cref="OptimizationResults.Evaluate"/>: fit quality plus the number of measurements it was computed from,
 /// so callers can refuse to act on a fit that is only supported by a handful of samples.
 /// </summary>
-public readonly record struct OptimizationEvaluation(double Correlation, double RMSE, int Samples);
+public readonly record struct OptimizationEvaluation(double Correlation, double RMSE, int Samples, double DistanceRmse = double.NaN);
 
 /// <summary>One measure as <see cref="OptimizationResults.Predict"/> scores it: modelled and measured RSSI in dB.</summary>
-internal readonly record struct PredictedMeasure(Measure Measure, double Predicted, double Measured)
+internal readonly record struct PredictedMeasure(Measure Measure, double Predicted, double Measured, double MapDistance, double TxRefRssi, double PathLossExponent)
 {
     /// <summary>Measured minus predicted: positive when the link is louder than the model expects.</summary>
     public double Residual => Measured - Predicted;
@@ -85,7 +85,18 @@ public class OptimizationResults
         var correlation = MathUtils.CalculatePearsonCorrelation(predictedValues, measuredValues);
         var rmse = MathUtils.CalculateRMSE(predictedValues, measuredValues);
 
-        return new OptimizationEvaluation(correlation, rmse, predictedValues.Count);
+        // Distance RMSE (issue #1868): the distance each link's measured RSSI implies under the scored
+        // calibration, d = 10^((txRef - measured) / (10 n)), against its map distance. A common shift of
+        // every txRef or rxAdj (the gauge) leaves Pearson R where it was but moves these distances, and
+        // distance is what the locator ranges with. Reported only; it is not part of the composite.
+        var distanceErrors = predictions
+            .Where(p => p.PathLossExponent > 0)
+            .Select(p => Math.Pow(10.0, (p.TxRefRssi - p.Measured) / (10.0 * p.PathLossExponent)) - p.MapDistance)
+            .Where(double.IsFinite)
+            .ToList();
+        var distanceRmse = distanceErrors.Count > 0 ? Math.Sqrt(distanceErrors.Average(e => e * e)) : double.NaN;
+
+        return new OptimizationEvaluation(correlation, rmse, predictedValues.Count, distanceRmse);
     }
 
     /// <summary>
@@ -124,7 +135,7 @@ public class OptimizationResults
                 double predictedRssi = txRefRssi - 10 * pathLossExponent * Math.Log10(mapDistance);
                 double measuredRssi = m.GetAdjustedRssi(rxAdjRssi);
 
-                yield return new PredictedMeasure(m, predictedRssi, measuredRssi);
+                yield return new PredictedMeasure(m, predictedRssi, measuredRssi, mapDistance, txRefRssi, pathLossExponent);
             }
         }
     }
