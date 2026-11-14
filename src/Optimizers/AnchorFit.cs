@@ -23,9 +23,11 @@ internal static class AnchorFit
     internal const int MinReceivers = 3;
 
     /// <summary>
-    /// Every anchor in <paramref name="snapshots"/>, each receiver's raw RSSI averaged. An anchor without a usable
-    /// rssi@1m counts too: the fit has to drop it (<see cref="Measure.IsUnusableAnchor"/>), but the level is fitted
-    /// here, so its position is all this needs. Readings without the rxAdj they were taken with are skipped.
+    /// Every anchor in <paramref name="snapshots"/>, each receiver's raw RSSI averaged. The level is fitted here, so
+    /// the anchor's rssi@1m is never used: a configured value and the firmware's default count the same. (A reading
+    /// that arrives with rssi@1m 0 or missing never gets this far: <see cref="State.ReadMeasures"/> drops it for the
+    /// optimizers. Current firmware always sends one.) Readings without the rxAdj they were taken with are skipped.
+    /// The id carries the position at full precision, so two positions that only differ after rounding stay apart.
     /// </summary>
     public static List<AnchorReadings> FromSnapshots(IEnumerable<OptimizationSnapshot> snapshots)
     {
@@ -38,7 +40,7 @@ internal static class AnchorFit
             // not at its last position with readings from both.
             .GroupBy(m => (m.Tx.Id, m.Tx.Location))
             .Select(g => new AnchorReadings(
-                $"{g.Key.Id}@{g.Key.Location.X:0.00},{g.Key.Location.Y:0.00},{g.Key.Location.Z:0.00}",
+                FormattableString.Invariant($"{g.Key.Id}@{g.Key.Location.X:R},{g.Key.Location.Y:R},{g.Key.Location.Z:R}"),
                 g.Key.Location,
                 g.GroupBy(m => m.Rx.Id, StringComparer.Ordinal)
                     .Select(r => new AnchorReading(r.Key, r.Last().Rx.Location, r.Average(m => m.Rssi + m.RssiRxAdj!.Value)))

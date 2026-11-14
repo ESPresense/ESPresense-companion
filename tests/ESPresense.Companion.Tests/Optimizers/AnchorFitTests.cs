@@ -126,6 +126,26 @@ public class AnchorFitTests
     }
 
     [Test]
+    public void FromSnapshots_PositionsThatOnlyDifferAfterRounding_StayApart()
+    {
+        // 3 mm apart: both round to the same centimetre, but they are two positions and both must be scored.
+        var here = new OptNode { Id = "anchor-1", Location = new Point3D(1.001, 1, 0.5), IsAnchor = true };
+        var there = new OptNode { Id = "anchor-1", Location = new Point3D(1.004, 1, 0.5), IsAnchor = true };
+        OptNode Rx(int i) => new() { Id = Receivers[i].Id, Location = Receivers[i].At };
+        var s1 = new OptimizationSnapshot(); var s2 = new OptimizationSnapshot();
+        for (var i = 0; i < 3; i++)
+        {
+            s1.Measures.Add(new Measure { Tx = here, Rx = Rx(i), Rssi = -60 - i, RssiRxAdj = 0 });
+            s2.Measures.Add(new Measure { Tx = there, Rx = Rx(i), Rssi = -70 - 3 * i, RssiRxAdj = 0 });
+        }
+
+        var anchors = AnchorFit.FromSnapshots(new[] { s1, s2 });
+
+        Assert.That(anchors.Select(a => a.Id).Distinct().Count(), Is.EqualTo(2));
+        Assert.That(AnchorFit.Evaluate(anchors, Calibrated), Has.Count.EqualTo(2), "neither position overwrites the other");
+    }
+
+    [Test]
     public void Cycle_ReportsTheAnchorFit_OfTheAnchorsInTheEvalSet()
     {
         // Node-to-node links that fit the incumbent exactly, plus one anchor heard 6 dB hot by rx-b. A proposal that only
