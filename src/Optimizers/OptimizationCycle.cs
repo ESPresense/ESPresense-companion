@@ -84,7 +84,18 @@ internal static class OptimizationCycle
             return OptimizationResults.Score(predictions);
         }
 
+        // How well each calibration fits the anchors, each anchor's level fitted (#1868). Report-only: no gate reads it.
+        var anchors = AnchorFit.FromSnapshots(evalSet);
+        Dictionary<string, (double Sse, int Readings)> AnchorsUnder(OptimizationResults results) => AnchorFit.Evaluate(anchors, id =>
+        {
+            results.Nodes.TryGetValue(id, out var pv);
+            var cal = Frozen(id).Calibration;
+            return (pv?.RxAdjRssi ?? cal.RxAdjRssi ?? 0, pv?.Absorption ?? cal.Absorption ?? 2.7);
+        });
+
         var baselineResults = new OptimizationResults();
+        var baselineFit = AnchorsUnder(baselineResults);
+        OptimizerAnchorFit? baselineAnchors = baselineFit.Count > 0 ? AnchorFit.Report(baselineFit) : null;
         var (bestCorr, bestRmse, baselineSamples) = Score(IncumbentScenario, baselineResults);
         var bestScore = Composite(bestCorr, bestRmse, optimization);
         var baseline = new OptimizerScore(bestScore, bestCorr, bestRmse, baselineSamples);
@@ -93,7 +104,8 @@ internal static class OptimizationCycle
         {
             var skipped = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
                 Array.Empty<OptimizerProposalReport>(), null, false,
-                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).");
+                $"Skipped: only {baselineSamples} validation measurements, need at least {optimization.MinSamples} (min_samples).")
+                { BaselineAnchors = baselineAnchors };
             return new OptimizationCycleResult(skipped, null, null, null, baselineSamples) { Incumbent = frozen };
         }
 
@@ -173,7 +185,10 @@ internal static class OptimizationCycle
             i == selected ? OptimizerGateDecision.Selected : s.Decision,
             false,
             s.Gates,
-            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))).ToList();
+            s.Results.Nodes.ToDictionary(kv => kv.Key, kv => OptimizerNodeProposal.From(kv.Value)))
+            {
+                Anchors = baselineFit.Count > 0 ? AnchorFit.Report(AnchorsUnder(s.Results), baselineFit) : null
+            }).ToList();
 
         string outcome;
         IOptimizer? chosen = null;
@@ -191,7 +206,7 @@ internal static class OptimizationCycle
         }
 
         var report = new OptimizerCycleReport(at, dryRun, os.Measures.Count, evalSet.Count, settings, baseline,
-            proposals, chosen?.Name, false, outcome);
+            proposals, chosen?.Name, false, outcome) { BaselineAnchors = baselineAnchors };
         return new OptimizationCycleResult(report, residuals.Build(at, dryRun, evalSet.Count), chosen, chosenResults, baselineSamples) { Incumbent = frozen };
     }
 
