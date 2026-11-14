@@ -64,6 +64,28 @@ public class AnchorFitTests
     }
 
     [Test]
+    public void Report_CountsWorseAnchors_AndTreatsTinyDifferencesAsTies()
+    {
+        var baseline = new Dictionary<string, (double Sse, int Readings)>
+        {
+            ["a1"] = (4.0, 4), ["a2"] = (4.0, 4), ["a3"] = (4.0, 4), ["a4"] = (4.0, 4),
+        };
+        var proposal = new Dictionary<string, (double Sse, int Readings)>
+        {
+            ["a1"] = (1.0, 4),      // better
+            ["a2"] = (9.0, 4),      // worse
+            ["a3"] = (4.005, 4),    // inside the 0.01 dB² tie band: neither
+            ["a4"] = (3.995, 4),    // inside the tie band the other way: neither
+        };
+
+        var report = AnchorFit.Report(proposal, baseline);
+
+        Assert.That((report.Better, report.Worse), Is.EqualTo(((int?)1, (int?)1)));
+        Assert.That(report.Anchors, Is.EqualTo(4));
+        Assert.That(report.Rms, Is.EqualTo(Math.Sqrt((1.0 + 9.0 + 4.005 + 3.995) / 16)).Within(1e-12));
+    }
+
+    [Test]
     public void UniformShiftOfEveryReceiver_DoesNotChangeTheScore()
     {
         // Moving every rxAdj by the same amount is the gauge: it changes every device's range, but not how the
