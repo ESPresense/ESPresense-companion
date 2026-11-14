@@ -126,11 +126,16 @@ filtering:
   # Kalman Filter Parameters
   process_noise: 0.01      # Controls how quickly the filter adapts to change. Lower = smoother but more lag.
   measurement_noise: 0.1   # Controls how much new measurements are trusted. Higher = trust model more (smoother).
-  max_velocity: 0.5        # Maximum expected velocity in m/s. Used to reject/dampen impossible movements.
+  max_velocity: 1.5        # Fastest expected movement in m/s (walking is ~1.4). Fixes beyond it are trusted less.
 
   # Smoothing Parameters
   smoothing_weight: 0.7    # Weight given to previous state (0.0-1.0). Higher = more stable/repeatable.
   motion_sigma: 2.0        # Motion consistency sensitivity. Controls how much distant scenarios are penalized.
+
+  # Room and floor hold: the reported room only switches once a challenger has earned it
+  room_hold: 3             # Seconds a different room must hold before the room switches. 0 = at once.
+  room_margin: 0.25        # Metres outside the current room's wall a fix can be and still keep the room. 0 = off.
+  floor_hold: 5            # Seconds a different floor must hold before the floor switches. 0 = at once.
 
 history:
   enabled: false # Enable to log history to db (Beta)

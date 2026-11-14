@@ -67,7 +67,7 @@ public class FilteringTests
         // Verify defaults match the hardcoded values we replaced
         Assert.That(config.Filtering.ProcessNoise, Is.EqualTo(0.01));
         Assert.That(config.Filtering.MeasurementNoise, Is.EqualTo(0.1));
-        Assert.That(config.Filtering.MaxVelocity, Is.EqualTo(0.5));
+        Assert.That(config.Filtering.MaxVelocity, Is.EqualTo(1.5));
         Assert.That(config.Filtering.SmoothingWeight, Is.EqualTo(0.7));
         Assert.That(config.Filtering.MotionSigma, Is.EqualTo(2.0));
     }
@@ -121,6 +121,7 @@ filtering:
             Assert.That(kf.ProcessNoise, Is.EqualTo(0.123));
             Assert.That(kf.MeasurementNoise, Is.EqualTo(0.456));
             Assert.That(kf.MaxVelocity, Is.EqualTo(0.789));
+            Assert.That(device.Scenarios[0].KalmanFilter.Settings, Is.EqualTo(kf), "the scenario's filter gets the config too");
             Assert.That(device.Location?.X, Is.EqualTo(1));
         }
         finally
