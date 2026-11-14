@@ -75,7 +75,15 @@ public sealed record OptimizerCycleReport(
     bool Applied,
     string Outcome,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Note = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ApplyError = null)
+{
+    /// <summary>
+    /// How well the incumbent fits the anchors (see <see cref="OptimizerAnchorFit"/>). Report-only: no gate reads it.
+    /// Null when no anchor has enough receivers.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerAnchorFit? BaselineAnchors { get; init; }
+}
 
 /// <summary>Where a proposal stopped. Gates are checked in this order; the first one failed is the decision.</summary>
 public enum OptimizerGateDecision
@@ -100,7 +108,24 @@ public sealed record OptimizerProposalReport(
     OptimizerGateDecision Decision,
     bool Applied,
     OptimizerGates Gates,
-    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes);
+    IReadOnlyDictionary<string, OptimizerNodeProposal> Nodes)
+{
+    /// <summary>How well the proposal fits the anchors, and on how many it beats or loses to the incumbent. Report-only.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OptimizerAnchorFit? Anchors { get; init; }
+}
+
+/// <summary>
+/// How well a calibration fits the anchors, #1868. Each anchor's level is fitted, so this is the RMS (dB) of how the
+/// receivers disagree about each anchor: their calibration relative to each other, which is what moves a trilaterated
+/// position, without the guess in an anchor's rssi@1m. <see cref="Better"/> and <see cref="Worse"/> count anchors
+/// against the incumbent and are null on the incumbent itself.
+/// </summary>
+public sealed record OptimizerAnchorFit(int Anchors, int Readings, double Rms)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Better { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? Worse { get; init; }
+}
 
 /// <summary>
 /// The numbers behind each gate. All are computed for every proposal, so a proposal stopped early still shows

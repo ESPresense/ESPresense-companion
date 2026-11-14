@@ -6,6 +6,7 @@
 	import { tooltip } from '#lib/tooltip.js';
 	import { errorColor } from '#lib/explain.js';
 	import SlideToggle from '#lib/SlideToggle.svelte';
+	import OptimizerAnchorFit from '#lib/OptimizerAnchorFit.svelte';
 	import { onMount } from 'svelte';
 
 	enum DataPoint {
@@ -213,6 +214,7 @@
 						<span class="ml-1">{$calibration.optimizerState.lastOutcome}</span>
 					</div>
 				{/if}
+				<OptimizerAnchorFit lastRunAt={$calibration.optimizerState.lastRunAt} />
 			</div>
 		{/if}
 

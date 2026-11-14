@@ -38,6 +38,75 @@ test.describe('Calibration Matrix Anchored Devices', () => {
 		await expect(page.getByText('0.876', { exact: true })).toBeVisible();
 	});
 
+	test('shows how the current calibration and each proposal fit the anchors', async ({ page }) => {
+		await mockApi(page, { stubWebSocket: true });
+		await page.route('**/api/state/calibration', (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: {},
+					optimizerState: {
+						optimizers: 'Test',
+						phase: 'Waiting',
+						message: 'Waiting',
+						snapshotCount: 3,
+						measurementCount: 30,
+						trainingSamples: 20,
+						validationSamples: 10,
+						lastRunAt: '2026-11-14T19:00:00Z'
+					}
+				})
+			})
+		);
+		await page.route('**/api/optimizer/last-cycle', (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					at: '2026-11-14T19:00:00Z',
+					dryRun: false,
+					outcome: 'Applied',
+					baselineAnchors: { anchors: 3, readings: 35, rms: 4.3955 },
+					proposals: [{ optimizer: 'Per Node Absorption Rx Tx Adj', decision: 'Selected', applied: true, anchors: { anchors: 3, readings: 35, rms: 4.2396, better: 2, worse: 1 } }]
+				})
+			})
+		);
+
+		await page.goto('/calibration');
+		const fit = page.getByTestId('anchor-fit');
+		await expect(fit.getByText('Fit to anchors', { exact: true })).toBeVisible();
+		await expect(fit.getByRole('row', { name: /Current/ })).toContainText('4.40');
+		const proposal = fit.getByRole('row', { name: /Per Node Absorption/ });
+		await expect(proposal).toContainText('(applied)');
+		await expect(proposal).toContainText('4.24');
+		await expect(proposal).toContainText('better on 2, worse on 1');
+	});
+
+	test('shows nothing about anchors before the first cycle', async ({ page }) => {
+		await mockApi(page, { stubWebSocket: true });
+		let asked = false;
+		await page.route('**/api/optimizer/last-cycle', (route) => {
+			asked = true;
+			return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'No optimization cycle has run since start-up.' }) });
+		});
+		await page.route('**/api/state/calibration', (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					matrix: {},
+					optimizerState: { optimizers: 'Test', phase: 'Collecting', message: 'Collecting samples', snapshotCount: 1, measurementCount: 10, trainingSamples: 0, validationSamples: 0 }
+				})
+			})
+		);
+
+		await page.goto('/calibration');
+		await expect(page.getByText('Collecting samples', { exact: true })).toBeVisible();
+		await expect.poll(() => asked).toBe(true);
+		await expect(page.getByTestId('anchor-fit')).toHaveCount(0);
+	});
+
 	test('refreshes calibration without overlapping requests', async ({ page }) => {
 		let requestCount = 0;
 		let activeRequests = 0;
