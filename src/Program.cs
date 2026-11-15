@@ -102,16 +102,11 @@ app.UseSerilogRequestLogging(o =>
 app.UseSwagger(c => c.RouteTemplate = "api/swagger/{documentName}/swagger.{json|yaml}");
 app.UseSwaggerUI(c => c.RoutePrefix = "api/swagger");
 
-// Without Cache-Control, browsers (and the HA ingress iframe) heuristically cached index.html off Last-Modified
-// and kept running the previous build after an add-on update. Hashed assets never change. Everything else is
-// good for a minute, then revalidates (ETag makes that a cheap 304). Not "public": ingress responses are per-user.
-const string spaCacheControl = "max-age=60, must-revalidate";
+// Hashed chunks are cached for good; index.html, version.json and the rest are revalidated on every use, so a
+// browser never boots the previous build from its cache after an add-on update (see SpaIndex.CacheControlFor).
 var spaFiles = new StaticFileOptions
 {
-    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl =
-        ctx.Context.Request.Path.StartsWithSegments("/_app/immutable")
-            ? "public, max-age=31536000, immutable"
-            : spaCacheControl
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = SpaIndex.CacheControlFor(ctx.Context.Request.Path)
 };
 app.UseStaticFiles(spaFiles);
 app.UseRouting();
@@ -123,6 +118,6 @@ app.MapControllerRoute(
     pattern: "{controller}/{action=Index}/{id?}");
 
 // Client-side routes (/devices/{id}, ...) get index.html with its relative paths rebased to the request's depth.
-app.MapSpaFallback(spaCacheControl);
+app.MapSpaFallback(SpaIndex.ShellCacheControl);
 
 app.Run();
