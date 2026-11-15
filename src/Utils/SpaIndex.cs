@@ -22,6 +22,19 @@ public static partial class SpaIndex
     [GeneratedRegex("""new URL\("\.", location\)""")]
     private static partial Regex RuntimeBase();
 
+    /// <summary>
+    /// Cache-Control for everything the UI serves. Files under <c>_app/immutable</c> are content-hashed and never
+    /// change, so they are cached for good. Everything else, above all index.html and <c>_app/version.json</c>, must be
+    /// checked with the server on every use (<c>no-cache</c>; the ETag makes an unchanged file a 304): the HTML names the
+    /// build's chunks, so a cached copy after an add-on update boots the previous build, whose chunks are gone.
+    /// Not "public": ingress responses are per-user.
+    /// </summary>
+    public const string ShellCacheControl = "no-cache";
+
+    /// <inheritdoc cref="ShellCacheControl"/>
+    public static string CacheControlFor(PathString path) =>
+        path.StartsWithSegments("/_app/immutable") ? "public, max-age=31536000, immutable" : ShellCacheControl;
+
     /// <summary>The relative prefix that leads from <paramref name="requestPath"/>'s directory back to the app root.</summary>
     public static string PrefixFor(string? requestPath)
     {

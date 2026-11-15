@@ -28,6 +28,15 @@ public class SpaIndexTests
     public void PrefixFor_ReturnsPathBackToRoot(string? path, string expected) =>
         Assert.That(SpaIndex.PrefixFor(path), Is.EqualTo(expected));
 
+    [TestCase("/", "no-cache")]
+    [TestCase("/index.html", "no-cache")]
+    [TestCase("/_app/version.json", "no-cache")]
+    [TestCase("/favicon.png", "no-cache")]
+    [TestCase("/_app/immutable/entry/start.Su9T-wkT.js", "public, max-age=31536000, immutable")]
+    [TestCase("/_app/immutable/nodes/5.BeU0UGsx.js", "public, max-age=31536000, immutable")]
+    public void CacheControlFor_RevalidatesTheShell_AndKeepsHashedChunks(string path, string expected) =>
+        Assert.That(SpaIndex.CacheControlFor(new Microsoft.AspNetCore.Http.PathString(path)), Is.EqualTo(expected));
+
     [Test]
     public void Rebase_AtRoot_LeavesHtmlUnchanged() =>
         Assert.That(SpaIndex.Rebase(Index, "/"), Is.SameAs(Index));
