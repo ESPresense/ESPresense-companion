@@ -3,7 +3,9 @@
 	import { resolve } from '$app/paths';
 	import { page, updated } from '$app/state';
 	import { beforeNavigate } from '$app/navigation';
-	import type { Snippet } from 'svelte';
+	import { dev, version } from '$app/env';
+	import { apiUrl } from '#lib/api.js';
+	import { onMount, type Snippet } from 'svelte';
 	import Modal from '#lib/modal/Modal.svelte';
 	import Toast from '#lib/toast/Toast.svelte';
 	import CommandPalette from '#lib/CommandPalette.svelte';
@@ -24,11 +26,38 @@
 	const current = $derived(page.url.pathname);
 	let paletteOpen = $state(false);
 
-	// SvelteKit polls _app/version.json; once a newer build is live, finish the next in-app navigation with a
-	// full page load so the new bundle is picked up instead of running the old one until the tab is closed.
+	// SvelteKit polls _app/version.json too, but its check has no timeout and never starts a new one while one is
+	// in flight, so a single request left hanging while the add-on restarts for an update stops it for good and the
+	// tab never learns about the new build. This poll gives up on a request after 4 s and tries again.
+	let newerBuild = $state(false);
+	onMount(() => {
+		if (dev) return;
+		let timer: ReturnType<typeof setTimeout>;
+		let stopped = false;
+		const check = async () => {
+			try {
+				const res = await fetch(apiUrl('/_app/version.json'), { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+				if (res.ok && (await res.json()).version !== version) {
+					newerBuild = true;
+					return;
+				}
+			} catch {
+				// unreachable or timed out (the server is restarting): try again
+			}
+			if (!stopped) timer = setTimeout(check, 5000);
+		};
+		timer = setTimeout(check, 5000);
+		return () => {
+			stopped = true;
+			clearTimeout(timer);
+		};
+	});
+
+	// Once a newer build is live, finish the next in-app navigation with a full page load so the new bundle is
+	// picked up instead of running the old one until the tab is closed.
 	beforeNavigate(({ willUnload, to, shallow, type }) => {
 		if (shallow && type === 'goto') return;
-		if (updated.current && !willUnload && to?.url) location.href = to.url.href;
+		if ((newerBuild || updated.current) && !willUnload && to?.url) location.href = to.url.href;
 	});
 
 	// `resolve()` is typed per route, so each href is resolved individually.
