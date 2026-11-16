@@ -27,8 +27,8 @@ public class DeviceCaptureService
     private Task OnDeviceMessage(DeviceMessageEventArgs e)
     {
         foreach (var session in _sessions.Values)
-            if (session.Active && session.Matches(e.DeviceId))
-                session.Add(e.NodeId, e.Payload);
+            if (session.Matches(e.DeviceId))
+                session.TryAdd(e.NodeId, e.Payload);
         return Task.CompletedTask;
     }
 
@@ -53,9 +53,8 @@ public class DeviceCaptureService
 
     public CaptureStatus? AddPosition(string deviceId, double x, double y, double z, string? floor)
     {
-        if (!_sessions.TryGetValue(deviceId, out var session) || !session.Active) return null;
-        session.AddPosition(x, y, z, floor);
-        return session.Status();
+        if (!_sessions.TryGetValue(deviceId, out var session)) return null;
+        return session.TryAddPosition(x, y, z, floor) ? session.Status() : null;
     }
 
     public CaptureStatus? GetStatus(string deviceId)
@@ -75,50 +74,77 @@ public class DeviceCaptureService
             .Where(n => n.HasLocation)
             .Select(n => new CaptureNode(n.Id, n.Name, new[] { n.X ?? 0, n.Y ?? 0, n.Z ?? 0 }, n.Floors?.Select(f => f.Id ?? "").ToArray() ?? Array.Empty<string>()))
             .ToArray();
-        return new CaptureExport(1, deviceId, deviceName, session.StartedUtc, session.EndedUtc, session.Truncated, nodes, session.PositionSnapshot(), session.Snapshot());
+        var snap = session.Snapshot();
+        return new CaptureExport(1, deviceId, deviceName, snap.Status.started, snap.Status.ended, snap.Status.truncated, nodes, snap.Positions, snap.Messages);
     }
 
+    /// <summary>
+    /// One capture. All state is guarded by <c>_gate</c> (held only for in-memory work, never for I/O or
+    /// serialization), so "is it still active?" and "append" are one step: nothing is appended once
+    /// <see cref="Finish"/> returns, stop is idempotent, and status/export come from one snapshot.
+    /// </summary>
     private class CaptureSession(string deviceId, HashSet<string> matchIds)
     {
-        private readonly ConcurrentQueue<CaptureMessage> _entries = new();
-        private readonly ConcurrentQueue<CapturePosition> _positions = new();
-        private int _count;
+        private readonly object _gate = new();
+        private readonly List<CaptureMessage> _entries = new();
+        private readonly List<CapturePosition> _positions = new();
+        private bool _active = true;
+        private DateTime? _endedUtc;
+        private bool _truncated;
 
         public DateTime StartedUtc { get; } = DateTime.UtcNow;
-        public DateTime? EndedUtc { get; private set; }
-        public bool Active { get; private set; } = true;
-        public bool Truncated { get; private set; }
+
+        public bool Active { get { lock (_gate) return _active; } }
 
         public bool Matches(string id) => matchIds.Contains(id);
 
-        public void Add(string nodeId, DeviceMessage payload)
+        public bool TryAdd(string nodeId, DeviceMessage payload)
         {
-            if (Interlocked.Increment(ref _count) > MaxEntries)
+            lock (_gate)
             {
-                Truncated = true;
-                Interlocked.Decrement(ref _count);
-                return;
+                if (!_active) return false;
+                if (_entries.Count >= MaxEntries)
+                {
+                    _truncated = true;
+                    return false;
+                }
+                _entries.Add(new CaptureMessage(DateTime.UtcNow, nodeId, payload.Distance, payload.DistVar, payload.Rssi, payload.RssiRxAdj, payload.RssiVar, payload.RefRssi));
+                return true;
             }
-            _entries.Enqueue(new CaptureMessage(DateTime.UtcNow, nodeId, payload.Distance, payload.DistVar, payload.Rssi, payload.RssiRxAdj, payload.RssiVar, payload.RefRssi));
         }
 
-        public void AddPosition(double x, double y, double z, string? floor)
+        public bool TryAddPosition(double x, double y, double z, string? floor)
         {
-            _positions.Enqueue(new CapturePosition(DateTime.UtcNow, x, y, z, floor));
+            lock (_gate)
+            {
+                if (!_active) return false;
+                _positions.Add(new CapturePosition(DateTime.UtcNow, x, y, z, floor));
+                return true;
+            }
         }
 
         public void Finish()
         {
-            if (!Active) return;
-            Active = false;
-            EndedUtc = DateTime.UtcNow;
+            lock (_gate)
+            {
+                if (!_active) return;
+                _active = false;
+                _endedUtc = DateTime.UtcNow;
+            }
         }
 
-        public CaptureMessage[] Snapshot() => _entries.ToArray();
+        public (CaptureStatus Status, CaptureMessage[] Messages, CapturePosition[] Positions) Snapshot()
+        {
+            lock (_gate)
+                return (BuildStatus(), _entries.ToArray(), _positions.ToArray());
+        }
 
-        public CapturePosition[] PositionSnapshot() => _positions.ToArray();
+        public CaptureStatus Status()
+        {
+            lock (_gate) return BuildStatus();
+        }
 
-        public CaptureStatus Status() => new(deviceId, Active, _entries.Count, _positions.Count, StartedUtc, EndedUtc, Truncated);
+        private CaptureStatus BuildStatus() => new(deviceId, _active, _entries.Count, _positions.Count, StartedUtc, _endedUtc, _truncated);
     }
 }
 
