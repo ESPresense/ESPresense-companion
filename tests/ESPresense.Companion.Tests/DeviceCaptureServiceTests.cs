@@ -47,9 +47,13 @@ public class DeviceCaptureServiceTests
         {
             var id = $"dev{i}";
             _service.Start(id);
-            var senders = Enumerable.Range(0, 4).Select(_ => Task.Run(() => { for (var k = 0; k < 200; k++) Send(id); })).ToArray();
-            await Task.Delay(1);
+            // The senders run until cancelled and Stop waits for a recorded message, so appends always race Stop.
+            using var cts = new CancellationTokenSource();
+            var senders = Enumerable.Range(0, 4).Select(_ => Task.Run(() => { while (!cts.IsCancellationRequested) Send(id); })).ToArray();
+            Assert.That(SpinWait.SpinUntil(() => _service.GetStatus(id)!.Value.count > 0, TimeSpan.FromSeconds(10)), Is.True, "senders never recorded");
             var stopped = _service.Stop(id)!.Value;
+            await Task.Delay(1);
+            cts.Cancel();
             await Task.WhenAll(senders);
 
             var export = _service.Export(id, null)!.Value;
