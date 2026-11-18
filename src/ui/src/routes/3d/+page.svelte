@@ -21,7 +21,7 @@
 	<FloorTabs bind:floorId />
 	<Map3DControls bind:showNodes bind:showDevices bind:autoRotate onview={(preset) => map?.frameView(preset)} />
 	{#if $config && $devices && $nodes}
-		<Map3D bind:this={map} devicesToShow={$devices} nodesToShow={$nodes} config={$config} {floorId} showAllFloors={$showAllFloors} {showNodes} {showDevices} bind:autoRotate showHistoryPath={false} historyData={[]} />
+		<Map3D bind:this={map} devicesToShow={$devices} nodesToShow={$nodes} config={$config} {floorId} showAllFloors={$showAllFloors} {showNodes} {showDevices} bind:autoRotate />
 	{:else}
 		<div class="absolute inset-0 flex items-center justify-center text-white">Loading map data...</div>
 	{/if}

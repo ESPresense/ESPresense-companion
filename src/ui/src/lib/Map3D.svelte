@@ -9,32 +9,36 @@
 	import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 	import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 	import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-	import type { Device, Node, Config, DeviceHistory, Floor } from '#lib/types.js';
+	import type { Device, Node, Config, Floor } from '#lib/types.js';
+	import { formatClock, type HistoryView } from '#lib/history.js';
 	import { gotoDetail3d } from '#lib/urls.js';
 	import { hexToThreeNumber, getRoomColor } from '#lib/colors.js';
 	import { floorRingRadius, nodeRangeColors } from '#lib/ranges3d.js';
 	import { wallSegments, wallPosts, wallHeight, wallOpacityAt, MIN_WALL_THICKNESS } from '#lib/walls3d.js';
+	import { lastSeenOpacity, trailTube, type TubePoint } from '#lib/devices3d.js';
 	import logoSvg from '#lib/images/logo.svg?raw';
 
 	interface Props {
 		devicesToShow?: Device[];
 		nodesToShow?: Node[];
 		config?: Config | null;
-		historyData?: DeviceHistory[];
+		/** A device's history at the moment shown (from DeviceHistoryPanel): its trail, and where it was while scrubbing. */
+		history?: HistoryView | null;
 		/** The floor in focus: drawn in full, with labels. Null means the first floor. */
 		floorId?: string | null;
 		/** Keep the other floors as faint outlines instead of hiding them. */
 		showAllFloors?: boolean;
 		showNodes?: boolean;
 		showDevices?: boolean;
-		showHistoryPath?: boolean;
 		/** Slow orbit around the plan. Switches itself off when the user drags. */
 		autoRotate?: boolean;
 	}
 
-	let { devicesToShow = [], nodesToShow = [], config = null, historyData = [], floorId = null, showAllFloors = false, showNodes = true, showDevices = true, showHistoryPath = false, autoRotate = $bindable(false) }: Props = $props();
+	let { devicesToShow = [], nodesToShow = [], config = null, history = null, floorId = null, showAllFloors = false, showNodes = true, showDevices = true, autoRotate = $bindable(false) }: Props = $props();
 
 	let activeFloorId = $derived(floorId ?? config?.floors?.[0]?.id ?? null);
+	// Scrubbing back through history: the live markers step aside for where the device was then, as on the 2D map
+	let scrubbing = $derived(history != null && !history.live);
 
 	// --- Internal State ---
 	let container: HTMLDivElement = $state()!;
@@ -51,6 +55,7 @@
 	let isAnimating = false;
 	let animationFrameId: number;
 	let lastTime: number | null = null;
+	let lastFadeCheck = 0;
 	let planCenter = new THREE.Vector3(0, 0, 0);
 	let builtConfig: Config | null = null; // the config the rooms on screen were built from
 	let raycaster = new THREE.Raycaster();
@@ -155,8 +160,16 @@
 	// --- Devices ---
 	type DeviceVisual = {
 		group: THREE.Group; // at (x, y, floor base), eased
-		sphere: THREE.Mesh;
-		outline: THREE.Mesh; // a white rim, shown while the device is selected
+		sphere: THREE.Mesh; // a ball, or a pin for an anchored device
+		outline: THREE.Mesh; // a white rim, so the marker stands off a floor of its own colour; bolder while selected
+		body: THREE.MeshStandardMaterial; // the marker's own copy of its room material, so it can fade by itself
+		rim: THREE.MeshBasicMaterial;
+		anchored: boolean;
+		radius: number;
+		mats: DeviceMaterials;
+		look: { presence: Presence; dimmed: boolean; selected: boolean };
+		lastSeen: number | null; // epoch ms
+		timeout: number; // ms
 		line: THREE.Line;
 		disc: THREE.Mesh;
 		label: CSS2DObject;
@@ -203,6 +216,21 @@
 		// 0.1 m at no confidence up to 0.3 m at 100%
 		return 0.1 + 0.2 * (Math.max(0, Math.min(100, confidence)) / 100);
 	}
+
+	const RIM = { width: 0.012, selectedWidth: 0.03, opacity: 0.85 }; // metres beyond the marker, and how white
+	const FADE_CHECK_MS = 500; // how often animate() re-fades markers that haven't reported
+	const ANCHOR_HEAD_RADIUS = 0.12; // an anchor's position is set, not estimated: one size for all
+	// A map pin like the 2D map's: a ball with a cone under it whose tip is the anchor's position. Unit head,
+	// centred on the head so the rim, scaled about the origin, stays even all round.
+	const PIN_TIP = 2.4; // head radii from the head's centre down to the tip
+	const pinGeometry = (() => {
+		const head = new THREE.SphereGeometry(1, 24, 16);
+		const cone = new THREE.ConeGeometry(0.72, PIN_TIP - 0.3, 24).rotateX(-Math.PI / 2).translate(0, 0, -(PIN_TIP + 0.3) / 2); // tip down
+		const merged = mergeGeometries([head.deleteAttribute('uv'), cone.deleteAttribute('uv')]);
+		head.dispose();
+		cone.dispose();
+		return merged;
+	})();
 
 	// --- Nodes ---
 	type NodeVisual = {
@@ -269,7 +297,6 @@
 	type RangeMaterials = { sphere: THREE.MeshBasicMaterial; line: THREE.LineBasicMaterial };
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- plain cache of Three.js materials, never rendered from
 	const rangeMaterialCache = new Map<string, RangeMaterials>();
-	const outlineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide });
 
 	function rangeMaterials(color: string): RangeMaterials {
 		let set = rangeMaterialCache.get(color);
@@ -306,7 +333,7 @@
 			if (child instanceof THREE.Line && child.geometry !== unitRing) child.geometry.dispose();
 		}
 		const device = selectedDevice;
-		if (!device?.location || !showDevices) return;
+		if (!device?.location || !showDevices || scrubbing) return;
 		const floorZ = floorBaseZ(deviceFloorIds(device), device.location.z);
 
 		for (const { node, distance, color } of ranges) {
@@ -333,9 +360,17 @@
 		selectedDeviceId = id;
 	}
 
-	// --- History path ---
-	const historyPathMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
-	let historyPathLine: THREE.Line | null = null;
+	// --- History trail ---
+	// The trail is a tube, not a line (WebGL draws every line one pixel wide), coloured by the room each fix
+	// fell in and fading with age as on the 2D map. While scrubbing, a marker shows where the device was.
+	const TRAIL_RADIUS = 0.025;
+	const TRAIL_GHOST_FLOOR = 0.3; // a faint floor's stretch of trail, as a share of its opacity
+	const QUIET_HEIGHT = 1; // metres above the floor for a fix that has no height
+	const trailMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false });
+	let trailMesh: THREE.Mesh | null = null;
+	type HistoryMarker = { group: THREE.Group; ball: THREE.Mesh; material: THREE.MeshStandardMaterial; label: CSS2DObject; labelElement: HTMLDivElement };
+	let historyMarker: HistoryMarker | null = null;
+	const historyRimMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide });
 
 	// --- Hover tooltip ---
 	let hover: { title: string; lines: string[]; x: number; y: number } | null = $state(null);
@@ -556,8 +591,7 @@
 		if (showNodes) renderNodes(nodesToShow);
 		else cleanupNodeGroup();
 
-		if (showHistoryPath) renderHistoryPath(historyData);
-		else cleanupHistoryPath();
+		renderHistory(history);
 
 		renderRanges();
 	}
@@ -949,6 +983,7 @@
 			deviceGroup.name = 'DeviceGroup';
 			contentGroup.add(deviceGroup);
 		}
+		deviceGroup.visible = !scrubbing;
 
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local temp
 		const currentDeviceIds = new Set<string>();
@@ -958,9 +993,15 @@
 			currentDeviceIds.add(device.id);
 
 			const mats = deviceMaterials(device);
+			const anchored = device.isAnchored ?? false;
 			let v = deviceVisuals.get(device.id);
+			if (v && v.anchored !== anchored) {
+				removeDeviceVisual(v); // the shape changes: start the marker over
+				deviceVisuals.delete(device.id);
+				v = undefined;
+			}
 			if (!v) {
-				v = createDeviceVisual(device, mats);
+				v = createDeviceVisual(device, mats, anchored);
 				v.current.set(device.location.x, device.location.y, device.location.z); // appear in place, don't fly in
 				deviceVisuals.set(device.id, v);
 				deviceGroup?.add(v.group);
@@ -968,22 +1009,20 @@
 
 			v.target.set(device.location.x, device.location.y, device.location.z);
 			v.floorZ = floorBaseZ(deviceFloorIds(device), device.location.z);
-			v.sphere.scale.setScalar(deviceRadius(device.confidence || 0));
-			v.outline.scale.setScalar(deviceRadius(device.confidence || 0) + 0.03);
+			v.radius = anchored ? ANCHOR_HEAD_RADIUS : deviceRadius(device.confidence || 0);
+			v.mats = mats;
+			const lastSeen = device.lastSeen ? new Date(device.lastSeen).getTime() : NaN;
+			v.lastSeen = Number.isFinite(lastSeen) ? lastSeen : null;
+			v.timeout = device.timeout;
 
-			const p = presence(deviceFloorIds(device));
 			const selected = device.id === selectedDeviceId;
-			const dimmed = selectedDevice != null && !selected; // step back while another device is selected
-			v.group.visible = p !== 'hidden';
-			v.sphere.material = p === 'ghost' || dimmed ? mats.ghost : mats.sphere;
-			v.sphere.castShadow = !dimmed;
-			v.outline.visible = selected;
-			v.labelElement.style.opacity = dimmed ? '0.35' : '';
+			// Step back while another device is selected
+			v.look = { presence: presence(deviceFloorIds(device)), dimmed: selectedDevice != null && !selected, selected };
 			v.line.material = mats.line;
 			v.disc.material = mats.disc;
-			v.line.visible = v.disc.visible = v.label.visible = p === 'active';
 			v.labelElement.textContent = shortName(device.name || device.id);
 			v.sphere.userData = { kind: 'device', id: device.id };
+			styleDevice(v, Date.now());
 			placeDevice(v);
 		});
 
@@ -994,17 +1033,45 @@
 		}
 	}
 
-	function createDeviceVisual(device: Device, mats: DeviceMaterials): DeviceVisual {
+	/**
+	 * Size, material and visibility of a device marker from its look and how long ago it was heard. Run on
+	 * every update, and every FADE_CHECK_MS from animate(): a device that has gone quiet sends no update.
+	 */
+	function styleDevice(v: DeviceVisual, now: number) {
+		const { presence: p, dimmed, selected } = v.look;
+		const fade = lastSeenOpacity(v.lastSeen == null ? null : now - v.lastSeen, v.timeout);
+		v.group.visible = p !== 'hidden';
+		v.sphere.scale.setScalar(v.radius);
+		v.outline.scale.setScalar(v.radius + (selected ? RIM.selectedWidth : RIM.width));
+
+		v.body.color.copy(v.mats.sphere.color);
+		v.body.emissive.copy(v.mats.sphere.emissive);
+		v.body.opacity = fade;
+		v.body.depthWrite = fade >= 1; // a faded marker must not blot out what is behind it
+		v.sphere.material = p === 'ghost' || dimmed ? v.mats.ghost : v.body;
+		v.sphere.castShadow = !dimmed && p === 'active';
+
+		v.rim.opacity = selected ? 1 : RIM.opacity * fade;
+		v.outline.visible = selected || (p === 'active' && !dimmed);
+		v.labelElement.style.opacity = dimmed ? '0.35' : fade < 1 ? fade.toFixed(2) : '';
+		v.line.visible = v.disc.visible = v.label.visible = p === 'active';
+	}
+
+	function createDeviceVisual(device: Device, mats: DeviceMaterials, anchored: boolean): DeviceVisual {
 		const group = new THREE.Group();
 		group.name = 'device#' + device.id;
 
-		const sphere = new THREE.Mesh(unitSphere, mats.sphere);
+		const shape = anchored ? pinGeometry : unitSphere;
+		const body = mats.sphere.clone();
+		body.transparent = true;
+		const sphere = new THREE.Mesh(shape, body);
 		sphere.castShadow = true;
 		sphere.receiveShadow = true;
 		group.add(sphere);
 
-		const outline = new THREE.Mesh(unitSphere, outlineMaterial);
-		outline.visible = false;
+		// Back faces of a slightly larger copy: from any angle, a white edge round the marker
+		const rim = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide, transparent: true, opacity: RIM.opacity });
+		const outline = new THREE.Mesh(shape, rim);
 		group.add(outline);
 
 		const line = makeDropLine(mats.line);
@@ -1022,22 +1089,44 @@
 		label.name = device.id + '#label';
 		group.add(label);
 
-		return { group, sphere, outline, line, disc, label, labelElement, current: new THREE.Vector3(), target: new THREE.Vector3(), floorZ: 0 };
+		return {
+			group,
+			sphere,
+			outline,
+			body,
+			rim,
+			anchored,
+			radius: anchored ? ANCHOR_HEAD_RADIUS : deviceRadius(device.confidence || 0),
+			mats,
+			look: { presence: 'active', dimmed: false, selected: false },
+			lastSeen: null,
+			timeout: device.timeout,
+			line,
+			disc,
+			label,
+			labelElement,
+			current: new THREE.Vector3(),
+			target: new THREE.Vector3(),
+			floorZ: 0
+		};
 	}
 
 	function removeDeviceVisual(v: DeviceVisual) {
 		v.labelElement.remove();
 		v.group.removeFromParent();
 		v.line.geometry.dispose();
+		v.body.dispose();
+		v.rim.dispose();
 	}
 
 	/** Put a device where its eased position says, with the drop line reaching its floor. */
 	function placeDevice(v: DeviceVisual) {
 		const height = v.current.z - v.floorZ;
+		const centre = height + (v.anchored ? PIN_TIP * v.radius : 0); // a pin's tip, not its head, marks the spot
 		v.group.position.set(v.current.x, v.current.y, v.floorZ);
-		v.sphere.position.z = height;
-		v.outline.position.z = height;
-		v.label.position.z = height;
+		v.sphere.position.z = centre;
+		v.outline.position.z = centre;
+		v.label.position.z = centre;
 		setDropHeight(v.line, height);
 	}
 
@@ -1051,22 +1140,79 @@
 		}
 	}
 
-	// --- History Path Rendering ---
-	function renderHistoryPath(history: DeviceHistory[]) {
-		cleanupHistoryPath();
-		if (!contentGroup || history.length < 2) return;
-
-		// The backend writes one row per scenario; draw the path of the winning scenario only.
-		const best = history.filter((h) => h.best);
-		const rows = best.length > 0 ? best : history;
-		const points = rows.filter((h) => h.x != null && h.y != null && h.z != null).map((h) => new THREE.Vector3(h.x!, h.y!, h.z!));
-
-		if (points.length > 1) {
-			const geometry = new THREE.BufferGeometry().setFromPoints(points);
-			historyPathLine = new THREE.Line(geometry, historyPathMaterial);
-			historyPathLine.name = 'HistoryPathLine';
-			contentGroup.add(historyPathLine);
+	// --- History Rendering ---
+	function renderHistory(view: HistoryView | null) {
+		cleanupTrail();
+		if (!contentGroup || !view) {
+			cleanupHistoryMarker();
+			return;
 		}
+
+		// Runs of consecutive fixes on floors on screen; the trail breaks where the device was on a hidden
+		// floor, or where a fix has no height to put it at.
+		const runs: TubePoint[][] = [];
+		let run: TubePoint[] = [];
+		for (const p of view.trail) {
+			const shown = p.fix.z != null ? presence(p.floor ? [p.floor.id] : []) : 'hidden';
+			if (shown === 'hidden') {
+				if (run.length) runs.push(run);
+				run = [];
+				continue;
+			}
+			const color = new THREE.Color(getRoomColor(config, p.room?.id));
+			const alpha = (0.15 + 0.85 * (1 - p.age)) * (shown === 'ghost' ? TRAIL_GHOST_FLOOR : 1);
+			run.push({ x: p.fix.x, y: p.fix.y, z: p.fix.z!, rgb: [color.r, color.g, color.b], alpha });
+		}
+		if (run.length) runs.push(run);
+
+		const tube = trailTube(runs, TRAIL_RADIUS);
+		if (tube.indices.length) {
+			const geometry = new THREE.BufferGeometry();
+			geometry.setAttribute('position', new THREE.BufferAttribute(tube.positions, 3));
+			geometry.setAttribute('color', new THREE.BufferAttribute(tube.colors, 4));
+			geometry.setIndex(new THREE.BufferAttribute(tube.indices, 1));
+			trailMesh = new THREE.Mesh(geometry, trailMaterial);
+			trailMesh.name = 'HistoryTrail';
+			contentGroup.add(trailMesh);
+		}
+
+		const fix = view.live ? null : view.current;
+		if (!fix) {
+			cleanupHistoryMarker();
+			return;
+		}
+		const ids = view.floor ? [view.floor.id] : [];
+		const floorZ = floorBaseZ(ids, fix.z ?? 0);
+		const height = fix.z != null ? fix.z - floorZ : QUIET_HEIGHT;
+		const m = historyMarker ?? createHistoryMarker();
+		m.material.color.set(getRoomColor(config, view.room?.id));
+		m.material.emissive.copy(m.material.color);
+		m.group.position.set(fix.x, fix.y, floorZ);
+		m.ball.position.z = m.label.position.z = height;
+		m.group.visible = presence(ids) !== 'hidden';
+		m.labelElement.textContent = formatClock(view.cursor);
+	}
+
+	function createHistoryMarker(): HistoryMarker {
+		const group = new THREE.Group();
+		group.name = 'HistoryMarker';
+		const material = new THREE.MeshStandardMaterial({ emissiveIntensity: 0.2, metalness: 0.3, roughness: 0.4 });
+		const ball = new THREE.Mesh(unitSphere, material);
+		ball.scale.setScalar(0.15);
+		ball.castShadow = true;
+		const rim = new THREE.Mesh(unitSphere, historyRimMaterial);
+		rim.scale.setScalar(1 + RIM.selectedWidth / 0.15);
+		ball.add(rim);
+		group.add(ball);
+		const labelElement = document.createElement('div');
+		labelElement.className = 'text-white text-xs font-mono pointer-events-none';
+		labelElement.style.marginTop = '-1.4em';
+		labelElement.dataset.testid = 'map3d-history-time';
+		const label = new CSS2DObject(labelElement);
+		group.add(label);
+		contentGroup.add(group);
+		historyMarker = { group, ball, material, label, labelElement };
+		return historyMarker;
 	}
 
 	// --- Picking ---
@@ -1166,6 +1312,11 @@
 		}
 		controls?.update();
 		easeDevices(deltaTime);
+		if (currentTime - lastFadeCheck > FADE_CHECK_MS) {
+			lastFadeCheck = currentTime;
+			const now = Date.now();
+			for (const v of deviceVisuals.values()) styleDevice(v, now);
+		}
 
 		// Offline nodes breathe slowly so they catch the eye without flashing
 		nodeMaterials.offline.puck.emissiveIntensity = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin((currentTime / 1000 / NODE_PULSE_SECONDS) * 2 * Math.PI));
@@ -1199,7 +1350,11 @@
 		cleanupRooms();
 		cleanupNodeGroup();
 		cleanupDeviceGroup();
-		cleanupHistoryPath();
+		cleanupTrail();
+		cleanupHistoryMarker();
+		trailMaterial.dispose();
+		historyRimMaterial.dispose();
+		pinGeometry.dispose();
 		clearDeviceMaterials();
 		for (const set of rangeMaterialCache.values()) Object.values(set).forEach((m) => m.dispose());
 		rangeMaterialCache.clear();
@@ -1240,12 +1395,20 @@
 		deviceGroup = null;
 	}
 
-	function cleanupHistoryPath() {
-		if (historyPathLine) {
-			contentGroup?.remove(historyPathLine);
-			historyPathLine.geometry?.dispose();
-			historyPathLine = null;
+	function cleanupTrail() {
+		if (trailMesh) {
+			contentGroup?.remove(trailMesh);
+			trailMesh.geometry.dispose();
+			trailMesh = null;
 		}
+	}
+
+	function cleanupHistoryMarker() {
+		if (!historyMarker) return;
+		historyMarker.labelElement.remove();
+		historyMarker.group.removeFromParent();
+		historyMarker.material.dispose();
+		historyMarker = null;
 	}
 
 	// --- Lifecycle ---
@@ -1283,7 +1446,7 @@
 
 <div class="map3d w-full h-full relative" bind:this={container}>
 	<!-- Container for the 3D canvas and CSS2D labels -->
-	{#if selectedDevice}
+	{#if selectedDevice && !scrubbing}
 		<div class="absolute left-4 top-4 z-10 w-60 rounded bg-surface-100-900/90 p-3 text-xs shadow" data-testid="map3d-selection">
 			<div class="flex items-start justify-between gap-2">
 				<div class="min-w-0">
@@ -1314,6 +1477,11 @@
 		<div class="flex items-center gap-2"><span class="inline-block h-2 w-2 rounded-full bg-sky-400"></span>Node online</div>
 		<div class="flex items-center gap-2"><span class="inline-block h-2 w-2 rounded-full bg-red-400"></span>Node offline</div>
 		<div class="flex items-center gap-2"><span class="inline-block h-2 w-2 rounded-full bg-white/70"></span>Device: colour is its room, size its confidence</div>
+		<div class="flex items-center gap-2"><span class="inline-block h-2 w-2 rounded-full bg-white/30"></span>Faded: not heard from lately</div>
+		<div class="flex items-center gap-2"><span class="inline-block h-2.5 w-2 rounded-t-full bg-white/70" style="clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%)"></span>Pin: an anchored device</div>
+		{#if history}
+			<div class="flex items-center gap-2"><span class="inline-block h-0.5 w-2 bg-white/70"></span>Trail: colour is the room, older is fainter</div>
+		{/if}
 		<div class="mt-1 opacity-70">Click a device for its ranges, double-click to open it</div>
 	</div>
 	{#if hover}
