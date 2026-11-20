@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Temporarily run an unmerged PR's image on a Home Assistant install, in place of the add-on's own image.
+#
+#   ALPHA_HOST=<ssh host of the HA machine> scripts/alpha <pr-number>   # flip to the PR's newest image
+#   ALPHA_HOST=<ssh host of the HA machine> scripts/alpha off           # back to the released image
+#   ALPHA_HOST=<ssh host of the HA machine> scripts/alpha status
+#
+# The work happens in scripts/alpha-remote, which this feeds to the host over ssh. Labelling a PR
+# `alpha` does the same thing from CI (.github/workflows/alpha.yml and .crow/alpha.yaml).
+#
+# It is a test rig, not a channel: nothing is published, the Supervisor still believes it runs the
+# release, and the next add-on update (or `off`) replaces the PR image. Needs ssh to the host with
+# `docker` and `ha` (the SSH add-on with protection mode off). ALPHA_ADDON picks the add-on when
+# more than one is installed.
+set -euo pipefail
+
+host=${ALPHA_HOST:?set ALPHA_HOST to the ssh host of the Home Assistant machine}
+arg=${1:?usage: scripts/alpha <pr-number>|off|status}
+here=$(cd "$(dirname "$0")" && pwd)
+
+if [[ "$arg" =~ ^[0-9]+$ ]]; then
+  sha=$(gh pr view "$arg" --json headRefOid --jq .headRefOid)
+  arg="pr-$arg-${sha::7}"
+  sh "$here/alpha-wait-image" "$arg"
+fi
+
+ssh -o BatchMode=yes "$host" "ALPHA_ADDON='${ALPHA_ADDON:-}' sh -s -- '$arg'" < "$here/alpha-remote"

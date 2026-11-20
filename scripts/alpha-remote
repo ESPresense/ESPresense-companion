@@ -1,0 +1,71 @@
+#!/bin/sh
+# Runs ON the Home Assistant host (fed over ssh by scripts/alpha and .crow/alpha.yaml).
+#
+#   sh -s -- <image tag>   run that image in place of the add-on's own (pr-<number>-<sha7>)
+#   sh -s -- off           put the released image back
+#   sh -s -- status        show which commit is running
+#
+# The Supervisor starts the add-on from the local image tagged with the add-on's version, so
+# tagging another image as that version and restarting the add-on is the whole trick. The
+# released image is kept as alpha-backup-<version>.
+set -eu
+
+arg=${1:?usage: alpha-remote <image tag>|off|status}
+image=espresense/espresense-companion
+
+# One swap at a time: two at once could save a PR image as the backup.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"${TMPDIR:-/tmp}/companion-alpha.lock"
+  flock 9
+fi
+
+# -a: a stopped add-on still has to be restorable with `off`.
+containers=$(docker ps -a --format '{{.Names}}' | grep -E "^(app|addon)_.*espresense-companion${ALPHA_ADDON:+.*$ALPHA_ADDON}" || true)
+[ -n "$containers" ] || { echo "No ESPresense Companion add-on on this host" >&2; exit 1; }
+if [ "$(printf '%s\n' "$containers" | wc -l)" -ne 1 ]; then
+  echo "More than one ESPresense Companion add-on here; set ALPHA_ADDON to pick one:" >&2
+  printf '%s\n' "$containers" >&2
+  exit 1
+fi
+container=$containers
+slug=${container#*_}
+version=$(docker inspect "$container" --format '{{.Config.Image}}')
+version=${version##*:}
+
+restart() {
+  if ! out=$(ha apps restart "$slug" 2>&1); then
+    printf '%s\n' "$out" >&2
+    echo "The image tag is swapped but the add-on did not restart" >&2
+    exit 1
+  fi
+  sleep 5
+}
+
+status() {
+  docker inspect "$container" --format "$slug ($version) runs commit {{index .Config.Labels \"org.opencontainers.image.revision\"}}"
+  docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep "^$image:" || true
+}
+
+case "$arg" in
+  status)
+    status
+    ;;
+  off)
+    if docker image inspect "$image:alpha-backup-$version" >/dev/null 2>&1; then
+      docker tag "$image:alpha-backup-$version" "$image:$version"
+      docker image remove "$image:alpha-backup-$version" >/dev/null
+    else
+      docker pull -q "$image:$version"
+    fi
+    restart
+    status
+    ;;
+  *)
+    printf '%s' "$arg" | grep -Eqx 'pr-[0-9]+-[0-9a-f]{7}' || { echo "Not a PR image tag: $arg" >&2; exit 1; }
+    docker pull -q "$image:$arg"
+    docker image inspect "$image:alpha-backup-$version" >/dev/null 2>&1 || docker tag "$image:$version" "$image:alpha-backup-$version"
+    docker tag "$image:$arg" "$image:$version"
+    restart
+    status
+    ;;
+esac

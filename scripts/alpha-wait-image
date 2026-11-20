@@ -1,0 +1,20 @@
+#!/bin/sh
+# Waits (up to 20 minutes) for a PR image tag to appear on Docker Hub.
+#   alpha-wait-image pr-<number>-<sha7>
+set -eu
+
+tag=${1:?usage: alpha-wait-image pr-<number>-<sha7>}
+printf '%s' "$tag" | grep -Eqx 'pr-[0-9]+-[0-9a-f]{7}' || { echo "Not a PR image tag: $tag" >&2; exit 1; }
+image=espresense/espresense-companion
+
+i=0
+until curl -sf --max-time 10 "https://hub.docker.com/v2/repositories/$image/tags/$tag" >/dev/null; do
+  i=$((i + 1))
+  if [ "$i" -gt 80 ]; then
+    echo "timed out waiting for $image:$tag" >&2
+    exit 1
+  fi
+  echo "waiting for $image:$tag ($i/80)"
+  sleep 15
+done
+echo "$image:$tag is published"
