@@ -310,7 +310,7 @@ internal class OptimizationRunner : BackgroundService
         var (bestScore, bestCorr, bestRmse, _) = report.Baseline;
         if (double.IsNaN(_previousBestCorr) || double.IsNaN(_previousBestRmse) || Math.Abs(bestCorr - _previousBestCorr) > 0.001 || Math.Abs(bestRmse - _previousBestRmse) > 0.001)
         {
-            _logger.LogInformation("Baseline metrics: Composite={Composite:0.000} (R={R:0.000}, RMSE={RMSE:0.000})", bestScore, bestCorr, bestRmse);
+            _logger.LogInformation("Baseline metrics: Composite={Composite:0.000} (R={R:0.000}, RMSE={RMSE:0.000} m)", bestScore, bestCorr, bestRmse);
             _previousBestCorr = bestCorr;
             _previousBestRmse = bestRmse;
         }
@@ -327,7 +327,7 @@ internal class OptimizationRunner : BackgroundService
         var chosen = cycle.Selected;
         var chosenResults = cycle.SelectedResults;
         var chosenScore = report.Proposals.First(p => p.Decision == OptimizerGateDecision.Selected).Score;
-        _logger.LogInformation("Applying {Optimizer} (Composite={Composite:0.000}, R={R:0.000}, RMSE={RMSE:0.000})", chosen.Name, chosenScore.Composite, chosenScore.R, chosenScore.Rmse);
+        _logger.LogInformation("Applying {Optimizer} (Composite={Composite:0.000}, R={R:0.000}, RMSE={RMSE:0.000} m)", chosen.Name, chosenScore.Composite, chosenScore.R, chosenScore.Rmse);
         _state.OptimizerState.BestR = chosenScore.R;
         _state.OptimizerState.BestRMSE = chosenScore.Rmse;
 
@@ -348,7 +348,7 @@ internal class OptimizationRunner : BackgroundService
         }
 
         var applied = cycle.WithApplication(true,
-            $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenScore.R:0.000}, RMSE={chosenScore.Rmse:0.000}).");
+            $"Applied {chosen.Name} to {chosenResults.Nodes.Count} nodes (held-out R={chosenScore.R:0.000}, RMSE={chosenScore.Rmse:0.000} m).");
         LastCycle = applied;
         _state.OptimizerState.LastOutcome = applied.Report.Outcome;
     }
@@ -389,7 +389,7 @@ internal class OptimizationRunner : BackgroundService
                     p.Optimizer, samples, p.Gates.MinSamples.Required);
                 break;
             case OptimizerGateDecision.NotBetter:
-                _logger.LogInformation("Optimizer {Optimizer,-24} found worse results: Composite={Composite:0.000} <= Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
+                _logger.LogInformation("Optimizer {Optimizer,-24} found worse results: Composite={Composite:0.000} <= Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000} m)",
                     p.Optimizer, composite, bestScore, corr, rmse);
                 break;
             case OptimizerGateDecision.DeviceFrame:
@@ -401,7 +401,7 @@ internal class OptimizationRunner : BackgroundService
                     p.Optimizer, composite, bestScore, p.Gates.EverySnapshot!.LostOn, p.Gates.EverySnapshot.Of);
                 break;
             default:
-                _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000})",
+                _logger.LogInformation("Optimizer {Optimizer,-24} found better results: Composite={Composite:0.000} > Best={Best:0.000} (R={R:0.000}, RMSE={RMSE:0.000} m)",
                     p.Optimizer, composite, bestScore, corr, rmse);
                 break;
         }
