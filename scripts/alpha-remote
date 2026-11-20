@@ -13,14 +13,31 @@ set -eu
 arg=${1:?usage: alpha-remote <image tag>|off|status}
 image=espresense/espresense-companion
 
-container=$(docker ps --format '{{.Names}}' | grep -E "^(app|addon)_.*espresense-companion${ALPHA_ADDON:+.*$ALPHA_ADDON}" | head -n1)
-[ -n "$container" ] || { echo "No running ESPresense Companion add-on" >&2; exit 1; }
+# One swap at a time: two at once could save a PR image as the backup.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"${TMPDIR:-/tmp}/companion-alpha.lock"
+  flock 9
+fi
+
+# -a: a stopped add-on still has to be restorable with `off`.
+containers=$(docker ps -a --format '{{.Names}}' | grep -E "^(app|addon)_.*espresense-companion${ALPHA_ADDON:+.*$ALPHA_ADDON}" || true)
+[ -n "$containers" ] || { echo "No ESPresense Companion add-on on this host" >&2; exit 1; }
+if [ "$(printf '%s\n' "$containers" | wc -l)" -ne 1 ]; then
+  echo "More than one ESPresense Companion add-on here; set ALPHA_ADDON to pick one:" >&2
+  printf '%s\n' "$containers" >&2
+  exit 1
+fi
+container=$containers
 slug=${container#*_}
 version=$(docker inspect "$container" --format '{{.Config.Image}}')
 version=${version##*:}
 
 restart() {
-  ha apps restart "$slug" 2>&1 | grep -v 'is deprecated' || true
+  if ! out=$(ha apps restart "$slug" 2>&1); then
+    printf '%s\n' "$out" >&2
+    echo "The image tag is swapped but the add-on did not restart" >&2
+    exit 1
+  fi
   sleep 5
 }
 

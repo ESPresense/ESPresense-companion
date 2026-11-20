@@ -8,7 +8,7 @@ printf '%s' "$tag" | grep -Eqx 'pr-[0-9]+-[0-9a-f]{7}' || { echo "Not a PR image
 image=espresense/espresense-companion
 
 i=0
-until curl -sf "https://hub.docker.com/v2/repositories/$image/tags/$tag" >/dev/null; do
+until curl -sf --max-time 10 "https://hub.docker.com/v2/repositories/$image/tags/$tag" >/dev/null; do
   i=$((i + 1))
   if [ "$i" -gt 80 ]; then
     echo "timed out waiting for $image:$tag" >&2

@@ -4,6 +4,8 @@
 #
 # Install both on the host, then authorise the key with:
 #   command="/path/to/alpha-forced-command",restrict ssh-ed25519 AAAA... crow-companion-alpha
+# If the host has more than one Companion add-on, add environment="ALPHA_ADDON=beta" handling here
+# (export ALPHA_ADDON=...) so the key is tied to one of them; alpha-remote refuses to guess.
 set -eu
 
 arg=${SSH_ORIGINAL_COMMAND:-status}
