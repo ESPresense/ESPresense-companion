@@ -5,53 +5,23 @@
 #   ALPHA_HOST=<ssh host of the HA machine> scripts/alpha off           # back to the released image
 #   ALPHA_HOST=<ssh host of the HA machine> scripts/alpha status
 #
-# How: the Supervisor starts the add-on from the local image tagged with the add-on's version. This
-# pulls pr-<number>-<sha7> (built for every PR by docker.yml), tags it as that version, and restarts
-# the add-on. The released image is kept as alpha-backup-<version>. Nothing is published anywhere.
+# The work happens in scripts/alpha-remote, which this feeds to the host over ssh. Labelling a PR
+# `alpha` does the same thing from CI (.github/workflows/alpha.yml and .crow/alpha.yaml).
 #
-# It is a test rig, not a channel: the Supervisor still believes it runs the release, and the next
-# add-on update (or `off`) replaces the PR image. Needs ssh to the host with `docker` and `ha`
-# (the SSH add-on with protection mode off). ALPHA_ADDON picks the add-on when more than one is installed.
+# It is a test rig, not a channel: nothing is published, the Supervisor still believes it runs the
+# release, and the next add-on update (or `off`) replaces the PR image. Needs ssh to the host with
+# `docker` and `ha` (the SSH add-on with protection mode off). ALPHA_ADDON picks the add-on when
+# more than one is installed.
 set -euo pipefail
 
 host=${ALPHA_HOST:?set ALPHA_HOST to the ssh host of the Home Assistant machine}
 arg=${1:?usage: scripts/alpha <pr-number>|off|status}
-image=espresense/espresense-companion
+here=$(cd "$(dirname "$0")" && pwd)
 
-remote() { ssh -o BatchMode=yes "$host" "$@" 2>&1 | grep -v "is deprecated" || true; }
+if [[ "$arg" =~ ^[0-9]+$ ]]; then
+  sha=$(gh pr view "$arg" --json headRefOid --jq .headRefOid)
+  arg="pr-$arg-${sha::7}"
+  sh "$here/alpha-wait-image" "$arg"
+fi
 
-container=$(remote "docker ps --format '{{.Names}}'" | grep -E "^(app|addon)_.*espresense-companion${ALPHA_ADDON:+.*$ALPHA_ADDON}" | head -n1)
-[[ -n "$container" ]] || { echo "No running ESPresense Companion add-on on $host" >&2; exit 1; }
-slug=${container#*_}
-version=$(remote "docker inspect $container --format '{{.Config.Image}}'"); version=${version##*:}
-
-status() {
-  remote "docker inspect $container --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}'" \
-    | sed "s/^/$slug ($version) runs commit /"
-  remote "docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}'" | grep "^$image:" || true
-}
-
-case "$arg" in
-  status) status ;;
-  off)
-    remote "set -e
-      if docker image inspect $image:alpha-backup-$version >/dev/null 2>&1; then
-        docker tag $image:alpha-backup-$version $image:$version && docker rmi $image:alpha-backup-$version >/dev/null
-      else
-        docker pull -q $image:$version
-      fi
-      ha apps restart $slug"
-    status ;;
-  *)
-    [[ "$arg" =~ ^[0-9]+$ ]] || { echo "Not a PR number: $arg" >&2; exit 1; }
-    sha=$(gh pr view "$arg" --json headRefOid --jq .headRefOid)
-    tag="pr-$arg-${sha::7}"
-    curl -sf "https://hub.docker.com/v2/repositories/$image/tags/$tag" >/dev/null \
-      || { echo "$image:$tag is not published yet (is the PR's image build done?)" >&2; exit 1; }
-    remote "set -e
-      docker pull -q $image:$tag
-      docker image inspect $image:alpha-backup-$version >/dev/null 2>&1 || docker tag $image:$version $image:alpha-backup-$version
-      docker tag $image:$tag $image:$version
-      ha apps restart $slug"
-    status ;;
-esac
+ssh -o BatchMode=yes "$host" "ALPHA_ADDON='${ALPHA_ADDON:-}' sh -s -- '$arg'" < "$here/alpha-remote"

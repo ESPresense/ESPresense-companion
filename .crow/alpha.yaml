@@ -1,0 +1,34 @@
+# Alpha: run a PR's image on one Home Assistant install. .github/workflows/alpha.yml turns the
+# `alpha` label on a PR into a GitHub deployment (environment `alpha`, task = the image tag
+# pr-<number>-<sha7>); this runs on that deployment, waits for the image, then does over ssh what
+# scripts/alpha does by hand: tag the PR image as the version the installed add-on expects and
+# restart the add-on. Nothing is published.
+#
+# Crow secrets (never in the repo, they name the host): alpha_ssh_config with one `Host alpha`
+# entry that uses ~/.ssh/alpha as its key, alpha_ssh_key, alpha_known_hosts. Keep this repo's
+# Crow logs private.
+
+when:
+  - event: deployment
+    environment: alpha
+
+labels:
+  backend: docker
+  platform: linux/amd64
+
+steps:
+  - name: flip
+    image: alpine:3
+    environment:
+      ALPHA_SSH_CONFIG: { from_secret: alpha_ssh_config }
+      ALPHA_SSH_KEY: { from_secret: alpha_ssh_key }
+      ALPHA_KNOWN_HOSTS: { from_secret: alpha_known_hosts }
+    commands:
+      # $$ keeps Crow from substituting these before the secrets are in the environment.
+      - apk add -q --no-cache openssh-client curl
+      - mkdir -m 700 -p ~/.ssh
+      - printf '%s\n' "$${ALPHA_SSH_CONFIG}" > ~/.ssh/config
+      - printf '%s\n' "$${ALPHA_SSH_KEY}" > ~/.ssh/alpha && chmod 600 ~/.ssh/alpha
+      - printf '%s\n' "$${ALPHA_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+      - sh scripts/alpha-wait-image "$${CI_PIPELINE_DEPLOY_TASK}"
+      - ssh -o BatchMode=yes alpha sh -s -- "$${CI_PIPELINE_DEPLOY_TASK}" < scripts/alpha-remote

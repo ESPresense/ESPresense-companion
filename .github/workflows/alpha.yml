@@ -1,0 +1,35 @@
+# Alpha: a PR labelled `alpha` is put on one Home Assistant install when the label is added and
+# again on every push while the label stays. This only creates a GitHub deployment of the PR's
+# head commit to environment `alpha`, with the PR's image tag as the task; Crow receives the
+# deployment webhook and runs .crow/alpha.yaml, which does the swap (see scripts/alpha).
+# Removing the label stops further swaps; the install keeps what it last got until
+# `scripts/alpha off` or the next add-on update.
+name: Alpha
+
+on:
+  pull_request_target: # base-branch code; the PR's code is never checked out here
+    types: [labeled, synchronize, reopened]
+
+permissions:
+  deployments: write
+
+jobs:
+  deploy:
+    # Fork PRs never deploy: they get no image, and their head commit carries their own .crow/alpha.yaml.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      ((github.event.action == 'labeled' && github.event.label.name == 'alpha') ||
+       (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'alpha')))
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          jq -n --arg ref "$SHA" --arg task "pr-$PR-${SHA:0:7}" --arg desc "PR #$PR" \
+            '{ref: $ref, environment: "alpha", task: $task, description: $desc, auto_merge: false,
+              required_contexts: [], transient_environment: true, production_environment: false}' |
+            gh api "repos/$GH_REPO/deployments" --silent --input -
+          echo "PR #$PR ${SHA:0:7} -> alpha"
