@@ -53,7 +53,7 @@ public sealed record OptimizerGateSettings(
         o.EffectiveTrainingWindowMins, o.EffectiveSampleIntervalSecs, o.EffectiveOptimizationIntervalSecs);
 }
 
-/// <summary>Fit quality on the eval set: composite score, Pearson R and RMSE (dB) over <see cref="Samples"/> measures.</summary>
+/// <summary>Fit quality on the eval set: composite score, Pearson R of predicted against measured RSSI, and RMSE in metres of the distance each measure implies against its map distance, over <see cref="Samples"/> measures.</summary>
 public sealed record OptimizerScore(double Composite, double R, double Rmse, int Samples);
 
 /// <summary>

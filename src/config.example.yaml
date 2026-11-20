@@ -61,7 +61,8 @@ optimization:
   weights:
     # Weighting factor for Pearson Correlation in best scenario scoring (default: 0.5)
     correlation: 0.5
-    # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5)
+    # Weighting factor for normalized RMSE in best scenario scoring (default: 0.5).
+    # The RMSE is in metres: the distance each link's RSSI implies, against the distance on the map.
     rmse: 0.5
 
 
