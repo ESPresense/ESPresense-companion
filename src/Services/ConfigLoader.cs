@@ -110,6 +110,10 @@ public class ConfigLoader : BackgroundService
             if (string.IsNullOrWhiteSpace(text))
                 throw new InvalidDataException("config.yaml is empty (delete it to regenerate from the example)");
             config = FixIds(_deserializer.Deserialize<Config>(text));
+            // Unmatched keys are ignored so one typo cannot stop the config loading, but then they are silently
+            // without effect: say which, so a misspelt setting or one this version does not have is noticed.
+            foreach (var key in ConfigKeyCheck.UnknownKeys<Config>(text))
+                _logger.LogWarning("Unknown setting {Key} in {ConfigPath:l} is ignored: a typo, or a setting this version does not have", key, _configPath);
             // Assign/normalize room colors with adjacency-aware algorithm
             Utils.ColorAssigner.AssignRoomColors(config);
         }
