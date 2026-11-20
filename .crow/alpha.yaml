@@ -5,8 +5,9 @@
 # restart the add-on. Nothing is published.
 #
 # Crow secrets (never in the repo, they name the host): alpha_ssh_config with one `Host alpha`
-# entry that uses ~/.ssh/alpha as its key, alpha_ssh_key, alpha_known_hosts. Keep this repo's
-# Crow logs private.
+# entry that uses ~/.ssh/alpha as its key, alpha_ssh_key, alpha_known_hosts. On the host that key
+# is authorised with a forced command (scripts/alpha-forced-command), so it can do nothing else.
+# Keep this repo's Crow logs private.
 
 when:
   - event: deployment
@@ -31,4 +32,5 @@ steps:
       - printf '%s\n' "$${ALPHA_SSH_KEY}" > ~/.ssh/alpha && chmod 600 ~/.ssh/alpha
       - printf '%s\n' "$${ALPHA_KNOWN_HOSTS}" > ~/.ssh/known_hosts
       - sh scripts/alpha-wait-image "$${CI_PIPELINE_DEPLOY_TASK}"
-      - ssh -o BatchMode=yes alpha sh -s -- "$${CI_PIPELINE_DEPLOY_TASK}" < scripts/alpha-remote
+      # The key is bound on the host to scripts/alpha-forced-command, which accepts only an image tag, off or status.
+      - ssh -o BatchMode=yes alpha "$${CI_PIPELINE_DEPLOY_TASK}"
