@@ -19,7 +19,7 @@ public class KalmanFilterSettings
     /// <summary>
     /// Default settings matching KalmanLocation defaults
     /// </summary>
-    public static KalmanFilterSettings Default { get; } = new(0.01, 0.1, 0.5);
+    public static KalmanFilterSettings Default { get; } = new(0.01, 0.1, 1.5);
 
     /// <summary>
     /// Creates settings from config
