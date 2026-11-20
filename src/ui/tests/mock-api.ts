@@ -9,6 +9,10 @@ type MockApiOptions = {
 	releases?: Release[];
 	map?: { flipX?: boolean; flipY?: boolean };
 	history?: { enabled: boolean; expireAfter?: string; expireAfterTimeSpan?: string };
+	/** Replaces the demo floor plan. */
+	floors?: any[];
+	/** Replaces the demo devices. */
+	devices?: any[];
 };
 
 /**
@@ -77,13 +81,14 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 				]
 			}
 		],
+		...(options.floors ? { floors: options.floors } : {}),
 		devices: [],
 		gps: null,
 		map: { flipX: false, flipY: false, wallThickness: 1, wallOpacity: 0.35, wallColor: '#64748b', ...options.map },
 		history: { enabled: false, expireAfter: '24h', expireAfterTimeSpan: '1.00:00:00', ...options.history }
 	};
 
-	const demoDevices = [
+	const defaultDevices = [
 		{
 			id: 'dev-1',
 			name: 'Test Device',
@@ -99,6 +104,7 @@ export async function mockApi(page: Page, options: MockApiOptions = {}) {
 		}
 	];
 
+	const demoDevices = options.devices ?? defaultDevices;
 	const demoNodes = options.nodes ?? [];
 	const demoFirmwareTypes = options.firmwareTypes;
 	const demoReleases = options.releases;

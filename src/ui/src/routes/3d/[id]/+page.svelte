@@ -5,9 +5,8 @@
 	import FloorTabs from '#lib/FloorTabs.svelte';
 	import Map3D from '#lib/Map3D.svelte';
 	import Map3DControls from '#lib/Map3DControls.svelte';
-	import SlideToggle from '#lib/SlideToggle.svelte';
-	import type { DeviceHistory } from '#lib/types.js';
-	import { apiFetch } from '#lib/api.js';
+	import DeviceHistoryPanel from '#lib/DeviceHistoryPanel.svelte';
+	import type { HistoryView } from '#lib/history.js';
 
 	// --- Route Param ---
 	let deviceId = $derived(page.params.id ?? null); // Get device ID from URL
@@ -19,17 +18,9 @@
 	let floorId: string | null = $state(null);
 	let showNodes = $state(true);
 	let autoRotate = $state(false);
-	let showHistory = $state(false);
-	let historyDurationMinutes = $state(60);
-	let deviceHistoryData: DeviceHistory[] = $state([]);
 	let map: ReturnType<typeof Map3D> | undefined = $state.raw();
-
-	const historyOptions = [
-		{ minutes: 15, label: '15 min' },
-		{ minutes: 60, label: '1 hour' },
-		{ minutes: 360, label: '6 hours' },
-		{ minutes: 1440, label: '24 hours' }
-	];
+	// The same scrubber as the device page: its trail and the moment shown
+	let history = $state.raw<HistoryView | null>(null);
 
 	// Open on the device's own floor. Set once, so the floor tabs stay in charge afterwards.
 	let floorPinned = false;
@@ -43,30 +34,13 @@
 		floorId = initialFloorId;
 	});
 
-	// --- Data Fetching ---
-	async function fetchDeviceHistory() {
-		if (!deviceId || historyDurationMinutes <= 0) {
-			deviceHistoryData = []; // Clear data if no ID or invalid duration
-			return;
-		}
-
-		const endTime = new Date();
-		const startTime = new Date(endTime.getTime() - historyDurationMinutes * 60 * 1000);
-
-		try {
-			const data = await apiFetch<{ history: DeviceHistory[] }>(`/api/history/${encodeURIComponent(deviceId)}/range?start=${startTime.toISOString()}&end=${endTime.toISOString()}`);
-			deviceHistoryData = data.history || [];
-		} catch (error) {
-			console.error('Failed to fetch device history:', error);
-			deviceHistoryData = []; // Clear data on error
-		}
-	}
-
-	// Refetch history when relevant parameters change. One effect, not one per input:
-	// fetchDeviceHistory() reads both deviceId and historyDurationMinutes synchronously,
-	// so both are tracked here, and it already bails out on a missing id or duration.
+	// While scrubbing, follow the device from floor to floor as the 2D device page does. Only when the floor
+	// it was on changes, so the tabs still pick a floor in between.
+	let followedFloorId: string | null = null;
 	$effect(() => {
-		if (showHistory) fetchDeviceHistory();
+		const id = history && !history.live && history.current ? (history.floor?.id ?? null) : null;
+		if (id && id !== followedFloorId) floorId = id;
+		followedFloorId = id;
 	});
 </script>
 
@@ -74,31 +48,20 @@
 	<title>ESPresense Companion: 3D Map ({deviceId || 'Device'})</title>
 </svelte:head>
 
-<div class="w-full h-full relative">
+<div class="w-full h-full flex flex-col">
 	{#if $config && currentDevice && $nodes && floorId}
-		<FloorTabs bind:floorId />
-		<Map3DControls bind:showNodes bind:autoRotate hideDevicesToggle onview={(preset) => map?.frameView(preset)}>
-			<SlideToggle name="show-history" bind:checked={showHistory} size="sm">
-				<span>History</span>
-			</SlideToggle>
-			{#if showHistory}
-				<label class="flex items-center justify-between gap-2">
-					<span>Last</span>
-					<select class="select w-28 py-0.5" bind:value={historyDurationMinutes} aria-label="History duration">
-						{#each historyOptions as option (option.minutes)}
-							<option value={option.minutes}>{option.label}</option>
-						{/each}
-					</select>
-				</label>
-			{/if}
-		</Map3DControls>
-		<Map3D bind:this={map} devicesToShow={[currentDevice]} nodesToShow={$nodes} config={$config} {floorId} showAllFloors={$showAllFloors} historyData={showHistory ? deviceHistoryData : []} showHistoryPath={showHistory} {showNodes} bind:autoRotate />
+		<div class="relative min-h-0 flex-1">
+			<FloorTabs bind:floorId />
+			<Map3DControls bind:showNodes bind:autoRotate hideDevicesToggle onview={(preset) => map?.frameView(preset)} />
+			<Map3D bind:this={map} devicesToShow={[currentDevice]} nodesToShow={$nodes} config={$config} {floorId} showAllFloors={$showAllFloors} {history} {showNodes} bind:autoRotate />
+		</div>
+		<DeviceHistoryPanel deviceId={currentDevice.id} onview={(view) => (history = view)} />
 	{:else if !currentDevice && $devices}
-		<div class="absolute inset-0 flex items-center justify-center text-white">
+		<div class="flex flex-1 items-center justify-center text-white">
 			Device with ID '{deviceId}' not found.
 		</div>
 	{:else}
-		<div class="absolute inset-0 flex items-center justify-center text-white">Loading map and device data...</div>
+		<div class="flex flex-1 items-center justify-center text-white">Loading map and device data...</div>
 	{/if}
 </div>
 
