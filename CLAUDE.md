@@ -98,6 +98,9 @@ COMPANION_URL=http://<companion-host>:8267 DEV_ALLOWED_HOSTS=<this-machine's-hos
 
 Then open `http://<this-machine's-hostname>:44490/`. `DEV_ALLOWED_HOSTS` is only needed when the browser is on another machine. Only the UI comes from the branch; `/api` and `/ws` go to that companion, so read-only views are safe but any button that writes (node settings, calibration reset, restart) acts on the real system. Stop the dev server when done.
 
+### Alpha: run a PR's image on a Home Assistant install
+`ALPHA_HOST=<ssh host> scripts/alpha <pr-number>` pulls that PR's image (`pr-<number>-<sha7>`, built for every PR), tags it as the version the installed add-on expects, and restarts the add-on. `scripts/alpha off` puts the released image back; `scripts/alpha status` shows which commit is running. Nothing is published and the add-on repo is not involved: the Supervisor still thinks it runs the release, and the next add-on update replaces the PR image. It is for briefly testing one PR on real data, so switch back when done.
+
 ## Architecture Overview
 
 ### Backend Structure
