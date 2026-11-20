@@ -2,6 +2,8 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using ESPresense.Controllers;
+using ESPresense.Events;
+using ESPresense.Models;
 using ESPresense.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -20,7 +22,7 @@ public class StateWebSocketSessionTests
         var session = Create(fixture, events, CancellationToken.None);
         var run = session.RunAsync(socket, false, CancellationToken.None);
         Assert.That(await socket.Sent.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3)), Does.Contain("\"type\":\"time\""));
-        socket.Incoming.Writer.TryWrite(new WebSocketReceiveResult(0, WebSocketMessageType.Close, true));
+        socket.Incoming.Writer.TryWrite((new WebSocketReceiveResult(0, WebSocketMessageType.Close, true), []));
         await run.WaitAsync(TimeSpan.FromSeconds(3));
         events.OnDeviceRemoved("after-close");
         Assert.That(socket.Sent.Reader.TryRead(out _), Is.False);
@@ -58,7 +60,7 @@ public class StateWebSocketSessionTests
         var socket = new TestSocket();
         var run = Create(fixture, new GlobalEventDispatcher(), CancellationToken.None).RunAsync(socket, false, CancellationToken.None);
         for (var i = 0; i <= StateWebSocketSession.MaxCommandBytes / 4096; i++)
-            socket.Incoming.Writer.TryWrite(new WebSocketReceiveResult(4096, WebSocketMessageType.Text, false));
+            socket.Incoming.Writer.TryWrite((new WebSocketReceiveResult(4096, WebSocketMessageType.Text, false), new byte[4096]));
         await run.WaitAsync(TimeSpan.FromSeconds(3));
     }
 
@@ -72,6 +74,156 @@ public class StateWebSocketSessionTests
         await run.WaitAsync(TimeSpan.FromSeconds(3));
     }
 
+    [Test]
+    public async Task EventEnvelopesKeepTheirShape()
+    {
+        await using var fixture = await CalibrationFixture.CreateAsync();
+        var events = new GlobalEventDispatcher();
+        var socket = new TestSocket();
+        var run = Create(fixture, events, CancellationToken.None).RunAsync(socket, false, CancellationToken.None);
+        Assert.That(await Next(socket), Does.Match("^\\{\"type\":\"time\",\"data\":\\d+(\\.\\d+)?\\}$"));
+
+        events.OnDeviceRemoved("dev-1");
+        Assert.That(await Next(socket), Is.EqualTo("{\"type\":\"deviceRemoved\",\"deviceId\":\"dev-1\"}"));
+        events.OnDeviceChanged(Tracked("dev-2"), false);
+        var changed = await Next(socket);
+        Assert.That(changed, Does.StartWith("{\"type\":\"deviceChanged\",\"data\":{"));
+        Assert.That(changed, Does.Contain("\"id\":\"dev-2\""));
+        await Close(socket, run);
+    }
+
+    [Test]
+    public async Task UntrackedDevicesFollowShowAllFilter()
+    {
+        await using var fixture = await CalibrationFixture.CreateAsync();
+        var events = new GlobalEventDispatcher();
+        var socket = new TestSocket();
+        var run = Create(fixture, events, CancellationToken.None).RunAsync(socket, false, CancellationToken.None);
+        await Next(socket);
+
+        events.OnDeviceChanged(Untracked("hidden"), false);
+        events.OnDeviceChanged(Untracked("track-flip"), true);
+        Assert.That(await Next(socket), Does.Contain("\"id\":\"track-flip\""), "a track change is always sent");
+        await AssertNothingQueued(socket, events);
+
+        await Command(socket, "{\"command\":\"changeFilter\",\"type\":\"showAll\",\"value\":\"true\"}");
+        events.OnDeviceChanged(Untracked("shown"), false);
+        Assert.That(await Next(socket), Does.Contain("\"id\":\"shown\""));
+
+        await Command(socket, "{\"command\":\"changeFilter\",\"type\":\"showAll\",\"value\":\"false\"}");
+        events.OnDeviceChanged(Untracked("hidden-again"), false);
+        await AssertNothingQueued(socket, events);
+        await Close(socket, run);
+    }
+
+    [Test]
+    public async Task ShowAllQueryParameterSendsUntrackedDevices()
+    {
+        await using var fixture = await CalibrationFixture.CreateAsync();
+        var events = new GlobalEventDispatcher();
+        var socket = new TestSocket();
+        var run = Create(fixture, events, CancellationToken.None).RunAsync(socket, true, CancellationToken.None);
+        await Next(socket);
+        events.OnDeviceChanged(Untracked("untracked"), false);
+        Assert.That(await Next(socket), Does.Contain("\"id\":\"untracked\""));
+        await Close(socket, run);
+    }
+
+    [Test]
+    public async Task IncludeFilterSendsOneUntrackedDeviceUntilCleared()
+    {
+        await using var fixture = await CalibrationFixture.CreateAsync();
+        var events = new GlobalEventDispatcher();
+        var socket = new TestSocket();
+        var run = Create(fixture, events, CancellationToken.None).RunAsync(socket, false, CancellationToken.None);
+        await Next(socket);
+
+        await Command(socket, "{\"command\":\"changeFilter\",\"type\":\"include\",\"value\":\"Open-Device\"}");
+        events.OnDeviceChanged(Untracked("other"), false);
+        events.OnDeviceChanged(Untracked("open-device"), false);
+        Assert.That(await Next(socket), Does.Contain("\"id\":\"open-device\""), "include matches case-insensitively and skips others");
+
+        await Command(socket, "{\"command\":\"changeFilter\",\"type\":\"include\",\"value\":\"\"}");
+        events.OnDeviceChanged(Untracked("open-device"), false);
+        await AssertNothingQueued(socket, events);
+        await Close(socket, run);
+    }
+
+    [Test]
+    public async Task DeviceMessagesFollowSubscriptions()
+    {
+        await using var fixture = await CalibrationFixture.CreateAsync();
+        var events = new GlobalEventDispatcher();
+        var socket = new TestSocket();
+        var run = Create(fixture, events, CancellationToken.None).RunAsync(socket, false, CancellationToken.None);
+        await Next(socket);
+
+        events.OnDeviceMessageReceived(Message("dev-1"));
+        await AssertNothingQueued(socket, events);
+
+        await Command(socket, "{\"command\":\"subscribe\",\"type\":\"deviceMessage\",\"value\":\"dev-1\"}");
+        events.OnDeviceMessageReceived(Message("dev-2"));
+        events.OnDeviceMessageReceived(Message("dev-1"));
+        var message = await Next(socket);
+        Assert.That(message, Does.StartWith("{\"type\":\"deviceMessage\",\"deviceId\":\"dev-1\",\"nodeId\":\"node-1\",\"data\":{"));
+
+        await Command(socket, "{\"command\":\"unsubscribe\",\"type\":\"deviceMessage\",\"value\":\"dev-1\"}");
+        events.OnDeviceMessageReceived(Message("dev-1"));
+        await AssertNothingQueued(socket, events);
+        await Close(socket, run);
+    }
+
+    [TestCase("not json")]
+    [TestCase("{\"command\":")]
+    [TestCase("[1,2]")]
+    [TestCase("{\"command\":\"unknown\",\"type\":\"showAll\",\"value\":\"true\"}")]
+    public async Task MalformedOrUnknownCommandIsIgnored(string json)
+    {
+        await using var fixture = await CalibrationFixture.CreateAsync();
+        var events = new GlobalEventDispatcher();
+        var socket = new TestSocket();
+        var run = Create(fixture, events, CancellationToken.None).RunAsync(socket, false, CancellationToken.None);
+        await Next(socket);
+
+        await Command(socket, json);
+        Assert.That(run.IsCompleted, Is.False, "the session stays open");
+        events.OnDeviceChanged(Untracked("untracked"), false);
+        await AssertNothingQueued(socket, events);
+
+        await Command(socket, "{\"command\":\"changeFilter\",\"type\":\"showAll\",\"value\":\"true\"}");
+        events.OnDeviceChanged(Untracked("untracked"), false);
+        Assert.That(await Next(socket), Does.Contain("\"id\":\"untracked\""), "later commands still apply");
+        await Close(socket, run);
+    }
+
+    private static Device Untracked(string id) => new(id, null, TimeSpan.FromMinutes(5));
+    private static Device Tracked(string id) => new(id, null, TimeSpan.FromMinutes(5)) { Track = true };
+    private static DeviceMessageEventArgs Message(string deviceId) =>
+        new() { DeviceId = deviceId, NodeId = "node-1", Payload = new DeviceMessage { Distance = 1, Rssi = -60 } };
+
+    private static Task<string> Next(TestSocket socket) => socket.Sent.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+
+    /// <summary>Events are queued in order, so a marker arriving next proves nothing was queued before it.</summary>
+    private static async Task AssertNothingQueued(TestSocket socket, GlobalEventDispatcher events)
+    {
+        events.OnDeviceRemoved("marker");
+        Assert.That(await Next(socket), Does.Contain("\"deviceId\":\"marker\""));
+    }
+
+    /// <summary>Sends a text command and waits until the receive loop asks for the next frame, i.e. has applied it.</summary>
+    private static async Task Command(TestSocket socket, string json)
+    {
+        while (socket.Reads.Reader.TryRead(out _)) { }
+        socket.Incoming.Writer.TryWrite((new WebSocketReceiveResult(Encoding.UTF8.GetByteCount(json), WebSocketMessageType.Text, true), Encoding.UTF8.GetBytes(json)));
+        await socket.Reads.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
+    private static async Task Close(TestSocket socket, Task run)
+    {
+        socket.Incoming.Writer.TryWrite((new WebSocketReceiveResult(0, WebSocketMessageType.Close, true), []));
+        await run.WaitAsync(TimeSpan.FromSeconds(3));
+    }
+
     private static StateWebSocketSession Create(CalibrationFixture f, GlobalEventDispatcher events, CancellationToken stopping)
     {
         var lifetime = new Mock<IHostApplicationLifetime>();
@@ -81,7 +233,8 @@ public class StateWebSocketSessionTests
 
     private sealed class TestSocket : WebSocket
     {
-        public readonly Channel<WebSocketReceiveResult> Incoming = Channel.CreateUnbounded<WebSocketReceiveResult>();
+        public readonly Channel<(WebSocketReceiveResult Result, byte[] Data)> Incoming = Channel.CreateUnbounded<(WebSocketReceiveResult, byte[])>();
+        public readonly Channel<int> Reads = Channel.CreateUnbounded<int>();
         public readonly Channel<string> Sent = Channel.CreateUnbounded<string>();
         public bool BlockSends;
         public bool FailSends;
@@ -98,7 +251,9 @@ public class StateWebSocketSessionTests
         public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken token)
         {
             if (FailReceives) throw new WebSocketException("receive fault");
-            var result = await Incoming.Reader.ReadAsync(token);
+            Reads.Writer.TryWrite(0);
+            var (result, data) = await Incoming.Reader.ReadAsync(token);
+            data.CopyTo(buffer.Array!, buffer.Offset);
             if (result.MessageType == WebSocketMessageType.Close) _state = WebSocketState.CloseReceived;
             return result;
         }
