@@ -16,8 +16,10 @@ public sealed record LocatorDescriptor(string Name, bool Enabled, bool PerFloor,
 /// <summary>
 /// The single source of truth for which locators exist, which the config enables, and the scenarios a device gets.
 /// </summary>
-public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILoggerFactory loggers)
+public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILoggerFactory loggers, TimeProvider? time = null)
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+
     private readonly ILogger _logger = loggers.CreateLogger<ScenarioFactory>();
 
     // One logger per locator type, shared by every scenario built from it.
@@ -63,7 +65,7 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
         // An anchored device is where its anchor says; the locators don't run.
         if (device.IsAnchored && device.Anchor is { } anchor)
         {
-            yield return new Scenario(config, new AnchorLocator(anchor.Location, anchor.Floor, anchor.Room, state.Floors.Values), "Anchored")
+            yield return new Scenario(config, new AnchorLocator(anchor.Location, anchor.Floor, anchor.Room, state.Floors.Values), "Anchored", _time)
             {
                 Confidence = 100
             };
@@ -83,9 +85,9 @@ public sealed class ScenarioFactory(State state, NodeTelemetryStore nts, ILogger
         {
             if (locator.PerFloor)
                 foreach (var floor in state.GetFloorsByIds(locator.Floors))
-                    yield return new Scenario(config, locator.Create(device, floor, state), floor.Name);
+                    yield return new Scenario(config, locator.Create(device, floor, state), floor.Name, _time);
             else
-                yield return new Scenario(config, locator.Create(device, null, state), locator.Name);
+                yield return new Scenario(config, locator.Create(device, null, state), locator.Name, _time);
         }
     }
 }

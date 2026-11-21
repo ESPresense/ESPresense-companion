@@ -1,0 +1,52 @@
+# Ground truth for the #2220 room-flip regression fixture.
+#
+# The beacons are static, at surveyed coordinates, so the correct room is constant for the
+# whole trace and is known without consulting the allocator. That is what makes this a usable
+# fixture at all - see ESPA-570's qualification write-up.
+
+# Replay parameters. The logged `distance` field is reproducible but wrong in absolute terms:
+# the tags advertise an rssi@1m that is ~13-18 dB off, so distance taken at face value puts
+# every beacon off the map. The replay therefore recomputes
+#
+#     distance = 10 ^ ((rssi@1m + tx_offset_db - rssi) / (10 * absorption))
+#
+# absorption: 3.0 - measured from the corpus itself. Across 60,190 samples the logged distance
+#   satisfies the identity above with a = 3.02 (p1 2.98, p99 3.22); the nodes were running ~3.0,
+#   not the 2.7 default.
+# tx_offset_db: a fitted fixture parameter, NOT a captured value. The per-node converged
+#   calibration in effect at capture time was never captured, so the replay is not
+#   bit-reproducible. Fitting position in the dB domain with a free tx offset puts Green at
+#   (2.83, 0.60, 5.02) with 2.76 dB RMS - ground_floor / Kitchen, the surveyed room.
+#   Setting this to 0 reproduces the logged distances exactly, and the device lands off-map.
+replay:
+  absorption: 3.0
+  tx_offset_db: -13.2
+
+# Known-unknowns, recorded so nobody mistakes this fixture for more than it is.
+calibration: unknown      # nodes ran absorption ~3.0; per-node optimizer state not captured
+survey_frame: unverified  # as-quoted XY disagrees with the RSSI geometry; the room label does not
+
+beacons:
+  "iBeacon:fda50693-a4e2-4fb1-afcf-c6eb07647825-10011-19641":
+    label: Green Mint
+    expected_room: Kitchen            # ground_floor; constant for the whole trace
+    surveyed_point: [0.2, 3.7, 4.5]   # reference only - NOT an assertion target
+    z_margin_to_nearest_boundary: 1.09
+
+events:
+  # Canonical. Self-contained in one log: 580 s of pre-roll, the longest event in the corpus
+  # (116 s), and nearly 50 min of post-margin. Densest station coverage, tightest stability.
+  - file: green-2026-05-27T11.replay.jsonl
+    beacon: "iBeacon:fda50693-a4e2-4fb1-afcf-c6eb07647825-10011-19641"
+    canonical: true
+    window_start: "2026-05-27T11:09:35"
+    window_end: "2026-05-27T11:11:42"
+    min_samples_in_window: 20   # 4 stations clear this on this event
+  # Secondary. Same beacon, different day, and a 14 s transient rather than a sustained flip -
+  # so a fix that special-cases one trace, or only handles long events, still fails here.
+  - file: green-2026-05-26T14.replay.jsonl
+    beacon: "iBeacon:fda50693-a4e2-4fb1-afcf-c6eb07647825-10011-19641"
+    canonical: false
+    window_start: "2026-05-26T14:01:40"
+    window_end: "2026-05-26T14:02:05"
+    min_samples_in_window: 8    # 25 s window; fewer samples clear a per-station bar

@@ -1,4 +1,5 @@
 using ESPresense.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 using ESPresense.Services;
 using Moq;
 
@@ -23,14 +24,14 @@ internal sealed class YamlStateFixture : IAsyncDisposable
         State = state;
     }
 
-    public static async Task<YamlStateFixture> LoadAsync(string yaml)
+    public static async Task<YamlStateFixture> LoadAsync(string yaml, TimeProvider? time = null)
     {
         var dir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "cfg", Guid.NewGuid().ToString());
         Directory.CreateDirectory(dir);
         await File.WriteAllTextAsync(Path.Combine(dir, "config.yaml"), yaml);
         var loader = new ConfigLoader(dir);
         var nts = new NodeTelemetryStore(new Mock<IMqttCoordinator>().Object);
-        var state = new State(loader, nts);
+        var state = new State(loader, nts, NullLoggerFactory.Instance, time);
         await loader.LoadAsync();
         Assert.That(state.Config, Is.Not.Null, "config never loaded");
         return new YamlStateFixture(dir, loader, nts, state);

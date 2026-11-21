@@ -13,6 +13,15 @@ public class KalmanLocation
     private DateTime? _lastLocationUpdate;
 
     /// <summary>
+    /// Clock for the filter's dt. Settable because dt is load-bearing, not cosmetic: the update
+    /// clamps a step to <c>MaxVelocity * dt</c>, so replaying a captured trace faster than real
+    /// time freezes the filter at its first fix. An offline replay sets this to the trace clock.
+    /// </summary>
+    public TimeProvider Time { get; set; } = TimeProvider.System;
+
+    private DateTime UtcNow => Time.GetUtcNow().UtcDateTime;
+
+    /// <summary>
     /// Settings for the Kalman filter (shared across devices)
     /// </summary>
     public KalmanFilterSettings Settings { get; set; }
@@ -38,7 +47,7 @@ public class KalmanLocation
         }
 
         // Calculate time delta
-        var now = DateTime.UtcNow;
+        var now = UtcNow;
         var settings = Settings;
         var dt = _lastLocationUpdate.HasValue
             ? (now - _lastLocationUpdate.Value).TotalSeconds
@@ -83,7 +92,7 @@ public class KalmanLocation
     /// <returns>The filtered location after applying the update</returns>
     public Point3D Update(Point3D newLocation)
     {
-        return Update(newLocation, DateTime.UtcNow);
+        return Update(newLocation, UtcNow);
     }
 
     /// <summary>
@@ -230,7 +239,7 @@ public class KalmanLocation
         _kalmanErrorCovariance = Matrix<double>.Build.DenseDiagonal(6, 6, 1.0);
 
         // Store initial update time
-        _lastLocationUpdate = DateTime.UtcNow;
+        _lastLocationUpdate = UtcNow;
     }
 
     private Matrix<double> CreateStateTransitionMatrix(double dt)

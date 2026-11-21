@@ -1,0 +1,228 @@
+# Geometry for the #2220 room-flip regression fixture.
+#
+# Verbatim from the reporter's redacted config.yaml on
+# https://github.com/ESPresense/ESPresense/issues/2220 (attachment 25887337, 2026-03-11,
+# sha256 4607e453c78e25c2...) - the `map`, `timeout`, `floors` and `nodes` blocks, unaltered.
+# Note every node lists all three floors: that is the as-captured state and it is the
+# condition the flip needs. Do not "tidy" it.
+#
+# Deliberately NOT carried over: mqtt / gps (redacted upstream), optimization, history,
+# devices, exclude_devices, and `locators`. The locators block is supplied per test arm
+# (see RoomFlip2220Tests) so the as-captured and multi_floor arms differ in exactly one thing.
+
+map:
+  flip_x: false        # Set to true to flip X coordinates (default: false)
+  flip_y: true         # Set to true to use bottom-left origin, false for top-left origin (default: true)
+  wall_thickness: 0.17 # Wall thickness in meters
+  wall_color: "#ddd"   # Optional wall color, if not set uses room color
+  wall_opacity: 0.35   # Optional wall opacity, if not set defaults to 0.35
+
+# How long before device considered stale
+timeout: 30
+# How long before device is considered away
+
+floors:
+  - id: lower_ground_floor
+    name: Lower Ground Floor
+    # Bounds (x,y,z) of map in meters
+    bounds: [[0, 0, 0], [10.06, 5.44, 3.41]]
+    rooms:
+      - name: Dining Room
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [0.0, 0.0]
+          - [0.0, 5.44]
+          - [4.2, 5.44]
+          - [4.2, 0.0]
+          - [0.0, 0.0]
+      - name: Shower Room
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [4.2, 0.0]
+          - [4.2, 1.47]
+          - [5.16, 1.47]
+          - [5.16, 2.91]
+          - [6.72, 2.91]
+          - [6.72, 0.0]
+          - [4.2, 0.0]
+      - name: Lower Ground Floor Hallway
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [4.2, 1.47]
+          - [4.2, 5.44]
+          - [6.72, 5.44]
+          - [6.72, 5.44]
+          - [6.72, 2.91]
+          - [5.16, 2.91]
+          - [5.16, 1.47]
+          - [4.2, 1.47]
+      - name: Bedroom Two
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [6.72, 0.0]
+          - [6.72, 5.14]
+          - [10.06, 5.14]
+          - [10.06, 0.0]
+          - [6.72, 0.0]
+  - id: ground_floor
+    name: Ground Floor
+    # Bounds (x,y,z) of map in meters
+    bounds: [[0, 0, 3.41], [10.06, 5.44, 6.83]]
+    rooms:
+      - name: Kitchen
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [0.0, 0.0]
+          - [0.0, 5.44]
+          - [4.18, 5.44]
+          - [4.18, 4.39]
+          - [4.29, 4.39]
+          - [4.29, 0.0]
+          - [0.0, 0.0]
+      - name: Ground Floor Hallway
+        points:
+          - [4.29, 0.0]
+          - [4.29, 4.39]
+          - [4.18, 4.39]
+          - [4.18, 5.44]
+          - [5.61, 5.44]
+          - [5.61, 4.39]
+          - [5.5, 4.39]
+          - [5.5, 0.0]
+          - [4.29, 0.0]
+      - name: Sitting Room
+        points:
+          - [5.5, 0.0]
+          - [5.5, 4.39]
+          - [5.61, 4.39]
+          - [5.61, 5.44]
+          - [10.06, 5.44]
+          - [10.06, 0.0]
+          - [5.5, 0.0]
+  - id: first_floor
+    name: First Floor
+    # Bounds (x,y,z) of map in meters
+    bounds: [[0, 0, 6.83], [10.06, 5.44, 9.22]]
+    rooms:
+      - name: Bathroom
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [0.0, 0.0]
+          - [0.0, 2.25]
+          - [3.44, 2.25]
+          - [3.44, 0.0]
+          - [0.0, 0.0]
+      - name: Bedroom Three
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [0.0, 2.25]
+          - [0.0, 5.44]
+          - [3.44, 5.44]
+          - [3.44, 2.25]
+          - [0.3, 2.25]
+      - name: Upstairs Landing
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [3.44, 0.0]
+          - [3.44, 2.94]
+          - [4.54, 2.94]
+          - [4.54, 3.46]
+          - [5.5, 3.46]
+          - [5.5, 0.0]
+          - [3.44, 0.0]
+      - name: Library
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [3.44, 2.94]
+          - [3.44, 5.44]
+          - [5.5, 5.44]
+          - [5.5, 3.46]
+          - [4.54, 3.46]
+          - [4.54, 2.94]
+          - [3.44, 2.94]
+      - name: Bedroom One
+        # Optional room color in hex; if omitted, server assigns a deterministic color
+        # color: "#1F77B4"
+        points:
+          - [5.5, 0.0]
+          - [5.5, 5.44]
+          - [10.06, 5.44]
+          - [10.06, 0.0]
+          - [5.5, 0.0]
+
+# Locations of espresense nodes in meters
+nodes:
+  - name: diningroom1
+    point: [0.51, 0.2, 1.1]
+    floors: ["lower_ground_floor", "ground_floor", "first_floor"]
+  - name: diningroom2
+    point: [0.65, 5.2, 0.62]
+    floors: ["lower_ground_floor", "ground_floor", "first_floor"]
+  - name: diningroom4
+    point: [3.67, 0.2, 0.2]
+    floors: ["lower_ground_floor", "ground_floor", "first_floor"]
+  - name: lowerground1
+    point: [6.52, 3.86, 0.32]
+    floors: ["lower_ground_floor", "ground_floor", "first_floor"]
+  - name: bedroomtwo1
+    point: [9.86, 4.88, 0.3]
+    floors: ["lower_ground_floor", "ground_floor", "first_floor"]
+  - name: bedroomtwo2
+    point: [9.24, 0.2, 0.3]
+    floors: ["lower_ground_floor", "ground_floor", "first_floor"]
+  - name: bedroomtwo3
+    point: [6.98, 0.2, 1.37]
+    floors: ["lower_ground_floor", "ground_floor", "first_floor"]
+  - name: kitchen1
+    point: [0.3, 0.2, 4.56]
+    floors: ["ground_floor", "lower_ground_floor", "first_floor"]
+  - name: kitchen2
+    point: [0.36, 5.16, 4.55]
+    floors: ["ground_floor", "first_floor", "lower_ground_floor"]
+  - name: kitchen3
+    point: [3.32, 0.2, 4.52]
+    floors: ["ground_floor", "lower_ground_floor", "first_floor"]
+  - name: sittingroom2
+    point: [5.62, 4.19, 4.18]
+    floors: ["ground_floor", "first_floor", "lower_ground_floor"]
+  - name: sittingroom3
+    point: [9.89, 5.27, 4.59]
+    floors: ["ground_floor", "lower_ground_floor", "first_floor"]
+  - name: sittingroom4
+    point: [9.59, 0.17, 4.61]
+    floors: ["ground_floor", "first_floor", "lower_ground_floor"]
+  - name: bathroom1
+    point: [0.2, 0.2, 9.05]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+  - name: bathroom2
+    point: [3.3, 0.2, 9.05]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+  - name: bedroomthree1
+    point: [3.34, 2.35, 8.95]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+  - name: bedroomthree2
+    point: [0.2, 5.2, 9.05]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+  - name: bedroomone1
+    point: [5.65, 1.2, 7.6]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+  - name: bedroomone2
+    point: [5.65, 5.2, 9.05]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+  - name: bedroomone3
+    point: [9.81, 5.2, 9.05]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+  - name: bedroomone4
+    point: [9.81, 0.2, 9.05]
+    floors: ["first_floor", "ground_floor", "lower_ground_floor"]
+
+# Devices to track
