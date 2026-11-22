@@ -32,8 +32,10 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         if (heard.Length <= 1)
         {
             scenario.Confidence = 0;
-            scenario.Room = null;
             scenario.Error = null;
+            // Room is left as it was, as MultiFloor leaves it: clearing it only moves the device from its
+            // room to its floor, and with every scenario degenerate the last known room is the best answer
+            // there is. Confidence 0 keeps it off the map and loses to any scenario that does have a fix.
             scenario.Trace = LocatorTrace.NoFix(floor, heard);
             return false;
         }

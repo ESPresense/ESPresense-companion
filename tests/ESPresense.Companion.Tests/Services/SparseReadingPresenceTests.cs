@@ -18,8 +18,14 @@ namespace ESPresense.Companion.Tests.Services;
 /// </summary>
 public class SparseReadingPresenceTests
 {
-    // timeout: 1 so one real second of staleness expires a reading, and the scenario with it.
-    private const string Yaml = """
+    private const string DeviceId = "iBeacon:sparse";
+
+    /// <summary>
+    /// One floor, one room covering it, three nodes. <paramref name="locator"/> is the only one enabled,
+    /// so nothing else covers the sparse case. timeout: 1 so one real second of staleness expires a
+    /// reading, and the scenario with it.
+    /// </summary>
+    private static string Yaml(string locator) => $"""
         timeout: 1
         floors:
           - id: first
@@ -30,15 +36,12 @@ public class SparseReadingPresenceTests
                 points: [[0, 0], [10, 0], [10, 10], [0, 10]]
         nodes:
           - id: node1
-            name: Node 1
             point: [1, 1, 1]
             floors: ["first"]
           - id: node2
-            name: Node 2
             point: [9, 1, 1]
             floors: ["first"]
           - id: node3
-            name: Node 3
             point: [5, 9, 1]
             floors: ["first"]
         locators:
@@ -49,101 +52,123 @@ public class SparseReadingPresenceTests
           mle:
             enabled: false
           multi_floor:
-            enabled: true
+            enabled: {locator == "multi_floor"}
           nadaraya_watson:
-            enabled: false
+            enabled: {locator == "nadaraya_watson"}
           nearest_node:
             enabled: false
         """;
 
-    private const string DeviceId = "iBeacon:sparse";
-
-    [Test]
-    public async Task MultiFloorOnly_DeviceHeardByOneNode_KeepsItsRoomInsteadOfGoingNotHome()
+    [TestCase("multi_floor")]
+    [TestCase("nadaraya_watson")]
+    public async Task OneLocator_DeviceHeardByOneNode_KeepsItsRoomInsteadOfGoingNotHome(string locator)
     {
-        await using var fx = await YamlStateFixture.LoadAsync(Yaml);
+        await using var h = await Harness.StartAsync(locator);
 
-        var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
-        var mqtt = new Mock<MqttCoordinator>(fx.Loader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), supervisor);
-        var states = new List<string?>();
-        mqtt.Setup(m => m.TryEnqueueAsync(MqttTopics.CompanionDeviceState(DeviceId), It.IsAny<string?>(), true))
-            .Callback((string _, string? payload, bool _) => states.Add(payload))
-            .ReturnsAsync(true);
-        mqtt.Setup(m => m.TryEnqueueAsync(MqttTopics.DeviceAttributes(DeviceId), It.IsAny<string?>(), true))
-            .ReturnsAsync(true);
-        mqtt.Setup(m => m.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
+        // Three nodes hear it from the middle of the Living Room, so the locator has a fix.
+        await h.HeardByAllThree();
+        Assert.That(h.Device.Scenarios, Has.Count.EqualTo(1), $"only {locator} is enabled");
 
-        var tele = new TelemetryService(mqtt.Object);
-        var tracker = new DeviceTracker(fx.State, mqtt.Object, tele, new GlobalEventDispatcher(),
-            new DeviceSettingsStore(mqtt.Object, fx.State));
-        var publisher = new DeviceStatePublisher(mqtt.Object);
-        var locator = new MultiScenarioLocator(tracker, fx.State, publisher, Mock.Of<IDeviceHistoryWriter>(),
-            new GlobalEventDispatcher(), Mock.Of<ILeaseService>(), NullLogger<MultiScenarioLocator>.Instance);
-
-        // Three nodes hear it from the middle of the Living Room, so MultiFloor has a fix.
-        await Heard(tracker, "node1", 5.66);
-        await Heard(tracker, "node2", 5.66);
-        await Heard(tracker, "node3", 4.0);
-
-        var device = fx.State.Devices[DeviceId];
-        Assert.That(device.Scenarios.Select(s => s.Name), Is.EqualTo(new[] { "MultiFloor" }), "only multi_floor is enabled");
-
-        await locator.ProcessDevice(device);
-        Assert.That(states, Is.EqualTo(new[] { "Living Room" }), "a three-node fix puts it in the Living Room");
+        await h.Locate();
+        Assert.That(h.States, Is.EqualTo(new[] { "Living Room" }), "a three-node fix puts it in the Living Room");
 
         // Two nodes stop reporting. One real second later their readings are stale and the previous
         // solve is older than timeout, which is the point the scenario used to expire.
         await Task.Delay(1200);
-        await Heard(tracker, "node1", 5.66);
-        Assert.That(device.CurrentReadings(), Has.Length.EqualTo(1), "only node1 is still current");
+        await h.Heard("node1", 5.66);
+        Assert.That(h.Device.CurrentReadings(), Has.Length.EqualTo(1), "only node1 is still current");
 
-        await locator.ProcessDevice(device);
+        await h.Locate();
 
-        Assert.That(states, Does.Not.Contain(DeviceReport.NotHome), "a node is still hearing it");
-        Assert.That(publisher.Reported(device).State, Is.EqualTo("Living Room"));
-        Assert.That(device.BestScenario, Is.Not.Null, "the scenario is still Current");
-        Assert.That(device.Confidence, Is.Zero, "one node is not a fix, so the map still hides it");
-        Assert.That(device.Room?.Name, Is.EqualTo("Living Room"), "the last known room is better than none");
+        Assert.That(h.States, Does.Not.Contain(DeviceReport.NotHome), "a node is still hearing it");
+        Assert.That(h.Reported, Is.EqualTo("Living Room"), "the last known room is better than none");
+        Assert.That(h.Device.BestScenario, Is.Not.Null, "the scenario is still Current");
+        Assert.That(h.Device.Confidence, Is.Zero, "one node is not a fix, so the map still hides it");
+        Assert.That(h.Device.Room?.Name, Is.EqualTo("Living Room"));
     }
 
-    [Test]
-    public async Task MultiFloorOnly_NothingHearsTheDevice_StillGoesNotHome()
+    [TestCase("multi_floor")]
+    [TestCase("nadaraya_watson")]
+    public async Task OneLocator_NothingHearsTheDevice_StillGoesNotHome(string locator)
     {
-        await using var fx = await YamlStateFixture.LoadAsync(Yaml);
+        await using var h = await Harness.StartAsync(locator);
 
-        var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
-        var mqtt = new Mock<MqttCoordinator>(fx.Loader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), supervisor);
-        mqtt.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
-        mqtt.Setup(m => m.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
-
-        var tele = new TelemetryService(mqtt.Object);
-        var tracker = new DeviceTracker(fx.State, mqtt.Object, tele, new GlobalEventDispatcher(),
-            new DeviceSettingsStore(mqtt.Object, fx.State));
-        var publisher = new DeviceStatePublisher(mqtt.Object);
-        var locator = new MultiScenarioLocator(tracker, fx.State, publisher, Mock.Of<IDeviceHistoryWriter>(),
-            new GlobalEventDispatcher(), Mock.Of<ILeaseService>(), NullLogger<MultiScenarioLocator>.Instance);
-
-        await Heard(tracker, "node1", 5.66);
-        await Heard(tracker, "node2", 5.66);
-        await Heard(tracker, "node3", 4.0);
-
-        var device = fx.State.Devices[DeviceId];
-        await locator.ProcessDevice(device);
-        Assert.That(publisher.Reported(device).State, Is.EqualTo("Living Room"));
+        await h.HeardByAllThree();
+        await h.Locate();
+        Assert.That(h.Reported, Is.EqualTo("Living Room"));
 
         // Nothing reports it again: every reading goes stale and the device really has left.
         await Task.Delay(1200);
-        await locator.ProcessDevice(device);
+        await h.Locate();
 
-        Assert.That(publisher.Reported(device).State, Is.EqualTo(DeviceReport.NotHome));
-        Assert.That(device.BestScenario, Is.Null);
+        Assert.That(h.Reported, Is.EqualTo(DeviceReport.NotHome));
+        Assert.That(h.Device.BestScenario, Is.Null);
     }
 
-    private static Task Heard(DeviceTracker tracker, string nodeId, double distance) =>
-        tracker.OnDeviceMessageReceivedAsync(new DeviceMessageEventArgs
+    /// <summary>The real tracker, fusion and publisher over a config, with the state topic recorded.</summary>
+    private sealed class Harness : IAsyncDisposable
+    {
+        private readonly YamlStateFixture _fx;
+        private readonly DeviceTracker _tracker;
+        private readonly DeviceStatePublisher _publisher;
+        private readonly MultiScenarioLocator _locator;
+
+        /// <summary>Every state topic payload published for the device, in order.</summary>
+        public List<string?> States { get; } = new();
+
+        private Harness(YamlStateFixture fx, DeviceTracker tracker, DeviceStatePublisher publisher, MultiScenarioLocator locator)
         {
-            NodeId = nodeId,
-            DeviceId = DeviceId,
-            Payload = new DeviceMessage { Rssi = -65, RefRssi = -59, Distance = distance }
-        });
+            _fx = fx;
+            _tracker = tracker;
+            _publisher = publisher;
+            _locator = locator;
+        }
+
+        public static async Task<Harness> StartAsync(string locator)
+        {
+            var fx = await YamlStateFixture.LoadAsync(Yaml(locator));
+            var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
+            var mqtt = new Mock<MqttCoordinator>(fx.Loader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), supervisor);
+            var tracker = new DeviceTracker(fx.State, mqtt.Object, new TelemetryService(mqtt.Object), new GlobalEventDispatcher(),
+                new DeviceSettingsStore(mqtt.Object, fx.State));
+            var publisher = new DeviceStatePublisher(mqtt.Object);
+            var h = new Harness(fx, tracker, publisher,
+                new MultiScenarioLocator(tracker, fx.State, publisher, Mock.Of<IDeviceHistoryWriter>(),
+                    new GlobalEventDispatcher(), Mock.Of<ILeaseService>(), NullLogger<MultiScenarioLocator>.Instance));
+
+            mqtt.Setup(m => m.TryEnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).ReturnsAsync(true);
+            // After the catch-all, so this one wins for the state topic.
+            mqtt.Setup(m => m.TryEnqueueAsync(MqttTopics.CompanionDeviceState(DeviceId), It.IsAny<string?>(), true))
+                .Callback((string _, string? payload, bool _) => h.States.Add(payload))
+                .ReturnsAsync(true);
+            mqtt.Setup(m => m.EnqueueAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
+
+            return h;
+        }
+
+        public Device Device => _fx.State.Devices[DeviceId];
+
+        /// <summary>The last state topic payload the publisher recorded as accepted.</summary>
+        public string? Reported => _publisher.Reported(Device).State;
+
+        public Task Locate() => _locator.ProcessDevice(Device);
+
+        /// <summary>Distances from the three nodes to the middle of the room.</summary>
+        public async Task HeardByAllThree()
+        {
+            await Heard("node1", 5.66);
+            await Heard("node2", 5.66);
+            await Heard("node3", 4.0);
+        }
+
+        public Task Heard(string nodeId, double distance) =>
+            _tracker.OnDeviceMessageReceivedAsync(new DeviceMessageEventArgs
+            {
+                NodeId = nodeId,
+                DeviceId = DeviceId,
+                Payload = new DeviceMessage { Rssi = -65, RefRssi = -59, Distance = distance }
+            });
+
+        public ValueTask DisposeAsync() => _fx.DisposeAsync();
+    }
 }
