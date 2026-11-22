@@ -12,8 +12,10 @@ namespace ESPresense.Companion.Tests.Locators;
 ///   * AsCaptured   - per-floor Nadaraya-Watson on all three floors, which is what the reporter
 ///                    was running. Every node is listed on every floor, so each floor's scenario
 ///                    sees the same stations and they score alike; that is the flip mechanism.
-///   * MultiFloor   - one 3D solve with the floor taken from the containing room, which is the
-///                    fix that shipped in companion v2.6.3.
+///   * MultiFloor   - one 3D solve with the floor taken from the containing room, which is what
+///                    shipped in companion v2.6.3. It passes on these two traces; the reporter's
+///                    own 2026-11-21 field test says it does not fully resolve his system, so read
+///                    this arm as a lock on covered behaviour, not as proof the bug is closed.
 ///
 /// Fixture provenance, and what this data can and cannot prove: TestData/room-flip-2220/README.md.
 /// Per-log qualification: ESPA-570.

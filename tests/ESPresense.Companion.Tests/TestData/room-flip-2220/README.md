@@ -29,7 +29,7 @@ Both fixtures, deterministic across repeated runs:
 | Arm | `locators` | Room reported | Verdict |
 |---|---|---|---|
 | as-captured | `nadaraya_watson` per-floor × 3 floors | **Dining Room** (Lower Ground Floor), constant | wrong floor entirely |
-| shipped fix | `multi_floor` | **Kitchen** (Ground Floor), constant | matches the survey |
+| v2.6.3 `multi_floor` | `multi_floor` | **Kitchen** (Ground Floor), constant | matches the survey |
 
 So the fixture discriminates: the config the reporter was running puts a static beacon on the
 wrong floor, and `multi_floor` puts it in the surveyed room. That difference is the regression
@@ -40,6 +40,19 @@ Note what the discrimination is *not*: "flips within the window" versus "does no
 "constantly wrong" versus "constantly right". See below for why the corpus cannot show the flip
 itself. The as-captured arm is therefore recorded, not asserted — asserting that it stays wrong
 would lock in the broken behaviour and fail the day someone fixes the per-floor path.
+
+Do not read the passing `multi_floor` arm as "#2220 is fixed". On 2026-11-21 the reporter
+field-tested v2.6.3 and said `multi_floor` alone is *"by far the best"* but *"does not completely
+resolve the problem"*: beacons hung in one place still resolve floor-only or to the wrong room, and
+he attributes it to *"my nodes still span multi-floors"*. This fixture pins the behaviour these two
+traces cover; it does not certify the bug closed. Two specific limits that follow:
+
+- The `multi_floor` arm here also has `nearest_node` enabled, which the reporter reports as a
+  combination that reintroduces flipping on his system. It passes on these traces, so this corpus
+  does not exercise that interaction.
+- Both traces are the same beacon on a config where every node spans all three floors, and it still
+  lands in the right room under `multi_floor`. His residual cases do not. Whatever distinguishes
+  them is not in this corpus — the newer config he attached on 2026-11-21 is the lead.
 
 ## What it can and cannot prove
 
