@@ -50,9 +50,18 @@ public class MultiFloorMultilateralizer : ILocate
         });
         var pos = nodes.Select(a => a.Node!.Location).ToList();
 
-        // One node gives a distance but no position; NearestNode owns that case and enforces max_distance
+        // One node gives a distance but no position, so there is no fix and the map hides the device. The
+        // scenario still has to stay Current, the way BaseMultilateralizer.InitializeScenario keeps it:
+        // ScenarioFusion only picks BestScenario from Current scenarios, and a null BestScenario publishes
+        // not_home. With multi_floor as the only enabled locator this is the only scenario, so letting it
+        // expire reports a device as away while a node is still hearing it. Room, Floor and Location stay
+        // as they were, and with nothing hearing the device nodes is empty, so LastHit goes null and it
+        // expires for real.
         if (pos.Count <= 1)
         {
+            scenario.Minimum = nodes.Min(a => (double?)a.Distance);
+            scenario.LastHit = nodes.Max(a => a.LastHit);
+            scenario.Fixes = pos.Count;
             scenario.Scale = 1;
             confidence = 0;
         }
