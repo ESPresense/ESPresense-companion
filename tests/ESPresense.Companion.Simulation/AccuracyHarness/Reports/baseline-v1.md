@@ -22,6 +22,108 @@ Single-station-outage (drop each, solve on remaining stations):
   - drop `node-living-nw`: median 0.79m, p95 2.15m, n=121
   - drop `node-living-sw`: median 0.80m, p95 2.02m, n=121
 
+### Scenario: `baseline_4node_6x4m` &middot; locator `GaussNewton`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 1.10 | 1.97 | 1.09 | 2.40 | 11.5% |
+| `living_to_bedroom` | 121 | 0.96 | 2.33 | 1.16 | 3.46 | 25.6% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 1.17m, p95 3.44m, n=61
+  - drop `node-bedroom-se`: median 1.19m, p95 2.14m, n=61
+  - drop `node-living-nw`: median 1.32m, p95 2.28m, n=61
+  - drop `node-living-sw`: median 1.25m, p95 3.12m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 1.45m, p95 2.65m, n=121
+  - drop `node-bedroom-se`: median 1.36m, p95 2.69m, n=121
+  - drop `node-living-nw`: median 1.07m, p95 2.37m, n=121
+  - drop `node-living-sw`: median 1.13m, p95 2.47m, n=121
+
+### Scenario: `baseline_4node_6x4m` &middot; locator `Bfgs`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.99 | 1.75 | 0.99 | 2.31 | 18.0% |
+| `living_to_bedroom` | 121 | 0.78 | 2.07 | 0.93 | 3.48 | 32.2% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 1.23m, p95 2.72m, n=61
+  - drop `node-bedroom-se`: median 1.26m, p95 2.05m, n=61
+  - drop `node-living-nw`: median 1.38m, p95 2.03m, n=61
+  - drop `node-living-sw`: median 1.28m, p95 3.47m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 1.33m, p95 2.35m, n=121
+  - drop `node-bedroom-se`: median 1.54m, p95 2.57m, n=121
+  - drop `node-living-nw`: median 1.11m, p95 2.53m, n=121
+  - drop `node-living-sw`: median 1.08m, p95 2.41m, n=121
+
+### Scenario: `baseline_4node_6x4m` &middot; locator `Mle`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.96 | 1.75 | 0.95 | 2.05 | 23.0% |
+| `living_to_bedroom` | 121 | 0.75 | 1.77 | 0.85 | 2.37 | 31.4% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 1.05m, p95 3.62m, n=61
+  - drop `node-bedroom-se`: median 1.19m, p95 2.29m, n=61
+  - drop `node-living-nw`: median 0.99m, p95 1.98m, n=61
+  - drop `node-living-sw`: median 0.99m, p95 2.58m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 0.86m, p95 2.48m, n=121
+  - drop `node-bedroom-se`: median 0.95m, p95 2.37m, n=121
+  - drop `node-living-nw`: median 0.81m, p95 2.23m, n=121
+  - drop `node-living-sw`: median 0.81m, p95 2.10m, n=121
+
+### Scenario: `baseline_4node_6x4m` &middot; locator `MultiFloor`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.93 | 1.76 | 0.94 | 2.28 | 27.9% |
+| `living_to_bedroom` | 121 | 0.69 | 1.83 | 0.86 | 3.32 | 29.8% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
+
+### Scenario: `baseline_4node_6x4m` &middot; locator `NadarayaWatson`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.66 | 1.05 | 0.66 | 1.62 | 9.8% |
+| `living_to_bedroom` | 121 | 0.59 | 1.25 | 0.63 | 1.87 | 24.8% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 1.42m, p95 3.18m, n=61
+  - drop `node-bedroom-se`: median 0.90m, p95 1.74m, n=61
+  - drop `node-living-nw`: median 0.94m, p95 1.67m, n=61
+  - drop `node-living-sw`: median 1.39m, p95 2.95m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 1.35m, p95 2.20m, n=121
+  - drop `node-bedroom-se`: median 1.35m, p95 2.25m, n=121
+  - drop `node-living-nw`: median 1.07m, p95 1.92m, n=121
+  - drop `node-living-sw`: median 1.13m, p95 1.85m, n=121
+
 ### Scenario: `plug_height_4node_6x4m` &middot; locator `NelderMead`
 
 Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
@@ -43,4 +145,190 @@ Single-station-outage (drop each, solve on remaining stations):
   - drop `node-bedroom-se`: median 0.81m, p95 2.12m, n=121
   - drop `node-living-nw`: median 0.68m, p95 1.77m, n=121
   - drop `node-living-sw`: median 0.68m, p95 1.90m, n=121
+
+### Scenario: `plug_height_4node_6x4m` &middot; locator `GaussNewton`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.83 | 1.86 | 0.89 | 2.12 | 4.9% |
+| `living_to_bedroom` | 121 | 0.80 | 2.02 | 0.91 | 2.52 | 23.1% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 0.89m, p95 3.47m, n=61
+  - drop `node-bedroom-se`: median 0.91m, p95 2.12m, n=61
+  - drop `node-living-nw`: median 0.80m, p95 2.23m, n=61
+  - drop `node-living-sw`: median 0.99m, p95 2.86m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 1.07m, p95 2.16m, n=121
+  - drop `node-bedroom-se`: median 0.96m, p95 2.21m, n=121
+  - drop `node-living-nw`: median 0.77m, p95 2.25m, n=121
+  - drop `node-living-sw`: median 0.91m, p95 2.24m, n=121
+
+### Scenario: `plug_height_4node_6x4m` &middot; locator `Bfgs`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.74 | 1.30 | 0.73 | 1.85 | 6.6% |
+| `living_to_bedroom` | 121 | 0.65 | 2.00 | 0.78 | 2.62 | 20.7% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 0.94m, p95 4.13m, n=61
+  - drop `node-bedroom-se`: median 0.99m, p95 1.92m, n=61
+  - drop `node-living-nw`: median 0.85m, p95 2.11m, n=61
+  - drop `node-living-sw`: median 0.96m, p95 2.92m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 1.20m, p95 2.43m, n=121
+  - drop `node-bedroom-se`: median 1.15m, p95 2.64m, n=121
+  - drop `node-living-nw`: median 0.75m, p95 2.27m, n=121
+  - drop `node-living-sw`: median 0.80m, p95 2.25m, n=121
+
+### Scenario: `plug_height_4node_6x4m` &middot; locator `Mle`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.72 | 1.22 | 0.67 | 1.26 | 6.6% |
+| `living_to_bedroom` | 121 | 0.62 | 1.45 | 0.72 | 2.62 | 19.8% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 0.90m, p95 3.18m, n=61
+  - drop `node-bedroom-se`: median 0.75m, p95 1.75m, n=61
+  - drop `node-living-nw`: median 0.74m, p95 1.47m, n=61
+  - drop `node-living-sw`: median 0.88m, p95 3.16m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 0.85m, p95 2.14m, n=121
+  - drop `node-bedroom-se`: median 0.90m, p95 2.36m, n=121
+  - drop `node-living-nw`: median 0.71m, p95 1.92m, n=121
+  - drop `node-living-sw`: median 0.70m, p95 1.90m, n=121
+
+### Scenario: `plug_height_4node_6x4m` &middot; locator `MultiFloor`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.74 | 1.61 | 0.81 | 3.48 | 19.7% |
+| `living_to_bedroom` | 121 | 0.62 | 1.81 | 0.77 | 3.65 | 23.1% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
+
+### Scenario: `plug_height_4node_6x4m` &middot; locator `NadarayaWatson`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.56 | 1.01 | 0.59 | 1.63 | 3.3% |
+| `living_to_bedroom` | 121 | 0.51 | 1.08 | 0.57 | 1.24 | 21.5% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+  - drop `node-bedroom-ne`: median 1.47m, p95 3.29m, n=61
+  - drop `node-bedroom-se`: median 0.78m, p95 1.54m, n=61
+  - drop `node-living-nw`: median 0.88m, p95 1.46m, n=61
+  - drop `node-living-sw`: median 1.39m, p95 2.92m, n=61
+- track `living_to_bedroom`
+  - drop `node-bedroom-ne`: median 1.32m, p95 1.87m, n=121
+  - drop `node-bedroom-se`: median 1.29m, p95 1.97m, n=121
+  - drop `node-living-nw`: median 1.10m, p95 1.63m, n=121
+  - drop `node-living-sw`: median 1.17m, p95 1.76m, n=121
+
+### Scenario: `sparse_3node_6x4m` &middot; locator `NelderMead`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.91 | 2.09 | 0.98 | 3.06 | 6.6% |
+| `living_to_bedroom` | 121 | 0.89 | 2.16 | 1.01 | 2.98 | 28.9% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
+
+### Scenario: `sparse_3node_6x4m` &middot; locator `GaussNewton`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 1.04 | 2.77 | 1.25 | 3.58 | 3.3% |
+| `living_to_bedroom` | 121 | 1.43 | 2.17 | 1.38 | 2.49 | 20.7% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
+
+### Scenario: `sparse_3node_6x4m` &middot; locator `Bfgs`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 1.18 | 3.51 | 1.32 | 4.29 | 13.1% |
+| `living_to_bedroom` | 121 | 1.32 | 2.53 | 1.41 | 3.87 | 27.3% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
+
+### Scenario: `sparse_3node_6x4m` &middot; locator `Mle`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.91 | 2.11 | 0.99 | 3.09 | 6.6% |
+| `living_to_bedroom` | 121 | 0.91 | 2.61 | 1.08 | 3.83 | 26.4% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
+
+### Scenario: `sparse_3node_6x4m` &middot; locator `MultiFloor`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 0 | nan | nan | nan | nan | 0.0% |
+| `living_to_bedroom` | 0 | nan | nan | nan | nan | 0.0% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
+
+### Scenario: `sparse_3node_6x4m` &middot; locator `NadarayaWatson`
+
+Base seed: `20260530` &middot; Gaussian σ: `2.5 dB` &middot; Multipath p: `10%` @ `-6 dB`
+
+| Track | n | Median (m) | p95 (m) | Mean (m) | Max (m) | Room mis-id |
+|---|---:|---:|---:|---:|---:|---:|
+| `diagonal_walk` | 61 | 0.86 | 2.04 | 1.02 | 2.50 | 8.2% |
+| `living_to_bedroom` | 121 | 1.36 | 2.27 | 1.37 | 2.58 | 29.8% |
+
+Single-station-outage (drop each, solve on remaining stations):
+
+- track `diagonal_walk`
+- track `living_to_bedroom`
 

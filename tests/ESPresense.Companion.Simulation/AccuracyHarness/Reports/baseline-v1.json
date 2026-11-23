@@ -77,6 +77,334 @@
       ]
     },
     {
+      "scenario": "baseline_4node_6x4m",
+      "locator": "GaussNewton",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 1.101,
+          "p95_error_m": 1.966,
+          "mean_error_m": 1.094,
+          "max_error_m": 2.401,
+          "room_misid_rate": 0.115,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 1.166,
+              "p95_error_m": 3.435
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 1.194,
+              "p95_error_m": 2.14
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 1.317,
+              "p95_error_m": 2.276
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 1.255,
+              "p95_error_m": 3.123
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.961,
+          "p95_error_m": 2.335,
+          "mean_error_m": 1.164,
+          "max_error_m": 3.457,
+          "room_misid_rate": 0.256,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 1.454,
+              "p95_error_m": 2.65
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 1.362,
+              "p95_error_m": 2.693
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 1.074,
+              "p95_error_m": 2.372
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 1.128,
+              "p95_error_m": 2.468
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "baseline_4node_6x4m",
+      "locator": "Bfgs",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.995,
+          "p95_error_m": 1.749,
+          "mean_error_m": 0.995,
+          "max_error_m": 2.308,
+          "room_misid_rate": 0.18,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 1.23,
+              "p95_error_m": 2.721
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 1.264,
+              "p95_error_m": 2.054
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 1.377,
+              "p95_error_m": 2.033
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 1.278,
+              "p95_error_m": 3.472
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.777,
+          "p95_error_m": 2.067,
+          "mean_error_m": 0.93,
+          "max_error_m": 3.481,
+          "room_misid_rate": 0.322,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 1.33,
+              "p95_error_m": 2.346
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 1.54,
+              "p95_error_m": 2.57
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 1.115,
+              "p95_error_m": 2.53
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 1.084,
+              "p95_error_m": 2.412
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "baseline_4node_6x4m",
+      "locator": "Mle",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.957,
+          "p95_error_m": 1.749,
+          "mean_error_m": 0.948,
+          "max_error_m": 2.051,
+          "room_misid_rate": 0.23,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 1.053,
+              "p95_error_m": 3.619
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 1.193,
+              "p95_error_m": 2.288
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 0.993,
+              "p95_error_m": 1.981
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 0.987,
+              "p95_error_m": 2.579
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.748,
+          "p95_error_m": 1.774,
+          "mean_error_m": 0.85,
+          "max_error_m": 2.367,
+          "room_misid_rate": 0.314,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 0.862,
+              "p95_error_m": 2.484
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 0.948,
+              "p95_error_m": 2.37
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 0.808,
+              "p95_error_m": 2.233
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 0.814,
+              "p95_error_m": 2.101
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "baseline_4node_6x4m",
+      "locator": "MultiFloor",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.93,
+          "p95_error_m": 1.761,
+          "mean_error_m": 0.94,
+          "max_error_m": 2.277,
+          "room_misid_rate": 0.279,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.695,
+          "p95_error_m": 1.832,
+          "mean_error_m": 0.856,
+          "max_error_m": 3.316,
+          "room_misid_rate": 0.298,
+          "single_station_outage": {}
+        }
+      ]
+    },
+    {
+      "scenario": "baseline_4node_6x4m",
+      "locator": "NadarayaWatson",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.658,
+          "p95_error_m": 1.049,
+          "mean_error_m": 0.659,
+          "max_error_m": 1.616,
+          "room_misid_rate": 0.098,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 1.417,
+              "p95_error_m": 3.182
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 0.902,
+              "p95_error_m": 1.738
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 0.935,
+              "p95_error_m": 1.668
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 1.388,
+              "p95_error_m": 2.953
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.591,
+          "p95_error_m": 1.248,
+          "mean_error_m": 0.629,
+          "max_error_m": 1.872,
+          "room_misid_rate": 0.248,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 1.347,
+              "p95_error_m": 2.198
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 1.35,
+              "p95_error_m": 2.255
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 1.07,
+              "p95_error_m": 1.915
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 1.129,
+              "p95_error_m": 1.85
+            }
+          }
+        }
+      ]
+    },
+    {
       "scenario": "plug_height_4node_6x4m",
       "locator": "NelderMead",
       "base_seed": 20260530,
@@ -147,6 +475,526 @@
               "p95_error_m": 1.902
             }
           }
+        }
+      ]
+    },
+    {
+      "scenario": "plug_height_4node_6x4m",
+      "locator": "GaussNewton",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.828,
+          "p95_error_m": 1.86,
+          "mean_error_m": 0.893,
+          "max_error_m": 2.122,
+          "room_misid_rate": 0.049,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 0.888,
+              "p95_error_m": 3.468
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 0.905,
+              "p95_error_m": 2.122
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 0.802,
+              "p95_error_m": 2.228
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 0.992,
+              "p95_error_m": 2.857
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.8,
+          "p95_error_m": 2.022,
+          "mean_error_m": 0.912,
+          "max_error_m": 2.524,
+          "room_misid_rate": 0.231,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 1.073,
+              "p95_error_m": 2.163
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 0.961,
+              "p95_error_m": 2.209
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 0.768,
+              "p95_error_m": 2.255
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 0.91,
+              "p95_error_m": 2.24
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "plug_height_4node_6x4m",
+      "locator": "Bfgs",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.743,
+          "p95_error_m": 1.305,
+          "mean_error_m": 0.727,
+          "max_error_m": 1.849,
+          "room_misid_rate": 0.066,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 0.94,
+              "p95_error_m": 4.129
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 0.986,
+              "p95_error_m": 1.922
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 0.855,
+              "p95_error_m": 2.111
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 0.965,
+              "p95_error_m": 2.92
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.647,
+          "p95_error_m": 2,
+          "mean_error_m": 0.779,
+          "max_error_m": 2.622,
+          "room_misid_rate": 0.207,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 1.198,
+              "p95_error_m": 2.429
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 1.154,
+              "p95_error_m": 2.639
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 0.748,
+              "p95_error_m": 2.267
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 0.8,
+              "p95_error_m": 2.251
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "plug_height_4node_6x4m",
+      "locator": "Mle",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.718,
+          "p95_error_m": 1.217,
+          "mean_error_m": 0.669,
+          "max_error_m": 1.261,
+          "room_misid_rate": 0.066,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 0.899,
+              "p95_error_m": 3.178
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 0.75,
+              "p95_error_m": 1.754
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 0.74,
+              "p95_error_m": 1.471
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 0.884,
+              "p95_error_m": 3.162
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.619,
+          "p95_error_m": 1.45,
+          "mean_error_m": 0.725,
+          "max_error_m": 2.622,
+          "room_misid_rate": 0.198,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 0.849,
+              "p95_error_m": 2.143
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 0.903,
+              "p95_error_m": 2.362
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 0.713,
+              "p95_error_m": 1.92
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 0.702,
+              "p95_error_m": 1.897
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "plug_height_4node_6x4m",
+      "locator": "MultiFloor",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.743,
+          "p95_error_m": 1.612,
+          "mean_error_m": 0.815,
+          "max_error_m": 3.485,
+          "room_misid_rate": 0.197,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.62,
+          "p95_error_m": 1.811,
+          "mean_error_m": 0.771,
+          "max_error_m": 3.647,
+          "room_misid_rate": 0.231,
+          "single_station_outage": {}
+        }
+      ]
+    },
+    {
+      "scenario": "plug_height_4node_6x4m",
+      "locator": "NadarayaWatson",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.556,
+          "p95_error_m": 1.012,
+          "mean_error_m": 0.586,
+          "max_error_m": 1.631,
+          "room_misid_rate": 0.033,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 61,
+              "median_error_m": 1.47,
+              "p95_error_m": 3.287
+            },
+            "node-bedroom-se": {
+              "samples": 61,
+              "median_error_m": 0.781,
+              "p95_error_m": 1.537
+            },
+            "node-living-nw": {
+              "samples": 61,
+              "median_error_m": 0.882,
+              "p95_error_m": 1.461
+            },
+            "node-living-sw": {
+              "samples": 61,
+              "median_error_m": 1.39,
+              "p95_error_m": 2.92
+            }
+          }
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.513,
+          "p95_error_m": 1.084,
+          "mean_error_m": 0.568,
+          "max_error_m": 1.243,
+          "room_misid_rate": 0.215,
+          "single_station_outage": {
+            "node-bedroom-ne": {
+              "samples": 121,
+              "median_error_m": 1.325,
+              "p95_error_m": 1.874
+            },
+            "node-bedroom-se": {
+              "samples": 121,
+              "median_error_m": 1.286,
+              "p95_error_m": 1.968
+            },
+            "node-living-nw": {
+              "samples": 121,
+              "median_error_m": 1.098,
+              "p95_error_m": 1.632
+            },
+            "node-living-sw": {
+              "samples": 121,
+              "median_error_m": 1.165,
+              "p95_error_m": 1.762
+            }
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "sparse_3node_6x4m",
+      "locator": "NelderMead",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.91,
+          "p95_error_m": 2.094,
+          "mean_error_m": 0.983,
+          "max_error_m": 3.057,
+          "room_misid_rate": 0.066,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.887,
+          "p95_error_m": 2.161,
+          "mean_error_m": 1.012,
+          "max_error_m": 2.978,
+          "room_misid_rate": 0.289,
+          "single_station_outage": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sparse_3node_6x4m",
+      "locator": "GaussNewton",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 1.039,
+          "p95_error_m": 2.765,
+          "mean_error_m": 1.245,
+          "max_error_m": 3.583,
+          "room_misid_rate": 0.033,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 1.43,
+          "p95_error_m": 2.165,
+          "mean_error_m": 1.384,
+          "max_error_m": 2.494,
+          "room_misid_rate": 0.207,
+          "single_station_outage": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sparse_3node_6x4m",
+      "locator": "Bfgs",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 1.184,
+          "p95_error_m": 3.508,
+          "mean_error_m": 1.318,
+          "max_error_m": 4.285,
+          "room_misid_rate": 0.131,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 1.324,
+          "p95_error_m": 2.531,
+          "mean_error_m": 1.407,
+          "max_error_m": 3.867,
+          "room_misid_rate": 0.273,
+          "single_station_outage": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sparse_3node_6x4m",
+      "locator": "Mle",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.914,
+          "p95_error_m": 2.112,
+          "mean_error_m": 0.987,
+          "max_error_m": 3.088,
+          "room_misid_rate": 0.066,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 0.911,
+          "p95_error_m": 2.613,
+          "mean_error_m": 1.081,
+          "max_error_m": 3.829,
+          "room_misid_rate": 0.264,
+          "single_station_outage": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sparse_3node_6x4m",
+      "locator": "MultiFloor",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 0,
+          "median_error_m": "NaN",
+          "p95_error_m": "NaN",
+          "mean_error_m": "NaN",
+          "max_error_m": "NaN",
+          "room_misid_rate": 0,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 0,
+          "median_error_m": "NaN",
+          "p95_error_m": "NaN",
+          "mean_error_m": "NaN",
+          "max_error_m": "NaN",
+          "room_misid_rate": 0,
+          "single_station_outage": {}
+        }
+      ]
+    },
+    {
+      "scenario": "sparse_3node_6x4m",
+      "locator": "NadarayaWatson",
+      "base_seed": 20260530,
+      "noise": {
+        "gaussian_std_db": 2.5,
+        "multipath_probability": 0.1,
+        "multipath_attenuation_db": 6
+      },
+      "tracks": [
+        {
+          "track": "diagonal_walk",
+          "samples": 61,
+          "median_error_m": 0.862,
+          "p95_error_m": 2.037,
+          "mean_error_m": 1.021,
+          "max_error_m": 2.503,
+          "room_misid_rate": 0.082,
+          "single_station_outage": {}
+        },
+        {
+          "track": "living_to_bedroom",
+          "samples": 121,
+          "median_error_m": 1.362,
+          "p95_error_m": 2.269,
+          "mean_error_m": 1.371,
+          "max_error_m": 2.581,
+          "room_misid_rate": 0.298,
+          "single_station_outage": {}
         }
       ]
     }

@@ -21,6 +21,27 @@ public static class AccuracyCli
     private const double DefaultTolerance = 0.05;
     private const string DefaultSeed = "20260530";
 
+    /// <summary>
+    /// Scenarios the checked-in baseline covers. <c>baseline</c> and <c>check</c>
+    /// MUST run the same set, or the guard compares a subset against the full
+    /// baseline and passes on rows it never computed.
+    /// </summary>
+    private static readonly string[] DefaultScenarios =
+    {
+        "baseline_4node_6x4m.json",
+        "plug_height_4node_6x4m.json",
+        "sparse_3node_6x4m.json"
+    };
+
+    /// <summary>
+    /// Every <see cref="LocatorKind"/>, so the baseline covers every shipped
+    /// multilateralizer. This used to default to NelderMead alone, which left
+    /// MultiFloor and NadarayaWatson gated by a check that could not see them —
+    /// a green tick on a change the guard could not fail on.
+    /// </summary>
+    private static readonly LocatorKind[] DefaultLocators =
+        (LocatorKind[])Enum.GetValues(typeof(LocatorKind));
+
     public static int Run(string[] args)
     {
         if (args.Length == 0)
@@ -44,12 +65,8 @@ public static class AccuracyCli
     private static int CmdBaseline(string[] args)
     {
         var opts = ParseOpts(args);
-        var scenarios = opts.Scenarios.Count == 0
-            ? new List<string> { "baseline_4node_6x4m.json", "plug_height_4node_6x4m.json" }
-            : opts.Scenarios;
-        var locators = opts.Locators.Count == 0
-            ? new List<LocatorKind> { LocatorKind.NelderMead }
-            : opts.Locators;
+        var scenarios = opts.Scenarios.Count == 0 ? DefaultScenarios.ToList() : opts.Scenarios;
+        var locators = opts.Locators.Count == 0 ? DefaultLocators.ToList() : opts.Locators;
 
         var profile = opts.NoiseProfile;
         var reports = new List<ScenarioReport>();
@@ -92,12 +109,21 @@ public static class AccuracyCli
             return 2;
         }
 
-        var scenarios = opts.Scenarios.Count == 0
-            ? new List<string> { "baseline_4node_6x4m.json", "plug_height_4node_6x4m.json" }
-            : opts.Scenarios;
-        var locators = opts.Locators.Count == 0
-            ? new List<LocatorKind> { LocatorKind.NelderMead }
-            : opts.Locators;
+        // Before comparing numbers, check the gate can see what it gates. Only
+        // meaningful on a full run: --locator narrows what is scored on purpose.
+        if (opts.Locators.Count == 0)
+        {
+            var uncovered = LocatorCoverage.FindUncovered();
+            if (uncovered.Count > 0)
+            {
+                foreach (var line in LocatorCoverage.DescribeFailure(uncovered))
+                    Console.Error.WriteLine(line);
+                return 1;
+            }
+        }
+
+        var scenarios = opts.Scenarios.Count == 0 ? DefaultScenarios.ToList() : opts.Scenarios;
+        var locators = opts.Locators.Count == 0 ? DefaultLocators.ToList() : opts.Locators;
 
         var profile = opts.NoiseProfile;
         var current = new List<ScenarioReport>();
@@ -174,6 +200,8 @@ public static class AccuracyCli
                         "gaussnewton" or "gauss-newton" or "gn" => LocatorKind.GaussNewton,
                         "bfgs" => LocatorKind.Bfgs,
                         "mle" => LocatorKind.Mle,
+                        "multifloor" or "multi-floor" or "multi_floor" or "mf" => LocatorKind.MultiFloor,
+                        "nadarayawatson" or "nadaraya-watson" or "nadaraya_watson" or "nw" => LocatorKind.NadarayaWatson,
                         var x => throw new ArgumentException($"unknown locator '{x}'")
                     };
                     o.Locators.Add(lk);
@@ -308,8 +336,10 @@ public static class AccuracyCli
         Console.Error.WriteLine();
         Console.Error.WriteLine("Common options:");
         Console.Error.WriteLine("  --seed N                       deterministic seed (default 20260530)");
-        Console.Error.WriteLine("  --scenario FILE                scenario filename under Scenarios/ (repeatable)");
-        Console.Error.WriteLine("  --locator NelderMead|GaussNewton|BFGS|MLE (repeatable; default NelderMead)");
+        Console.Error.WriteLine("  --scenario FILE                scenario filename under Scenarios/ (repeatable;");
+        Console.Error.WriteLine($"                                 default {string.Join(", ", DefaultScenarios)})");
+        Console.Error.WriteLine("  --locator NelderMead|GaussNewton|BFGS|MLE|MultiFloor|NadarayaWatson");
+        Console.Error.WriteLine("                                 (repeatable; default all of them)");
         Console.Error.WriteLine("  --gaussian-std-db F            RSSI Gaussian σ in dB (default 2.5)");
         Console.Error.WriteLine("  --multipath-probability F      multipath burst probability (default 0.10)");
         Console.Error.WriteLine("  --multipath-attenuation-db F   multipath -dB hit (default 6.0)");
