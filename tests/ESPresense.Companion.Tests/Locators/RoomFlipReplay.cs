@@ -193,18 +193,27 @@ internal static class RoomFlipReplay
     }
 
     /// <summary>Per-station distance statistics inside the window, for the stability gate.</summary>
-    internal static Dictionary<string, (int N, double Sd, double P5ToP95)> WindowStability(
+    /// <summary>
+    /// Per-station distance statistics inside the window, for the stability gate.
+    /// <paramref name="spec"/>'s <see cref="EventSpec.MinSamplesInWindow"/> no longer excludes a
+    /// station from the result - it only marks it <c>Dense</c>. Everything with at least two
+    /// in-window readings is reported, because everything with in-window readings is fed to
+    /// fusion, and a gate that silently skipped the sparse stations would claim more than it
+    /// checked.
+    /// </summary>
+    internal static Dictionary<string, (int N, double Sd, double P5ToP95, bool Dense)> WindowStability(
         IEnumerable<Reading> readings, EventSpec spec, ReplayParams p)
     {
-        var stats = new Dictionary<string, (int, double, double)>(StringComparer.OrdinalIgnoreCase);
+        var stats = new Dictionary<string, (int, double, double, bool)>(StringComparer.OrdinalIgnoreCase);
         foreach (var g in readings.Where(r => r.T >= spec.WindowStart && r.T <= spec.WindowEnd)
                      .GroupBy(r => r.Node, StringComparer.OrdinalIgnoreCase))
         {
             var d = g.Select(r => DistanceOf(r, p)).OrderBy(x => x).ToArray();
-            if (d.Length < spec.MinSamplesInWindow) continue;
+            if (d.Length < 2) continue; // nothing to measure from a single reading
             var mean = d.Average();
             var sd = Math.Sqrt(d.Sum(x => (x - mean) * (x - mean)) / d.Length);
-            stats[g.Key] = (d.Length, sd, Percentile(d, 95) - Percentile(d, 5));
+            stats[g.Key] = (d.Length, sd, Percentile(d, 95) - Percentile(d, 5),
+                d.Length >= spec.MinSamplesInWindow);
         }
 
         return stats;

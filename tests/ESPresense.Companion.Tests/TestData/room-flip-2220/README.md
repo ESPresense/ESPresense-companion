@@ -54,6 +54,19 @@ traces cover; it does not certify the bug closed. Two specific limits that follo
   lands in the right room under `multi_floor`. His residual cases do not. Whatever distinguishes
   them is not in this corpus — the newer config he attached on 2026-11-21 is the lead.
 
+## Stability gate coverage
+
+Every station with in-window readings is checked, not just the dense ones, because every one of
+them is fed to fusion. Two tiers: dense stations (≥ `min_samples_in_window`) get ESPA-570's
+measured bounds, sparse ones twice those — an sd from a handful of samples is itself noisy, and 2×
+still sits far below the 1.7–10.3 m mean shifts that disqualified the four events ESPA-570
+rejected.
+
+The tiering is not cosmetic. On the canonical event `bathroom1` contributes 9 in-window readings at
+sd 0.495 m / p5–p95 1.20 m, which is **over the dense bound** — it would fail a one-tier gate, and
+it was invisible to the earlier version that simply dropped sub-threshold stations. The four dense
+stations carry the solve at sd ≤ 0.24 m.
+
 ## What it can and cannot prove
 
 **Can:** that the allocator does not change the published room for a static beacon while its own
