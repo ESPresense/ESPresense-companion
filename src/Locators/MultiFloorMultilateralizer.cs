@@ -10,6 +10,9 @@ namespace ESPresense.Locators;
 
 public class MultiFloorMultilateralizer : ILocate
 {
+    // An unconstrained 3D range position needs at least four readings to resolve its ambiguity.
+    internal const int MinimumReadings = 4;
+
     private readonly Device _device;
     private readonly State _state;
     private readonly IWeighting _weighting;
@@ -50,14 +53,15 @@ public class MultiFloorMultilateralizer : ILocate
         });
         var pos = nodes.Select(a => a.Node!.Location).ToList();
 
-        // One node gives a distance but no position, so there is no fix and the map hides the device. The
+        // Fewer than four nodes cannot constrain the 3D position, so there is no fix. An enabled
+        // nearest-node fallback can take over; otherwise the map hides the device. The
         // scenario still has to stay Current, the way BaseMultilateralizer.InitializeScenario keeps it:
         // ScenarioFusion only picks BestScenario from Current scenarios, and a null BestScenario publishes
         // not_home. With multi_floor as the only enabled locator this is the only scenario, so letting it
         // expire reports a device as away while a node is still hearing it. Room, Floor and Location stay
         // as they were, and with nothing hearing the device nodes is empty, so LastHit goes null and it
         // expires for real.
-        if (pos.Count <= 1)
+        if (pos.Count < MinimumReadings)
         {
             scenario.Minimum = nodes.Min(a => (double?)a.Distance);
             scenario.LastHit = nodes.Max(a => a.LastHit);
@@ -120,7 +124,7 @@ public class MultiFloorMultilateralizer : ILocate
         }
 
         scenario.Confidence = confidence;
-        scenario.Trace = pos.Count <= 1
+        scenario.Trace = pos.Count < MinimumReadings
             ? LocatorTrace.NoFix(null, nodes)
             : LocatorTrace.Finished(null, nodes, solvedWeights, scenario.Fit, scenario.Scale ?? 1);
 

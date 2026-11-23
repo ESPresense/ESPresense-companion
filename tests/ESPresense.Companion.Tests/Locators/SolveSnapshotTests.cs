@@ -118,7 +118,7 @@ public class SolveSnapshotTests
     [Test]
     public void Locate_NotSuperseded_Finishes()
     {
-        var device = CreateDevice(3, new Random(1));
+        var device = CreateDevice(4, new Random(1));
         var scenario = new Scenario(_configLoader.Config, new MultiFloorMultilateralizer(device, _state), "MultiFloor") { Confidence = 0 };
 
         Assert.That(scenario.Locate(), Is.True);

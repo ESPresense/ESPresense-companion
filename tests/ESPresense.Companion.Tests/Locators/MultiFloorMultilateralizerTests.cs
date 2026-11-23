@@ -115,11 +115,14 @@ public class MultiFloorMultilateralizerTests
 
     private (bool moved, Scenario scenario) LocateAt(Point3D location, params Floor[] floors)
     {
-        // Two zero-range nodes at one spot pin the solve there, whatever the floor layout
+        // Four zero-range nodes at one spot pin the solve there for these floor-assignment tests.
         var node = CreateTestNode("node1", "Node 1", location, floors);
         var device = CreateDeviceWithNode(node, 0.0);
-        var other = CreateTestNode("node2", "Node 2", location, floors);
-        device.Nodes[other.Id] = new DeviceToNode(device, other) { Distance = 0.0, LastHit = DateTime.UtcNow };
+        for (var i = 2; i <= 4; i++)
+        {
+            var other = CreateTestNode($"node{i}", $"Node {i}", location, floors);
+            device.Nodes[other.Id] = new DeviceToNode(device, other) { Distance = 0.0, LastHit = DateTime.UtcNow };
+        }
         var locator = new MultiFloorMultilateralizer(device, _state);
         // Confidence starts low so the solve is seeded at the nodes, not the origin
         var scenario = new Scenario(_configLoader.Config, locator, "MultiFloor") { Confidence = 0 };
@@ -129,7 +132,7 @@ public class MultiFloorMultilateralizerTests
     // The first fix seeds the Kalman filter, which then only creeps towards later ones, so a fix
     // seeded from the origin shows every device starting at 0,0,0 and sliding into place
     [TestCase(5)]
-    [TestCase(3)]
+    [TestCase(4)]
     public void Locate_FirstFix_DoesNotStartFromTheOrigin(int heard)
     {
         var floor = CreateTestFloor("first", new double[] { -20, -20, 0 }, new double[] { 40, 40, 3 });
@@ -145,25 +148,41 @@ public class MultiFloorMultilateralizerTests
 
         scenario.Locate();
 
-        // Horizontal only: three nodes leave two exact answers, mirrored through their plane
-        Assert.That(new Point2D(scenario.Location.X, scenario.Location.Y).DistanceTo(new Point2D(truth.X, truth.Y)), Is.LessThan(0.2));
+        Assert.That(scenario.Location.DistanceTo(truth), Is.LessThan(0.2));
         Assert.That(scenario.Scale, Is.EqualTo(1).Within(0.01));
     }
 
-    [Test]
-    public void Locate_SingleNode_ProducesNoFix()
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    public void Locate_FewerThanFourNodes_PreservesLastPositionWithoutANewFix(int count)
     {
         var (ground, upstairs) = CreateTwoFloors();
-        var node = CreateTestNode("node1", "Node 1", new Point3D(2, 2, 1), ground, upstairs);
-        var device = CreateDeviceWithNode(node, 40.0);
+        var device = new Device("test-device", null, TimeSpan.FromSeconds(30));
+        var lastHit = DateTime.UtcNow.AddSeconds(-1);
+        for (var i = 0; i < count; i++)
+        {
+            var node = CreateTestNode($"node{i}", null, new Point3D(i, i, 1), ground, upstairs);
+            device.Nodes[node.Id] = new DeviceToNode(device, node) { Distance = 40, LastHit = lastHit };
+        }
         var locator = new MultiFloorMultilateralizer(device, _state);
-        var scenario = new Scenario(_configLoader.Config, locator, "MultiFloor") { Confidence = 0 };
+        var room = ground.Rooms.Values.Single();
+        var scenario = new Scenario(_configLoader.Config, locator, "MultiFloor") { Confidence = 100, Floor = ground, Room = room };
+        var previous = new Point3D(2, 2, 1);
+        scenario.ResetLocation(previous);
 
         var moved = locator.Locate(scenario);
 
         Assert.That(moved, Is.False);
         Assert.That(scenario.Confidence, Is.EqualTo(0));
-        Assert.That(scenario.Room, Is.Null);
+        Assert.That(scenario.Room, Is.SameAs(room));
+        Assert.That(scenario.Floor, Is.SameAs(ground));
+        Assert.That(scenario.Location, Is.EqualTo(previous));
+        Assert.That(scenario.Fixes, Is.EqualTo(count));
+        Assert.That(scenario.LastHit, Is.EqualTo(count == 0 ? (DateTime?)null : lastHit));
+        Assert.That(scenario.Minimum, Is.EqualTo(count == 0 ? (double?)null : 40));
+        Assert.That(scenario.Trace!.Outcome, Is.EqualTo(LocatorOutcome.NoFix));
     }
 
     [Test]

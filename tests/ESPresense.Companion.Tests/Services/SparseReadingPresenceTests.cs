@@ -21,8 +21,8 @@ public class SparseReadingPresenceTests
     private const string DeviceId = "iBeacon:sparse";
 
     /// <summary>
-    /// One floor, two rooms, three nodes. Nearest node is opt-in; node1 sits in Entry, while the
-    /// three-node solve lands in Living Room. timeout: 1 expires readings after one second.
+    /// One floor, two rooms, four nodes. Nearest node is opt-in; node1 sits in Entry, while the
+    /// four-node solve lands in Living Room. timeout: 1 expires readings after one second.
     /// </summary>
     private static string Yaml(string locator, bool nearestNode) => $"""
         timeout: 1
@@ -44,6 +44,9 @@ public class SparseReadingPresenceTests
             floors: ["first"]
           - id: node3
             point: [5, 9, 1]
+            floors: ["first"]
+          - id: node4
+            point: [9, 9, 2.5]
             floors: ["first"]
         locators:
           nelder_mead:
@@ -67,20 +70,20 @@ public class SparseReadingPresenceTests
     {
         await using var h = await Harness.StartAsync(locator);
 
-        // Three nodes hear it from the middle of the Living Room, so the locator has a fix.
-        await h.HeardByAllThree();
+        // Four nodes hear it from the middle of the Living Room, so the locator has a fix.
+        await h.HeardByAllFour();
         Assert.That(h.Device.Scenarios, Has.Count.EqualTo(1), $"only {locator} is enabled");
 
         await h.Locate();
-        Assert.That(h.States, Is.EqualTo(new[] { "Living Room" }), "a three-node fix puts it in the Living Room");
+        Assert.That(h.States, Is.EqualTo(new[] { "Living Room" }), "a four-node fix puts it in the Living Room");
         var scenario = h.Device.BestScenario!;
         var location = scenario.Location;
         var floor = scenario.Floor;
 
-        // Two nodes stop reporting. One real second later their readings are stale and the previous
+        // Three nodes stop reporting. One real second later their readings are stale and the previous
         // solve is older than timeout, which is the point the scenario used to expire.
         await Task.Delay(1200);
-        await h.Heard("node1", 5.66);
+        await h.Heard("node1", 2.83);
         Assert.That(h.Device.CurrentReadings(), Has.Length.EqualTo(1), "only node1 is still current");
 
         await h.Locate();
@@ -93,14 +96,14 @@ public class SparseReadingPresenceTests
         Assert.That(scenario.Location, Is.EqualTo(location), "a sparse pass must not invent a position");
         Assert.That(scenario.Floor, Is.SameAs(floor));
         Assert.That(scenario.LastHit, Is.EqualTo(h.Device.Nodes["node1"].LastHit), "presence uses the reading's timestamp");
-        Assert.That(scenario.Minimum, Is.EqualTo(5.66));
+        Assert.That(scenario.Minimum, Is.EqualTo(2.83));
         Assert.That(scenario.Fixes, Is.EqualTo(1));
 
-        await h.HeardByAllThree();
+        await h.HeardByAllFour();
         await h.Locate();
         Assert.That(h.Reported, Is.EqualTo("Living Room"));
         Assert.That(h.Device.Confidence, Is.GreaterThan(0), "fresh readings allow a solve after a sparse pass");
-        Assert.That(scenario.Fixes, Is.EqualTo(3));
+        Assert.That(scenario.Fixes, Is.EqualTo(4));
     }
 
     [TestCase("multi_floor", false)]
@@ -111,14 +114,14 @@ public class SparseReadingPresenceTests
     {
         await using var h = await Harness.StartAsync(locator);
 
-        await h.HeardByAllThree();
+        await h.HeardByAllFour();
         await h.Locate();
         Assert.That(h.Reported, Is.EqualTo("Living Room"));
 
         if (afterSparsePass)
         {
             await Task.Delay(1200);
-            await h.Heard("node1", 5.66);
+            await h.Heard("node1", 2.83);
             await h.Locate();
             Assert.That(h.Reported, Is.EqualTo("Living Room"));
             Assert.That(h.Device.Confidence, Is.Zero);
@@ -141,7 +144,7 @@ public class SparseReadingPresenceTests
     public async Task OneLocator_OneNodeWithoutPreviousFix_DoesNotInventAPlacement(string locator)
     {
         await using var h = await Harness.StartAsync(locator);
-        await h.Heard("node1", 5.66);
+        await h.Heard("node1", 2.83);
         var scenario = h.Device.Scenarios.Single();
         var location = scenario.Location;
 
@@ -163,7 +166,7 @@ public class SparseReadingPresenceTests
         await using var h = await Harness.StartAsync(locator, nearestNode: true);
         // Freeze the priors to prove handoff is an eligibility rule, not a confidence/smoothing race.
         h.Filtering.SmoothingWeight = 1;
-        await h.Heard("node1", 5.66);
+        await h.Heard("node1", 2.83);
         Assert.That(h.Device.Scenarios, Has.Count.EqualTo(2));
         var primary = h.Device.Scenarios.Single(s => !s.IsNearestNode);
         var nearest = h.Device.Scenarios.Single(s => s.IsNearestNode);
@@ -174,7 +177,7 @@ public class SparseReadingPresenceTests
 
         nearest.Probability = 1;
         primary.Probability = 0;
-        await h.HeardByAllThree();
+        await h.HeardByAllFour();
         await h.Locate();
         Assert.That(h.Device.BestScenario, Is.SameAs(primary), "a recovered solve immediately displaces fallback");
         Assert.That(h.Reported, Is.EqualTo("Living Room"));
@@ -183,7 +186,7 @@ public class SparseReadingPresenceTests
         primary.Probability = 1;
         nearest.Probability = 0;
         h.ExpireReadings();
-        await h.Heard("node1", 5.66);
+        await h.Heard("node1", 2.83);
         await h.Locate();
         Assert.That(primary.Confidence, Is.Zero);
         Assert.That(primary.Room?.Name, Is.EqualTo("Living Room"));
@@ -191,7 +194,7 @@ public class SparseReadingPresenceTests
         Assert.That(h.Reported, Is.EqualTo("Entry"));
         Assert.That(primary.WeightedConfidence, Is.Zero);
 
-        await h.HeardByAllThree();
+        await h.HeardByAllFour();
         await h.Locate();
         Assert.That(h.Device.BestScenario, Is.SameAs(primary));
         Assert.That(h.Reported, Is.EqualTo("Living Room"));
@@ -200,6 +203,42 @@ public class SparseReadingPresenceTests
         await h.Locate();
         Assert.That(h.Reported, Is.EqualTo(DeviceReport.NotHome));
         Assert.That(h.Device.BestScenario, Is.Null, "neither locator can extend expired readings");
+    }
+
+    [Test]
+    public async Task MultiFloor_UsesNearestNodeBelowFourReadings_AndSolvesAtFour()
+    {
+        await using var h = await Harness.StartAsync("multi_floor", nearestNode: true);
+        h.Filtering.SmoothingWeight = 1;
+        var count = 0;
+        foreach (var (id, distance) in new[] { ("node1", 2.83), ("node2", 6.32), ("node3", 6.32) })
+        {
+            await h.Heard(id, distance);
+            await h.Locate();
+            var primary = h.Device.Scenarios.Single(s => !s.IsNearestNode);
+            Assert.That(primary.Fixes, Is.EqualTo(++count));
+            Assert.That(primary.Confidence, Is.Zero, $"{count} readings cannot resolve the 3D position");
+            Assert.That(primary.Room, Is.Null, "no previous solve is available");
+            Assert.That(h.Device.BestScenario!.IsNearestNode, Is.True);
+            Assert.That(h.Reported, Is.EqualTo("Entry"));
+        }
+
+        await h.Heard("node4", 8.62);
+        await h.Locate();
+        var solved = h.Device.BestScenario!;
+        Assert.That(solved.IsNearestNode, Is.False);
+        Assert.That(solved.Fixes, Is.EqualTo(4));
+        Assert.That(solved.Confidence, Is.GreaterThan(0));
+        Assert.That(h.Reported, Is.EqualTo("Living Room"));
+        var position = solved.Location;
+
+        h.Device.Nodes["node4"].LastHit = DateTime.UtcNow.AddMinutes(-1);
+        await h.Locate();
+        Assert.That(solved.Fixes, Is.EqualTo(3));
+        Assert.That(solved.Confidence, Is.Zero);
+        Assert.That(solved.Location, Is.EqualTo(position), "dropping to three readings must not produce a new solve");
+        Assert.That(h.Device.BestScenario!.IsNearestNode, Is.True);
+        Assert.That(h.Reported, Is.EqualTo("Entry"));
     }
 
     /// <summary>The real tracker, fusion and publisher over a config, with the state topic recorded.</summary>
@@ -257,12 +296,13 @@ public class SparseReadingPresenceTests
 
         public Task Locate() => _locator.ProcessDevice(Device);
 
-        /// <summary>Distances from the three nodes to the middle of the room.</summary>
-        public async Task HeardByAllThree()
+        /// <summary>Distances from the four nodes to (3, 3, 1), inside Living Room.</summary>
+        public async Task HeardByAllFour()
         {
-            await Heard("node1", 5.66);
-            await Heard("node2", 5.66);
-            await Heard("node3", 4.0);
+            await Heard("node1", 2.83);
+            await Heard("node2", 6.32);
+            await Heard("node3", 6.32);
+            await Heard("node4", 8.62);
         }
 
         public Task Heard(string nodeId, double distance) =>
