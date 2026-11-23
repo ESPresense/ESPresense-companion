@@ -1,5 +1,14 @@
 # Repository Guidelines
 
+## Specifications
+
+- Work specs first: update the relevant document in `specs/` before changing implementation or tests. Create a focused spec when none exists.
+- Explain **why** alongside the rules: the problem, constraints, failure modes, and reasons for important choices belong in the spec.
+- Follow Hermes Converse spec conventions: state intended behavior directly, use established terminology, and show concrete observable examples. Keep each spec small and focused.
+- Write specs as the agreed contract. Do not qualify rules with "currently", recount implementation history, or add proposed sections and abandoned designs.
+- Keep behavior and design documentation in specs. Use code comments for brief, non-obvious local details and link to the relevant spec instead of repeating it.
+- Keep specs, implementation, and tests consistent. A spec-only request authorizes documentation changes, not implementation or deployment.
+
 ## Project Structure & Module Organization
 - Backend: C# ASP.NET Core in `src/` (controllers, services, models, utils).
 - Frontend: SvelteKit app in `src/ui/` (routes, lib, tests). Vite dev server proxies `/api` and `/ws` to backend.

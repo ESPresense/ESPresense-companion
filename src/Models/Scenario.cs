@@ -25,6 +25,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
     public double? Minimum { get; set; }
     [JsonIgnore] public Point3D LastLocation { get; set; }
     public Point3D Location => _kalmanLocation.Location;
+    [JsonIgnore] internal bool HasPosition { get; private set; }
     public double? Scale { get; set; }
     public int? Fixes { get; set; }
     public string? Name { get; } = name;
@@ -122,6 +123,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
 
     public void UpdateLocation(Point3D newLocation)
     {
+        HasPosition = true;
         LastHit = DateTime.UtcNow;
         LastLocation = Location;
         Fit = newLocation;
@@ -132,6 +134,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
 
     public void ResetLocation(Point3D newLocation)
     {
+        HasPosition = true;
         LastHit = DateTime.UtcNow;
         LastLocation = newLocation;
         _kalmanLocation.Reset(newLocation);

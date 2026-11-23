@@ -20,18 +20,19 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             .OrderBy(n => n.Distance)
             .ToArray();
 
+        // Refresh presence even when there are too few readings for a position.
+        scenario.Minimum = heard.Min(n => (double?)n.Distance);
+        scenario.LastHit = heard.Max(n => n.LastHit);
+        scenario.Fixes = heard.Length;
+
         if (heard.Length <= 1)
         {
             scenario.Confidence = 0;
-            scenario.Room = null;
             scenario.Error = null;
             scenario.Trace = LocatorTrace.NoFix(floor, heard);
             return false;
         }
 
-        scenario.Minimum = heard.Min(n => (double?)n.Distance);
-        scenario.LastHit = heard.Max(n => n.LastHit);
-        scenario.Fixes = heard.Length;
         scenario.Floor = floor;
 
         Point3D est;

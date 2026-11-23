@@ -120,6 +120,7 @@ locators:
         sigma: 0.25
 
   nearest_node:
+    # Fallback behavior and reading thresholds: specs/fusion.md
     enabled: true
     max_distance: 10 # Don't fall back to a node more than 10 m from the device (leave out or 0 for no limit)
 

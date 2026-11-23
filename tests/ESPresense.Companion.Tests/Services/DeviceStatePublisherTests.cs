@@ -77,6 +77,21 @@ public class DeviceStatePublisherTests
     }
 
     [Test]
+    public async Task SameStateNotMoved_NewScenarioSendsAttributesOnly()
+    {
+        await _publisher.PublishAsync(_device, Located("Room One"), locationChanged: false);
+        _sent.Clear();
+        var report = Located("Room One") with { BestScenario = "MultiFloor" };
+
+        var published = await _publisher.PublishAsync(_device, report, locationChanged: false);
+
+        Assert.That(published, Is.True);
+        Assert.That(Topics(), Is.EqualTo(new[] { AttributesTopic }));
+        Assert.That(_publisher.Reported(_device).BestScenario, Is.EqualTo("MultiFloor"));
+        Assert.That(_sent.Single().Payload, Does.Contain("\"best_scenario\":\"MultiFloor\""));
+    }
+
+    [Test]
     public async Task NoLocation_SendsStateButNeverAttributes()
     {
         var published = await _publisher.PublishAsync(_device, Away(), locationChanged: true);

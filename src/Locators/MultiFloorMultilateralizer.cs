@@ -10,6 +10,8 @@ namespace ESPresense.Locators;
 
 public class MultiFloorMultilateralizer : ILocate
 {
+    internal const int MinimumReadings = 4;
+
     private readonly Device _device;
     private readonly State _state;
     private readonly IWeighting _weighting;
@@ -50,9 +52,12 @@ public class MultiFloorMultilateralizer : ILocate
         });
         var pos = nodes.Select(a => a.Node!.Location).ToList();
 
-        // One node gives a distance but no position; NearestNode owns that case and enforces max_distance
-        if (pos.Count <= 1)
+        // Preserve presence and last-known placement without producing a new position.
+        if (pos.Count < MinimumReadings)
         {
+            scenario.Minimum = nodes.Min(a => (double?)a.Distance);
+            scenario.LastHit = nodes.Max(a => a.LastHit);
+            scenario.Fixes = pos.Count;
             scenario.Scale = 1;
             confidence = 0;
         }
@@ -111,7 +116,7 @@ public class MultiFloorMultilateralizer : ILocate
         }
 
         scenario.Confidence = confidence;
-        scenario.Trace = pos.Count <= 1
+        scenario.Trace = pos.Count < MinimumReadings
             ? LocatorTrace.NoFix(null, nodes)
             : LocatorTrace.Finished(null, nodes, solvedWeights, scenario.Fit, scenario.Scale ?? 1);
 

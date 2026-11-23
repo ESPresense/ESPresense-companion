@@ -1,4 +1,5 @@
 using ESPresense.Locators;
+using ESPresense.Companion.Tests.Models;
 using ESPresense.Models;
 using ESPresense.Services;
 using MathNet.Spatial.Euclidean;
@@ -144,5 +145,43 @@ public class ScenarioFusionTests
         Add(device, "c", new At(new Point3D(1, 1, 0), 50, moved: true));
 
         Assert.That(ScenarioFusion.Update(device, new ConfigFiltering(), DateTime.UtcNow).Moved, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void ZeroConfidencePrior_CannotOutrankACurrentPosition()
+    {
+        var device = NewDevice();
+        var retained = Add(device, "last known", new At(new Point3D(1, 1, 0), 0, moved: false));
+        var position = Add(device, "position", new At(new Point3D(2, 2, 0), 5));
+        retained.Probability = 1;
+        position.Probability = 0;
+
+        var result = ScenarioFusion.Update(device, new ConfigFiltering { SmoothingWeight = 1 }, DateTime.UtcNow);
+
+        Assert.That(result.Best, Is.SameAs(position));
+        Assert.That(retained.Probability, Is.Zero);
+        Assert.That(position.Probability, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task NearestNode_CannotInfluenceAStationaryPrimaryPosition()
+    {
+        await using var fx = await YamlStateFixture.LoadAsync("floors: []");
+        var location = new Point3D(2, 2, 0);
+        var device = NewDevice(kalmanAt: location);
+        var node = new Node("node1", NodeSourceType.Config);
+        device.Nodes[node.Id] = new DeviceToNode(device, node) { Distance = 1, LastHit = DateTime.UtcNow };
+        var nearest = Add(device, "nearest", new NearestNode(device, fx.State));
+        var position = Add(device, "primary", new At(location, 1, moved: false));
+        position.Probability = 0;
+        nearest.Probability = 1;
+
+        var result = ScenarioFusion.Update(device, new ConfigFiltering { SmoothingWeight = 1 }, DateTime.UtcNow);
+
+        Assert.That(result.Best, Is.SameAs(position), "even equal raw confidence cannot make fallback compete");
+        Assert.That(result.Moved, Is.Zero, "the unused fallback must not trigger a position update");
+        Assert.That(nearest.WeightedConfidence, Is.Zero);
+        Assert.That(nearest.Probability, Is.Zero);
+        Assert.That(device.KalmanFilter.Location, Is.EqualTo(location), "fallback must not feed the device filter");
     }
 }

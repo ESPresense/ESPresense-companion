@@ -353,13 +353,16 @@ public class DeviceTrackerTests
         Assert.That(_removedDeviceIds, Is.EqualTo(new[] { "test-device" }));
     }
 
-    [Test]
-    public void MarkIdleDevices_QueuesTrackedDeviceThatWasNeverLocated()
+    [TestCase(null)]
+    [TestCase(0)]
+    [TestCase(50)]
+    public void MarkIdleDevices_QueuesTrackedDeviceThatWasNeverLocated(int? confidence)
     {
         // Message-created devices never set LastCalculated; they must still be picked up by the idle check.
         var never = new Device("never-located", null, TimeSpan.FromSeconds(30)) { Track = true };
         var recent = new Device("recent", null, TimeSpan.FromSeconds(30)) { Track = true, LastCalculated = DateTime.UtcNow };
         var stale = new Device("stale", null, TimeSpan.FromSeconds(30)) { Track = true, LastCalculated = DateTime.UtcNow.AddMinutes(-5) };
+        stale.BestScenario = new Scenario(null, Mock.Of<ILocate>(), "retained") { Confidence = confidence };
         var untracked = new Device("untracked", null, TimeSpan.FromSeconds(30)) { Track = false };
         foreach (var d in new[] { never, recent, stale, untracked }) _state.Devices[d.Id] = d;
 

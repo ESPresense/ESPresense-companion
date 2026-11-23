@@ -254,7 +254,7 @@ public class DeviceTracker(State state, IMqttCoordinator mqtt, TelemetryService 
     {
         foreach (var device in state.Devices.Values)
         {
-            if (device is { Track: true, Confidence: > 0 or null }
+            if (device.Track
                 && (device.LastCalculated is null || now - device.LastCalculated.Value > device.Timeout))
             {
                 _toProcess.Mark(device.Id);
