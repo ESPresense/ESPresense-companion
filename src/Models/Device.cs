@@ -12,7 +12,10 @@ public class Device
     private DateTime? _lastSeen;
 
     // Kalman filter for location smoothing (settings are shared globally)
-    private readonly KalmanLocation _kalmanLocation = new();
+    private readonly KalmanLocation _kalmanLocation;
+
+    /// <summary>Clock for this device's readings and filter; the trace clock under an offline replay.</summary>
+    internal TimeProvider Time { get; }
 
     /// <summary>
     /// Access to the device's Kalman filter for prediction
@@ -20,10 +23,12 @@ public class Device
     [STJ.JsonIgnore] public KalmanLocation KalmanFilter => _kalmanLocation;
 
     /// <param name="discoveryLogger">Logs the device's HA discovery publishes; null discards.</param>
-    public Device(string id, string? discoveryId, TimeSpan timeout, ILogger<AutoDiscovery>? discoveryLogger = null)
+    public Device(string id, string? discoveryId, TimeSpan timeout, ILogger<AutoDiscovery>? discoveryLogger = null, TimeProvider? time = null)
     {
         Id = id;
         Timeout = timeout;
+        Time = time ?? TimeProvider.System;
+        _kalmanLocation = new KalmanLocation { Time = Time };
         HassAutoDiscovery.Add(new AutoDiscovery("device_tracker", this, discoveryId, "bluetooth", discoveryLogger));
     }
 

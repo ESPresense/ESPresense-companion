@@ -5,14 +5,17 @@ using System.Text.Json.Serialization;
 
 namespace ESPresense.Models;
 
-public class Scenario(Config? config, ILocate locator, string? name)
+public class Scenario(Config? config, ILocate locator, string? name, TimeProvider? time = null)
 {
     private Config? Config { get; } = config;
     private ILocate Locator { get; } = locator;
 
-    private readonly KalmanLocation _kalmanLocation = new();
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly KalmanLocation _kalmanLocation = new() { Time = time ?? TimeProvider.System };
 
-    public bool Current => DateTime.UtcNow - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
+    private DateTime UtcNow => _time.GetUtcNow().UtcDateTime;
+
+    public bool Current => UtcNow - LastHit < TimeSpan.FromSeconds(Config?.Timeout ?? 30);
     public int? Confidence { get; set; }
 
     /// <summary>
@@ -122,7 +125,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
 
     public void UpdateLocation(Point3D newLocation)
     {
-        LastHit = DateTime.UtcNow;
+        LastHit = UtcNow;
         LastLocation = Location;
         Fit = newLocation;
 
@@ -132,7 +135,7 @@ public class Scenario(Config? config, ILocate locator, string? name)
 
     public void ResetLocation(Point3D newLocation)
     {
-        LastHit = DateTime.UtcNow;
+        LastHit = UtcNow;
         LastLocation = newLocation;
         _kalmanLocation.Reset(newLocation);
     }

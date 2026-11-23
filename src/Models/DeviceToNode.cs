@@ -19,7 +19,7 @@ public class DeviceToNode(Device device, Node node)
 
     public double LastDistance { get; set; }
 
-    public bool Current => DateTime.UtcNow - LastHit < Device!.Timeout;
+    public bool Current => Device!.Time.GetUtcNow().UtcDateTime - LastHit < Device!.Timeout;
 
     // ReadMessage and Snapshot hold this so a copy never mixes fields from two messages.
     private readonly object _gate = new();
@@ -59,7 +59,7 @@ public class DeviceToNode(Device device, Node node)
             if (moved) LastDistance = payload.Distance;
             Distance = payload.Distance;
             DistVar = payload.DistVar;
-            LastHit = DateTime.UtcNow;
+            LastHit = Device!.Time.GetUtcNow().UtcDateTime;
             Hits++;
         }
         NewName(payload.Name);

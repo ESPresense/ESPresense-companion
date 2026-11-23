@@ -14,6 +14,11 @@ public class State
     private double? _bestCalibrationR;
 
     /// <summary>For tests and tools that build a State by hand: its loggers discard everything.</summary>
+    /// <remarks>
+    /// Keep the parameter list exact - no optional extras. DeviceControllerTests mocks State with
+    /// <c>new Mock&lt;State&gt;(loader, nts)</c>, and Castle's class proxy matches a constructor by
+    /// arity, so an added defaulted parameter stops it finding one at all.
+    /// </remarks>
     public State(ConfigLoader cl, NodeTelemetryStore nts) : this(cl, nts, NullLoggerFactory.Instance)
     {
     }
@@ -25,13 +30,17 @@ public class State
     /// Subscribes to the provided ConfigLoader's ConfigChanged event and applies the current configuration if present;
     /// see <see cref="Apply"/>.
     /// </remarks>
-    public State(ConfigLoader cl, NodeTelemetryStore nts, ILoggerFactory loggerFactory)
+    public State(ConfigLoader cl, NodeTelemetryStore nts, ILoggerFactory loggerFactory, TimeProvider? time = null)
     {
         _loggerFactory = loggerFactory;
-        ScenarioFactory = new ScenarioFactory(this, nts, _loggerFactory);
+        Time = time ?? TimeProvider.System;
+        ScenarioFactory = new ScenarioFactory(this, nts, _loggerFactory, Time);
         cl.ConfigChanged += (_, args) => Apply(args);
         if (cl.Config != null) Apply(cl.Config);
     }
+
+    /// <summary>Clock handed to the scenarios this state builds; the trace clock under an offline replay.</summary>
+    public TimeProvider Time { get; } = TimeProvider.System;
 
     /// <summary>The current config. Replaced only through <see cref="Apply"/>.</summary>
     public Config? Config { get; private set; }
