@@ -58,10 +58,13 @@ public class Device
     public DeviceToNode[] CurrentReadings() => Nodes.Values.Select(n => n.Snapshot()).Where(n => n.Current).ToArray();
 
     [STJ.JsonConverter(typeof(RoomConverter))]
-    public Room? Room => Anchor?.Room ?? BestScenario?.Room;
+    public Room? Room => Anchor?.Room ?? (BestScenario == null ? null : Hold.IsHeld ? Hold.Room : BestScenario.Room);
 
     [STJ.JsonConverter(typeof(FloorConverter))]
-    public Floor? Floor => Anchor?.Floor ?? BestScenario?.Floor;
+    public Floor? Floor => Anchor?.Floor ?? (BestScenario == null ? null : Hold.IsHeld ? Hold.Floor : BestScenario.Floor);
+
+    /// <summary>The reported floor and room, held until a challenger earns the switch (#1827)</summary>
+    [STJ.JsonIgnore] public LocationHold Hold { get; } = new();
 
     public int? Confidence => IsAnchored ? 100 : BestScenario?.Confidence;
 

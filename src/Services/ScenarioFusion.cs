@@ -11,11 +11,12 @@ public sealed record FusionResult(Scenario? Best, int Moved);
 /// Combines a device's scenarios into one answer. No MQTT, history or events: everything it
 /// touches is on the <see cref="Device"/> and its <see cref="Scenario"/>s.
 ///   1. Runs every scenario's locator.
-///   2. Feeds the scenario with the highest raw Confidence into the device-level Kalman filter.
+///   2. Feeds the raw fit of the scenario with the highest raw Confidence, found this pass, into the device-level Kalman filter.
 ///   3. Weights each scenario's confidence by motion consistency (Gaussian penalty against the
 ///      Kalman predicted location) and smooths per-scenario probabilities over time.
 ///   4. Picks the current scenario with the highest smoothed probability; ties go to the higher
 ///      confidence, then to the earlier scenario.
+///   5. Holds the reported floor and room (<see cref="LocationHold"/>) until a challenger earns the switch.
 /// </summary>
 public static class ScenarioFusion
 {
@@ -24,13 +25,16 @@ public static class ScenarioFusion
         device.LastCalculated = now;
         var moved = device.Scenarios.AsParallel().Count(s => s.Locate());
 
+        // Only a fix found on this pass: a scenario stays Current while one node still hears the device, and
+        // feeding its old fit again would count it twice and keep the filter from starting over after a gap.
         var kalmanSource = device.Scenarios
-            .Where(s => s.Current)
+            .Where(s => s.Current && s.FitAt >= now)
             .OrderByDescending(s => s.Confidence)
             .FirstOrDefault();
 
+        // The raw fit: the scenario's Location is already Kalman-smoothed, and smoothing it twice doubles the lag
         if (kalmanSource != null)
-            device.UpdateLocation(kalmanSource.Location);
+            device.UpdateLocation(kalmanSource.Fit);
 
         // Predicted location from the updated Kalman filter (x̂ₖ|ₖ⁻¹)
         var (predictedLocation, _) = device.KalmanFilter.GetPrediction();
@@ -76,6 +80,13 @@ public static class ScenarioFusion
             .FirstOrDefault();
 
         device.BestScenario = best;
+
+        // Hold the reported floor and room until a challenger earns the switch; away starts over
+        if (best != null)
+            device.Hold.Update(best.Floor, best.Room, best.Location, now, filtering);
+        else
+            device.Hold.Reset();
+
         return new FusionResult(best, moved);
     }
 }
