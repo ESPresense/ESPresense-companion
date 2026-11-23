@@ -22,7 +22,7 @@ public class McpOptimizerTools(OptimizerDebugService service)
     public string GetOptimizerStatus() => JsonSerializer.Serialize(service.GetStatus(), Json);
 
     [McpServerTool(Name = "get_optimizer_last_cycle", ReadOnly = true)]
-    [Description("The last optimization cycle: baseline composite/R/RMSE on the held-out eval set, and per optimizer its per-node proposal (absorption, rxAdjRssi, txRefRssi), its composite/R/RMSE, and the gate decision with the numbers behind every gate (min samples, improvement, device frame with txRef held, eval snapshots lost on) and whether it was applied. Also how well the current calibration (baselineAnchors) and each proposal (anchors) fit the anchors: RMS in dB of how the nodes disagree about each anchor's level, and on how many anchors a proposal is better or worse. Report-only; no gate reads it.")]
+    [Description("The last optimization cycle: baseline composite/R/RMSE on the held-out eval set (RMSE in metres: the distance each link's RSSI implies under the calibration, against its map distance), and per optimizer its per-node proposal (absorption, rxAdjRssi, txRefRssi), its composite/R/RMSE, and the gate decision with the numbers behind every gate (min samples, improvement, device frame with txRef held, eval snapshots lost on) and whether it was applied. Also how well the current calibration (baselineAnchors) and each proposal (anchors) fit the anchors: RMS in dB of how the nodes disagree about each anchor's level, and on how many anchors a proposal is better or worse. Report-only; no gate reads it.")]
     public string GetOptimizerLastCycle()
         => service.GetLastCycle() is { } report
             ? JsonSerializer.Serialize(report, Json)

@@ -198,7 +198,7 @@ internal static class OptimizationCycle
             var s = scored[sel];
             chosen = s.Optimizer;
             chosenResults = s.Results;
-            outcome = $"{(dryRun ? "Would apply" : "Applying")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes (held-out R={s.Score.R:0.000}, RMSE={s.Score.Rmse:0.000}).";
+            outcome = $"{(dryRun ? "Would apply" : "Applying")} {s.Optimizer.Name} to {s.Results.Nodes.Count} nodes (held-out R={s.Score.R:0.000}, RMSE={s.Score.Rmse:0.000} m).";
         }
         else
         {

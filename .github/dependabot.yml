@@ -32,3 +32,7 @@ updates:
     directory: "src/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Serilog.AspNetCore 11 pulls in .NET libraries that do not support net8.0.
+      - dependency-name: "Serilog.AspNetCore"
+        versions: [">= 11.0.0, < 12.0.0"]

@@ -55,4 +55,41 @@ public class OptimizationResultsTests
         Assert.That(quantized.RxAdjRssi, Is.EqualTo(2));
         Assert.That(quantized.TxRefRssi, Is.EqualTo(-60));
     }
+
+    [Test]
+    public void Score_RmseIsInMetres_AndMovesWithATxRefShiftThatRIgnores()
+    {
+        // Three links (two would make R trivially ±1), exact RSSI under txRef=-59, n=2.7. A k dB shift of every txRef keeps Pearson R at 1.0
+        // but must move the RMSE away from 0 (issue #1868: R is blind to range bias).
+        var rx = NodeAt("rx", 0);
+        var txA = NodeAt("txA", 4.0);
+        var txB = NodeAt("txB", 9.0);
+        var txC = NodeAt("txC", 2.0);
+        static double Rssi(double d) => -59 - 10 * 2.7 * Math.Log10(d);
+        var snapshot = new OptimizationSnapshot();
+        snapshot.Measures.Add(MeasureOf(rx, txA, Rssi(4.0)));
+        snapshot.Measures.Add(MeasureOf(rx, txB, Rssi(9.0)));
+        snapshot.Measures.Add(MeasureOf(rx, txC, Rssi(2.0)));
+
+        var nss = new NodeSettingsStore(new Mock<IMqttCoordinator>().Object, Mock.Of<ILogger<NodeSettingsStore>>());
+        var exact = new OptimizationResults().Evaluate(new List<OptimizationSnapshot> { snapshot }, nss);
+        Assert.That(exact.RMSE, Is.EqualTo(0.0).Within(1e-9), "exact calibration should imply exact distances");
+
+        // Propose every txRef 6 dB hotter: predicted RSSI moves by the same 6 dB everywhere, so R stays 1.
+        var shifted = new OptimizationResults
+        {
+            Nodes = new Dictionary<string, ProposedValues>
+            {
+                ["txA"] = new() { TxRefRssi = -53 },
+                ["txB"] = new() { TxRefRssi = -53 },
+                ["txC"] = new() { TxRefRssi = -53 },
+            }
+        };
+        var eval = shifted.Evaluate(new List<OptimizationSnapshot> { snapshot }, nss);
+        // 6 dB hot at n=2.7 stretches every implied distance by 10^(6/27): the errors are that factor minus one, times 4, 9 and 2 m.
+        var stretch = Math.Pow(10, 6 / 27.0) - 1;
+        var expected = stretch * Math.Sqrt((16.0 + 81.0 + 4.0) / 3);
+        Assert.That(eval.RMSE, Is.EqualTo(expected).Within(1e-9), "RMSE is the ranging error in metres, so the long link counts most");
+        Assert.That(eval.Correlation, Is.EqualTo(1.0).Within(1e-9), "R alone is happy with the shifted calibration, which is why the RMSE has to see it");
+    }
 }
