@@ -31,16 +31,22 @@ internal class NearestNode : ILocate
             null,
             nearest == null ? [] : [new LocatorTraceNode(nearest, nearest.Node!.Location, nearest.Distance, null)],
             MaxDistance: limited ? maxDistance : null);
-        if (nearest == null) return false;
+        scenario.Minimum = nearest?.Distance;
+        scenario.Fixes = nearest == null ? 0 : 1;
+        scenario.LastHit = nearest?.LastHit;
+        if (nearest == null)
+        {
+            scenario.Confidence = 0;
+            return false;
+        }
 
         var node = nearest.Node!;
         var location = node.Location;
         scenario.UpdateLocation(location);
+        scenario.LastHit = nearest.LastHit;
 
-        // Very low confidence - this is a fallback locator
-        // Other locators with trilateration will have much higher confidence
+        // Fusion makes this eligible only when no other locator has a current position.
         scenario.Confidence = 1;
-        scenario.Fixes = 1;
 
         // A node's configured floors are the ones it helps locate on, which can include floors it
         // only hears through a ceiling, so the floor comes from where the node physically is.

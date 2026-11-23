@@ -306,4 +306,32 @@ public class NearestNodeTests
 
         Assert.That(locator.Locate(scenario), Is.True);
     }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task Locate_PreviousFallbackBecomesUnavailableWhenReadingIsRejected(bool expired)
+    {
+        (await _configLoader.ConfigAsync()).Locators.NearestNode.MaxDistance = 10;
+        var floor = CreateTestFloor("main", new[] { -5.0, -5.0, -1.0 }, new[] { 5.0, 5.0, 1.0 });
+        var node = CreateTestNode("node1", "Node 1", new Point3D(1, 1, 0), floor);
+        var device = CreateDeviceWithNode(node, 1);
+        var reading = device.Nodes[node.Id];
+        var locator = new NearestNode(device, _state);
+        var scenario = new Scenario(_configLoader.Config, locator, "Nearest");
+
+        Assert.That(locator.Locate(scenario), Is.True);
+        Assert.That(scenario.Current, Is.True);
+        Assert.That(scenario.LastHit, Is.EqualTo(reading.LastHit), "a pass must not renew the reading");
+
+        if (expired) reading.LastHit = DateTime.UtcNow.AddMinutes(-1);
+        else reading.Distance = 11;
+
+        Assert.That(locator.Locate(scenario), Is.False);
+        Assert.That(scenario.Current, Is.False);
+        Assert.That(scenario.LastHit, Is.Null);
+        Assert.That(scenario.Confidence, Is.Zero);
+        Assert.That(scenario.Minimum, Is.Null);
+        Assert.That(scenario.Fixes, Is.Zero);
+        Assert.That(scenario.Trace!.Outcome, Is.EqualTo(LocatorOutcome.NoFix));
+    }
 }

@@ -21,19 +21,20 @@ public class SparseReadingPresenceTests
     private const string DeviceId = "iBeacon:sparse";
 
     /// <summary>
-    /// One floor, one room covering it, three nodes. <paramref name="locator"/> is the only one enabled,
-    /// so nothing else covers the sparse case. timeout: 1 so one real second of staleness expires a
-    /// reading, and the scenario with it.
+    /// One floor, two rooms, three nodes. Nearest node is opt-in; node1 sits in Entry, while the
+    /// three-node solve lands in Living Room. timeout: 1 expires readings after one second.
     /// </summary>
-    private static string Yaml(string locator) => $"""
+    private static string Yaml(string locator, bool nearestNode) => $"""
         timeout: 1
         floors:
           - id: first
             name: First Floor
             bounds: [[0, 0, 0], [10, 10, 3]]
             rooms:
+              - name: Entry
+                points: [[0, 0], [2, 0], [2, 2], [0, 2]]
               - name: Living Room
-                points: [[0, 0], [10, 0], [10, 10], [0, 10]]
+                points: [[2, 0], [10, 0], [10, 10], [0, 10], [0, 2], [2, 2]]
         nodes:
           - id: node1
             point: [1, 1, 1]
@@ -56,7 +57,8 @@ public class SparseReadingPresenceTests
           nadaraya_watson:
             enabled: {locator == "nadaraya_watson"}
           nearest_node:
-            enabled: false
+            enabled: {nearestNode}
+            max_distance: 10
         """;
 
     [TestCase("multi_floor")]
@@ -154,6 +156,52 @@ public class SparseReadingPresenceTests
         Assert.That(h.Reported, Is.EqualTo(DeviceReport.NotHome), "there is no last known room to retain");
     }
 
+    [TestCase("multi_floor")]
+    [TestCase("nadaraya_watson")]
+    public async Task NearestNode_OnlyTakesOverWhenThePrimaryHasNoPosition(string locator)
+    {
+        await using var h = await Harness.StartAsync(locator, nearestNode: true);
+        // Freeze the priors to prove handoff is an eligibility rule, not a confidence/smoothing race.
+        h.Filtering.SmoothingWeight = 1;
+        await h.Heard("node1", 5.66);
+        Assert.That(h.Device.Scenarios, Has.Count.EqualTo(2));
+        var primary = h.Device.Scenarios.Single(s => !s.IsNearestNode);
+        var nearest = h.Device.Scenarios.Single(s => s.IsNearestNode);
+
+        await h.Locate();
+        Assert.That(h.Device.BestScenario, Is.SameAs(nearest), "cold start can use the explicit fallback");
+        Assert.That(h.Reported, Is.EqualTo("Entry"));
+
+        nearest.Probability = 1;
+        primary.Probability = 0;
+        await h.HeardByAllThree();
+        await h.Locate();
+        Assert.That(h.Device.BestScenario, Is.SameAs(primary), "a recovered solve immediately displaces fallback");
+        Assert.That(h.Reported, Is.EqualTo("Living Room"));
+        Assert.That(nearest.WeightedConfidence, Is.Zero, "fallback cannot influence fusion while a position exists");
+
+        primary.Probability = 1;
+        nearest.Probability = 0;
+        h.ExpireReadings();
+        await h.Heard("node1", 5.66);
+        await h.Locate();
+        Assert.That(primary.Confidence, Is.Zero);
+        Assert.That(primary.Room?.Name, Is.EqualTo("Living Room"));
+        Assert.That(h.Device.BestScenario, Is.SameAs(nearest), "fallback immediately displaces a retained room");
+        Assert.That(h.Reported, Is.EqualTo("Entry"));
+        Assert.That(primary.WeightedConfidence, Is.Zero);
+
+        await h.HeardByAllThree();
+        await h.Locate();
+        Assert.That(h.Device.BestScenario, Is.SameAs(primary));
+        Assert.That(h.Reported, Is.EqualTo("Living Room"));
+
+        h.ExpireReadings();
+        await h.Locate();
+        Assert.That(h.Reported, Is.EqualTo(DeviceReport.NotHome));
+        Assert.That(h.Device.BestScenario, Is.Null, "neither locator can extend expired readings");
+    }
+
     /// <summary>The real tracker, fusion and publisher over a config, with the state topic recorded.</summary>
     private sealed class Harness : IAsyncDisposable
     {
@@ -173,9 +221,9 @@ public class SparseReadingPresenceTests
             _locator = locator;
         }
 
-        public static async Task<Harness> StartAsync(string locator)
+        public static async Task<Harness> StartAsync(string locator, bool nearestNode = false)
         {
-            var fx = await YamlStateFixture.LoadAsync(Yaml(locator));
+            var fx = await YamlStateFixture.LoadAsync(Yaml(locator, nearestNode));
             var supervisor = new SupervisorConfigLoader(NullLogger<SupervisorConfigLoader>.Instance);
             var mqtt = new Mock<MqttCoordinator>(fx.Loader, NullLogger<MqttCoordinator>.Instance, new MqttNetLogger(), supervisor);
             var tracker = new DeviceTracker(fx.State, mqtt.Object, new TelemetryService(mqtt.Object), new GlobalEventDispatcher(),
@@ -196,6 +244,13 @@ public class SparseReadingPresenceTests
         }
 
         public Device Device => _fx.State.Devices[DeviceId];
+        public ConfigFiltering Filtering => _fx.State.Config!.Filtering;
+
+        public void ExpireReadings()
+        {
+            foreach (var reading in Device.Nodes.Values)
+                reading.LastHit = DateTime.UtcNow.AddMinutes(-1);
+        }
 
         /// <summary>The last state topic payload the publisher recorded as accepted.</summary>
         public string? Reported => _publisher.Reported(Device).State;
