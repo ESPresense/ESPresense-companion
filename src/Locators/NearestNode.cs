@@ -3,10 +3,7 @@ using ESPresense.Utils;
 
 namespace ESPresense.Locators;
 
-/// <summary>
-/// Fallback locator that uses the nearest node's location when other locators can't work.
-/// This is used when there aren't enough nodes for trilateration.
-/// </summary>
+/// <summary>Nearest-node position estimate; fusion controls fallback eligibility.</summary>
 internal class NearestNode : ILocate
 {
     private readonly Device _device;
@@ -45,7 +42,6 @@ internal class NearestNode : ILocate
         scenario.UpdateLocation(location);
         scenario.LastHit = nearest.LastHit;
 
-        // Fusion makes this eligible only when no other locator has a current position.
         scenario.Confidence = 1;
 
         // A node's configured floors are the ones it helps locate on, which can include floors it

@@ -20,11 +20,7 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
             .OrderBy(n => n.Distance)
             .ToArray();
 
-        // Before the no-fix check, the way BaseMultilateralizer.InitializeScenario does it: one node gives
-        // no fix, but the scenario still has to stay Current (see the same branch in
-        // MultiFloorMultilateralizer) or ScenarioFusion drops it from BestScenario and the device
-        // publishes not_home while a node is still hearing it. Empty heard leaves LastHit null, which is
-        // how a device that nothing hears expires for real.
+        // Refresh presence even when there are too few readings for a position.
         scenario.Minimum = heard.Min(n => (double?)n.Distance);
         scenario.LastHit = heard.Max(n => n.LastHit);
         scenario.Fixes = heard.Length;
@@ -33,10 +29,6 @@ public class NadarayaWatsonMultilateralizer(Device device, Floor floor, State st
         {
             scenario.Confidence = 0;
             scenario.Error = null;
-            // Room is left as it was, as MultiFloor leaves it: clearing it only moves the device from its
-            // room to its floor, and with every scenario degenerate the last known room is the best answer
-            // there is. Confidence 0 keeps it off the map; fusion prefers a current position or an
-            // enabled nearest-node fallback over this last-known placement.
             scenario.Trace = LocatorTrace.NoFix(floor, heard);
             return false;
         }

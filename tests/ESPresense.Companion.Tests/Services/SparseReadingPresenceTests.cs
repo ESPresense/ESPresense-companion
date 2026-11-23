@@ -9,21 +9,11 @@ using Moq;
 
 namespace ESPresense.Companion.Tests.Services;
 
-/// <summary>
-/// A device that drops to one current reading has no fix, but it is still here: a node is still
-/// hearing it. The locators that bail out early have to keep their scenario Current anyway, because
-/// ScenarioFusion only picks BestScenario from Current scenarios and a null BestScenario publishes
-/// not_home. Reported on ESPresense#2220 as devices leaving the map and coming back "at random" on a
-/// config with multi_floor as the only enabled locator.
-/// </summary>
+/// <summary>Observable fusion and presence behavior from specs/fusion.md.</summary>
 public class SparseReadingPresenceTests
 {
     private const string DeviceId = "iBeacon:sparse";
 
-    /// <summary>
-    /// One floor, two rooms, four nodes. Nearest node is opt-in; node1 sits in Entry, while the
-    /// four-node solve lands in Living Room. timeout: 1 expires readings after one second.
-    /// </summary>
     private static string Yaml(string locator, bool nearestNode) => $"""
         timeout: 1
         floors:
@@ -70,7 +60,6 @@ public class SparseReadingPresenceTests
     {
         await using var h = await Harness.StartAsync(locator);
 
-        // Four nodes hear it from the middle of the Living Room, so the locator has a fix.
         await h.HeardByAllFour();
         Assert.That(h.Device.Scenarios, Has.Count.EqualTo(1), $"only {locator} is enabled");
 
@@ -80,8 +69,7 @@ public class SparseReadingPresenceTests
         var location = scenario.Location;
         var floor = scenario.Floor;
 
-        // Three nodes stop reporting. One real second later their readings are stale and the previous
-        // solve is older than timeout, which is the point the scenario used to expire.
+        // Let the previous readings exceed timeout before refreshing node1.
         await Task.Delay(1200);
         await h.Heard("node1", 2.83);
         Assert.That(h.Device.CurrentReadings(), Has.Length.EqualTo(1), "only node1 is still current");
@@ -127,7 +115,6 @@ public class SparseReadingPresenceTests
             Assert.That(h.Device.Confidence, Is.Zero);
         }
 
-        // Nothing reports it again: every reading goes stale and the device really has left.
         await Task.Delay(1200);
         await h.Locate();
 
@@ -241,7 +228,6 @@ public class SparseReadingPresenceTests
         Assert.That(h.Reported, Is.EqualTo("Entry"));
     }
 
-    /// <summary>The real tracker, fusion and publisher over a config, with the state topic recorded.</summary>
     private sealed class Harness : IAsyncDisposable
     {
         private readonly YamlStateFixture _fx;
@@ -249,7 +235,6 @@ public class SparseReadingPresenceTests
         private readonly DeviceStatePublisher _publisher;
         private readonly MultiScenarioLocator _locator;
 
-        /// <summary>Every state topic payload published for the device, in order.</summary>
         public List<string?> States { get; } = new();
 
         private Harness(YamlStateFixture fx, DeviceTracker tracker, DeviceStatePublisher publisher, MultiScenarioLocator locator)
@@ -291,7 +276,6 @@ public class SparseReadingPresenceTests
                 reading.LastHit = DateTime.UtcNow.AddMinutes(-1);
         }
 
-        /// <summary>The last state topic payload the publisher recorded as accepted.</summary>
         public string? Reported => _publisher.Reported(Device).State;
 
         public Task Locate() => _locator.ProcessDevice(Device);

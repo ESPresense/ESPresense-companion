@@ -120,9 +120,7 @@ locators:
         sigma: 0.25
 
   nearest_node:
-    # Used only when the other enabled locators cannot produce a current position.
-    # multi_floor needs at least four current readings; below that count nearest_node takes over.
-    # It does not compete with a multi_floor position, even when that position has low confidence.
+    # Fallback behavior and reading thresholds: specs/fusion.md
     enabled: true
     max_distance: 10 # Don't fall back to a node more than 10 m from the device (leave out or 0 for no limit)
 

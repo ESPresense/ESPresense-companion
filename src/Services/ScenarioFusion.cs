@@ -7,18 +7,7 @@ namespace ESPresense.Services;
 /// <param name="Moved">How many eligible scenarios' locators reported a new position this pass.</param>
 public sealed record FusionResult(Scenario? Best, int Moved);
 
-/// <summary>
-/// Combines a device's scenarios into one answer. No MQTT, history or events: everything it
-/// touches is on the <see cref="Device"/> and its <see cref="Scenario"/>s.
-///   1. Runs every scenario's locator.
-///   2. Uses current non-nearest positions, or nearest node when none can produce a position, or
-///      retained last-known positions when no fallback is available.
-///   3. Feeds the eligible scenario with the highest raw Confidence into the device-level Kalman filter.
-///   4. Weights each eligible scenario's confidence by motion consistency (Gaussian penalty against the
-///      Kalman predicted location) and smooths per-scenario probabilities over time.
-///   5. Picks the eligible scenario with the highest smoothed probability; ties go to the higher
-///      confidence, then to the earlier scenario.
-/// </summary>
+/// <summary>Fuses eligible scenarios into one answer. Behavior and rationale: specs/fusion.md.</summary>
 public static class ScenarioFusion
 {
     public static FusionResult Update(Device device, ConfigFiltering filtering, DateTime now)
@@ -30,9 +19,7 @@ public static class ScenarioFusion
 
         var current = device.Scenarios.Where(s => s.Current).ToList();
         var candidates = current.Where(s => !s.IsNearestNode && s.Confidence > 0).ToList();
-        // Nearest node is a fallback, not a competing position estimate. Its lower confidence alone
-        // cannot enforce that: smoothed probability can keep it selected after a solve recovers, or
-        // keep a zero-confidence last-known room selected when solving stops.
+        // Eligibility precedes probability smoothing.
         if (candidates.Count == 0)
             candidates = current.Where(s => s.IsNearestNode && s.Confidence > 0).ToList();
         if (candidates.Count == 0)
