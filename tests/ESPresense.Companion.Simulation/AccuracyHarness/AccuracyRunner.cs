@@ -9,12 +9,23 @@ using ESPresense.Simulation.Tests;
 
 namespace ESPresense.Simulation.AccuracyHarness;
 
+/// <summary>
+/// Every shipped multilateralizing <see cref="ILocate"/> the harness scores.
+/// Keep this in sync with <c>src/Locators/</c>: a locator missing from here has
+/// no accuracy baseline, so the CI guard cannot fail on a change to it.
+/// <c>AnchorLocator</c> and <c>NearestNode</c> are deliberately absent —
+/// neither multilateralizes (one pins a device to a fixed point, the other
+/// reports the nearest node's own position), so a positioning-error baseline
+/// would not measure a solve.
+/// </summary>
 public enum LocatorKind
 {
     NelderMead,
     GaussNewton,
     Bfgs,
-    Mle
+    Mle,
+    MultiFloor,
+    NadarayaWatson
 }
 
 public sealed class TrackResult
@@ -194,6 +205,24 @@ public static class AccuracyRunner
         return (loc.X, loc.Y);
     }
 
+    /// <summary>
+    /// The concrete locator type a <see cref="LocatorKind"/> scores. Derived by
+    /// actually building it, so it cannot drift from <see cref="BuildContext"/>
+    /// the way a hand-maintained name map would. Used by
+    /// <see cref="LocatorCoverage"/> to prove the baseline covers every
+    /// multilateralizer in src/Locators/.
+    /// </summary>
+    public static Type LocatorTypeFor(LocatorKind kind) =>
+        BuildContext(ProbeScenario, kind).Locator.GetType();
+
+    /// <summary>Smallest scenario that builds a valid context; scored by nothing.</summary>
+    private static readonly HarnessScenario ProbeScenario = new()
+    {
+        Name = "locator-coverage-probe",
+        Bounds = new HarnessBounds { XMin = 0, YMin = 0, XMax = 2, YMax = 2 },
+        Stations = new[] { new HarnessStation { Id = "probe", X = 1, Y = 1, Z = 1 } }
+    };
+
     private sealed class SimulationContext
     {
         public Config Config { get; init; } = null!;
@@ -238,12 +267,20 @@ public static class AccuracyRunner
         var device = new Device("accuracy-harness-device", "accuracy-harness", TimeSpan.FromSeconds(30));
         state.Devices[device.Id] = device;
 
+        // The constructors are not uniform: the BaseMultilateralizer family takes
+        // (device, floor, state); MultiFloor is floor-agnostic by design and takes
+        // no floor; NadarayaWatson additionally needs the telemetry store to count
+        // online nodes for its confidence. MockNodeTelemetryStore reports every node
+        // online, which matches the harness's assumption that a station that did not
+        // report is an outage, not an offline node.
         ILocate locator = kind switch
         {
             LocatorKind.NelderMead => new NelderMeadMultilateralizer(device, floor, state),
             LocatorKind.GaussNewton => new GaussNewtonMultilateralizer(device, floor, state),
             LocatorKind.Bfgs => new BfgsMultilateralizer(device, floor, state),
             LocatorKind.Mle => new MLEMultilateralizer(device, floor, state),
+            LocatorKind.MultiFloor => new MultiFloorMultilateralizer(device, state),
+            LocatorKind.NadarayaWatson => new NadarayaWatsonMultilateralizer(device, floor, state, nodeTelemetryStore),
             _ => throw new InvalidOperationException($"Unsupported locator {kind}")
         };
 
