@@ -71,6 +71,9 @@ public class SparseReadingPresenceTests
 
         await h.Locate();
         Assert.That(h.States, Is.EqualTo(new[] { "Living Room" }), "a three-node fix puts it in the Living Room");
+        var scenario = h.Device.BestScenario!;
+        var location = scenario.Location;
+        var floor = scenario.Floor;
 
         // Two nodes stop reporting. One real second later their readings are stale and the previous
         // solve is older than timeout, which is the point the scenario used to expire.
@@ -85,11 +88,24 @@ public class SparseReadingPresenceTests
         Assert.That(h.Device.BestScenario, Is.Not.Null, "the scenario is still Current");
         Assert.That(h.Device.Confidence, Is.Zero, "one node is not a fix, so the map still hides it");
         Assert.That(h.Device.Room?.Name, Is.EqualTo("Living Room"));
+        Assert.That(scenario.Location, Is.EqualTo(location), "a sparse pass must not invent a position");
+        Assert.That(scenario.Floor, Is.SameAs(floor));
+        Assert.That(scenario.LastHit, Is.EqualTo(h.Device.Nodes["node1"].LastHit), "presence uses the reading's timestamp");
+        Assert.That(scenario.Minimum, Is.EqualTo(5.66));
+        Assert.That(scenario.Fixes, Is.EqualTo(1));
+
+        await h.HeardByAllThree();
+        await h.Locate();
+        Assert.That(h.Reported, Is.EqualTo("Living Room"));
+        Assert.That(h.Device.Confidence, Is.GreaterThan(0), "fresh readings allow a solve after a sparse pass");
+        Assert.That(scenario.Fixes, Is.EqualTo(3));
     }
 
-    [TestCase("multi_floor")]
-    [TestCase("nadaraya_watson")]
-    public async Task OneLocator_NothingHearsTheDevice_StillGoesNotHome(string locator)
+    [TestCase("multi_floor", false)]
+    [TestCase("multi_floor", true)]
+    [TestCase("nadaraya_watson", false)]
+    [TestCase("nadaraya_watson", true)]
+    public async Task OneLocator_NothingHearsTheDevice_StillGoesNotHome(string locator, bool afterSparsePass)
     {
         await using var h = await Harness.StartAsync(locator);
 
@@ -97,12 +113,45 @@ public class SparseReadingPresenceTests
         await h.Locate();
         Assert.That(h.Reported, Is.EqualTo("Living Room"));
 
+        if (afterSparsePass)
+        {
+            await Task.Delay(1200);
+            await h.Heard("node1", 5.66);
+            await h.Locate();
+            Assert.That(h.Reported, Is.EqualTo("Living Room"));
+            Assert.That(h.Device.Confidence, Is.Zero);
+        }
+
         // Nothing reports it again: every reading goes stale and the device really has left.
         await Task.Delay(1200);
         await h.Locate();
 
         Assert.That(h.Reported, Is.EqualTo(DeviceReport.NotHome));
         Assert.That(h.Device.BestScenario, Is.Null);
+        var scenario = h.Device.Scenarios.Single();
+        Assert.That(scenario.LastHit, Is.Null);
+        Assert.That(scenario.Minimum, Is.Null);
+        Assert.That(scenario.Fixes, Is.Zero);
+    }
+
+    [TestCase("multi_floor")]
+    [TestCase("nadaraya_watson")]
+    public async Task OneLocator_OneNodeWithoutPreviousFix_DoesNotInventAPlacement(string locator)
+    {
+        await using var h = await Harness.StartAsync(locator);
+        await h.Heard("node1", 5.66);
+        var scenario = h.Device.Scenarios.Single();
+        var location = scenario.Location;
+
+        await h.Locate();
+
+        Assert.That(h.Device.BestScenario, Is.SameAs(scenario), "the reading is current even without a fix");
+        Assert.That(scenario.LastHit, Is.EqualTo(h.Device.Nodes["node1"].LastHit));
+        Assert.That(scenario.Confidence, Is.Zero);
+        Assert.That(scenario.Room, Is.Null);
+        Assert.That(scenario.Floor, Is.Null);
+        Assert.That(scenario.Location, Is.EqualTo(location));
+        Assert.That(h.Reported, Is.EqualTo(DeviceReport.NotHome), "there is no last known room to retain");
     }
 
     /// <summary>The real tracker, fusion and publisher over a config, with the state topic recorded.</summary>
