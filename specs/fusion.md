@@ -23,7 +23,9 @@ jarring room changes even while a position is available.
 
 ## Scenario selection
 
-Run the configured locators, then select the first nonempty group:
+Run the configured locators. Only scenarios that have produced a position are
+eligible; a fresh reading alone does not establish a position. Select the first
+nonempty group:
 
 1. Current non-nearest scenarios with positive confidence.
 2. Current nearest-node scenarios with positive confidence.
@@ -75,10 +77,21 @@ visibility. With no previous placement, report `not_home` rather than inventing 
 
 When no readings remain current, both locators clear their reading metadata and
 become ineligible. Publish `not_home`; do not retain stale presence indefinitely.
+Queue idle tracked devices for re-evaluation regardless of confidence. A retained
+room has zero confidence, so excluding it from idle processing would leave its last
+room published forever when no further messages arrive.
+
+Publish changed `best_scenario` attributes even when the room is unchanged and no
+eligible locator moved. A stationary handoff must not leave the previous scenario
+advertised in retained MQTT attributes.
 
 ## Filtering and accuracy
 
 The highest-confidence eligible scenario supplies the device Kalman measurement.
+Track whether a scenario has produced a position explicitly: the origin can be a
+real position, and confidence zero can accompany an established placement. A sparse
+cold start must not seed the filter with the default origin and pull the first real
+positions toward a point never measured.
 Motion consistency weights eligible confidence before probability smoothing.
 The Kalman measurement noise starts from configuration and increases for implausible
 movement. Reported room and floor come from the selected scenario, while device
@@ -105,3 +118,7 @@ of unused fallback measurements and movement.
 checks reading timestamps, expiry, and distance rejection.
 [MultiFloorMultilateralizerTests](../tests/ESPresense.Companion.Tests/Locators/MultiFloorMultilateralizerTests.cs)
 checks that zero to three readings preserve placement without producing a new fix.
+[DeviceTrackerTests](../tests/ESPresense.Companion.Tests/DeviceTrackerTests.cs)
+checks idle scheduling at zero confidence, and
+[DeviceStatePublisherTests](../tests/ESPresense.Companion.Tests/Services/DeviceStatePublisherTests.cs)
+checks that a stationary same-room handoff updates retained scenario attributes.

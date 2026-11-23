@@ -137,13 +137,19 @@ public class SparseReadingPresenceTests
 
         await h.Locate();
 
-        Assert.That(h.Device.BestScenario, Is.SameAs(scenario), "the reading is current even without a fix");
+        Assert.That(scenario.Current, Is.True, "the reading is current even without a fix");
+        Assert.That(h.Device.BestScenario, Is.Null, "a never-placed scenario is not a position estimate");
         Assert.That(scenario.LastHit, Is.EqualTo(h.Device.Nodes["node1"].LastHit));
         Assert.That(scenario.Confidence, Is.Zero);
         Assert.That(scenario.Room, Is.Null);
         Assert.That(scenario.Floor, Is.Null);
         Assert.That(scenario.Location, Is.EqualTo(location));
         Assert.That(h.Reported, Is.EqualTo(DeviceReport.NotHome), "there is no last known room to retain");
+
+        await h.HeardByAllFour();
+        await h.Locate();
+        Assert.That(h.Device.KalmanFilter.Location, Is.EqualTo(h.Device.BestScenario!.Location),
+            "the first real measurement must seed the device filter without a default-origin prior");
     }
 
     [TestCase("multi_floor")]

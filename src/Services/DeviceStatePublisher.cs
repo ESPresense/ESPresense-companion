@@ -27,7 +27,7 @@ public interface IDeviceStatePublisher
     /// <list type="bullet">
     /// <item>The state is sent when it differs from the last state the broker accepted.</item>
     /// <item>The attributes are sent when the report has a location and
-    /// <paramref name="locationChanged"/>, the state changed, or the last attributes publish failed.</item>
+    /// <paramref name="locationChanged"/>, the state or best scenario changed, or the last attributes publish failed.</item>
     /// </list>
     /// </summary>
     /// <param name="locationChanged">The caller's view that the position moved since it was last reported.</param>
@@ -63,7 +63,7 @@ public class DeviceStatePublisher(IMqttCoordinator mqtt) : IDeviceStatePublisher
             last = Remember(device, last with { State = report.State, PreviousState = last.State, StateChanged = DateTime.UtcNow });
 
         var attributes = report.AttributesJson();
-        if (attributes == null || !(locationChanged || stateChanged || last.AttributesPending))
+        if (attributes == null || !(locationChanged || stateChanged || last.AttributesPending || report.BestScenario != last.BestScenario))
             return false;
 
         var sent = await mqtt.TryEnqueueAsync(MqttTopics.DeviceAttributes(device.Id), attributes, retain: true);

@@ -17,7 +17,7 @@ public static class ScenarioFusion
             .Select(s => (Scenario: s, Moved: s.Locate()))
             .ToArray();
 
-        var current = device.Scenarios.Where(s => s.Current).ToList();
+        var current = device.Scenarios.Where(s => s.Current && s.HasPosition).ToList();
         var candidates = current.Where(s => !s.IsNearestNode && s.Confidence > 0).ToList();
         // Eligibility precedes probability smoothing.
         if (candidates.Count == 0)
