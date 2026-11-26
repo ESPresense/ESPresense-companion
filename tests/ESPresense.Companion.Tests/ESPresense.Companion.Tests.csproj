@@ -24,6 +24,7 @@
   <ItemGroup>
     <EmbeddedResource Include="TestData\stationary.jsonp" />
     <None Include="TestData\robot-survey\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="TestData\room-flip-2220\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
